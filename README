@@ -1,0 +1,200 @@
+= Developing for snd-fireworks=
+
+2012/02/28 坂本 貴史
+Takashi Sakamoto <o-takashi@sakamocchi.jp>
+
+== General ==
+
+This is a device driver utilizing Advanced Linux Sound Architecture (ALSA) and Linux
+Firewire Subsystem (so called "juju"). This is an sound device driver for Echo Audio's
+firewire audio interface called as "fireworks(TM)".
+
+There is a project in user land, "FFADO".
+http://www.ffado.org/
+
+My aim is migration of the similar functions which FFADO did into kernel land.
+
+I test this code with AudioFirePre8.
+http://echoaudio.com/products/audiofire-pre8
+
+== Original source codes and strategy==
+The original source code was developed by Clemens Ladish in 2010. You can see
+it in alsa-kprivate.git repository.
+http://git.alsa-project.org/?p=alsa-kprivate.git;a=shortlog;h=refs/heads/fireworks
+
+It has some restriction below:
+1.It cannot get and set device status
+2.It utilizes few code in snd-firewire-lib.ko
+
+1.For this function, snd-fireworks need to speak Device-Dependent AV/C Commands but
+it can't speak it. With this command, below status is changeable:
+	- sampling rate, clock source, digital I/O mode, SPDIF format
+	- inner I/O routing, gain, pan, solo, mute, nominal
+	- save and load session state
+	- download and upload DSP firmware
+
+Without this function, snd-fireworks can play and capture 44.1kHz with internal
+clock source
+
+In the beginning of my developing, I work for implementation of this function with ALSA's
+control component. With this implementation, users can change device's status with
+alsa-lib control/hcontrol/mixer API.
+
+2.snd-firewire-lib.ko was developed by Clemens Ladish. Before developing it, He worked
+with snd-fireworks. After merging snd-firewire-lib.ko into upstream, he didn't touch
+snd-fireworks. Then snd-fireworks has some duplicate codes.
+
+In the middle of my developing, I work for removing duplicate codes from snd-fireworks and
+in the last, I commit some patches for snd-firewire.ko for lack of functions like cmp of
+oMPR/oPCR and receiving AMDTP, MIDI handling.
+
+
+== current status ==
+
+For device control:
+1. get/set sampling rate, clock source, digital I/O mode, digital I/O format via alsamixer
+2. get physical metering and internal monitoring via procfs
+3. playback PCM samples with any sampling rate (with bug, just second channel is available...)
+4. playback MIDI sequences
+
+
+== easy instraction with DKMS ==
+
+DKMS - Dynamic Kernel Module Support is easy for installing or updating external modules.
+http://linux.dell.com/dkms/
+
+You should create new directory named "alsa-firewire-3.9" in the directory which your
+system DKMS setting indicate. The path is "/usr/src" in my Ubuntu rootfs.
+("3.9" just means for Linux 3.9)
+
+Then follow usual DKMS steps, for example:
+ sudo dkms add -m alsa-firewire -v 3.9
+ sudo dkms build -m alsa-firewire -v 3.9
+ sudo dkms install -m alsa-firewire -v 3.9
+ sudo dkms remove -m alsa-firewire -v 3.9 --all
+
+Of cource, you should install dkms package in advance. For example, in Ubuntu system:
+sudo apt-get install dkms
+
+
+= snd-fireworks.koの開発 =
+
+2012/02/17 坂本 貴史
+Takashi Sakamoto <o-takashi@sakamocchi.jp>
+
+== 概要 ==
+
+このソフトウェアは、LinuxのAdvanced Linux Sound Architecture（ALSA）とFirewireサブシステ
+ムを利用したデバイスドライバーです。Echo社のFireworksを採用したFirewireオーディオインター
+フェイスのためのサウンドドライバーとなります。
+
+この装置のユーザー空間ドライバーは存在しています。FFADOです。
+http://www.ffado.org/
+
+FFADOプロジェクトがこの装置に対して実現していることを、ALSAの諸機能を用いてカーネル空間に
+持ち込むことが、この開発の目的です。
+
+== オリジナルソースと開発方針  ==
+
+オリジナルのソースは、alsa-kprivateリポジトリのfireworksブランチにあります。
+このブランチは、Clemens Ladischが2010年にコミットしたものです。
+http://git.alsa-project.org/?p=alsa-kprivate.git;a=shortlog;h=refs/heads/fireworks
+
+fireworksブランチのsnd-fireworksには以下の制約があります。
+1.装置の挙動を変更できない
+2.snd-firewire-lib.koに含まれる機能をあまり使ってない
+
+1.fireworksを採用した装置の挙動を変えるには、Vendor DependentなAV/Cコマンドを実装する必要
+があります。オリジナルのsnd-fireworksはこの機能を含んでいませんでした。この機能を使うと、
+以下の変更が可能となります。
+	装置の標本化周波数、動作クロック源、デジタル入出力モード、S/PDIFフォーマット
+	装置の入出力ルーティング、ゲイン、パニング、ソロ、ミュート
+	装置のセッション情報の保存、復元
+	装置のファームウェアのダウンロード、アップロード
+
+この機能が実装されていないため、標本化周波数44100Hzでの再生・録音のみのサポートでした。
+
+この開発の初期段階は、この機能をALSAのコントロールコンポーネントとともに実装することです。
+ユーザーが、ALSAのコントロールインターフェイスを通じ、装置の挙動を変更できるようにします。
+
+2.snd-firewire-lib.koはClemens Ladischが書いたものです。彼はまず、fireworksブランチでsnd-
+fireworks.koを書き上げ、その成果から、他のドライバでも再利用できるコードを集めてこのsnd-f
+irewire-lib.koを書きました。snd-firewire-lib.koがマージされて以降、firewireブランチは更新
+されていません。そのため、snd-fireworks.koはsnd-firewire-lib.koの機能を使っていません。
+
+Linux3.8-rc3時点で、snd-firewire-lib.koは、装置にPCMデータを送る機能しか持っていません。
+MIDIや装置からデータを取得する機能を実装するため、snd-fireworks.koは、snd-firewire-lib.ko
+と重複するコードを含んでいました。
+
+この開発の中期段階は、snd-firewire-lib.koとの重複コードをなくすことです。そしてsnd-firewi
+re-lib.koにデータ受信機能とMIDI処理を実装することが、この開発の最終段階となります。その
+作業は、ALSAのメインラインにマージしてもらえるような修正パッチをコミットすることになる
+でしょう。
+
+== インストール ==
+
+私が開発に用いているカーネルは、Linux3.8-rc3です。
+
+私はAudioFirePre8を使って開発をしており、それ以外のデバイスがちゃんと動くかどうかは確認し
+ていません。下記の「ハードウェアの基本情報」を教えていただけると助かります。
+
+procfsが有効なカーネルでは、AV/Cコマンドの受信内容の一部を出力できます。
+（以下、「X」はALSAが装置に割り振ったカード番号）
+	ハードウェアの基本情報
+		/proc/asound/cardX/efc_hardware
+	現在の標本化周波数とクロック源
+		/proc/asound/cardX/efc_clock
+	現在のハードウェアメーター（装置への入出力の大きさ）
+		/proc/asound/cardX/efc_meters
+	現在の入出力設定（ゲインなど）
+		/proc/asound/cardX/efc_mixer
+	現在の内部ルーティング（装置への入力と出力のルーティング）
+		/proc/asound/cardX/efc_monitor
+
+
+== いまできること ==
+
+1.PCM再生
+装置によりますが、標本化周波数32.0kHz〜192.0kHzでの再生が可能です。
+装置によりますが、クロックソースはどれでも使えます。
+装置の制約があり、チャンネル数は以下のようになります。
+	 48.0kHz以下 アナログ入出力8chずつ、デジタル入出力8chずつ
+	 96.0kHz以下 アナログ入出力8chずつ、デジタル入出力4chずつ
+	192.0kHz以下 アナログ入出力8chずつ、デジタル入出力2chずつ
+
+ただし、バグがあるためどのモードで再生しても2チャンネル目しか装置から出力されません。	
+ドライバーがAMDTPの処理を適切に行えないことに原因があります。
+
+2.MIDIの入力・出力。
+まだ実装されていません。
+
+3.alsamixerやamixerを使い、装置の挙動の一部を変更可能
+現在、標本化周波数、クロック源、デジタル出力モード、S/PDIFフォーマットを変更できます。
+入出力ルーティングは未実装です。
+
+4.procfsでの装置情報の取得
+ハードウェア情報、入出力ルーティング、入出力モニター、入出力ミキサー、クロック情報を出
+力することができます。
+
+
+== DKMSを使った簡単な導入 ==
+
+DKMS - Dynamic Kernel Module Supportはカーネルモジュールのインストールやアップデートを
+簡単にする便利な仕組みです。
+
+http://linux.dell.com/dkms/
+
+初めに、alsa-firewire-3.9というディレクトリを、システムのDKMSがデフォルトのソースディ
+レクトリに使うディレクトリに作成し、ソース一式を入れて下さい。Ubuntuのルートファイルシ
+ステムであれば、/usr/srcになります。
+(3.9はただLinux 3.9を指しているだけ)
+
+作成したら、DKMSの通常のステップを踏みます。例えば以下です。
+ sudo dkms add -m alsa-firewire -v 3.9
+ sudo dkms build -m alsa-firewire -v 3.9
+ sudo dkms install -m alsa-firewire -v 3.9
+ sudo dkms remove -m alsa-firewire -v 3.9 --all
+
+もちろん、あらかじめシステムにDKMSパッケージをインストールしておいて下さい。例えばUbuntu
+であれば、端末で以下を実行します。
+ sudo apt-get install dkms
