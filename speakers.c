@@ -723,7 +723,7 @@ static int fwspk_probe(struct device *unit_dev)
 		goto err_unit;
 	}
 
-	err = cmp_connection_init(&fwspk->connection, unit, 0);
+	err = cmp_connection_init(&fwspk->connection, unit, CMP_INPUT, 0);
 	if (err < 0)
 		goto err_unit;
 
