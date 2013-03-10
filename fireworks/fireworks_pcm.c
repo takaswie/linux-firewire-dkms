@@ -64,7 +64,6 @@ static int
 pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_efw_t *efw = substream->private_data;
-	struct amdtp_out_stream *opposite_strm;
 	int sampling_rate;
 	int err;
 
@@ -76,16 +75,15 @@ pcm_open(struct snd_pcm_substream *substream)
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
 		substream->runtime->hw.channels_min = efw->pcm_playback_channels;
 		substream->runtime->hw.channels_max = efw->pcm_playback_channels;
-		opposite_strm = &efw->receive_stream;
 	} else {
 		substream->runtime->hw.formats |= SNDRV_PCM_FMTBIT_S24_BE;
 		substream->runtime->hw.channels_min = efw->pcm_capture_channels;
 		substream->runtime->hw.channels_max = efw->pcm_capture_channels;
-		opposite_strm = &efw->transmit_stream;
 	}
 
 	/* the same sampling rate must be used for transmit and receive stream */
-	if (!IS_ERR(opposite_strm->context)) {
+	if (!IS_ERR(&efw->transmit_stream.strm) ||
+	    !IS_ERR(&efw->receive_stream.strm)) {
 		err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
 		if (err < 0)
 			goto end;
@@ -110,7 +108,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *hw_params)
 {
 	struct snd_efw_t *efw = substream->private_data;
-	struct amdtp_out_stream *strm;
+	struct snd_efw_stream_t *stream;
 	int midi_count;
 	int err;
 
@@ -120,16 +118,9 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	if (err < 0)
 		goto end;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		strm = &efw->transmit_stream;
-		midi_count = efw->midi_output_count;
-	} else {
-		strm = &efw->receive_stream;
-		midi_count = efw->midi_input_count;
-	}
-
 	/* set sampling rate if fw isochronous stream is not running */
-	if (!!IS_ERR(strm->context)) {
+	if (!!IS_ERR(efw->transmit_stream.strm.context) ||
+	    !!IS_ERR(efw->receive_stream.strm.context)) {
 		err = snd_efw_command_set_sampling_rate(efw,
 					params_rate(hw_params));
 		if (err < 0)
@@ -138,11 +129,19 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 					efw->control_id_sampling_rate);
 	}
 
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
+		stream = &efw->transmit_stream;
+		midi_count = efw->midi_output_count;
+	} else {
+		stream = &efw->receive_stream;
+		midi_count = efw->midi_input_count;
+	}
+
 	/* set AMDTP parameters for transmit stream */
-	amdtp_out_stream_set_rate(strm, params_rate(hw_params));
-	amdtp_out_stream_set_pcm(strm, params_channels(hw_params));
-	amdtp_out_stream_set_pcm_format(strm, params_format(hw_params));
-	amdtp_out_stream_set_midi(strm, midi_count);
+	amdtp_out_stream_set_rate(&stream->strm, params_rate(hw_params));
+	amdtp_out_stream_set_pcm(&stream->strm, params_channels(hw_params));
+	amdtp_out_stream_set_pcm_format(&stream->strm, params_format(hw_params));
+	amdtp_out_stream_set_midi(&stream->strm, midi_count);
 end:
 	return err;
 }
@@ -151,36 +150,17 @@ static int
 pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_efw_t *efw = substream->private_data;
-	struct cmp_connection *conn;
-	struct amdtp_out_stream *strm;
-	bool *pcm_running;
-	unsigned long *midi_running;
+	struct snd_efw_stream_t *stream;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		conn = &efw->input_connection;
-		strm = &efw->transmit_stream;
-		pcm_running = &efw->pcm_transmit_running;
-		midi_running = &efw->midi_transmit_running;
-	} else {
-		conn = &efw->output_connection;
-		strm = &efw->receive_stream;
-		pcm_running = &efw->pcm_receive_running;
-		midi_running = &efw->midi_receive_running;
-	}
-
-	/* fw isochronous stream is not run */
-	if (!!IS_ERR(strm->context))
-		goto end;
-	/* midi stream still needs fw isochronous stream */
-	else if (*midi_running > 0)
-		goto end;
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		stream = &efw->transmit_stream;
+	else
+		stream = &efw->receive_stream;
 
 	/* stop fw isochronous stream of AMDTP with CMP */
-	amdtp_out_stream_stop(strm);
-	cmp_connection_break(conn);
-	*pcm_running = false;
+	snd_efw_stream_stop(stream);
+	stream->pcm = false;
 
-end:
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
 
@@ -188,47 +168,22 @@ static int
 pcm_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_efw_t *efw = substream->private_data;
-	struct cmp_connection *conn;
-	struct amdtp_out_stream *strm;
-	bool *running;
+	struct snd_efw_stream_t *stream;
 	int err = 0;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		conn = &efw->input_connection;
-		strm = &efw->transmit_stream;
-		running = &efw->pcm_transmit_running;
-	}
-	else {
-		conn = &efw->output_connection;
-		strm = &efw->receive_stream;
-		running = &efw->pcm_receive_running;
-	}
+	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
+		stream = &efw->transmit_stream;
+	else
+		stream = &efw->receive_stream;
 
-	/* start fw isochronous stream of AMDTP with CMP
-	 *
-	 * TODO:
-	 * when capturing, instead of amdtp_stream_get_max_payload()
-	 * I hope to pass cmp_outgoing_bandwidth_units() here.
-	 * But need to change some function inner iso-resources.c.
-	 *
-	 */
-	if (!!IS_ERR(strm->context)) {
-		err = cmp_connection_establish(conn,
-			amdtp_out_stream_get_max_payload(strm));
-		if (err < 0)
-			goto end;
-
-		err = amdtp_out_stream_start(strm,
-				conn->resources.channel,
-				conn->speed);
-		if (err < 0)
-			goto end;
-
-		*running = true;
-	}
+	/* start stream */
+	err = snd_efw_stream_start(stream);
+	if (err < 0)
+		goto end;
+	stream->pcm = true;
 
 	/* initialize buffer pointer */
-	amdtp_out_stream_pcm_prepare(strm);
+	amdtp_out_stream_pcm_prepare(&stream->strm);
 
 end:
 	return err;
@@ -252,9 +207,9 @@ pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	}
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		amdtp_out_stream_pcm_trigger(&efw->transmit_stream, pcm);
+		amdtp_out_stream_pcm_trigger(&efw->transmit_stream.strm, pcm);
 	else
-		amdtp_out_stream_pcm_trigger(&efw->receive_stream, pcm);
+		amdtp_out_stream_pcm_trigger(&efw->receive_stream.strm, pcm);
 
 	return 0;
 }
@@ -264,9 +219,9 @@ static snd_pcm_uframes_t pcm_pointer(struct snd_pcm_substream *substream)
 	struct snd_efw_t *efw = substream->private_data;
 
 	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		return amdtp_out_stream_pcm_pointer(&efw->transmit_stream);
+		return amdtp_out_stream_pcm_pointer(&efw->transmit_stream.strm);
 	else
-		return amdtp_out_stream_pcm_pointer(&efw->receive_stream);
+		return amdtp_out_stream_pcm_pointer(&efw->receive_stream.strm);
 }
 
 static struct snd_pcm_ops pcm_playback_ops = {
@@ -307,32 +262,16 @@ int snd_efw_create_pcm_devices(struct snd_efw_t *efw)
 	snprintf(pcm->name, sizeof(pcm->name), "%s PCM", efw->card->shortname);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &pcm_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &pcm_capture_ops);
-	efw->pcm_playback_substream =
-			pcm->streams[SNDRV_PCM_STREAM_PLAYBACK].substream;
-	efw->pcm_capture_substream =
-			pcm->streams[SNDRV_PCM_STREAM_CAPTURE].substream;
 
 	/* for host transmit and target input */
-	err = cmp_connection_init(&efw->input_connection, efw->unit,
-					CMP_INPUT, 0);
+	err = snd_efw_stream_init(efw, &efw->transmit_stream);
 	if (err < 0)
 		goto end;
-	err = amdtp_out_stream_init(&efw->transmit_stream, efw->unit,
-					CIP_NONBLOCKING);
-	if (err < 0) {
-		cmp_connection_destroy(&efw->input_connection);
-		goto end;
-	}
 
-	/* for target output and host receive */
-	err = cmp_connection_init(&efw->output_connection, efw->unit,
-					CMP_OUTPUT, 0);
-	if (err < 0)
-		goto end;
-	err = amdtp_out_stream_init(&efw->receive_stream, efw->unit,
-					CIP_NONBLOCKING);
+	/* for host receive and target output */
+	err = snd_efw_stream_init(efw, &efw->receive_stream);
 	if (err < 0) {
-		cmp_connection_destroy(&efw->output_connection);
+		snd_efw_stream_destroy(&efw->transmit_stream);
 		goto end;
 	}
 
@@ -342,11 +281,13 @@ end:
 
 void snd_efw_destroy_pcm_devices(struct snd_efw_t *efw)
 {
-	amdtp_out_stream_pcm_abort(&efw->transmit_stream);
-	amdtp_out_stream_stop(&efw->transmit_stream);
+	amdtp_out_stream_pcm_abort(&efw->transmit_stream.strm);
+	amdtp_out_stream_stop(&efw->transmit_stream.strm);
+	snd_efw_stream_destroy(&efw->transmit_stream);
 
-	cmp_connection_break(&efw->input_connection);
-	cmp_connection_destroy(&efw->input_connection);
+	amdtp_out_stream_pcm_abort(&efw->receive_stream.strm);
+	amdtp_out_stream_stop(&efw->receive_stream.strm);
+	snd_efw_stream_destroy(&efw->receive_stream);
 
 	return;
 }

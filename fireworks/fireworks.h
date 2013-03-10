@@ -70,19 +70,25 @@ struct snd_efw_phys_group_t {
 	u8 count;
 } __attribute__((packed));
 
+/* for IEC61883-1 and -6 stream */
+struct snd_efw_stream_t {
+	struct cmp_connection conn;
+	struct amdtp_out_stream strm;
+	bool pcm;
+	bool midi;
+};
+
 struct snd_efw_t {
 	struct snd_card *card;
 	struct fw_device *device;
 	struct fw_unit *unit;
 	int card_index;
-	bool disconnect;
 
 	struct mutex mutex;
 	spinlock_t lock;
 
+	/* for EFC */
 	unsigned int sequence_number;
-
-	unsigned int syt_interval;
 
 	/* capabilities */
 	unsigned int supported_sampling_rate;
@@ -107,6 +113,7 @@ struct snd_efw_t {
 	unsigned int mixer_output_channels;
 	unsigned int mixer_input_channels;
 
+	/* MIDI output */
 	unsigned int midi_output_count;
 	struct {
 		struct snd_rawmidi_substream *substream;
@@ -114,37 +121,26 @@ struct snd_efw_t {
 		int fifo_max;
 	} midi_outputs[MAX_MIDI_OUTPUTS];
 
+	/* MIDI input */
 	unsigned int midi_input_count;
 	struct snd_rawmidi_substream *midi_inputs[MAX_MIDI_INPUTS];
 
 	/* PCM playback */
 	unsigned int pcm_playback_channels;
 	unsigned int pcm_playback_channels_sets[SND_EFW_MUITIPLIER_MODES];
-	unsigned int pcm_playback_period_pos;
-	unsigned int pcm_playback_buffer_pos;
-	struct snd_pcm_substream *pcm_playback_substream;
 
 	/* PCM capture */
 	unsigned int pcm_capture_channels;
 	unsigned int pcm_capture_channels_sets[SND_EFW_MUITIPLIER_MODES];
-	unsigned int pcm_capture_period_pos;
-	unsigned int pcm_capture_buffer_pos;
-	struct snd_pcm_substream *pcm_capture_substream;
 
 	/* notification to control components */
 	struct snd_ctl_elem_id *control_id_sampling_rate;
 	struct snd_ctl_elem_id *control_id_clock_source;
 
-	/* connection management procedure */
-	struct cmp_connection output_connection;
-	struct cmp_connection input_connection;
-
 	/* audio and music data transmittion protocol */
-	struct amdtp_out_stream transmit_stream;
-	bool pcm_transmit_running;
+	struct snd_efw_stream_t transmit_stream;
 	unsigned long midi_transmit_running;
-	struct amdtp_out_stream receive_stream;
-	bool pcm_receive_running;
+	struct snd_efw_stream_t receive_stream;
 	unsigned long midi_receive_running;
 };
 
@@ -219,11 +215,8 @@ enum snd_efw_iec60958_format_t {
 	SND_EFW_IEC60958_FORMAT_PROFESSIONAL	= 1
 };
 
-#define PLAYBACK_CHANNEL 17 /* XXX */
-#define CAPTURE_CHANNEL 23 /* XXX */
-
 /* Echo Fireworks Command functions */
-/* phys_in/phys_out/playback/capture/monitor category commands */
+/* for phys_in/phys_out/playback/capture/monitor category commands */
 enum snd_efw_mixer_cmd_t {
 	SND_EFW_MIXER_SET_GAIN		= 0,
 	SND_EFW_MIXER_GET_GAIN		= 1,
@@ -254,27 +247,11 @@ int snd_efw_command_phys_out(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd
 int snd_efw_command_capture(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
 int snd_efw_command_phys_in(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
 
-/* cmp functions */
-int cmp_outgoing_bandwidth_units(int opcr, int speed);
-int cmp_connection_init(struct cmp_connection *c,
-			struct fw_unit *unit,
-			enum cmp_direction direction,
-			unsigned int pcr_index);
-void cmp_connection_destroy(struct cmp_connection *c);
-int cmp_connection_establish(struct cmp_connection *c,
-			unsigned int max_payload_bytes);
-int cmp_connection_update(struct cmp_connection *c);
-void cmp_connection_break(struct cmp_connection *c);
-
-/* amdtp functions */
-int snd_efw_amdtp_transmit_start(struct snd_efw_t *efw);
-void snd_efw_amdtp_transmit_stop(struct snd_efw_t *efw);
-int snd_efw_amdtp_transmit_open(struct snd_efw_t *efw);
-void snd_efw_amdtp_transmit_close(struct snd_efw_t *efw);
-int snd_efw_amdtp_receive_start(struct snd_efw_t *efw);
-void snd_efw_amdtp_receive_stop(struct snd_efw_t *efw);
-int snd_efw_amdtp_receive_open(struct snd_efw_t *efw);
-void snd_efw_amdtp_receive_close(struct snd_efw_t *efw);
+/* for AMDTP stream and CMP */
+int snd_efw_stream_init(struct snd_efw_t *efw, struct snd_efw_stream_t *stream);
+int snd_efw_stream_start(struct snd_efw_stream_t *stream);
+void snd_efw_stream_stop(struct snd_efw_stream_t *stream);
+void snd_efw_stream_destroy(struct snd_efw_stream_t *stream);
 
 /* for procfs subsystem */
 void snd_efw_proc_init(struct snd_efw_t *efw);

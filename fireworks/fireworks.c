@@ -32,7 +32,7 @@ MODULE_PARM_DESC(index, "card index");
 module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string");
 module_param_array(enable, bool, NULL, 0444);
-MODULE_PARM_DESC(enable, "enable card");
+MODULE_PARM_DESC(enable, "enable Fireworks sound card");
 
 static DEFINE_MUTEX(devices_mutex);
 static unsigned int devices_used;
@@ -200,24 +200,22 @@ snd_efw_update(struct fw_unit *unit)
 	fcp_bus_reset(efw->unit);
 
 	/* bus reset for isochronous transmit stream */
-	if (cmp_connection_update(&efw->output_connection) < 0) {
-		amdtp_out_stream_pcm_abort(&efw->receive_stream);
+	if (cmp_connection_update(&efw->receive_stream.conn) < 0) {
+		amdtp_out_stream_pcm_abort(&efw->receive_stream.strm);
 		mutex_lock(&efw->mutex);
-		amdtp_out_stream_stop(&efw->receive_stream);
-		cmp_connection_break(&efw->output_connection);
+		snd_efw_stream_stop(&efw->receive_stream);
 		mutex_unlock(&efw->mutex);
 	}
-	amdtp_out_stream_update(&efw->receive_stream);
+	amdtp_out_stream_update(&efw->receive_stream.strm);
 
 	/* bus reset for isochronous receive stream */
-	if (cmp_connection_update(&efw->input_connection) < 0) {
-		amdtp_out_stream_pcm_abort(&efw->transmit_stream);
+	if (cmp_connection_update(&efw->transmit_stream.conn) < 0) {
+		amdtp_out_stream_pcm_abort(&efw->transmit_stream.strm);
 		mutex_lock(&efw->mutex);
-		amdtp_out_stream_stop(&efw->transmit_stream);
-		cmp_connection_break(&efw->input_connection);
+		snd_efw_stream_stop(&efw->transmit_stream);
 		mutex_unlock(&efw->mutex);
 	}
-	amdtp_out_stream_update(&efw->transmit_stream);
+	amdtp_out_stream_update(&efw->transmit_stream.strm);
 
 	return;
 }
@@ -370,10 +368,9 @@ static int snd_efw_remove(struct device *dev)
 
 	snd_efw_destroy_pcm_devices(efw);
 
-	efw->disconnect = true;
 	snd_card_disconnect(card);
-
 	snd_card_free_when_closed(card);
+
 	return 0;
 }
 

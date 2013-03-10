@@ -21,66 +21,79 @@
 #define MIDI_FIFO_SIZE 4096
 
 static int
-midi_output_open(struct snd_rawmidi_substream *substream)
+midi_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw_t *efw = substream->rmidi->private_data;
+	struct snd_efw_stream_t *stream;
 	int err;
 
-	if (!!IS_ERR(efw->transmit_stream.context))
-		goto running;
+	if (substream->stream == SNDRV_RAWMIDI_STREAM_OUTPUT)
+		stream = &efw->transmit_stream;
+	else
+		stream = &efw->receive_stream;
 
-	err = cmp_connection_establish(&efw->input_connection,
-		amdtp_out_stream_get_max_payload(&efw->transmit_stream));
+	/* midi is already transferred */
+	if (stream->midi) {
+		err = 0;
+		goto end;
+	}
+
+	/* start stream */
+	err = snd_efw_stream_start(stream);
 	if (err < 0)
-		goto err_conn;
+		goto end;
 
-	err = amdtp_out_stream_start(&efw->transmit_stream,
-			efw->input_connection.resources.channel,
-			efw->input_connection.speed);
-	if (err < 0)
-		goto err_strm;
+	/* midi is transferred */
+	stream->midi = true;
 
-running:
-	efw->midi_transmit_running = true;
-	return 0;
-
-err_strm:
-	cmp_connection_break(&efw->input_connection);
-err_conn:
+end:
 	return err;
 }
 
 static int
-midi_output_close(struct snd_rawmidi_substream *substream)
+midi_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw_t *efw = substream->rmidi->private_data;
+	struct snd_efw_stream_t *stream;
 
-	if (efw->pcm_transmit_running ||
-	    !!IS_ERR(efw->transmit_stream.context))
+	if (substream->stream == SNDRV_RAWMIDI_STREAM_OUTPUT)
+		stream = &efw->transmit_stream;
+	else
+		stream = &efw->receive_stream;
+
+	/* midi is already transferred */
+	if (!stream->midi)
 		goto end;
 
-	amdtp_out_stream_stop(&efw->transmit_stream);
-	cmp_connection_break(&efw->input_connection);
+	/* stop stream */
+	snd_efw_stream_stop(&efw->receive_stream);
+
+	/* midi is not transferred */
+	stream->midi = false;
 
 end:
-	efw->midi_transmit_running = false;
 	return 0;
 }
 
 static void
-midi_output_trigger(struct snd_rawmidi_substream *substream, int up)
+midi_trigger(struct snd_rawmidi_substream *substream, int up)
 {
 	struct snd_efw_t *efw = substream->rmidi->private_data;
+	unsigned long *midi_running;
 	unsigned long flags;
 
 	spin_lock_irqsave(&efw->lock, flags);
 
-	if (up)
-		__set_bit(substream->number,
-				&efw->midi_transmit_running);
+	if (substream->stream == SNDRV_RAWMIDI_STREAM_OUTPUT)
+		midi_running = &efw->midi_transmit_running;
 	else
-		__clear_bit(substream->number,
-				&efw->midi_transmit_running);
+		midi_running = &efw->midi_receive_running;
+
+	/* TODO: MIDI is not transferred yet... */
+	if (up)
+		__set_bit(substream->number, midi_running);
+	else
+		__clear_bit(substream->number, midi_running);
 
 	spin_unlock_irqrestore(&efw->lock, flags);
 
@@ -88,7 +101,7 @@ midi_output_trigger(struct snd_rawmidi_substream *substream, int up)
 }
 
 static void
-midi_output_drain(struct snd_rawmidi_substream *substream)
+midi_drain(struct snd_rawmidi_substream *substream)
 {
 	/* FIXME: magic */
 	msleep(4 + 1);
@@ -96,84 +109,16 @@ midi_output_drain(struct snd_rawmidi_substream *substream)
 }
 
 static struct snd_rawmidi_ops midi_output_ops = {
-	.open		= midi_output_open,
-	.close		= midi_output_close,
-	.trigger	= midi_output_trigger,
-	.drain		= midi_output_drain,
+	.open		= midi_open,
+	.close		= midi_close,
+	.trigger	= midi_trigger,
+	.drain		= midi_drain,
 };
 
-static int
-midi_input_open(struct snd_rawmidi_substream *substream)
-{
-	struct snd_efw_t *efw = substream->rmidi->private_data;
-	int err;
-
-	if (!IS_ERR(efw->transmit_stream.context))
-		goto running;
-
-	/* TODO: codes should be in fireworks_amdtp.c */
-	err = cmp_connection_establish(&efw->output_connection,
-		amdtp_out_stream_get_max_payload(&efw->transmit_stream));
-	if (err < 0)
-		goto err_conn;
-
-	err = amdtp_out_stream_start(&efw->transmit_stream,
-			efw->output_connection.resources.channel,
-			efw->output_connection.speed);
-	if (err < 0)
-		goto err_strm;
-
-running:
-	efw->midi_receive_running = true;
-	return 0;
-
-err_strm:
-	cmp_connection_break(&efw->output_connection);
-err_conn:
-	return err;
-}
-
-static int
-midi_input_close(struct snd_rawmidi_substream *substream)
-{
-	struct snd_efw_t *efw = substream->rmidi->private_data;
-
-	if (efw->pcm_receive_running ||
-	    !!IS_ERR(efw->receive_stream.context))
-		goto end;
-
-	amdtp_out_stream_stop(&efw->receive_stream);
-	cmp_connection_break(&efw->output_connection);
-
-end:
-	efw->midi_receive_running = false;
-	return 0;
-}
-
-static void
-midi_input_trigger(struct snd_rawmidi_substream *substream, int up)
-{
-	struct snd_efw_t *efw = substream->rmidi->private_data;
-	unsigned long flags;
-
-	spin_lock_irqsave(&efw->lock, flags);
-
-	if (up)
-		__set_bit(substream->number,
-				&efw->midi_receive_running);
-	else
-		__clear_bit(substream->number,
-				&efw->midi_receive_running);
-
-	spin_unlock_irqrestore(&efw->lock, flags);
-
-	return;
-}
-
 static struct snd_rawmidi_ops midi_input_ops = {
-	.open		= midi_input_open,
-	.close		= midi_input_close,
-	.trigger	= midi_input_trigger,
+	.open		= midi_open,
+	.close		= midi_close,
+	.trigger	= midi_trigger,
 };
 
 static void
