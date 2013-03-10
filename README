@@ -201,8 +201,10 @@ http://linux.dell.com/dkms/
  sudo apt-get install dkms
 
 == hardware information ==
+Note that there are several firmware versions.
+
 === Echo AudioFire2 ===
-(thanks for Doug MxLain)
+(thanks to Doug McLain)
 flags: 0xA1
 guid_hi: 0x148606
 guid_lo: 0x9D5BD6CA
@@ -246,6 +248,52 @@ nb_1394_playback_channels_2x: 0x6
 nb_1394_capture_channels_2x: 0x4
 nb_1394_playback_channels_4x: 0x6
 nb_1394_capture_channels_4x: 0x4
+
+=== Echo AudioFire12===
+(thanks to Doug McLain)
+flags: 0x11
+guid_hi: 0x14860F
+guid_lo: 0xC44A84A6
+type: 0xAF12
+version: 0x0
+vendor_name: Echo Digital Audio
+model_name: AudioFire12
+supported_clock: 0x5
+nb_1394_playback_channels: 0xC
+nb_1394_capture_channels: 0xC
+nb_phys_audio_out: 0xC
+nb_phys_audio_in: 0xC
+nb_out_groups: 0x1
+out_group[0x0]: type 0x0, count 0x12
+out_group[0x1]: type 0x0, count 0x0
+out_group[0x2]: type 0x0, count 0x0
+out_group[0x3]: type 0x0, count 0x0
+out_group[0x4]: type 0x0, count 0x0
+out_group[0x5]: type 0x0, count 0x0
+out_group[0x6]: type 0x0, count 0x0
+out_group[0x7]: type 0x0, count 0x0
+nb_in_groups: 0x1
+out_group[0x0]: type 0x0, count 0x12
+out_group[0x1]: type 0x0, count 0x0
+out_group[0x2]: type 0x0, count 0x0
+out_group[0x3]: type 0x0, count 0x0
+out_group[0x4]: type 0x0, count 0x0
+out_group[0x5]: type 0x0, count 0x0
+out_group[0x6]: type 0x0, count 0x0
+out_group[0x7]: type 0x0, count 0x0
+nb_midi_out: 0x1
+nb_midi_in: 0x1
+max_sample_rate: 0x2EE00
+min_sample_rate: 0x7D00
+dsp_version: 0x4080000
+arm_version: 0x4080000
+mixer_playback_channels: 0xC
+mixer_capture_channels: 0xC
+fpga_version: 0x0
+nb_1394_playback_channels_2x: 0xC
+nb_1394_capture_channels_2x: 0xC
+nb_1394_playback_channels_4x: 0xC
+nb_1394_capture_channels_4x: 0xC
 
 === Echo AudioFirePre8 ===
 flags: 0x625
