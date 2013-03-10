@@ -133,7 +133,7 @@ static int snd_efw_playback_mute_put(struct snd_kcontrol *kctl, struct snd_ctl_e
 	return err;
 }
 
-static struct snd_kcontrol_new snd_efw_playback_controls[] __devinitdata = {
+static struct snd_kcontrol_new snd_efw_playback_controls[] = {
 	{
 		.name	= "PCM Playback Gain",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
@@ -294,7 +294,7 @@ static int snd_efw_capture_pan_put(struct snd_kcontrol *kctl, struct snd_ctl_ele
 	return err;
 }
 
-static struct snd_kcontrol_new snd_efw_capture_controls[] __devinitdata = {
+static struct snd_kcontrol_new snd_efw_capture_controls[] = {
 	{
 		.name	= "PCM Capture Volume",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
