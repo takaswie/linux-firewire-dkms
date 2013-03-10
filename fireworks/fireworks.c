@@ -23,12 +23,9 @@ MODULE_DESCRIPTION("Echo Fireworks driver");
 MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
 MODULE_LICENSE("GPL v2");
 
-static int index[SNDRV_CARDS] = SNDRV_DEFAULT_IDX;
-static char *id[SNDRV_CARDS] = SNDRV_DEFAULT_STR;
-static int enable[SNDRV_CARDS] = SNDRV_DEFAULT_ENABLE_PNP;
-
-unsigned int dump_tx_packets;
-unsigned int dump_rx_packets;
+static int index[SNDRV_CARDS]	= SNDRV_DEFAULT_IDX;
+static char *id[SNDRV_CARDS]	= SNDRV_DEFAULT_STR;
+static int enable[SNDRV_CARDS]	= SNDRV_DEFAULT_ENABLE_PNP;
 
 module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "card index");
@@ -36,12 +33,6 @@ module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string");
 module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "enable card");
-module_param(dump_tx_packets, uint, 0644);
-MODULE_PARM_DESC(dump_tx_packets, "log this many sent iso packets");
-module_param(dump_rx_packets, uint, 0644);
-MODULE_PARM_DESC(dump_rx_packets, "log this many received iso packets");
-
-#define MIDI_FIFO_SIZE 4096
 
 static DEFINE_MUTEX(devices_mutex);
 static unsigned int devices_used;
@@ -288,7 +279,6 @@ static int snd_efw_probe(struct device *dev)
 	int card_index;
 	struct snd_card *card;
 	struct snd_efw_t *efw;
-	unsigned int i;
 	int err;
 
 	if (!match_fireworks_device_name(unit))
@@ -315,10 +305,6 @@ static int snd_efw_probe(struct device *dev)
 	efw->card_index = -1;
 	mutex_init(&efw->mutex);
 	spin_lock_init(&efw->lock);
-	init_waitqueue_head(&efw->capture_data_wait);
-
-	efw->last_opcr = 1 << 31;
-	efw->last_ipcr = 1 << 31;
 
 	/* identifing */
 	if (snd_efw_command_identify(efw) < 0)
@@ -334,26 +320,26 @@ static int snd_efw_probe(struct device *dev)
 	if (err < 0)
 		goto error_card;
 
-	efw->syt_interval = 8;
+	/* create proc interface */
+	snd_efw_proc_init(efw);
 
-	for (i = 0; i < MAX_MIDI_OUTPUTS; i += 1)
-		efw->midi_outputs[i].fifo_max = (MIDI_FIFO_SIZE - 1) * FIXED_RATE;
+	/* create hardware control */
+	err = snd_efw_create_control_devices(efw);
+	if (err < 0)
+		goto error_card;
 
+	/* create PCM interface */
+	err = snd_efw_create_pcm_devices(efw);
+	if (err < 0)
+		goto error_card;
+
+	/* create midi interface */
 	if (efw->midi_output_count || efw->midi_input_count) {
 		err = snd_efw_create_midi_ports(efw);
 		if (err < 0)
 			goto error_card;
 	}
 
-	err = snd_efw_create_pcm_devices(efw);
-	if (err < 0)
-		goto error_card;
-
-	err = snd_efw_create_control_devices(efw);
-	if (err < 0)
-		goto error_card;
-
-	snd_efw_proc_init(efw);
 	snd_card_set_dev(card, dev);
 	err = snd_card_register(card);
 	if (err < 0)

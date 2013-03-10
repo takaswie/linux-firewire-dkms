@@ -46,19 +46,10 @@
 #include "../cmp.h"
 #include "../fcp.h"
 
-#define PLAYBACK_QUEUE_LENGTH	40
-#define CAPTURE_QUEUE_LENGTH	40
-
 #define MAX_MIDI_OUTPUTS 2
 #define MAX_MIDI_INPUTS 2
 
-#define FIXED_RATE 44100 /* XXX */
-
 #define ef_err(ef, format, arg...) dev_err(&(ef)->device->device, format, ##arg)
-
-/* module option */
-extern unsigned int dump_tx_packets;
-extern unsigned int dump_rx_packets;
 
 #define SND_EFW_MUITIPLIER_MODES 3
 #define HWINFO_NAME_SIZE_BYTES 32
@@ -116,33 +107,6 @@ struct snd_efw_t {
 	unsigned int mixer_output_channels;
 	unsigned int mixer_input_channels;
 
-	unsigned int fw_capture_users;
-	bool capture_data_received;
-	unsigned int capture_audio_frame_bytes;
-	unsigned int capture_packet_bytes_max;
-	__be32 cip_0_expected_value;
-	u32 cip_1_expected_fdf;
-	struct fw_iso_buffer capture_iso_buffer;
-	u32 capture_cycle;
-	unsigned int capture_packet_index;
-	void *capture_packets[CAPTURE_QUEUE_LENGTH];
-	unsigned int capture_packet_offset[CAPTURE_QUEUE_LENGTH];
-	struct fw_iso_context *capture_iso_context;
-	wait_queue_head_t capture_data_wait;
-	u32 last_opcr;
-
-	unsigned int fw_playback_users;
-	unsigned int playback_audio_frame_bytes;
-	unsigned int playback_packet_bytes_max;
-	u32 playback_cip_0;
-	unsigned int playback_dbc;
-	struct fw_iso_buffer playback_iso_buffer;
-	unsigned int playback_packet_index;
-	void *playback_packets[PLAYBACK_QUEUE_LENGTH];
-	unsigned int playback_packet_offset[PLAYBACK_QUEUE_LENGTH];
-	struct fw_iso_context *playback_iso_context;
-	u32 last_ipcr;
-
 	unsigned int midi_output_count;
 	struct {
 		struct snd_rawmidi_substream *substream;
@@ -153,18 +117,19 @@ struct snd_efw_t {
 	unsigned int midi_input_count;
 	struct snd_rawmidi_substream *midi_inputs[MAX_MIDI_INPUTS];
 
+	/* PCM playback */
 	unsigned int pcm_playback_channels;
 	unsigned int pcm_playback_channels_sets[SND_EFW_MUITIPLIER_MODES];
 	unsigned int pcm_playback_period_pos;
 	unsigned int pcm_playback_buffer_pos;
 	struct snd_pcm_substream *pcm_playback_substream;
 
+	/* PCM capture */
 	unsigned int pcm_capture_channels;
 	unsigned int pcm_capture_channels_sets[SND_EFW_MUITIPLIER_MODES];
 	unsigned int pcm_capture_period_pos;
 	unsigned int pcm_capture_buffer_pos;
 	struct snd_pcm_substream *pcm_capture_substream;
-
 
 	/* notification to control components */
 	struct snd_ctl_elem_id *control_id_sampling_rate;

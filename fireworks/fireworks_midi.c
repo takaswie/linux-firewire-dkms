@@ -18,6 +18,8 @@
  */
 #include "fireworks.h"
 
+#define MIDI_FIFO_SIZE 4096
+
 static int
 midi_output_open(struct snd_rawmidi_substream *substream)
 {
@@ -193,6 +195,7 @@ int snd_efw_create_midi_ports(struct snd_efw_t *efw)
 	struct snd_rawmidi *rmidi;
 	struct snd_rawmidi_str *str;
 	struct snd_rawmidi_substream *subs;
+	int i;
 	int err;
 
 	err = snd_rawmidi_new(efw->card, efw->card->driver, 0,
@@ -213,6 +216,10 @@ int snd_efw_create_midi_ports(struct snd_efw_t *efw)
 		list_for_each_entry(subs, &str->substreams, list)
 			efw->midi_outputs[subs->number].substream = subs;
 		set_midi_substream_names(efw, str);
+
+		/* TODO: */
+		for (i = 0; i < MAX_MIDI_OUTPUTS; i += 1)
+			efw->midi_outputs[i].fifo_max = (MIDI_FIFO_SIZE - 1) * 44100;
 	}
 
 	if (efw->midi_input_count > 0) {
