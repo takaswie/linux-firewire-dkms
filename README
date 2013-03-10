@@ -57,6 +57,7 @@ For device control:
 3. playback PCM samples with any sampling rate (with bug, just second channel is available...)
 4. playback MIDI sequences
 
+Hardware information is in the end of this README.
 
 == easy instraction with DKMS ==
 
@@ -198,3 +199,95 @@ http://linux.dell.com/dkms/
 もちろん、あらかじめシステムにDKMSパッケージをインストールしておいて下さい。例えばUbuntu
 であれば、端末で以下を実行します。
  sudo apt-get install dkms
+
+== hardware information ==
+=== Echo AudioFire2 ===
+(thanks for Doug MxLain)
+flags: 0xA1
+guid_hi: 0x148606
+guid_lo: 0x9D5BD6CA
+type: 0xAF2
+version: 0x0
+vendor_name: Echo Digital Audio
+model_name: AudioFire2
+supported_clock: 0x9
+nb_1394_playback_channels: 0x6
+nb_1394_capture_channels: 0x4
+nb_phys_audio_out: 0x6
+nb_phys_audio_in: 0x4
+nb_out_groups: 0x3
+out_group[0x0]: type 0x0, count 0x2
+out_group[0x1]: type 0x5, count 0x2
+out_group[0x2]: type 0x1, count 0x2
+out_group[0x3]: type 0x0, count 0x0
+out_group[0x4]: type 0x0, count 0x0
+out_group[0x5]: type 0x0, count 0x0
+out_group[0x6]: type 0x0, count 0x0
+out_group[0x7]: type 0x0, count 0x0
+nb_in_groups: 0x2
+out_group[0x0]: type 0x0, count 0x2
+out_group[0x1]: type 0x5, count 0x2
+out_group[0x2]: type 0x1, count 0x2
+out_group[0x3]: type 0x0, count 0x0
+out_group[0x4]: type 0x0, count 0x0
+out_group[0x5]: type 0x0, count 0x0
+out_group[0x6]: type 0x0, count 0x0
+out_group[0x7]: type 0x0, count 0x0
+nb_midi_out: 0x1
+nb_midi_in: 0x1
+max_sample_rate: 0x17700
+min_sample_rate: 0x7D00
+dsp_version: 0x0
+arm_version: 0x4080000
+mixer_playback_channels: 0x6
+mixer_capture_channels: 0x4
+fpga_version: 0x3000200
+nb_1394_playback_channels_2x: 0x6
+nb_1394_capture_channels_2x: 0x4
+nb_1394_playback_channels_4x: 0x6
+nb_1394_capture_channels_4x: 0x4
+
+=== Echo AudioFirePre8 ===
+flags: 0x625
+guid_hi: 0x14860A
+guid_lo: 0x5B6BDB9B
+type: 0xAF9
+version: 0x0
+vendor_name: Echo Digital Audio
+model_name: AudioFirePre8
+supported_clock: 0x1D
+nb_1394_playback_channels: 0x10
+nb_1394_capture_channels: 0x10
+nb_phys_audio_out: 0x10
+nb_phys_audio_in: 0x10
+nb_out_groups: 0x2
+out_group[0x0]: type 0x0, count 0x8
+out_group[0x1]: type 0x3, count 0x8
+out_group[0x2]: type 0x0, count 0x0
+out_group[0x3]: type 0x0, count 0x0
+out_group[0x4]: type 0x0, count 0x0
+out_group[0x5]: type 0x0, count 0x0
+out_group[0x6]: type 0x0, count 0x0
+out_group[0x7]: type 0x0, count 0x0
+nb_in_groups: 0x2
+out_group[0x0]: type 0x0, count 0x8
+out_group[0x1]: type 0x3, count 0x8
+out_group[0x2]: type 0x0, count 0x0
+out_group[0x3]: type 0x0, count 0x0
+out_group[0x4]: type 0x0, count 0x0
+out_group[0x5]: type 0x0, count 0x0
+out_group[0x6]: type 0x0, count 0x0
+out_group[0x7]: type 0x0, count 0x0
+nb_midi_out: 0x1
+nb_midi_in: 0x1
+max_sample_rate: 0x17700
+min_sample_rate: 0x7D00
+dsp_version: 0x0
+arm_version: 0x5050000
+mixer_playback_channels: 0x10
+mixer_capture_channels: 0x10
+fpga_version: 0x4010100
+nb_1394_playback_channels_2x: 0xC
+nb_1394_capture_channels_2x: 0xC
+nb_1394_playback_channels_4x: 0xA
+nb_1394_capture_channels_4x: 0xA
