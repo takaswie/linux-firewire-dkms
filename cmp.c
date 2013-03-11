@@ -224,6 +224,8 @@ retry_after_bus_reset:
 	if (err < 0)
 		goto err_mutex;
 
+	/* TODO: here, set oPCR with speed, overhead_id, payload if CMP_OUTPUT */
+
 	err = pcr_modify(c, pcr_set_modify, pcr_set_check,
 			 ABORT_ON_BUS_RESET);
 	if (err == -EAGAIN) {
@@ -272,6 +274,8 @@ int cmp_connection_update(struct cmp_connection *c)
 	err = fw_iso_resources_update(&c->resources);
 	if (err < 0)
 		goto err_unconnect;
+
+	/* TODO: here, set oPCR with speed, overhead_id, payload if CMP_OUTPUT */
 
 	err = pcr_modify(c, pcr_set_modify, pcr_set_check,
 			 SUCCEED_ON_BUS_RESET);
