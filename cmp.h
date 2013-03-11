@@ -44,6 +44,5 @@ int cmp_connection_establish(struct cmp_connection *connection,
 			     unsigned int max_payload);
 int cmp_connection_update(struct cmp_connection *connection);
 void cmp_connection_break(struct cmp_connection *connection);
-int cmp_output_get_bandwidth_units(struct cmp_connection *connection, int speed);
 
 #endif

@@ -194,6 +194,38 @@ static int pcr_set_check(struct cmp_connection *c, __be32 pcr)
 	return 0;
 }
 
+static void opcr_set_bandwidth_parameters(struct cmp_connection *c)
+{
+	int id;
+
+	/* convert to oPCR overhead ID encoding */
+	/*
+	 * TODO:
+	 * ask the developer about the implementation of current_bandwidth_overhead()
+	 * because the return value is sometimes over the range of overhead ID encoding.
+	 * Here we use 512 if the value is over the range.
+	 */
+	for (id = 1; id < 16; id += 1) {
+		if (c->resources.bandwidth_overhead < (id << 5))
+			break;
+	}
+	if (id == 16)
+		id = 0;
+
+	c->last_pcr_value &= ~cpu_to_be32(OPCR_DATA_RATE_MASK |
+						OPCR_OVERHEAD_ID_MASK);
+	c->last_pcr_value |= cpu_to_be32(c->speed << OPCR_DATA_RATE_SHIFT);
+	c->last_pcr_value |= cpu_to_be32(id << OPCR_OVERHEAD_ID_SHIFT);
+
+	/*
+	 * TODO:
+	 * why setting payload size is needless?
+	 * if the targets set it by their own, how and when?
+	 */
+
+	return;
+}
+
 /**
  * cmp_connection_establish - establish a connection to the target
  * @c: the connection manager
@@ -224,7 +256,8 @@ retry_after_bus_reset:
 	if (err < 0)
 		goto err_mutex;
 
-	/* TODO: here, set oPCR with speed, overhead_id, payload if CMP_OUTPUT */
+	if (c->direction == CMP_OUTPUT)
+		opcr_set_bandwidth_parameters(c);
 
 	err = pcr_modify(c, pcr_set_modify, pcr_set_check,
 			 ABORT_ON_BUS_RESET);
@@ -275,7 +308,8 @@ int cmp_connection_update(struct cmp_connection *c)
 	if (err < 0)
 		goto err_unconnect;
 
-	/* TODO: here, set oPCR with speed, overhead_id, payload if CMP_OUTPUT */
+	if (c->direction == CMP_OUTPUT)
+		opcr_set_bandwidth_parameters(c);
 
 	err = pcr_modify(c, pcr_set_modify, pcr_set_check,
 			 SUCCEED_ON_BUS_RESET);
@@ -332,35 +366,3 @@ void cmp_connection_break(struct cmp_connection *c)
 	mutex_unlock(&c->mutex);
 }
 EXPORT_SYMBOL(cmp_connection_break);
-
-int cmp_output_get_bandwidth_units(struct cmp_connection *c, int speed)
-{
-	int data_rate;
-	int overhead_id;
-	int payload;
-	int btw;
-
-	if (c->direction != CMP_OUTPUT)
-		return -EINVAL;
-
-	if (speed < 0 || 2 < speed)
-		data_rate = (c->last_pcr_value & OPCR_DATA_RATE_MASK)
-					>> OPCR_DATA_RATE_SHIFT;
-	else
-		data_rate = speed;
-
-	overhead_id = (c->last_pcr_value & OPCR_OVERHEAD_ID_MASK)
-					>> OPCR_OVERHEAD_ID_SHIFT;
-	if (overhead_id > 0)
-		/* 16 * 32 = 512 */
-		overhead_id = 16;
-
-	payload = (c->last_pcr_value & OPCR_PAYLOAD_MASK)
-					>> OPCR_PAYLOAD_SHIFT;
-
-	btw  = (payload + 3) * (1 << (2 - data_rate)) * 4;
-	btw += overhead_id * 32;
-
-	return btw;
-}
-EXPORT_SYMBOL(cmp_output_get_bandwidth_units);
