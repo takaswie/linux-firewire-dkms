@@ -88,7 +88,7 @@ struct snd_efw_t {
 	spinlock_t lock;
 
 	/* for EFC */
-	unsigned int sequence_number;
+	u32 sequence_number;
 
 	/* capabilities */
 	unsigned int supported_sampling_rate;

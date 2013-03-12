@@ -221,6 +221,7 @@ efc_over_avc(struct snd_efw_t *efw, unsigned int version,
 	unsigned int cmdbuf_bytes;
 	__be32 *cmdbuf;
 	struct efc_fields_t *efc_fields;
+	u32 sequence_number;
 	unsigned int i;
 
 	/* AV/C fields */
@@ -257,10 +258,15 @@ efc_over_avc(struct snd_efw_t *efw, unsigned int version,
 	efc_fields = (struct efc_fields_t *)(cmdbuf + 2);
 	efc_fields->length	= sizeof(struct efc_fields_t) / 4 + param_count;
 	efc_fields->version	= version;
-	efc_fields->seqnum	= efw->sequence_number++;
 	efc_fields->category	= category;
 	efc_fields->command	= command;
 	efc_fields->retval	= 0;
+
+	/* sequence number should keep consistency */
+	spin_lock(&efw->lock);
+	efc_fields->seqnum = efw->sequence_number++;
+	sequence_number = efw->sequence_number;
+	spin_unlock(&efw->lock);
 
 	/* fill EFC parameters */
 	for (i = 0; i < param_count; i += 1)
@@ -305,7 +311,7 @@ efc_over_avc(struct snd_efw_t *efw, unsigned int version,
 
 	/* check EFC response fields */
 	efc_fields = (struct efc_fields_t *)(cmdbuf + 2);
-	if ((efc_fields->seqnum != efw->sequence_number) |
+	if ((efc_fields->seqnum != sequence_number) |
 	    (efc_fields->category != category) |
 	    (efc_fields->command != command) |
 	    (efc_fields->retval != EFC_RETVAL_OK)) {
