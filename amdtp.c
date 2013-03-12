@@ -39,13 +39,15 @@ static void pcm_period_tasklet(unsigned long data);
  * @unit: the target of the stream
  * @flags: the packet transmission method to use
  */
+/* TODO: rename */
 int amdtp_out_stream_init(struct amdtp_out_stream *s, struct fw_unit *unit,
-			  enum cip_out_flags flags)
+		enum amdtp_stream_direction direction, enum cip_out_flags flags)
 {
 	if (flags != CIP_NONBLOCKING)
 		return -EINVAL;
 
 	s->unit = fw_unit_get(unit);
+	s->direction = direction;
 	s->flags = flags;
 	s->context = ERR_PTR(-1);
 	mutex_init(&s->mutex);
@@ -60,6 +62,7 @@ EXPORT_SYMBOL(amdtp_out_stream_init);
  * amdtp_out_stream_destroy - free stream resources
  * @s: the AMDTP output stream to destroy
  */
+/* TODO: rename */
 void amdtp_out_stream_destroy(struct amdtp_out_stream *s)
 {
 	WARN_ON(!IS_ERR(s->context));
@@ -76,6 +79,7 @@ EXPORT_SYMBOL(amdtp_out_stream_destroy);
  * The sample rate must be set before the stream is started, and must not be
  * changed while the stream is running.
  */
+/* TODO: rename */
 void amdtp_out_stream_set_rate(struct amdtp_out_stream *s, unsigned int rate)
 {
 	static const struct {
@@ -113,6 +117,7 @@ EXPORT_SYMBOL(amdtp_out_stream_set_rate);
  * with amdtp_out_stream_set_hw_params(), amdtp_out_stream_set_pcm(), and
  * amdtp_out_stream_set_midi().
  */
+/* TODO: rename */
 unsigned int amdtp_out_stream_get_max_payload(struct amdtp_out_stream *s)
 {
 	static const unsigned int max_data_blocks[] = {
@@ -139,6 +144,13 @@ static void amdtp_write_s32(struct amdtp_out_stream *s,
 			    struct snd_pcm_substream *pcm,
 			    __be32 *buffer, unsigned int frames);
 
+static void amdtp_read_s16(struct amdtp_out_stream *s,
+			    struct snd_pcm_substream *pcm,
+			    __be32 *buffer, unsigned int frames);
+static void amdtp_read_s32(struct amdtp_out_stream *s,
+			    struct snd_pcm_substream *pcm,
+			    __be32 *buffer, unsigned int frames);
+
 /**
  * amdtp_out_stream_set_pcm_format - set the PCM format
  * @s: the AMDTP output stream to configure
@@ -147,6 +159,7 @@ static void amdtp_write_s32(struct amdtp_out_stream *s,
  * The sample format must be set before the stream is started, and must not be
  * changed while the stream is running.
  */
+/* TODO: rename to transmit */
 void amdtp_out_stream_set_pcm_format(struct amdtp_out_stream *s,
 				     snd_pcm_format_t format)
 {
@@ -158,10 +171,16 @@ void amdtp_out_stream_set_pcm_format(struct amdtp_out_stream *s,
 		WARN_ON(1);
 		/* fall through */
 	case SNDRV_PCM_FORMAT_S16:
-		s->transfer_samples = amdtp_write_s16;
+		if (s->direction == AMDTP_STREAM_RECEIVE)
+			s->transfer_samples = amdtp_read_s16;
+		else
+			s->transfer_samples = amdtp_write_s16;
 		break;
 	case SNDRV_PCM_FORMAT_S32:
-		s->transfer_samples = amdtp_write_s32;
+		if (s->direction == AMDTP_STREAM_RECEIVE)
+			s->transfer_samples = amdtp_read_s32;
+		else
+			s->transfer_samples = amdtp_write_s32;
 		break;
 	}
 }
@@ -173,6 +192,7 @@ EXPORT_SYMBOL(amdtp_out_stream_set_pcm_format);
  *
  * This function should be called from the PCM device's .prepare callback.
  */
+/* TODO: rename */
 void amdtp_out_stream_pcm_prepare(struct amdtp_out_stream *s)
 {
 	tasklet_kill(&s->period_tasklet);
@@ -310,6 +330,58 @@ static void amdtp_write_s16(struct amdtp_out_stream *s,
 	}
 }
 
+static void amdtp_read_s32(struct amdtp_out_stream *s,
+			    struct snd_pcm_substream *pcm,
+			    __be32 *buffer, unsigned int frames)
+{
+	struct snd_pcm_runtime *runtime = pcm->runtime;
+	unsigned int channels, remaining_frames, frame_step, i, c;
+	u32 *dst;
+
+	channels = s->pcm_channels;
+	dst = (void *)runtime->dma_area +
+			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
+	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
+	frame_step = s->data_block_quadlets - channels;
+
+	for (i = 0; i < frames; ++i) {
+		for (c = 0; c < channels; ++c) {
+			*dst = be32_to_cpu(*buffer) & 0x00FFFFFF;
+			dst++;
+			buffer++;
+		}
+		buffer += frame_step;
+		if (--remaining_frames == 0)
+			dst = (void *)runtime->dma_area;
+	}
+}
+
+static void amdtp_read_s16(struct amdtp_out_stream *s,
+			    struct snd_pcm_substream *pcm,
+			    __be32 *buffer, unsigned int frames)
+{
+	struct snd_pcm_runtime *runtime = pcm->runtime;
+	unsigned int channels, remaining_frames, frame_step, i, c;
+	u16 *dst;
+
+	channels = s->pcm_channels;
+	dst = (void *)runtime->dma_area +
+			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
+	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
+	frame_step = s->data_block_quadlets - channels;
+
+	for (i = 0; i < frames; ++i) {
+		for (c = 0; c < channels; ++c) {
+			*dst = (be32_to_cpu(*buffer) & 0x00FFFF00) >> 8;
+			dst++;
+			buffer++;
+		}
+		buffer += frame_step;
+		if (--remaining_frames == 0)
+			dst = (void *)runtime->dma_area;
+	}
+}
+
 static void amdtp_fill_pcm_silence(struct amdtp_out_stream *s,
 				   __be32 *buffer, unsigned int frames)
 {
@@ -330,6 +402,17 @@ static void amdtp_fill_midi(struct amdtp_out_stream *s,
 	for (i = 0; i < frames; ++i)
 		buffer[s->pcm_channels + i * s->data_block_quadlets] =
 						cpu_to_be32(0x80000000);
+}
+
+static void amdtp_pull_midi(struct amdtp_out_stream *s,
+				__be32 *buffer, unsigned int frames)
+{
+	unsigned int i;
+	u32 sequence;
+
+	for (i = 0; i < frames; i += 1)
+		sequence = be32_to_cpu(buffer[s->pcm_channels +
+						i * s->data_block_quadlets]);
 }
 
 static void queue_out_packet(struct amdtp_out_stream *s, unsigned int cycle)
@@ -400,6 +483,74 @@ static void queue_out_packet(struct amdtp_out_stream *s, unsigned int cycle)
 	}
 }
 
+static void handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle)
+{
+	__be32 *buffer;
+	unsigned int index, data_blocks, syt, ptr;
+	struct snd_pcm_substream *pcm;
+	struct fw_iso_packet packet;
+	int err;
+
+	if (s->packet_index < 0)
+		return;
+	index = s->packet_index;
+
+	buffer = s->buffer.packets[index].buffer;
+	/* TODO: check cip first quadlet */
+	/* TODO: check cip second quadlet */
+	data_blocks = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 4;
+	syt = be32_to_cpu(buffer[1]) & 0xFFFF;
+	/* TODO: other fields? */
+	buffer += 2;
+
+	pcm = ACCESS_ONCE(s->pcm);
+	if (pcm)
+		s->transfer_samples(s, pcm, buffer, data_blocks);
+
+	if (s->midi_ports)
+		amdtp_pull_midi(s, buffer, data_blocks);
+
+	s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
+
+	if (s->midi_ports)
+		amdtp_pull_midi(s, buffer, data_blocks);
+
+	packet.payload_length = amdtp_out_stream_get_max_payload(s);
+	packet.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
+	packet.skip = 0;
+	packet.tag = TAG_CIP;
+	packet.sy = 0;
+	packet.header_length = 0;
+
+	err = fw_iso_context_queue(s->context, &packet, &s->buffer.iso_buffer,
+				   s->buffer.packets[index].offset);
+
+	if (err < 0) {
+		dev_err(&s->unit->device, "queueing error: %d\n", err);
+		s->packet_index = -1;
+		amdtp_out_stream_pcm_abort(s);
+		return;
+	}
+
+	if (++index >= QUEUE_LENGTH)
+		index = 0;
+	s->packet_index = index;
+
+	if (pcm) {
+		ptr = s->pcm_buffer_pointer + data_blocks;
+		if (ptr >= pcm->runtime->buffer_size)
+			ptr -= pcm->runtime->buffer_size;
+		ACCESS_ONCE(s->pcm_buffer_pointer) = ptr;
+
+		s->pcm_period_pointer += data_blocks;
+		if (s->pcm_period_pointer >= pcm->runtime->period_size) {
+			s->pcm_period_pointer -= pcm->runtime->period_size;
+			s->pointer_flush = false;
+			tasklet_hi_schedule(&s->period_tasklet);
+		}
+	}
+}
+
 static void pcm_period_tasklet(unsigned long data)
 {
 	struct amdtp_out_stream *s = (void *)data;
@@ -409,12 +560,12 @@ static void pcm_period_tasklet(unsigned long data)
 		snd_pcm_period_elapsed(pcm);
 }
 
+/* TODO: rename */
 static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
-				size_t header_length, void *header, void *data)
+			size_t header_length, void *header, void *private_data)
 {
-	struct amdtp_out_stream *s = data;
+	struct amdtp_out_stream *s = private_data;
 	unsigned int i, packets = header_length / 4;
-
 	/*
 	 * Compute the cycle of the last queued packet.
 	 * (We need only the four lowest bits for the SYT, so we can ignore
@@ -423,7 +574,10 @@ static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
 	cycle += QUEUE_LENGTH - packets;
 
 	for (i = 0; i < packets; ++i)
-		queue_out_packet(s, ++cycle);
+		if (s->direction == AMDTP_STREAM_RECEIVE)
+			handle_receive_packet(s, ++cycle);
+		else
+			queue_out_packet(s, ++cycle);
 	fw_iso_context_queue_flush(s->context);
 }
 
@@ -459,6 +613,7 @@ static int queue_initial_skip_packets(struct amdtp_out_stream *s)
  * amdtp_out_stream_set_midi(); and it must be started before any
  * PCM or MIDI device can be started.
  */
+/* TODO: rename */
 int amdtp_out_stream_start(struct amdtp_out_stream *s, int channel, int speed)
 {
 	static const struct {
@@ -539,6 +694,7 @@ EXPORT_SYMBOL(amdtp_out_stream_start);
  *
  * Returns the current buffer position, in frames.
  */
+/* TODO: rename */
 unsigned long amdtp_out_stream_pcm_pointer(struct amdtp_out_stream *s)
 {
 	/* this optimization is allowed to be racy */
@@ -555,6 +711,7 @@ EXPORT_SYMBOL(amdtp_out_stream_pcm_pointer);
  * amdtp_out_stream_update - update the stream after a bus reset
  * @s: the AMDTP output stream
  */
+/* TODO: rename */
 void amdtp_out_stream_update(struct amdtp_out_stream *s)
 {
 	ACCESS_ONCE(s->source_node_id_field) =
@@ -569,6 +726,7 @@ EXPORT_SYMBOL(amdtp_out_stream_update);
  * All PCM and MIDI devices of the stream must be stopped before the stream
  * itself can be stopped.
  */
+/* TODO: rename */
 void amdtp_out_stream_stop(struct amdtp_out_stream *s)
 {
 	mutex_lock(&s->mutex);
@@ -595,6 +753,7 @@ EXPORT_SYMBOL(amdtp_out_stream_stop);
  * If the isochronous stream needs to be stopped asynchronously, call this
  * function first to stop the PCM device.
  */
+/* TODO: rename */
 void amdtp_out_stream_pcm_abort(struct amdtp_out_stream *s)
 {
 	struct snd_pcm_substream *pcm;

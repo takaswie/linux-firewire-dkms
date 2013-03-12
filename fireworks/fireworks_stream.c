@@ -20,19 +20,23 @@
 int
 snd_efw_stream_init(struct snd_efw_t *efw, struct snd_efw_stream_t *stream)
 {
-	int direction;
+	enum cmp_direction c_direction;
+	enum amdtp_stream_direction s_direction;
 	int err;
 
-	if (stream == &efw->transmit_stream)
-		direction = CMP_INPUT;
-	else
-		direction = CMP_OUTPUT;
+	if (stream == &efw->receive_stream) {
+		c_direction = CMP_OUTPUT;
+		s_direction = AMDTP_STREAM_RECEIVE;
+	} else {
+		c_direction = CMP_INPUT;
+		s_direction = AMDTP_STREAM_TRANSMIT;
+	}
 
-	err = cmp_connection_init(&stream->conn, efw->unit, direction, 0);
+	err = cmp_connection_init(&stream->conn, efw->unit, c_direction, 0);
 	if (err < 0)
 		goto end;
 
-	err = amdtp_out_stream_init(&stream->strm, efw->unit, CIP_NONBLOCKING);
+	err = amdtp_out_stream_init(&stream->strm, efw->unit, s_direction, CIP_NONBLOCKING);
 	if (err < 0) {
 		cmp_connection_destroy(&stream->conn);
 		goto end;
@@ -48,6 +52,7 @@ end:
 int
 snd_efw_stream_start(struct snd_efw_stream_t *stream)
 {
+	enum amdtp_stream_direction direction;
 	int err;
 
 	/* already running */
@@ -58,12 +63,6 @@ snd_efw_stream_start(struct snd_efw_stream_t *stream)
 
 	/*
 	 * establish connection via CMP
-	 *
-	 * TODO:
-	 * when capturing, instead of amdtp_stream_get_max_payload()
-	 * I hope to pass cmp_outgoing_bandwidth_units() here.
-	 * But need to change some function inner iso-resources.c.
-	 *
 	 */
 	err = cmp_connection_establish(&stream->conn,
 		amdtp_out_stream_get_max_payload(&stream->strm));

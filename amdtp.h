@@ -37,8 +37,14 @@ struct fw_unit;
 struct fw_iso_context;
 struct snd_pcm_substream;
 
+enum amdtp_stream_direction {
+	AMDTP_STREAM_RECEIVE = 0,
+	AMDTP_STREAM_TRANSMIT
+};
+
 struct amdtp_out_stream {
 	struct fw_unit *unit;
+	enum amdtp_stream_direction direction;
 	enum cip_out_flags flags;
 	struct fw_iso_context *context;
 	struct mutex mutex;
@@ -72,7 +78,7 @@ struct amdtp_out_stream {
 };
 
 int amdtp_out_stream_init(struct amdtp_out_stream *s, struct fw_unit *unit,
-			  enum cip_out_flags flags);
+			enum amdtp_stream_direction, enum cip_out_flags flags);
 void amdtp_out_stream_destroy(struct amdtp_out_stream *s);
 
 void amdtp_out_stream_set_rate(struct amdtp_out_stream *s, unsigned int rate);
@@ -96,6 +102,7 @@ void amdtp_out_stream_pcm_abort(struct amdtp_out_stream *s);
  *
  * This function must not be called while the stream is running.
  */
+/* TODO: rename */
 static inline void amdtp_out_stream_set_pcm(struct amdtp_out_stream *s,
 					    unsigned int pcm_channels)
 {
@@ -109,6 +116,7 @@ static inline void amdtp_out_stream_set_pcm(struct amdtp_out_stream *s,
  *
  * This function must not be called while the stream is running.
  */
+/* TODO: rename*/
 static inline void amdtp_out_stream_set_midi(struct amdtp_out_stream *s,
 					     unsigned int midi_ports)
 {
@@ -122,6 +130,7 @@ static inline void amdtp_out_stream_set_midi(struct amdtp_out_stream *s,
  * If this function returns true, the stream's packet queue has stopped due to
  * an asynchronous error.
  */
+/* TODO: rename*/
 static inline bool amdtp_out_streaming_error(struct amdtp_out_stream *s)
 {
 	return s->packet_index < 0;
@@ -136,6 +145,7 @@ static inline bool amdtp_out_streaming_error(struct amdtp_out_stream *s)
  * transmission of PCM data.  This function should be called from the PCM
  * device's .trigger callback.
  */
+/* TODO: rename*/
 static inline void amdtp_out_stream_pcm_trigger(struct amdtp_out_stream *s,
 						struct snd_pcm_substream *pcm)
 {
