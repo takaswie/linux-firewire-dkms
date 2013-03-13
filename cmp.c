@@ -168,33 +168,18 @@ void cmp_connection_destroy(struct cmp_connection *c)
 EXPORT_SYMBOL(cmp_connection_destroy);
 
 
-static __be32 pcr_set_modify(struct cmp_connection *c, __be32 pcr)
+static __be32 ipcr_set_modify(struct cmp_connection *c, __be32 ipcr)
 {
-	pcr &= ~cpu_to_be32(PCR_BCAST_CONN |
+	ipcr &= ~cpu_to_be32(PCR_BCAST_CONN |
 			     PCR_P2P_CONN_MASK |
 			     PCR_CHANNEL_MASK);
-	pcr |= cpu_to_be32(1 << PCR_P2P_CONN_SHIFT);
-	pcr |= cpu_to_be32(c->resources.channel << PCR_CHANNEL_SHIFT);
+	ipcr |= cpu_to_be32(1 << PCR_P2P_CONN_SHIFT);
+	ipcr |= cpu_to_be32(c->resources.channel << PCR_CHANNEL_SHIFT);
 
-	return pcr;
+	return ipcr;
 }
 
-static int pcr_set_check(struct cmp_connection *c, __be32 pcr)
-{
-	if (pcr & cpu_to_be32(PCR_BCAST_CONN |
-			       PCR_P2P_CONN_MASK)) {
-		cmp_error(c, "plug is already in use\n");
-		return -EBUSY;
-	}
-	if (!(pcr & cpu_to_be32(PCR_ONLINE))) {
-		cmp_error(c, "plug is not on-line\n");
-		return -ECONNREFUSED;
-	}
-
-	return 0;
-}
-
-static void opcr_set_bandwidth_parameters(struct cmp_connection *c)
+static int get_overhead_id(struct cmp_connection *c)
 {
 	int id;
 
@@ -202,8 +187,9 @@ static void opcr_set_bandwidth_parameters(struct cmp_connection *c)
 	/*
 	 * TODO:
 	 * ask the developer about the implementation of current_bandwidth_overhead()
-	 * because the return value is sometimes over the range of overhead ID encoding.
-	 * Here we use 512 if the value is over the range.
+	 * in iso-resource.c because the return value is sometimes over the range of
+	 * the value which can be encoded by overhead id table (it's 32 to 512).
+	 * Here I use 512 if the value is over the range.
 	 */
 	for (id = 1; id < 16; id += 1) {
 		if (c->resources.bandwidth_overhead < (id << 5))
@@ -212,18 +198,43 @@ static void opcr_set_bandwidth_parameters(struct cmp_connection *c)
 	if (id == 16)
 		id = 0;
 
-	c->last_pcr_value &= ~cpu_to_be32(OPCR_DATA_RATE_MASK |
-						OPCR_OVERHEAD_ID_MASK);
-	c->last_pcr_value |= cpu_to_be32(c->speed << OPCR_DATA_RATE_SHIFT);
-	c->last_pcr_value |= cpu_to_be32(id << OPCR_OVERHEAD_ID_SHIFT);
+	return id;
+}
+
+static __be32 opcr_set_modify(struct cmp_connection *c, __be32 opcr)
+{
+	opcr &= ~cpu_to_be32(PCR_BCAST_CONN |
+			     PCR_P2P_CONN_MASK |
+			     PCR_CHANNEL_MASK |
+			     OPCR_DATA_RATE_MASK |
+			     OPCR_OVERHEAD_ID_MASK);
+	opcr |= cpu_to_be32(1 << PCR_P2P_CONN_SHIFT);
+	opcr |= cpu_to_be32(c->resources.channel << PCR_CHANNEL_SHIFT);
+	opcr |= cpu_to_be32(c->speed << OPCR_DATA_RATE_SHIFT);
+	opcr |= cpu_to_be32(get_overhead_id(c) << OPCR_OVERHEAD_ID_SHIFT);
 
 	/*
 	 * TODO:
-	 * why setting payload size is needless?
-	 * if the targets set it by their own, how and when?
+	 * investigate the reason that setting payload size is no need here.
+	 * target set it or specification eratta?
 	 */
 
-	return;
+	return opcr;
+}
+
+static int pcr_set_check(struct cmp_connection *c, __be32 opcr)
+{
+	if (opcr & cpu_to_be32(PCR_BCAST_CONN |
+			       PCR_P2P_CONN_MASK)) {
+		cmp_error(c, "plug is already in use\n");
+		return -EBUSY;
+	}
+	if (!(opcr & cpu_to_be32(PCR_ONLINE))) {
+		cmp_error(c, "plug is not on-line\n");
+		return -ECONNREFUSED;
+	}
+
+	return 0;
 }
 
 /**
@@ -257,10 +268,12 @@ retry_after_bus_reset:
 		goto err_mutex;
 
 	if (c->direction == CMP_OUTPUT)
-		opcr_set_bandwidth_parameters(c);
+		err = pcr_modify(c, opcr_set_modify, pcr_set_check,
+				 ABORT_ON_BUS_RESET);
+	else
+		err = pcr_modify(c, ipcr_set_modify, pcr_set_check,
+				 ABORT_ON_BUS_RESET);
 
-	err = pcr_modify(c, pcr_set_modify, pcr_set_check,
-			 ABORT_ON_BUS_RESET);
 	if (err == -EAGAIN) {
 		fw_iso_resources_free(&c->resources);
 		goto retry_after_bus_reset;
@@ -309,10 +322,12 @@ int cmp_connection_update(struct cmp_connection *c)
 		goto err_unconnect;
 
 	if (c->direction == CMP_OUTPUT)
-		opcr_set_bandwidth_parameters(c);
+		err = pcr_modify(c, opcr_set_modify, pcr_set_check,
+				 SUCCEED_ON_BUS_RESET);
+	else
+		err = pcr_modify(c, ipcr_set_modify, pcr_set_check,
+				 SUCCEED_ON_BUS_RESET);
 
-	err = pcr_modify(c, pcr_set_modify, pcr_set_check,
-			 SUCCEED_ON_BUS_RESET);
 	if (err < 0)
 		goto err_resources;
 
