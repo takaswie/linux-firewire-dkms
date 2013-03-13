@@ -52,7 +52,6 @@ end:
 int
 snd_efw_stream_start(struct snd_efw_stream_t *stream)
 {
-	enum amdtp_stream_direction direction;
 	int err;
 
 	/* already running */
