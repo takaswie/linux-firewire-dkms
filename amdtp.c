@@ -496,6 +496,10 @@ static void handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle
 	index = s->packet_index;
 
 	buffer = s->buffer.packets[index].buffer;
+
+	/* TODO: improvement... */
+	return;
+
 	/* TODO: check cip first quadlet */
 	/* TODO: check cip second quadlet */
 	data_blocks = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 4;
@@ -520,7 +524,7 @@ static void handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle
 	packet.skip = 0;
 	packet.tag = TAG_CIP;
 	packet.sy = 0;
-	packet.header_length = 0;
+	packet.header_length = 4;
 
 	err = fw_iso_context_queue(s->context, &packet, &s->buffer.iso_buffer,
 				   s->buffer.packets[index].offset);
@@ -583,8 +587,10 @@ static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
 
 static int queue_initial_skip_packets(struct amdtp_out_stream *s)
 {
+	/* header length is needed for receive stream */
 	struct fw_iso_packet skip_packet = {
-		.skip = 1,
+		.skip		= 1,
+		.header_length	= 4
 	};
 	unsigned int i;
 	int err;
@@ -648,10 +654,17 @@ int amdtp_out_stream_start(struct amdtp_out_stream *s, int channel, int speed)
 	if (err < 0)
 		goto err_unlock;
 
-	s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
-					   FW_ISO_CONTEXT_TRANSMIT,
-					   channel, speed, 0,
-					   out_packet_callback, s);
+	/* TODO: better way... */
+	if (s->direction == AMDTP_STREAM_RECEIVE)
+		s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
+						   FW_ISO_CONTEXT_RECEIVE,
+						   channel, speed, 4,
+						   out_packet_callback, s);
+	else
+		s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
+						   FW_ISO_CONTEXT_TRANSMIT,
+						   channel, speed, 0,
+						   out_packet_callback, s);
 	if (IS_ERR(s->context)) {
 		err = PTR_ERR(s->context);
 		if (err == -EBUSY)
@@ -668,7 +681,8 @@ int amdtp_out_stream_start(struct amdtp_out_stream *s, int channel, int speed)
 	if (err < 0)
 		goto err_context;
 
-	err = fw_iso_context_start(s->context, -1, 0, 0);
+	/* TODO: tag should means CIP or not? */
+	err = fw_iso_context_start(s->context, -1, 0, FW_ISO_CONTEXT_MATCH_ALL_TAGS);
 	if (err < 0)
 		goto err_context;
 
