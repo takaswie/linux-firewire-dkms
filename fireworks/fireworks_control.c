@@ -389,22 +389,8 @@ static int snd_efw_master_mute_put(struct snd_kcontrol *kctl, struct snd_ctl_ele
 /*
  * Global Control:  Digital capture and playback mode
  *
- *  AudioFire2:		Coaxial digital interface (Dongle)
- *			 with S/PDIF protocol for Coaxial
- *  AudioFire4:		Coaxial difital interface
- *			 with S/PDIF protocol for Coaxial
- *  AudioFire8:		Coaxial digital interface
- *			 with S/PDIF protocol for Coaxial
- *
- *  AudioFire8a:	Coaxial and Optical digital interfaces
- *			 with S/PDIF protocol for Optical and Coaxial,
- *			      ADAT protocol for Optical
- *  AudioFirePre8:	Coaxial and Optical digital interfaces
- *			 with S/PDIF protocol for Optical and Coaxial,
- *			      ADAT protocol for Optical
- *
- *  AudioFire12:	nothing
- *
+ * S/PDIF or ADAT, Coaxial or Optical
+ * struct efc_hwinfo_t.flags include a flag for this control
  */
 static char *digital_mode_descs[] = {"S/PDIF Coaxial", "ADAT Coaxial",
 						"S/PDIF Optical", "ADAT Optical"};
@@ -503,6 +489,8 @@ end:
  * Global Control: S/PDIF format are selectable from "Professional/Consumer".
  *  Consumer:		IEC-60958 Digital audio interface – Part 3: Consumer applications
  *  Professional:	IEC-60958 Digital audio interface – Part 4: Professional applications
+ *
+ * struct efc_hwinfo_t.flags include a flag for this control
  */
 static char *spdif_format_descs[] = {"Consumer", "Professional"};
 static int snd_efw_control_spdif_format_info(struct snd_kcontrol *kctl,
@@ -555,6 +543,9 @@ end:
 
 /*
  * Global Control: Sampling Rate Control
+ *
+ * struct efc_hwinfo_t.min_sample_rate and struct efc_hwinfo_t.max_sample_rate
+ * is a minimum and maximum sampling rate
  */
 static char *sampling_rate_descs[] = {"5512Hz", "8000Hz", "11025Hz", "16000Hz",
 	"22050Hz", "32000Hz", "44100Hz", "48000Hz", "64000Hz",
@@ -665,19 +656,9 @@ end:
 }
 
 /*
- * Global Control: Clock Source
+ * Global Control: Clock Source Control
  *
- *  AudioFire2:
- *  AudioFire4:
- *   "Internal" and "S/PDIF" are supported.
- *
- *  AudioFire8:
- *  AudioFire8a:
- *  AudioFirePre8:
- *  AudioFire12:
- *   whole source are supported.
- *
- * efw_hwinfo_t.supported_clocks is a set of flags for supported clock source.
+ * struct efw_hwinfo_t.supported_clocks is a flags for this control
  */
 static char *clock_source_descs[] = {"Internal", "SYT Match", "Word",
 						"S/PDIF", "ADAT1", "ADAT2"};
@@ -774,6 +755,50 @@ end:
 	return changed;
 }
 
+/*
+ * Global Control: Phantom Power Control
+ *
+ * struct efc_hwinfo_t.flags include a flag for this control
+ */
+static int snd_efw_control_phantom_state_info(struct snd_kcontrol *kctl,
+						struct snd_ctl_elem_info *einf)
+{
+
+	einf->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	einf->count = 1;
+	einf->value.integer.min = 0;
+	einf->value.integer.max = 1;
+
+        return 0;
+}
+static int snd_efw_control_phantom_state_get(struct snd_kcontrol *kctl,
+						struct snd_ctl_elem_value *uval)
+{
+	int err = 0;
+
+	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	int state = 0;
+
+	err = snd_efw_command_get_phantom_state(efw, &state);
+	if (err >= 0)
+		uval->value.integer.value[0] = (state > 0) ? 1: 0;
+
+	return 0;
+}
+static int snd_efw_control_phantom_state_put(struct snd_kcontrol *kctl,
+						struct snd_ctl_elem_value *uval)
+{
+	int changed = 0;
+
+	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	int value = uval->value.integer.value[0];
+
+	if (snd_efw_command_set_phantom_state(efw, value) > 0)
+		changed = 1;
+
+	return changed;
+}
+
 static struct snd_kcontrol_new snd_efw_global_controls[] = {
 	{
 		.name	= "Master Output Gain",
@@ -835,6 +860,16 @@ static struct snd_kcontrol_new snd_efw_global_iec60958_format_control =
 	.put	= snd_efw_control_spdif_format_put
 };
 
+static struct snd_kcontrol_new snd_efw_global_phantom_state_control =
+{
+	.name	= "Phantom Power",
+	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
+	.info	= snd_efw_control_phantom_state_info,
+	.get	= snd_efw_control_phantom_state_get,
+	.put	= snd_efw_control_phantom_state_put
+};
+
 int snd_efw_create_control_devices(struct snd_efw_t *efw)
 {
 	unsigned int i;
@@ -889,6 +924,12 @@ int snd_efw_create_control_devices(struct snd_efw_t *efw)
 		if (err < 0)
 			goto end;
 		kctl = snd_ctl_new1(&snd_efw_global_iec60958_format_control, efw);
+		err = snd_ctl_add(efw->card, kctl);
+		if (err < 0)
+			goto end;
+	}
+	if (efw->has_phantom > 0) {
+		kctl = snd_ctl_new1(&snd_efw_global_phantom_state_control, efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;

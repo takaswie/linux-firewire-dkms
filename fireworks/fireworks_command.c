@@ -624,6 +624,34 @@ int snd_efw_command_set_digital_mode(struct snd_efw_t *efw,
 		&value, 1, NULL, 0);
 }
 
+
+int snd_efw_command_get_phantom_state(struct snd_efw_t *efw, int *state)
+{
+	int err = 0;
+	u32 response;
+
+	err = efc_over_avc(efw, 0, EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
+				NULL, 0, &response, 1);
+	if (err >= 0)
+		*state = response;
+
+	return err;
+}
+
+int snd_efw_command_set_phantom_state(struct snd_efw_t *efw, int state)
+{
+	u32 request;
+	u32 response;
+
+	if (state > 0)
+		request = 1;
+	else
+		request = 0;
+
+	return efc_over_avc(efw, 0, EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
+				&request, 1, &response, 1);
+}
+
 static int
 snd_efw_command_get_monitor(struct snd_efw_t *efw, int category, int command,
 						int input, int output, int *value)
@@ -805,4 +833,3 @@ int snd_efw_command_phys_in(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
 		return -EINVAL;
 	}
 }
-

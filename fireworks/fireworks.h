@@ -246,6 +246,8 @@ int snd_efw_command_playback(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd
 int snd_efw_command_phys_out(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
 int snd_efw_command_capture(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
 int snd_efw_command_phys_in(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
+int snd_efw_command_get_phantom_state(struct snd_efw_t *efw, int *state);
+int snd_efw_command_set_phantom_state(struct snd_efw_t *efw, int state);
 
 /* for AMDTP stream and CMP */
 int snd_efw_stream_init(struct snd_efw_t *efw, struct snd_efw_stream_t *stream);
