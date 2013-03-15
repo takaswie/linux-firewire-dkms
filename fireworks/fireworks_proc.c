@@ -266,15 +266,15 @@ void snd_efw_proc_init(struct snd_efw_t *efw)
 {
 	struct snd_info_entry *entry;
 
-	if(!snd_card_proc_new(efw->card, "efc_hardware", &entry))
+	if(!snd_card_proc_new(efw->card, "#hardware", &entry))
 		snd_info_set_text_ops(entry, efw, snd_efw_proc_read_hwinfo);
-	if(!snd_card_proc_new(efw->card, "efc_clock", &entry))
+	if(!snd_card_proc_new(efw->card, "#clock", &entry))
 		snd_info_set_text_ops(entry, efw, snd_efw_proc_read_clock);
-	if(!snd_card_proc_new(efw->card, "efc_meters", &entry))
+	if(!snd_card_proc_new(efw->card, "#meters", &entry))
 		snd_info_set_text_ops(entry, efw, snd_efw_proc_read_phys_meters);
-	if(!snd_card_proc_new(efw->card, "efc_mixer", &entry))
+	if(!snd_card_proc_new(efw->card, "#mixer", &entry))
 		snd_info_set_text_ops(entry, efw, snd_efw_proc_read_mixer);
-	if(!snd_card_proc_new(efw->card, "efc_monitor", &entry))
+	if(!snd_card_proc_new(efw->card, "#monitor", &entry))
 		snd_info_set_text_ops(entry, efw, snd_efw_proc_read_monitor);
 	return;
 }
