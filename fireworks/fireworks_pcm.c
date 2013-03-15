@@ -82,8 +82,8 @@ pcm_open(struct snd_pcm_substream *substream)
 	}
 
 	/* the same sampling rate must be used for transmit and receive stream */
-	if (!IS_ERR(&efw->transmit_stream.strm) ||
-	    !IS_ERR(&efw->receive_stream.strm)) {
+	if (efw->transmit_stream.pcm || efw->transmit_stream.midi ||
+	    efw->receive_stream.pcm || efw->receive_stream.midi) {
 		err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
 		if (err < 0)
 			goto end;
