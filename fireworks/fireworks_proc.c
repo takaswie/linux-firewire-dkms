@@ -228,7 +228,7 @@ snd_efw_proc_read_monitor(struct snd_info_entry *entry, struct snd_info_buffer *
 	int i, o;
 
 	for (i = 0; i < efw->mixer_input_channels; i += 1 ) {
-		snd_iprintf(buffer, "\n\t\tGain\t\tMute\tSolo\tPan\tNominal\n");
+		snd_iprintf(buffer, "\n\t\tGain\t\tMute\tSolo\tPan\n");
 		for (o = 0; o < efw->mixer_output_channels; o += 1) {
 			snd_iprintf(buffer, "IN[%d]:OUT[%d]:\t", i, o);
 			if (snd_efw_command_monitor(efw, SND_EFW_MIXER_GET_GAIN,
@@ -251,15 +251,10 @@ snd_efw_proc_read_monitor(struct snd_info_entry *entry, struct snd_info_buffer *
 
 			if (snd_efw_command_monitor(efw, SND_EFW_MIXER_GET_PAN,
 							i, o, &value) < 0)
-				snd_iprintf(buffer, "*\t");
-			else
-				snd_iprintf(buffer, "%d\t", value);
-
-			if (snd_efw_command_monitor(efw, SND_EFW_MIXER_GET_NOMINAL,
-							i, o, &value) < 0)
 				snd_iprintf(buffer, "*\n");
 			else
 				snd_iprintf(buffer, "%d\n", value);
+
 		}
 	}
 

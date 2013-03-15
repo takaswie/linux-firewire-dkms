@@ -699,10 +699,10 @@ int snd_efw_command_monitor(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
 	case SND_EFW_MIXER_GET_MUTE:
 	case SND_EFW_MIXER_GET_SOLO:
 	case SND_EFW_MIXER_GET_PAN:
-	case SND_EFW_MIXER_GET_NOMINAL:
 		return snd_efw_command_get_monitor(efw, EFC_CAT_MIXER_MONITOR, cmd,
 								input, output, value);
 
+	case SND_EFW_MIXER_GET_NOMINAL:
 	default:
 		return -EINVAL;
 	}
