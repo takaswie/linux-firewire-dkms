@@ -800,7 +800,10 @@ static int snd_efw_control_phantom_state_put(struct snd_kcontrol *kctl,
 }
 
 /*
- * Global Control: Mixer Usable Control
+ * Global Control: DSP Mixer Usable Control
+ *
+ * If it's On, this driver can change Hardware Matrix Mixer.
+ * If it's Off, this driver cannot change Hardware Matrix Mixer and it's fixed.
  */
 static int snd_efw_control_mixer_usable_info(struct snd_kcontrol *kctl,
 						struct snd_ctl_elem_info *einf)
@@ -914,7 +917,7 @@ static struct snd_kcontrol_new snd_efw_global_phantom_state_control =
 
 static struct snd_kcontrol_new snd_efw_global_mixer_usable_control =
 {
-	.name	= "Mixer Usable",
+	.name	= "DSP Mixer",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
 	.info	= snd_efw_control_mixer_usable_info,
@@ -987,10 +990,12 @@ int snd_efw_create_control_devices(struct snd_efw_t *efw)
 			goto end;
 	}
 
-	kctl = snd_ctl_new1(&snd_efw_global_mixer_usable_control, efw);
-	err = snd_ctl_add(efw->card, kctl);
-	if (err < 0)
-		goto end;
+	if (efw->has_dsp_mixer > 0) {
+		kctl = snd_ctl_new1(&snd_efw_global_mixer_usable_control, efw);
+		err = snd_ctl_add(efw->card, kctl);
+		if (err < 0)
+			goto end;
+	}
 
 end:
 	return err;

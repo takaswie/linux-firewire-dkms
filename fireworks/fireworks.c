@@ -42,7 +42,7 @@ static unsigned int devices_used;
 #define FLAG_MIRRORING_SUPPORTED		1
 #define FLAG_SPDIF_COAX_SUPPORTED		2
 #define FLAG_SPDIF_AES_EBU_XLR_SUPPORTED	3
-#define FLAG_HAS_DSP				4
+#define FLAG_HAS_DSP_MIXER			4
 #define FLAG_HAS_FPGA				5
 #define FLAG_HAS_PHANTOM			6
 static int snd_efw_get_hardware_info(struct snd_efw_t *efw)
@@ -71,8 +71,8 @@ static int snd_efw_get_hardware_info(struct snd_efw_t *efw)
 		efw->mirroring_support = 1;
 	if (hwinfo->flags & (1 << FLAG_SPDIF_AES_EBU_XLR_SUPPORTED))
 		efw->aes_ebu_xlr_support = 1;
-	if (hwinfo->flags & (1 << FLAG_HAS_DSP))
-		efw->has_dsp = 1;
+	if (hwinfo->flags & (1 << FLAG_HAS_DSP_MIXER))
+		efw->has_dsp_mixer = 1;
 	if (hwinfo->flags & (1 << FLAG_HAS_FPGA))
 		efw->has_fpga = 1;
 	if (hwinfo->flags & (1 << FLAG_HAS_PHANTOM))

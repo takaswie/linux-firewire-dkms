@@ -95,7 +95,7 @@ struct snd_efw_t {
 	unsigned int supported_clock_source;
 	unsigned int supported_digital_mode;
 	unsigned int has_phantom;
-	unsigned int has_dsp;
+	unsigned int has_dsp_mixer;
 	unsigned int has_fpga;
 	unsigned int aes_ebu_xlr_support;
 	unsigned int mirroring_support;
