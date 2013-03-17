@@ -1,0 +1,208 @@
+(from Echo Audio's driver archive)
+
+5.8
+	Added “Flash” button to the console. Changes made to the console settings are no longer
+	automatically saved to persistent flash memory in the device. To make your changes
+	permanent, click the “Flash” button before closing the console.
+	Fixed a minor bug with the tray icon pop-up menu.
+	Windows 8 support
+5.7.6
+	Enabled kernel mode driver event logging for improved customer service
+	Fixed analog input inversion for AudioFire 12
+	Fixed issues with multiclient audio
+	Fixed bug with AudioFire 12 front panel LEDs
+	Output is muted while writing to flash memory
+	Fixed minor error with the console
+	AudioFire 2, 4, 8a, and Pre8: Fixed bug with saving and restoring the clock source
+	AudioFire 8a and Pre8: Fixed bug with saving and restoring the digital mode
+	AudioFire 8a and Pre8: The driver will only create audio endpoints that are valid
+	for the current sample rate and digital mode
+	Improved firmware update reliability
+	Fixed minor cleanup issue with Windows audio
+5.7
+	New overhauled streaming engine featuring better synchronization between playback and
+	record isochronous FireWire transfers and lower FireWire playback bandwidth
+	Fixed potential blue screen caused by connecting and disconnecting multiple devices repeatedly
+5.5
+	New optimized firmware for all devices
+	Optimizations for Windows 7
+	More accurate ASIO timestamping when using multiple devices
+	Integrated RIP and AudioFire console
+	Support for the new Gibson Dusk Tiger guitar
+	Fixed the problem with the console not opening
+	Fixed the problem with duplicate device names
+	Fixed the problem with the console window position not saving
+
+5.2.1
+	Added support for Gibson RIP
+	Features an overhauled and optimized FireWire audio streaming engine,
+	with particular attention paid to optimization for multiprocessor computers.
+	Changed the ASIO time stamping code for better multiple device support
+	Improved driver installer.  It will automatically detect and offer to remove
+	any previous standalone AudioFire or RIP drivers.  The new installer also eliminates
+	the need for Windows to reinstall your devices after a driver update.
+·	Added exception handling to fix potential application crashes
+·	Friendlier channel names for Cakewalk SONAR
+·	Improved handling of different channel configurations with multiple device
+·	Added more error checking to the user client code
+·	Fixed a problem with DirectSound support in stereo mode in Windows Vista
+·	Fixed a driver bug where the wave devices would sometimes not be properly created on Windows Vista
+
+4.8
+·	Added playback routing to the AudioFire4
+·	Fixed a problem with playback at sample rates below 32 kHz
+
+4.7
+·	The Vista Core Audio sample rate can now be set for all wave devices simultaneously
+·	Surround sound playback is now supported for Windows Vista Media Center
+·	Surround sound playback is now supported for DVD playback on Windows Vista
+·	Windows volume controls and the console playback volume controls are now synchronized in Vista.
+·	Added a system tray icon for the console
+·	Added playback solo buttons to the console
+·	Added a current sample rate display to the console for a Windows Vista
+·	You can now verify and rewrite the firmware from the console
+·	Added a "copy to clipboard" button to the console so that you can easily send the current version information in an e-mail
+·	Pan knobs can now be ganged
+·	Fixed a problem with playing Dolby Digital, DTS, and WMA Pro over S/PDIF on Windows Vista
+·	Fixed a problem with AudioFire 2 default routing
+·	Fixed potential crash while using GigaStudio
+·	Fixed a problem with MIDI system exclusive capture
+·	Added timeouts to the console
+
+4.6
+·	Added playback routing to the AudioFire 2
+·	Improved ASIO time stamping and latency reporting
+·	ASIO driver now supports the Vista multimedia scheduler
+·	ASIO driver settings are now saved per user
+·	Added save and load hotkeys to the console- press control-S to save and control-O to load
+·	You can now click on the numerical readout below each fader on the console and enter a value.  Pressing the Tab key lets you step between each fader readout.
+·	The console will now remember the last folder used to save or load a session..
+·	Fixed a problem with playing Dolby Digital, DTS, and WMA Pro over S/PDIF
+4.3
+·	Surround sound playback
+·	Windows volume and mute controls, including support for individual speaker surround sound volume
+·	The console now has activity lights for each audio output.
+·	Various cosmetic improvements for the console
+
+4.1
+·	The firmware and driver code has been extensively optimized, with particular attention paid to AudioFire 12.
+·	Added support for DTS over S/PDIF.
+·	Improved MIDI output timing
+·	Fixed a problem with AudioFire 2 and 4 where playback could become distorted upon opening the console.
+·	Fixed a problem with AudioFire 2 and 4 initial sample rate.
+·	Fixed a problem with AudioFire 2 and 4 restoring the settings for the +4/-10 buttons.
+·	Fixed a problem where the buffer size slider on the console would display the incorrect buffer duration.
+
+4.0
+·	Added Windows 64-bit support
+·	Added support for Dolby Digital and WMA Pro over S/PDIF
+·	More efficient use of FireWire to better support multiple devices on a single FireWire bus
+·	The device will now remember the previously programmed clock and sample rate in standalone mode.
+·	AudioFire 8 and AudioFire 12 firmware optimizations
+·	Fixed MIDI input for Vista
+·	Increased MIDI output buffering inside the device
+·	Fixed a bug with the driver remembering the most recent sample rate on startup.
+
+3.1.1
+·	Firmware update to correct a problem with playback on AudioFire 8 and 12
+
+3.1
+·	Added support for Windows Vista (32-bit)
+·	Phantom power for the AudioFire 4 is now saved and restored with console sessions
+·	Firmware fixes for improved Mac OS X support
+·	Firmware tweak for AudioFire 12 to improve playback at 176.4 and 192 kHz
+·	Changed the internal filter creation logic for better DirectShow support
+·	Improved playback buffer timing
+
+3.0.5
+·	The clock source can now be selected via the ASIO driver.
+·	Console hardware identification - when you select the console window, an LED blinks on the corresponding AudioFire device.   This is useful when you have multiple AudioFire units attached.  (AudioFire 8 and 12 only).
+·	The LEDs now blink on startup (AudioFire 8 and 12).
+·	The meters on the console are more accurate.
+·	Fixed a bug in the ASIO driver when using multiple AudioFires; the ASIO driver would incorrectly report that audio channels were not available.
+·	Word clock now works at 32 kHz.
+·	Fixed a bug with the console remembering which output tab was previously selected.
+·	Fixed a bug in the console where the session file name extension could be set incorrectly.
+
+3.0.4.3
+·	The audio buffer size is now saved with the session.
+·	The console meters are better calibrated.
+·	Fixed the rude solo light on the console.
+·	Various firmware efficiency improvements.
+·	The front panel lights on the AudioFire 12 now blink on startup.
+·	Fixed a bus reset problem in the firmware
+·	Fixed 32 kHz playback
+
+3.0.4
+·	The console can now save and load settings.
+·	Multi-client audio is now supported; this means that multiple applications can play and record at the same time.
+·	The ASIO driver now displays more descriptive channel names
+·	MIDI output timing is improved
+·	The ASIO driver no longer needs to be reset when changing sample rates
+·	Windows no longer displays the message “No audio device” in the Sounds and Audio Devices control panel (you may need to uninstall and reinstall your AudioFire from Device Manager).
+
+2.1.0
+	Support for multiple AudioFires.
+	Firmware update is built into the console.
+	ASIO Control Panel is added.
+	Sample Rate Lock
+	Support for 32kHz Sample Rates
+
+2.0.6
+
+	Performance, particularly in double speed, has been greatly improved!
+	A bug that could cause MIDI data to be lost is fixed.
+	Kernel streaming mode in SONAR is improved.
+	Reason now works at 96kHz in DirectSound and MME modes
+	The ASIO control panel has been restored; you can now change the buffer size from within your ASIO application.
+	You can now change the buffer size on the fly from the console for DirectSound, MME, KS and GigaStudio.
+	192kHz is now supported on AudioFire12
+	Nominal level settings (+4/-10) have been added.
+	GigaStudio now works with all buffer sizes.
+	Cosmetic improvements to the console.
+	Flash update shows version number.
+	Fixed issues with the sample rate lock
+
+
+
+2.0.2
+
+	Console sessions are saved to flash
+	Firmware update is now built into the console
+
+
+1.09.17
+
+	S/PDIF Sync is fixed
+	MIDI drift is corrected
+
+
+1.09.15
+
+	Initial BETA release
+
+1.05
+	Support for WDM Audio, Direct Sound, Kernel Streaming and MME.
+
+1.04
+
+	Full support for Tascam’s GigaStudio 3, including support for GSIF 2 audio input.
+	Many performance enhancements
+	Fixed console session bugs
+
+
+1.03
+
+	Initial release for AudioFire12
+	Firmware fixes for 192 support
+	Fixed Mac record glitching bug	
+	Fixed a bug with nominal record shift
+	Fixed a bug with session validation
+	Rewrote mixer code to be more efficient
+	Fixed timestamping and packetizer bugs
+
+
+1.01(2005)
+
+	Initial release for AudioFire8
+
