@@ -777,7 +777,7 @@ static int snd_efw_control_phantom_state_get(struct snd_kcontrol *kctl,
 	int err = 0;
 
 	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
-	int state = 0;
+	int state;
 
 	err = snd_efw_command_get_phantom_state(efw, &state);
 	if (err >= 0)
@@ -791,9 +791,51 @@ static int snd_efw_control_phantom_state_put(struct snd_kcontrol *kctl,
 	int changed = 0;
 
 	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
-	int value = uval->value.integer.value[0];
+	int value = (uval->value.integer.value[0] > 0) ? 1: 0;
 
 	if (snd_efw_command_set_phantom_state(efw, value) > 0)
+		changed = 1;
+
+	return changed;
+}
+
+/*
+ * Global Control: Mixer Usable Control
+ */
+static int snd_efw_control_mixer_usable_info(struct snd_kcontrol *kctl,
+						struct snd_ctl_elem_info *einf)
+{
+
+	einf->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	einf->count = 1;
+	einf->value.integer.min = 0;
+	einf->value.integer.max = 1;
+
+        return 0;
+}
+static int snd_efw_control_mixer_usable_get(struct snd_kcontrol *kctl,
+						struct snd_ctl_elem_value *uval)
+{
+	int err = 0;
+
+	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	int usable;
+
+	err = snd_efw_command_get_mixer_usable(efw, &usable);
+	if (err >= 0)
+		uval->value.integer.value[0] = (usable > 0) ? 1: 0;
+
+	return 0;
+}
+static int snd_efw_control_mixer_usable_put(struct snd_kcontrol *kctl,
+						struct snd_ctl_elem_value *uval)
+{
+	int changed = 0;
+
+	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	int value = (uval->value.integer.value[0] > 0) ? 1: 0;
+
+	if (snd_efw_command_set_mixer_usable(efw, value) > 0)
 		changed = 1;
 
 	return changed;
@@ -870,6 +912,16 @@ static struct snd_kcontrol_new snd_efw_global_phantom_state_control =
 	.put	= snd_efw_control_phantom_state_put
 };
 
+static struct snd_kcontrol_new snd_efw_global_mixer_usable_control =
+{
+	.name	= "Mixer Usable",
+	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
+	.info	= snd_efw_control_mixer_usable_info,
+	.get	= snd_efw_control_mixer_usable_get,
+	.put	= snd_efw_control_mixer_usable_put
+};
+
 int snd_efw_create_control_devices(struct snd_efw_t *efw)
 {
 	unsigned int i;
@@ -934,6 +986,11 @@ int snd_efw_create_control_devices(struct snd_efw_t *efw)
 		if (err < 0)
 			goto end;
 	}
+
+	kctl = snd_ctl_new1(&snd_efw_global_mixer_usable_control, efw);
+	err = snd_ctl_add(efw->card, kctl);
+	if (err < 0)
+		goto end;
 
 end:
 	return err;

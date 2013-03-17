@@ -233,6 +233,8 @@ int snd_efw_command_identify(struct snd_efw_t *efw);
 int snd_efw_command_get_hwinfo(struct snd_efw_t *efw, struct efc_hwinfo_t *hwinfo);
 int snd_efw_command_get_phys_meters_count(struct snd_efw_t *efw, int *inputs, int *outputs);
 int snd_efw_command_get_phys_meters(struct snd_efw_t *efw, int count, u32 *polled_meters);
+int snd_efw_command_get_mixer_usable(struct snd_efw_t *efw, int *usable);
+int snd_efw_command_set_mixer_usable(struct snd_efw_t *efw, int usable);
 int snd_efw_command_get_iec60958_format(struct snd_efw_t *efw, enum snd_efw_iec60958_format_t *format);
 int snd_efw_command_set_iec60958_format(struct snd_efw_t *efw, enum snd_efw_iec60958_format_t format);
 int snd_efw_command_get_clock_source(struct snd_efw_t *efw, enum snd_efw_clock_source_t *source);
@@ -241,13 +243,13 @@ int snd_efw_command_get_sampling_rate(struct snd_efw_t *efw, int *sampling_rate)
 int snd_efw_command_set_sampling_rate(struct snd_efw_t *efw, int sampling_rate);
 int snd_efw_command_get_digital_mode(struct snd_efw_t *efw, enum snd_efw_digital_mode_t *mode);
 int snd_efw_command_set_digital_mode(struct snd_efw_t *efw, enum snd_efw_digital_mode_t mode);
+int snd_efw_command_get_phantom_state(struct snd_efw_t *efw, int *state);
+int snd_efw_command_set_phantom_state(struct snd_efw_t *efw, int state);
 int snd_efw_command_monitor(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int input, int output, int *value);
 int snd_efw_command_playback(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
 int snd_efw_command_phys_out(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
 int snd_efw_command_capture(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
 int snd_efw_command_phys_in(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
-int snd_efw_command_get_phantom_state(struct snd_efw_t *efw, int *state);
-int snd_efw_command_set_phantom_state(struct snd_efw_t *efw, int state);
 
 /* for AMDTP stream and CMP */
 int snd_efw_stream_init(struct snd_efw_t *efw, struct snd_efw_stream_t *stream);

@@ -89,13 +89,13 @@ struct avc_fields_t {
  * quadlet parameters following to this fields.
  */
 struct efc_fields_t {
-	__be32 length;
-	__be32 version;
-	__be32 seqnum;
-	__be32 category;
-	__be32 command;
-	__be32 retval;
-} __attribute__((packed));
+	u32 length;
+	u32 version;
+	u32 seqnum;
+	u32 category;
+	u32 command;
+	u32 retval;
+};
 
 /* command categories */
 enum efc_category_t {
@@ -110,7 +110,6 @@ enum efc_category_t {
 	EFC_CAT_IOCONF			= 9,
 	/* unused */
 	EFC_CAT_TRANSPORT		= 2,
-	EFC_CAT_COUNT			= 10
 };
 
 /* hardware info category commands */
@@ -143,6 +142,11 @@ enum efc_cmd_hwctl_t {
 	EFC_CMD_HWCTL_IDENTIFY		= 5,
 	EFC_CMD_HWCTL_RECONNECT_PHY	= 6
 };
+/* for flags */
+#define EFC_HWCTL_FLAG_MIXER_UNUSABLE	0x00
+#define EFC_HWCTL_FLAG_MIXER_USABLE	0x01
+#define EFC_HWCTL_FLAG_DIGITAL_PRO	0x02
+#define EFC_HWCTL_FLAG_DIGITAL_RAW	0x04
 
 /* I/O config category commands */
 enum efc_cmd_ioconf_t {
@@ -156,18 +160,12 @@ enum efc_cmd_ioconf_t {
 	EFC_CMD_IOCONF_GET_ISOC_MAP	= 7,
 };
 
-enum efc_hwctl_flag_t {
-	EFC_HWCTL_FLAG_MIXER_ENABLED	= 1,
-	EFC_HWCTL_FLAG_DIGITAL_PRO	= 2,
-	EFC_HWCTL_FLAG_DIGITAL_RAW	= 4
-};
-
 /* for clock source and sampling rate */
 struct efc_clock_t {
 	u32 source;
 	u32 sampling_rate;
 	u32 index;
-} __attribute__((packed));
+};
 
 /* for hardware metering s*/
 struct efc_polled_values_t {
@@ -552,12 +550,43 @@ end:
 	return err;
 }
 
-/*
- * Return value:
- *  < 0: error
- *  = 0: consumer
- *  > 0: professional
- */
+int snd_efw_command_get_mixer_usable(struct snd_efw_t *efw, int *usable)
+{
+	int err = 0;
+
+	u32 flag = {0};
+
+	err = efc_over_avc(efw, 0,
+		EFC_CAT_HWCTL, EFC_CMD_HWCTL_GET_FLAGS,
+		NULL, 0, &flag, 1);
+	if (err >= 0) {
+		if (flag & EFC_HWCTL_FLAG_MIXER_USABLE)
+			*usable = 1;
+		else
+			*usable = 0;
+	}
+
+	return err;
+}
+
+int snd_efw_command_set_mixer_usable(struct snd_efw_t *efw, int usable)
+{
+	/*
+	 * mask[0]: for set
+	 * mask[1]: for clear
+	 */
+	u32 mask[2] = {0};
+
+	if (usable == 1)
+		mask[0] = EFC_HWCTL_FLAG_MIXER_USABLE;
+	else
+		mask[1] = EFC_HWCTL_FLAG_MIXER_UNUSABLE;
+
+	return efc_over_avc(efw, 0,
+		EFC_CAT_HWCTL, EFC_CMD_HWCTL_CHANGE_FLAGS,
+		(u32 *)mask, 2, NULL, 0);
+}
+
 int snd_efw_command_get_iec60958_format(struct snd_efw_t *efw,
 				enum snd_efw_iec60958_format_t *format)
 {
@@ -630,8 +659,9 @@ int snd_efw_command_get_phantom_state(struct snd_efw_t *efw, int *state)
 	int err = 0;
 	u32 response;
 
-	err = efc_over_avc(efw, 0, EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
-				NULL, 0, &response, 1);
+	err = efc_over_avc(efw, 0,
+		EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
+		NULL, 0, &response, 1);
 	if (err >= 0)
 		*state = response;
 
@@ -648,8 +678,9 @@ int snd_efw_command_set_phantom_state(struct snd_efw_t *efw, int state)
 	else
 		request = 0;
 
-	return efc_over_avc(efw, 0, EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
-				&request, 1, &response, 1);
+	return efc_over_avc(efw, 0,
+		EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
+		&request, 1, &response, 1);
 }
 
 static int
