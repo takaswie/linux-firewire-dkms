@@ -233,39 +233,39 @@ static int snd_efw_capture_solo_put(struct snd_kcontrol *kctl, struct snd_ctl_el
 }
 
 /* Capture Control: capture solo of each channels */
-static int capture_level_tmp = 0;
-static char *capture_level_descs[] = {"-10dBV", "+4dBu"};
-static int snd_efw_capture_level_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static int capture_nominal_tmp = 0;
+static char *capture_nominal_descs[] = {"-10dBV", "+4dBu"};
+static int snd_efw_capture_nominal_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
 	einf->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	einf->count = 1;
-	einf->value.enumerated.items = ARRAY_SIZE(capture_level_descs);
+	einf->value.enumerated.items = ARRAY_SIZE(capture_nominal_descs);
 
 	if (einf->value.enumerated.item >= einf->value.enumerated.items)
 		einf->value.enumerated.item = einf->value.enumerated.items - 1;
 
-	strcpy(einf->value.enumerated.name, capture_level_descs[einf->value.enumerated.item]);
+	strcpy(einf->value.enumerated.name, capture_nominal_descs[einf->value.enumerated.item]);
 
 	return err;
 }
-static int snd_efw_capture_level_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
+static int snd_efw_capture_nominal_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
 {
 	int err = 0;
 
-	uval->value.enumerated.item[0] = capture_level_tmp;
+	uval->value.enumerated.item[0] = capture_nominal_tmp;
 
 	return err;
 }
-static int snd_efw_capture_level_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
+static int snd_efw_capture_nominal_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
 {
 	int changed = 0;
 	int value = uval->value.enumerated.item[0];
 
-	if (value <= ARRAY_SIZE(capture_level_descs)) {
+	if (value <= ARRAY_SIZE(capture_nominal_descs)) {
 		changed = 1;
-		capture_level_tmp = value;
+		capture_nominal_tmp = value;
 	}
 
 	return changed;
@@ -296,7 +296,7 @@ static int snd_efw_capture_pan_put(struct snd_kcontrol *kctl, struct snd_ctl_ele
 
 static struct snd_kcontrol_new snd_efw_capture_controls[] = {
 	{
-		.name	= "PCM Capture Volume",
+		.name	= "PCM Capture Gain",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE |
 		          SNDRV_CTL_ELEM_ACCESS_TLV_READWRITE,
@@ -322,12 +322,12 @@ static struct snd_kcontrol_new snd_efw_capture_controls[] = {
 		.put	= snd_efw_capture_solo_put,
 	},
 	{
-		.name	= "PCM Capture Level",
+		.name	= "PCM Capture Nominal",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-		.info	= snd_efw_capture_level_info,
-		.get	= snd_efw_capture_level_get,
-		.put	= snd_efw_capture_level_put,
+		.info	= snd_efw_capture_nominal_info,
+		.get	= snd_efw_capture_nominal_get,
+		.put	= snd_efw_capture_nominal_put,
 	},
 	{
 		.name	= "PCM Capture Pan",
@@ -339,9 +339,9 @@ static struct snd_kcontrol_new snd_efw_capture_controls[] = {
 	}
 };
 
-/* Global Control: Master Output Gain */
-static const DECLARE_TLV_DB_SCALE(snd_efw_master_db_scale, -6000, 100, 0);
-static int snd_efw_master_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+/* Output Control: Master Output Gain */
+static const DECLARE_TLV_DB_SCALE(snd_efw_output_db_scale, -6000, 100, 0);
+static int snd_efw_output_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -352,19 +352,19 @@ static int snd_efw_master_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_el
 
 	return err;
 }
-static int snd_efw_master_gain_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int snd_efw_output_gain_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_master_gain_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int snd_efw_output_gain_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
 
-/* Global Control: Master Output Mute */
-static int snd_efw_master_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+/* Output Control: Master Output Mute */
+static int snd_efw_output_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -375,16 +375,68 @@ static int snd_efw_master_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_el
 
 	return err;
 }
-static int snd_efw_master_mute_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int snd_efw_output_mute_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_master_mute_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int snd_efw_output_mute_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
+
+/* Output Control: Master Output Solo */
+static int snd_efw_output_solo_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+{
+	int err = 0;
+
+	einf->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	einf->count = 1;
+	einf->value.integer.min = 0;
+	einf->value.integer.max = 1;
+
+	return err;
+}
+static int snd_efw_output_solo_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+{
+	int err = 0;
+	return err;
+}
+static int snd_efw_output_solo_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+{
+	int err = 0;
+	return err;
+}
+
+static struct snd_kcontrol_new snd_efw_output_controls[] = {
+	{
+		.name	= "Master Output Gain",
+		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE |
+		          SNDRV_CTL_ELEM_ACCESS_TLV_READWRITE,
+		.info	= snd_efw_output_gain_info,
+		.get	= snd_efw_output_gain_get,
+		.put	= snd_efw_output_gain_put,
+		.tlv = { .p =  snd_efw_output_db_scale }
+	},
+	{
+		.name	= "Master Output Mute",
+		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
+		.info	= snd_efw_output_mute_info,
+		.get	= snd_efw_output_mute_get,
+		.put	= snd_efw_output_mute_put
+	},
+	{
+		.name	= "Master Output Solo",
+		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
+		.info	= snd_efw_output_solo_info,
+		.get	= snd_efw_output_solo_get,
+		.put	= snd_efw_output_solo_put
+	},
+};
 
 /*
  * Global Control:  Digital capture and playback mode
@@ -844,27 +896,6 @@ static int snd_efw_control_mixer_usable_put(struct snd_kcontrol *kctl,
 	return changed;
 }
 
-static struct snd_kcontrol_new snd_efw_global_controls[] = {
-	{
-		.name	= "Master Output Gain",
-		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
-		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE |
-		          SNDRV_CTL_ELEM_ACCESS_TLV_READWRITE,
-		.info	= snd_efw_master_gain_info,
-		.get	= snd_efw_master_gain_get,
-		.put	= snd_efw_master_gain_put,
-		.tlv = { .p =  snd_efw_master_db_scale }
-	},
-	{
-		.name	= "Master Output Mute",
-		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
-		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-		.info	= snd_efw_master_mute_info,
-		.get	= snd_efw_master_mute_get,
-		.put	= snd_efw_master_mute_put
-	},
-};
-
 static struct snd_kcontrol_new snd_efw_clock_source_control =
 {
 	.name	= "Clock Source",
@@ -936,8 +967,8 @@ int snd_efw_create_control_devices(struct snd_efw_t *efw)
 	if (err < 0)
 		goto end;
 
-	for (i = 0; i < ARRAY_SIZE(snd_efw_global_controls); ++i) {
-		kctl = snd_ctl_new1(&snd_efw_global_controls[i], efw);
+	for (i = 0; i < ARRAY_SIZE(snd_efw_output_controls); ++i) {
+		kctl = snd_ctl_new1(&snd_efw_output_controls[i], efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
