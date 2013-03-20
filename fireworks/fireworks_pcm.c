@@ -19,6 +19,100 @@
 #include "./fireworks.h"
 
 static int
+hw_rule_rate(struct snd_pcm_hw_params *params,
+		struct snd_pcm_hw_rule *rule, int *channels_sets)
+{
+	struct snd_interval *r =
+			hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval *c =
+			hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_interval t;
+
+	snd_interval_any(&t);
+
+	if (channels_sets[0] == channels_sets[1] &&
+	    channels_sets[1] == channels_sets[2])
+		return 0;
+
+	if (snd_interval_min(c) > channels_sets[1])
+		t.max = 48000;
+	else if (snd_interval_min(c) > channels_sets[2])
+		t.max = 96000;
+	else
+		t.max = 192000;
+
+	t.min = 32000;
+	t.integer = 1;
+
+	return snd_interval_refine(r, &t);
+}
+
+static int
+hw_rule_channels(struct snd_pcm_hw_params *params,
+		struct snd_pcm_hw_rule *rule, int *channels_sets)
+{
+	struct snd_interval *c =
+		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_interval *r =
+		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval t;
+
+	snd_interval_any(&t);
+
+	if (channels_sets[0] == channels_sets[1] &&
+	    channels_sets[1] == channels_sets[2])
+		return 0;
+
+	if (snd_interval_min(r) > 174000)
+		t.max = channels_sets[2];
+	else if (snd_interval_min(r) > 88200)
+		t.max = channels_sets[1];
+	else
+		t.max = channels_sets[0];
+
+	t.min = 0;
+	t.integer = 1;
+
+	return snd_interval_refine(c, &t);
+}
+
+static inline int
+hw_rule_playback_rate(struct snd_pcm_hw_params *params,
+				struct snd_pcm_hw_rule *rule)
+{
+	struct snd_efw_t *efw = rule->private;
+	return hw_rule_rate(params, rule,
+				efw->pcm_playback_channels_sets);
+}
+
+static inline int
+hw_rule_capture_rate(struct snd_pcm_hw_params *params,
+				struct snd_pcm_hw_rule *rule)
+{
+	struct snd_efw_t *efw = rule->private;
+	return hw_rule_rate(params, rule,
+				efw->pcm_capture_channels_sets);
+}
+
+static inline int
+hw_rule_playback_channels(struct snd_pcm_hw_params *params,
+				struct snd_pcm_hw_rule *rule)
+{
+	struct snd_efw_t *efw = rule->private;
+	return hw_rule_channels(params, rule,
+				efw->pcm_playback_channels_sets);
+}
+
+static inline int
+hw_rule_capture_channels(struct snd_pcm_hw_params *params,
+				struct snd_pcm_hw_rule *rule)
+{
+	struct snd_efw_t *efw = rule->private;
+	return hw_rule_channels(params, rule,
+				efw->pcm_capture_channels_sets);
+}
+
+static int
 pcm_init_hw_params(struct snd_efw_t *efw,
 			struct snd_pcm_substream *substream)
 {
@@ -56,6 +150,23 @@ pcm_init_hw_params(struct snd_efw_t *efw,
 	err = snd_pcm_hw_constraint_msbits(substream->runtime, 0, 32, 24);
 	if (err < 0)
 		return err;
+
+	/* add rule between channels and sampling rate */
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+				hw_rule_capture_channels, efw,
+				SNDRV_PCM_HW_PARAM_RATE, -1);
+		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+				hw_rule_capture_rate, efw,
+				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	} else {
+		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+				hw_rule_playback_channels, efw,
+				SNDRV_PCM_HW_PARAM_RATE, -1);
+		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+				hw_rule_playback_rate, efw,
+				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	}
 
 	return 0;
 }
