@@ -77,15 +77,6 @@ hw_rule_channels(struct snd_pcm_hw_params *params,
 }
 
 static inline int
-hw_rule_playback_rate(struct snd_pcm_hw_params *params,
-				struct snd_pcm_hw_rule *rule)
-{
-	struct snd_efw_t *efw = rule->private;
-	return hw_rule_rate(params, rule,
-				efw->pcm_playback_channels_sets);
-}
-
-static inline int
 hw_rule_capture_rate(struct snd_pcm_hw_params *params,
 				struct snd_pcm_hw_rule *rule)
 {
@@ -95,11 +86,11 @@ hw_rule_capture_rate(struct snd_pcm_hw_params *params,
 }
 
 static inline int
-hw_rule_playback_channels(struct snd_pcm_hw_params *params,
+hw_rule_playback_rate(struct snd_pcm_hw_params *params,
 				struct snd_pcm_hw_rule *rule)
 {
 	struct snd_efw_t *efw = rule->private;
-	return hw_rule_channels(params, rule,
+	return hw_rule_rate(params, rule,
 				efw->pcm_playback_channels_sets);
 }
 
@@ -110,6 +101,15 @@ hw_rule_capture_channels(struct snd_pcm_hw_params *params,
 	struct snd_efw_t *efw = rule->private;
 	return hw_rule_channels(params, rule,
 				efw->pcm_capture_channels_sets);
+}
+
+static inline int
+hw_rule_playback_channels(struct snd_pcm_hw_params *params,
+				struct snd_pcm_hw_rule *rule)
+{
+	struct snd_efw_t *efw = rule->private;
+	return hw_rule_channels(params, rule,
+				efw->pcm_playback_channels_sets);
 }
 
 static int
@@ -183,13 +183,13 @@ pcm_open(struct snd_pcm_substream *substream)
 	if (err < 0)
 		goto end;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		substream->runtime->hw.channels_min = efw->pcm_playback_channels;
-		substream->runtime->hw.channels_max = efw->pcm_playback_channels;
-	} else {
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		substream->runtime->hw.formats |= SNDRV_PCM_FMTBIT_S24_BE;
 		substream->runtime->hw.channels_min = efw->pcm_capture_channels;
 		substream->runtime->hw.channels_max = efw->pcm_capture_channels;
+	} else {
+		substream->runtime->hw.channels_min = efw->pcm_playback_channels;
+		substream->runtime->hw.channels_max = efw->pcm_playback_channels;
 	}
 
 	/* the same sampling rate must be used for transmit and receive stream */
@@ -240,12 +240,12 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 					efw->control_id_sampling_rate);
 	}
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK) {
-		stream = &efw->transmit_stream;
-		midi_count = efw->midi_output_count;
-	} else {
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		stream = &efw->receive_stream;
 		midi_count = efw->midi_input_count;
+	} else {
+		stream = &efw->transmit_stream;
+		midi_count = efw->midi_output_count;
 	}
 
 	/* set AMDTP parameters for transmit stream */
@@ -263,10 +263,10 @@ pcm_hw_free(struct snd_pcm_substream *substream)
 	struct snd_efw_t *efw = substream->private_data;
 	struct snd_efw_stream_t *stream;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		stream = &efw->transmit_stream;
-	else
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		stream = &efw->receive_stream;
+	else
+		stream = &efw->transmit_stream;
 
 	/* stop fw isochronous stream of AMDTP with CMP */
 	snd_efw_stream_stop(stream);
@@ -282,10 +282,10 @@ pcm_prepare(struct snd_pcm_substream *substream)
 	struct snd_efw_stream_t *stream;
 	int err = 0;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		stream = &efw->transmit_stream;
-	else
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		stream = &efw->receive_stream;
+	else
+		stream = &efw->transmit_stream;
 
 	/* start stream */
 	err = snd_efw_stream_start(stream);
@@ -317,10 +317,10 @@ pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 		return -EINVAL;
 	}
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		amdtp_out_stream_pcm_trigger(&efw->transmit_stream.strm, pcm);
-	else
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		amdtp_out_stream_pcm_trigger(&efw->receive_stream.strm, pcm);
+	else
+		amdtp_out_stream_pcm_trigger(&efw->transmit_stream.strm, pcm);
 
 	return 0;
 }
@@ -329,10 +329,10 @@ static snd_pcm_uframes_t pcm_pointer(struct snd_pcm_substream *substream)
 {
 	struct snd_efw_t *efw = substream->private_data;
 
-	if (substream->stream == SNDRV_PCM_STREAM_PLAYBACK)
-		return amdtp_out_stream_pcm_pointer(&efw->transmit_stream.strm);
-	else
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		return amdtp_out_stream_pcm_pointer(&efw->receive_stream.strm);
+	else
+		return amdtp_out_stream_pcm_pointer(&efw->transmit_stream.strm);
 }
 
 static struct snd_pcm_ops pcm_playback_ops = {
