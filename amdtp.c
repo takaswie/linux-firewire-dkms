@@ -13,7 +13,7 @@
 #include <linux/slab.h>
 #include <sound/pcm.h>
 #include "amdtp.h"
-
+#include <sound/core.h>
 #define TICKS_PER_CYCLE		3072
 #define CYCLES_PER_SECOND	8000
 #define TICKS_PER_SECOND	(TICKS_PER_CYCLE * CYCLES_PER_SECOND)
@@ -497,14 +497,11 @@ static void handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle
 
 	buffer = s->buffer.packets[index].buffer;
 
-	/* TODO: improvement... */
-	return;
-
 	/* TODO: check cip first quadlet */
 	/* TODO: check cip second quadlet */
-	data_blocks = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 4;
+	data_blocks = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 16;
 	syt = be32_to_cpu(buffer[1]) & 0xFFFF;
-	/* TODO: other fields? */
+	/* TODO: check other fields? */
 	buffer += 2;
 
 	pcm = ACCESS_ONCE(s->pcm);
@@ -585,12 +582,38 @@ static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
 	fw_iso_context_queue_flush(s->context);
 }
 
+static int queue_initial_receive_packets(struct amdtp_out_stream *s)
+{
+	/* header length is needed for receive stream */
+	struct fw_iso_packet initial_packet = {
+		.payload_length	= amdtp_out_stream_get_max_payload(s),
+		.skip		= 0,
+		.tag		= TAG_CIP,
+		.sy		= 0,
+		.header_length	= 4
+	};
+	unsigned int i;
+	int err;
+
+	for (i = 0; i < QUEUE_LENGTH; ++i) {
+		initial_packet.interrupt = IS_ALIGNED(s->packet_index + 1,
+						INTERRUPT_INTERVAL);
+		err = fw_iso_context_queue(s->context, &initial_packet,
+			&s->buffer.iso_buffer, s->buffer.packets[i].offset);
+		if (err < 0)
+			return err;
+		if (++s->packet_index >= QUEUE_LENGTH)
+			s->packet_index = 0;
+	}
+
+	return 0;
+}
+
 static int queue_initial_skip_packets(struct amdtp_out_stream *s)
 {
 	/* header length is needed for receive stream */
 	struct fw_iso_packet skip_packet = {
 		.skip		= 1,
-		.header_length	= 4
 	};
 	unsigned int i;
 	int err;
@@ -677,7 +700,11 @@ int amdtp_out_stream_start(struct amdtp_out_stream *s, int channel, int speed)
 
 	s->packet_index = 0;
 	s->data_block_counter = 0;
-	err = queue_initial_skip_packets(s);
+
+	if (s->direction == AMDTP_STREAM_RECEIVE)
+		err = queue_initial_receive_packets(s);
+	else
+		err = queue_initial_skip_packets(s);
 	if (err < 0)
 		goto err_context;
 
