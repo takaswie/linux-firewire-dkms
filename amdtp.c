@@ -13,7 +13,7 @@
 #include <linux/slab.h>
 #include <sound/pcm.h>
 #include "amdtp.h"
-#include <sound/core.h>
+
 #define TICKS_PER_CYCLE		3072
 #define CYCLES_PER_SECOND	8000
 #define TICKS_PER_SECOND	(TICKS_PER_CYCLE * CYCLES_PER_SECOND)
@@ -486,7 +486,7 @@ static void queue_out_packet(struct amdtp_out_stream *s, unsigned int cycle)
 static void handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle)
 {
 	__be32 *buffer;
-	unsigned int index, data_blocks, syt, ptr;
+	unsigned int index, data_blocks, ptr;
 	struct snd_pcm_substream *pcm;
 	struct fw_iso_packet packet;
 	int err;
@@ -497,25 +497,43 @@ static void handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle
 
 	buffer = s->buffer.packets[index].buffer;
 
-	/* TODO: check cip first quadlet */
-	/* TODO: check cip second quadlet */
-	data_blocks = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 16;
-	syt = be32_to_cpu(buffer[1]) & 0xFFFF;
-	/* TODO: check other fields? */
-	buffer += 2;
+	/* checking CIP headers */
+	if (((be32_to_cpu(buffer[0]) & 0xC0000000) >> 30 != 0x00) ||	/* EOH_0 and form_0 */
+	    ((be32_to_cpu(buffer[1]) & 0xC0000000) >> 30 != 0x02) ||	/* EOH_1 and form_1 */
+	    ((be32_to_cpu(buffer[1]) & 0x3F000000) >> 24 != 0x10)) {	/* FMT is not for Audio and Music Data */
+		dev_err(&s->unit->device, "CIP headers error: %08X:%08X\n",
+			be32_to_cpu(buffer[0]), be32_to_cpu(buffer[1]));
+		return;
+	}
+	else if ((be32_to_cpu(buffer[1]) & 0x00FF0000) >> 16 == 0xFF) {	/* NO-DATA packet */
+		pcm = NULL;
+	}
+	else {
+		/* NOTE: we do not check syt field */
+		data_blocks = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 16;
+		s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
 
-	pcm = ACCESS_ONCE(s->pcm);
-	if (pcm)
-		s->transfer_samples(s, pcm, buffer, data_blocks);
+		/* finish to check CIP header */
+		buffer += 2;
 
-	if (s->midi_ports)
-		amdtp_pull_midi(s, buffer, data_blocks);
+		/*
+		 * pick up data from packet
+		 *
+		 * NOTE:
+		 * CIP[0].DBS (=data_blocks) should be used for counting data if fully
+		 * comformant for IEC 61883-6. But FIreworks (snd-fireworks applied)
+		 * don't transmit data according to this way. Here we use
+		 * s->pcm_channels instead of data_blocks.
+		 *
+		 */
+		pcm = ACCESS_ONCE(s->pcm);
+		if (pcm)
+			s->transfer_samples(s, pcm, buffer, s->pcm_channels);
+		if (s->midi_ports)
+			amdtp_pull_midi(s, buffer, s->pcm_channels);
+	}
 
-	s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
-
-	if (s->midi_ports)
-		amdtp_pull_midi(s, buffer, data_blocks);
-
+	/* queueing a packet for next cycle */
 	packet.payload_length = amdtp_out_stream_get_max_payload(s);
 	packet.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
 	packet.skip = 0;
@@ -533,17 +551,18 @@ static void handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle
 		return;
 	}
 
+	/* buffer arrangement */
 	if (++index >= QUEUE_LENGTH)
 		index = 0;
 	s->packet_index = index;
 
 	if (pcm) {
-		ptr = s->pcm_buffer_pointer + data_blocks;
+		ptr = s->pcm_buffer_pointer + s->pcm_channels;
 		if (ptr >= pcm->runtime->buffer_size)
 			ptr -= pcm->runtime->buffer_size;
 		ACCESS_ONCE(s->pcm_buffer_pointer) = ptr;
 
-		s->pcm_period_pointer += data_blocks;
+		s->pcm_period_pointer += s->pcm_channels;
 		if (s->pcm_period_pointer >= pcm->runtime->period_size) {
 			s->pcm_period_pointer -= pcm->runtime->period_size;
 			s->pointer_flush = false;
