@@ -18,6 +18,19 @@
  */
 #include "./fireworks.h"
 
+struct snd_efw_multiplier_condition_t snd_efw_multiplier_condition[] = {
+	/* mode 0 */
+	[0] = { 32000, "32000"},
+	[1] = { 44100, "44100"},
+	[2] = { 48000, "48000"},
+	/* mode 1 */
+	[3] = { 88200, "88200"},
+	[4] = { 96000, "96000"},
+	/* mode 2 */
+	[5] = {176400, "176400"},
+	[6] = {192000, "192000"},
+};
+
 static int
 hw_rule_rate(struct snd_pcm_hw_params *params,
 		struct snd_pcm_hw_rule *rule, int *channels_sets)
@@ -26,23 +39,25 @@ hw_rule_rate(struct snd_pcm_hw_params *params,
 			hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	struct snd_interval *c =
 			hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
-	struct snd_interval t;
+	struct snd_interval t = {
+		.min = UINT_MAX, .max = 0, .integer = 1
+	};
+	int i, sampling_rate, mode;
 
-	snd_interval_any(&t);
+	for (i = 0; i < ARRAY_SIZE(snd_efw_multiplier_condition); i += 1) {
+		/* skip unsupported sampling rate */
+		sampling_rate = snd_efw_multiplier_condition[i].sampling_rate;
+		if (!(efw->supported_sampling_rate & snd_pcm_rate_to_rate_bit(sampling_rate)))
+			continue;
 
-	if (channels_sets[0] == channels_sets[1] &&
-	    channels_sets[1] == channels_sets[2])
-		return 0;
+		/* skip test failed */
+		mode = get_multiplier_mode(i);
+		if (!snd_interval_test(c, channels_sets[mode]))
+			continue;
 
-	if (snd_interval_min(c) > channels_sets[1])
-		t.max = 48000;
-	else if (snd_interval_min(c) > channels_sets[2])
-		t.max = 96000;
-	else
-		t.max = 192000;
-
-	t.min = 32000;
-	t.integer = 1;
+		t.min = min(t.min, snd_efw_multiplier_condition[i].samplig_rate);
+		t.max = max(t.max, snd_efw_multiplier_condition[i].samplig_rate);
+	}
 
 	return snd_interval_refine(r, &t);
 }
@@ -55,23 +70,25 @@ hw_rule_channels(struct snd_pcm_hw_params *params,
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	struct snd_interval *r =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_interval t;
+	struct snd_interval t = {
+		.min = UINT_MAX, .max = 0, .integer = 1
+	};
+	int i, sampling_rate, mode;
 
-	snd_interval_any(&t);
+	for (i = 0; i < ARRAY_SIZE(snd_efw_multiplier_condition); i += 1) {
+		/* skip unsupported sampling rate */
+		sampling_rate = snd_efw_multiplier_condition[i].sampling_rate;
+		if (!(efw->supported_sampling_rate & snd_pcm_rate_to_rate_bit(sampling_rate)))
+			continue;
 
-	if (channels_sets[0] == channels_sets[1] &&
-	    channels_sets[1] == channels_sets[2])
-		return 0;
+		/* skip test failed */
+		if (!snd_interval_test(r, snd_efw_multiplier_condition[i].sampling_rate))
+			continue;
 
-	if (snd_interval_min(r) > 174000)
-		t.max = channels_sets[2];
-	else if (snd_interval_min(r) > 88200)
-		t.max = channels_sets[1];
-	else
-		t.max = channels_sets[0];
-
-	t.min = 0;
-	t.integer = 1;
+		mode = get_multiplier_mode(i);
+		t.min = min(t.min, channels_sets[mode]);
+		t.max = max(t.max, channels_sets[mode]);
+	}
 
 	return snd_interval_refine(c, &t);
 }

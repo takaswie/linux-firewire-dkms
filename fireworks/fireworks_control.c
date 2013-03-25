@@ -610,6 +610,7 @@ snd_efw_control_sampling_rate_info(struct snd_kcontrol *kctl,
 					struct snd_ctl_elem_info *einf)
 {
 	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	const char *desc;
 	int value, i;
 
 	/* TODO: this control is unavailable when isochronous stream runs
@@ -619,8 +620,9 @@ snd_efw_control_sampling_rate_info(struct snd_kcontrol *kctl,
 
 	/* maximum value for user */
 	einf->value.enumerated.items = 0;
-	for (i = 0; i < ARRAY_SIZE(sampling_rate_descs); i += 1) {
-		if ((1 << i) & efw->supported_sampling_rate)
+	for (i = 0; i < ARRAY_SIZE(snd_efw_multiplier_conditions); i += 1) {
+		sampling_rate = snd_efw_multiplier_conditions[i].sampling_rate;
+		if (efw->supported_sampling_rate & snd_pcm_rate_to_rate_bit(sampling_rate))
 			einf->value.enumerated.items += 1;
 	}
 
@@ -641,7 +643,8 @@ snd_efw_control_sampling_rate_info(struct snd_kcontrol *kctl,
 			value -= 1;
 	}
 
-	strcpy(einf->value.enumerated.name, sampling_rate_descs[i]);
+	desc = snd_efw_multiplier_conditions[i].desc;
+	strcpy(einf->value.enumerated.name, desc);
 
         return 0;
 }

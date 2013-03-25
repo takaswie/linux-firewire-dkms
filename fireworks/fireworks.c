@@ -52,6 +52,7 @@ static int snd_efw_get_hardware_info(struct snd_efw_t *efw)
 	struct efc_hwinfo_t *hwinfo = NULL;
 	char version[12];
 	int size;
+	int sampling_rate;
 	int i;
 
 	hwinfo = kmalloc(sizeof(struct efc_hwinfo_t), GFP_KERNEL);
@@ -151,30 +152,14 @@ static int snd_efw_get_hardware_info(struct snd_efw_t *efw)
 
 	/* set flag for supported sampling rate */
 	efw->supported_sampling_rate = 0;
-	if ((hwinfo->min_sample_rate <= 22050)
-	 && (22050 <= hwinfo->max_sample_rate))
-		efw->supported_sampling_rate |= SNDRV_PCM_RATE_22050;
-	if ((hwinfo->min_sample_rate <= 32000)
-	 && (32000 <= hwinfo->max_sample_rate))
-		efw->supported_sampling_rate |= SNDRV_PCM_RATE_32000;
-	if ((hwinfo->min_sample_rate <= 44100)
-	 && (44100 <= hwinfo->max_sample_rate))
-		efw->supported_sampling_rate |= SNDRV_PCM_RATE_44100;
-	if ((hwinfo->min_sample_rate <= 48000)
-	 && (48000 <= hwinfo->max_sample_rate))
-		efw->supported_sampling_rate |= SNDRV_PCM_RATE_48000;
-	if ((hwinfo->min_sample_rate <= 88200)
-	 && (88200 <= hwinfo->max_sample_rate))
-		efw->supported_sampling_rate |= SNDRV_PCM_RATE_88200;
-	if ((hwinfo->min_sample_rate <= 96000)
-	 && (96000 <= hwinfo->max_sample_rate))
-		efw->supported_sampling_rate |= SNDRV_PCM_RATE_96000;
-	if ((hwinfo->min_sample_rate <= 176400)
-	 && (176400 <= hwinfo->max_sample_rate))
-		efw->supported_sampling_rate |= SNDRV_PCM_RATE_176400;
-	if ((hwinfo->min_sample_rate <= 192000)
-	 && (192000 <= hwinfo->max_sample_rate))
-		efw->supported_sampling_rate |= SNDRV_PCM_RATE_192000;
+	for (i = 0; i < ARRAY_SIZE(snd_efw_multiplier_conditions); i += 1) {
+		sampling_rate = snd_efw_multiplier_conditions[i].sampling_rate;
+		/* skip unsupported sampling rate */
+		if (sampling_rate < hwinfo->min_sample_rate &&
+		    hwinfo->max_sample_rate < sampling_rate)
+			continue;
+		efw->supported_sample_rate |= snd_pcm_rate_to_rate_bit(sampling_rate);
+	}
 
 	/* MIDI/PCM inputs and outputs */
 	efw->midi_output_count = hwinfo->nb_midi_out;
