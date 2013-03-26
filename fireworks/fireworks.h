@@ -49,16 +49,11 @@
 #define MAX_MIDI_OUTPUTS 2
 #define MAX_MIDI_INPUTS 2
 
+#define ef_err(ef, format, arg...) dev_err(&(ef)->device->device, format, ##arg)
+
+#define SND_EFW_MUITIPLIER_MODES 3
 #define HWINFO_NAME_SIZE_BYTES 32
 #define HWINFO_MAX_CAPS_GROUPS 8
-
-/* for multiplier mode */
-#define SND_EFW_MUITIPLIER_MODES 3
-extern struct snd_efw_sampling_rate_table_t {
-	int sampling_rate;
-	const char *label;
-} snd_efw_sampling_rate_table[];
-
 
 /* for physical metering */
 enum snd_efw_channel_type_t {
