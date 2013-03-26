@@ -18,60 +18,105 @@
  */
 #include "./fireworks.h"
 
+/*
+ * NOTE:
+ * Fireworks reduces its PCM channels according to its sampling rate.
+ * There are three modes.
+ *  0:  32.0- 48.0 kHz then nb_1394_XXX_channels    applied
+ *  1:  88.2- 96.0 kHz then nb_1394_XXX_channels_2x applied
+ *  2: 176.4-192.0 kHz then nb_1394_XXX_channels_4x applied
+ *
+ * Then the number of PCM channels for analog input and output are always fixed
+ * but the number of PCM channels for digital input and output are differed.
+ *
+ * Additionally, according to AudioFire Owner's Manual Version 2.2,
+ * the number of PCM channels for digital input has more restriction
+ *  with digital mode.
+ *  - ADAT optical with 32.0-48.0 kHz	: use inputs 1-8
+ *  - ADAT coaxial with 88.2-96.0 kHz	: use inputs 1-4
+ *  - S/PDIF coaxial and optical	: use inputs 1-2
+ *
+ * Currently this module doesn't have rules for the latter.
+ */
+static unsigned int freq_table[] = {
+	/* multiplier mode 0 */
+	[0] = 32000,
+	[1] = 44100,
+	[2] = 48000,
+	/* multiplier mode 1 */
+	[3] = 88200,
+	[4] = 96000,
+	/* multiplier mode 2 */
+	[5] = 176400,
+	[6] = 192000,
+};
+
 static int
-hw_rule_rate(struct snd_pcm_hw_params *params,
-		struct snd_pcm_hw_rule *rule, int *channels_sets)
+get_multiplier_mode(int index)
+{
+	return ((int)index - 1) / 2;
+}
+
+static int
+hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
+			struct snd_efw_t *efw, unsigned int *channels_sets)
 {
 	struct snd_interval *r =
 			hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_interval *c =
-			hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
-	struct snd_interval t;
+	const struct snd_interval *c =
+			hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_interval t = {
+		.min = UINT_MAX, .max = 0, .integer = 1
+	};
+	unsigned int rate_bit;
+	int i, mode;
 
-	snd_interval_any(&t);
+	for (i = 0; i < ARRAY_SIZE(freq_table); i += 1) {
+		/* skip unsupported sampling rate */
+		rate_bit = snd_pcm_rate_to_rate_bit(freq_table[i]);
+		if (!(efw->supported_sampling_rate & rate_bit))
+			continue;
 
-	if (channels_sets[0] == channels_sets[1] &&
-	    channels_sets[1] == channels_sets[2])
-		return 0;
+		mode = get_multiplier_mode(i);
+		if (!snd_interval_test(c, channels_sets[mode]))
+			continue;
+		t.min = min(t.min, freq_table[i]);
+		t.max = max(t.max, freq_table[i]);
 
-	if (snd_interval_min(c) > channels_sets[1])
-		t.max = 48000;
-	else if (snd_interval_min(c) > channels_sets[2])
-		t.max = 96000;
-	else
-		t.max = 192000;
-
-	t.min = 32000;
-	t.integer = 1;
+	}
 
 	return snd_interval_refine(r, &t);
 }
 
 static int
-hw_rule_channels(struct snd_pcm_hw_params *params,
-		struct snd_pcm_hw_rule *rule, int *channels_sets)
+hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
+			struct snd_efw_t *efw, unsigned int *channels_sets)
 {
 	struct snd_interval *c =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
-	struct snd_interval *r =
-		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_interval t;
+	const struct snd_interval *r =
+		hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval t = {
+		.min = UINT_MAX, .max = 0, .integer = 1
+	};
 
-	snd_interval_any(&t);
+	unsigned int rate_bit;
+	int i, mode;
 
-	if (channels_sets[0] == channels_sets[1] &&
-	    channels_sets[1] == channels_sets[2])
-		return 0;
+	for (i = 0; i < ARRAY_SIZE(freq_table); i += 1) {
+		/* skip unsupported sampling rate */
+		rate_bit = snd_pcm_rate_to_rate_bit(freq_table[i]);
+		if (!(efw->supported_sampling_rate & rate_bit))
+			continue;
 
-	if (snd_interval_min(r) > 174000)
-		t.max = channels_sets[2];
-	else if (snd_interval_min(r) > 88200)
-		t.max = channels_sets[1];
-	else
-		t.max = channels_sets[0];
+		mode = get_multiplier_mode(i);
+		if (!snd_interval_test(r, freq_table[i]))
+			continue;
 
-	t.min = 0;
-	t.integer = 1;
+		t.min = min(t.min, channels_sets[mode]);
+		t.max = max(t.max, channels_sets[mode]);
+
+	}
 
 	return snd_interval_refine(c, &t);
 }
@@ -81,7 +126,7 @@ hw_rule_capture_rate(struct snd_pcm_hw_params *params,
 				struct snd_pcm_hw_rule *rule)
 {
 	struct snd_efw_t *efw = rule->private;
-	return hw_rule_rate(params, rule,
+	return hw_rule_rate(params, rule, efw,
 				efw->pcm_capture_channels_sets);
 }
 
@@ -90,7 +135,7 @@ hw_rule_playback_rate(struct snd_pcm_hw_params *params,
 				struct snd_pcm_hw_rule *rule)
 {
 	struct snd_efw_t *efw = rule->private;
-	return hw_rule_rate(params, rule,
+	return hw_rule_rate(params, rule, efw,
 				efw->pcm_playback_channels_sets);
 }
 
@@ -99,7 +144,7 @@ hw_rule_capture_channels(struct snd_pcm_hw_params *params,
 				struct snd_pcm_hw_rule *rule)
 {
 	struct snd_efw_t *efw = rule->private;
-	return hw_rule_channels(params, rule,
+	return hw_rule_channels(params, rule, efw,
 				efw->pcm_capture_channels_sets);
 }
 
@@ -108,7 +153,7 @@ hw_rule_playback_channels(struct snd_pcm_hw_params *params,
 				struct snd_pcm_hw_rule *rule)
 {
 	struct snd_efw_t *efw = rule->private;
-	return hw_rule_channels(params, rule,
+	return hw_rule_channels(params, rule, efw,
 				efw->pcm_playback_channels_sets);
 }
 
