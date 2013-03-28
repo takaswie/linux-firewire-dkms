@@ -333,7 +333,7 @@ static int snd_efw_probe(struct device *dev)
 
 	/* create midi interface */
 	if (efw->midi_output_count || efw->midi_input_count) {
-		err = snd_efw_create_midi_ports(efw);
+		err = snd_efw_create_midi_devices(efw);
 		if (err < 0)
 			goto error_card;
 	}

@@ -262,7 +262,7 @@ void snd_efw_proc_init(struct snd_efw_t *efw);
 int snd_efw_create_control_devices(struct snd_efw_t *efw);
 
 /* for midi component */
-int snd_efw_create_midi_ports(struct snd_efw_t *ef);
+int snd_efw_create_midi_devices(struct snd_efw_t *ef);
 
 /* for pcm component */
 int snd_efw_create_pcm_devices(struct snd_efw_t *efw);

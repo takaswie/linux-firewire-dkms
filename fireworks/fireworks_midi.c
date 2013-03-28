@@ -66,7 +66,7 @@ midi_close(struct snd_rawmidi_substream *substream)
 		goto end;
 
 	/* stop stream */
-	snd_efw_stream_stop(&efw->receive_stream);
+	snd_efw_stream_stop(stream);
 
 	/* midi is not transferred */
 	stream->midi = false;
@@ -135,7 +135,8 @@ set_midi_substream_names(struct snd_efw_t *efw,
 			"%s MIDI %d", efw->card->shortname, subs->number + 1);
 }
 
-int snd_efw_create_midi_ports(struct snd_efw_t *efw)
+int
+snd_efw_create_midi_devices(struct snd_efw_t *efw)
 {
 	struct snd_rawmidi *rmidi;
 	struct snd_rawmidi_str *str;
