@@ -192,6 +192,7 @@ pcm_init_hw_params(struct snd_efw_t *efw,
 	if (err < 0)
 		return err;
 
+	/* AM824 in IEC 61883-6 can deliver 24bit data */
 	err = snd_pcm_hw_constraint_msbits(substream->runtime, 0, 32, 24);
 	if (err < 0)
 		return err;
