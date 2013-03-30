@@ -150,9 +150,6 @@ static void amdtp_write_s32(struct amdtp_out_stream *s,
 static void amdtp_read_s16(struct amdtp_out_stream *s,
 			    struct snd_pcm_substream *pcm,
 			    __be32 *buffer, unsigned int frames);
-static void amdtp_read_s24(struct amdtp_out_stream *s,
-			    struct snd_pcm_substream *pcm,
-			    __be32 *buffer, unsigned int frames);
 static void amdtp_read_s32(struct amdtp_out_stream *s,
 			    struct snd_pcm_substream *pcm,
 			    __be32 *buffer, unsigned int frames);
@@ -176,12 +173,6 @@ void amdtp_out_stream_set_pcm_format(struct amdtp_out_stream *s,
 	default:
 		WARN_ON(1);
 		/* fall through */
-	case SNDRV_PCM_FORMAT_S24:
-		if (s->direction == AMDTP_STREAM_RECEIVE) {
-			s->transfer_samples = amdtp_read_s24;
-			break;
-		}
-		/* fail through */
 	case SNDRV_PCM_FORMAT_S16:
 		if (s->direction == AMDTP_STREAM_RECEIVE)
 			s->transfer_samples = amdtp_read_s16;
@@ -342,82 +333,48 @@ static void amdtp_write_s16(struct amdtp_out_stream *s,
 	}
 }
 
-static void amdtp_read_s32(struct amdtp_out_stream *s,
+/* NOTE: frames is not used */
+static void
+amdtp_read_s32(struct amdtp_out_stream *s,
 			    struct snd_pcm_substream *pcm,
 			    __be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int channels, remaining_frames, frame_step, i, c;
+	unsigned int c;
 	u32 *dst;
 
-	channels = s->pcm_channels;
-	dst = (void *)runtime->dma_area +
-			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
-	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
-	frame_step = s->data_block_quadlets - channels;
+	dst  = (void *)runtime->dma_area;
+	dst += s->pcm_buffer_pointer;
 
-	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < channels; ++c) {
-			*dst = be32_to_cpu(*buffer) << 8;
-			dst++;
-			buffer++;
-		}
-		buffer += frame_step;
-		if (--remaining_frames == 0)
-			dst = (void *)runtime->dma_area;
+	for (c = 0; c < s->pcm_channels; ++c) {
+		*dst = be32_to_cpu(*buffer) << 8;
+		dst += 1;
+		buffer += 1;
 	}
+
+	/* TODO: MIDI */
 }
 
-static void amdtp_read_s24(struct amdtp_out_stream *s,
-			    struct snd_pcm_substream *pcm,
-			    __be32 *buffer, unsigned int frames)
+/* NOTE: frames is not used */
+static void
+amdtp_read_s16(struct amdtp_out_stream *s,
+		struct snd_pcm_substream *pcm,
+		__be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int channels, remaining_frames, frame_step, i, c;
-	u32 *dst;
-
-	channels = s->pcm_channels;
-	dst = (void *)runtime->dma_area +
-			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
-	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
-	frame_step = s->data_block_quadlets - channels;
-
-	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < channels; ++c) {
-			*dst = be32_to_cpu(*buffer) << 8;
-			dst++;
-			buffer++;
-		}
-		buffer += frame_step;
-		if (--remaining_frames == 0)
-			dst = (void *)runtime->dma_area;
-	}
-}
-
-static void amdtp_read_s16(struct amdtp_out_stream *s,
-			    struct snd_pcm_substream *pcm,
-			    __be32 *buffer, unsigned int frames)
-{
-	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int channels, remaining_frames, frame_step, i, c;
+	unsigned int c;
 	u16 *dst;
 
-	channels = s->pcm_channels;
-	dst = (void *)runtime->dma_area +
-			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
-	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
-	frame_step = s->data_block_quadlets - channels;
+	dst  = (void *)runtime->dma_area;
+	dst += s->pcm_buffer_pointer;
 
-	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < channels; ++c) {
-			*dst = be32_to_cpu(*buffer) << 8;
-			dst++;
-			buffer++;
-		}
-		buffer += frame_step;
-		if (--remaining_frames == 0)
-			dst = (void *)runtime->dma_area;
+	for (c = 0; c < s->pcm_channels; ++c) {
+		*dst = be32_to_cpu(*buffer) << 8;
+		dst += 1;
+		buffer += 1;
 	}
+
+	/* TODO: MIDI */
 }
 
 static void amdtp_fill_pcm_silence(struct amdtp_out_stream *s,
@@ -433,7 +390,7 @@ static void amdtp_fill_pcm_silence(struct amdtp_out_stream *s,
 }
 
 static void amdtp_fill_midi(struct amdtp_out_stream *s,
-			    __be32 *buffer, unsigned int frames)
+				__be32 *buffer, unsigned int frames)
 {
 	unsigned int i;
 
@@ -442,13 +399,14 @@ static void amdtp_fill_midi(struct amdtp_out_stream *s,
 						cpu_to_be32(0x80000000);
 }
 
-static void amdtp_pull_midi(struct amdtp_out_stream *s,
-				__be32 *buffer, unsigned int frames)
+/* TODO: MIDI */
+static void
+amdtp_pull_midi(struct amdtp_out_stream *s, __be32 *buffer)
 {
 	unsigned int i;
 	u32 sequence;
 
-	for (i = 0; i < frames; i += 1)
+	for (i = 0; i < s->midi_ports; i += 1)
 		sequence = be32_to_cpu(buffer[s->pcm_channels +
 						i * s->data_block_quadlets]);
 }
@@ -521,7 +479,8 @@ static void queue_out_packet(struct amdtp_out_stream *s, unsigned int cycle)
 	}
 }
 
-static void handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle)
+static void
+handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle)
 {
 	__be32 *buffer;
 	unsigned int index, data_blocks, ptr;
@@ -551,27 +510,6 @@ static void handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle
 		data_blocks = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 16;
 		s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
 
-snd_printk("%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X,%08X\n",
-buffer[0],
-buffer[1],
-buffer[2],
-buffer[3],
-buffer[4],
-buffer[5],
-buffer[6],
-buffer[7],
-buffer[8],
-buffer[9],
-buffer[10],
-buffer[11],
-buffer[12],
-buffer[13],
-buffer[14],
-buffer[15],
-buffer[16],
-buffer[17],
-buffer[18]);
-
 		/* finish to check CIP header */
 		buffer += 2;
 
@@ -587,9 +525,9 @@ buffer[18]);
 		 */
 		pcm = ACCESS_ONCE(s->pcm);
 		if (pcm)
-			s->transfer_samples(s, pcm, buffer, s->pcm_channels);
+			s->transfer_samples(s, pcm, buffer, 1);
 		if (s->midi_ports)
-			amdtp_pull_midi(s, buffer, s->pcm_channels);
+			amdtp_pull_midi(s, buffer);
 	}
 
 	/* queueing a packet for next cycle */
@@ -614,11 +552,12 @@ buffer[18]);
 		index = 0;
 	s->packet_index = index;
 
-	/* PCM buffer pointer arrangement */
-	if (pcm) {
+	/* PCM buffer pointer arrangement, here 'pointer' means frame count */
+	if (pcm != NULL) {
 		ptr = s->pcm_buffer_pointer + s->pcm_channels;
-		if (ptr >= pcm->runtime->buffer_size)
+		if (ptr >= pcm->runtime->buffer_size) {
 			ptr -= pcm->runtime->buffer_size;
+		}
 		ACCESS_ONCE(s->pcm_buffer_pointer) = ptr;
 
 		s->pcm_period_pointer += s->pcm_channels;

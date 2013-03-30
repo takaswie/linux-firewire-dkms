@@ -230,7 +230,6 @@ pcm_open(struct snd_pcm_substream *substream)
 		goto end;
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		substream->runtime->hw.formats |= SNDRV_PCM_FMTBIT_S24_BE;
 		substream->runtime->hw.channels_min = efw->pcm_capture_channels;
 		substream->runtime->hw.channels_max = efw->pcm_capture_channels;
 	} else {
