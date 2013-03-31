@@ -348,7 +348,6 @@ amdtp_read_s32(struct amdtp_out_stream *s,
 
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < s->pcm_channels; ++c) {
-			snd_printk("s32 %d:%d\n", i, c);
 			*dst = be32_to_cpu(*buffer) << 8;
 			dst += 1;
 			buffer += 1;
@@ -371,7 +370,6 @@ amdtp_read_s16(struct amdtp_out_stream *s,
 
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < s->pcm_channels; ++c) {
-			snd_printk("s16 %d:%d\n", i, c);
 			*dst = be32_to_cpu(*buffer) << 8;
 			dst += 1;
 			buffer += 1;
