@@ -333,48 +333,50 @@ static void amdtp_write_s16(struct amdtp_out_stream *s,
 	}
 }
 
-/* NOTE: frames is not used */
 static void
 amdtp_read_s32(struct amdtp_out_stream *s,
 			    struct snd_pcm_substream *pcm,
 			    __be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int c;
+	unsigned int i, c;
 	u32 *dst;
 
+	/* here we don't use ALSA's DMA buffer as PCI devices do */
 	dst  = (void *)runtime->dma_area;
 	dst += s->pcm_buffer_pointer;
 
-	for (c = 0; c < s->pcm_channels; ++c) {
-		*dst = be32_to_cpu(*buffer) << 8;
-		dst += 1;
-		buffer += 1;
+	for (i = 0; i < frames; ++i) {
+		for (c = 0; c < s->pcm_channels; ++c) {
+			snd_printk("s32 %d:%d\n", i, c);
+			*dst = be32_to_cpu(*buffer) << 8;
+			dst += 1;
+			buffer += 1;
+		}
 	}
-
-	/* TODO: MIDI */
 }
 
-/* NOTE: frames is not used */
 static void
 amdtp_read_s16(struct amdtp_out_stream *s,
 		struct snd_pcm_substream *pcm,
 		__be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int c;
+	unsigned int i, c;
 	u16 *dst;
 
-	dst  = (void *)runtime->dma_area;
+	/* here we don't use ALSA's DMA buffer as PCI devices do */
+	dst = (void *)runtime->dma_area;
 	dst += s->pcm_buffer_pointer;
 
-	for (c = 0; c < s->pcm_channels; ++c) {
-		*dst = be32_to_cpu(*buffer) << 8;
-		dst += 1;
-		buffer += 1;
+	for (i = 0; i < frames; ++i) {
+		for (c = 0; c < s->pcm_channels; ++c) {
+			snd_printk("s16 %d:%d\n", i, c);
+			*dst = be32_to_cpu(*buffer) << 8;
+			dst += 1;
+			buffer += 1;
+		}
 	}
-
-	/* TODO: MIDI */
 }
 
 static void amdtp_fill_pcm_silence(struct amdtp_out_stream *s,
@@ -483,7 +485,7 @@ static void
 handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle)
 {
 	__be32 *buffer;
-	unsigned int index, data_blocks, ptr;
+	unsigned int index, data_blocks, frames, ptr;
 	struct snd_pcm_substream *pcm;
 	struct fw_iso_packet packet;
 	int err;
@@ -497,7 +499,7 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle)
 	/* checking CIP headers */
 	if (((be32_to_cpu(buffer[0]) & 0xC0000000) >> 30 != 0x00) ||	/* EOH_0 and form_0 */
 	    ((be32_to_cpu(buffer[1]) & 0xC0000000) >> 30 != 0x02) ||	/* EOH_1 and form_1 */
-	    ((be32_to_cpu(buffer[1]) & 0x3F000000) >> 24 != 0x10)) {	/* FMT is not for Audio and Music Data */
+	    ((be32_to_cpu(buffer[1]) & 0x3F000000) >> 24 != 0x10)) {	/* FMT not for AM824 */
 		dev_err(&s->unit->device, "CIP headers error: %08X:%08X\n",
 			be32_to_cpu(buffer[0]), be32_to_cpu(buffer[1]));
 		return;
@@ -513,19 +515,11 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle)
 		/* finish to check CIP header */
 		buffer += 2;
 
-		/*
-		 * pick up data from packet
-		 *
-		 * NOTE:
-		 * CIP[0].DBS (=data_blocks) should be used for counting data if fully
-		 * comformant for IEC 61883-6. But FIreworks (snd-fireworks applied)
-		 * don't transmit data according to this way. Here we use
-		 * s->pcm_channels instead of data_blocks.
-		 *
-		 */
+		/* pick up samples from packet */
+		frames = data_blocks / (s->pcm_channels + s->midi_ports);
 		pcm = ACCESS_ONCE(s->pcm);
 		if (pcm)
-			s->transfer_samples(s, pcm, buffer, 1);
+			s->transfer_samples(s, pcm, buffer, frames);
 		if (s->midi_ports)
 			amdtp_pull_midi(s, buffer);
 	}
