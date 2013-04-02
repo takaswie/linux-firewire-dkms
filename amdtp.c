@@ -343,8 +343,8 @@ amdtp_read_s32(struct amdtp_out_stream *s,
 	u32 *dst;
 
 	/* here we don't use ALSA's DMA buffer as PCI devices do */
-	dst  = (void *)runtime->dma_area;
-	dst += s->pcm_buffer_pointer;
+	dst  = (void *)runtime->dma_area +
+			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
 
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < s->pcm_channels; ++c) {
@@ -365,8 +365,8 @@ amdtp_read_s16(struct amdtp_out_stream *s,
 	u16 *dst;
 
 	/* here we don't use ALSA's DMA buffer as PCI devices do */
-	dst = (void *)runtime->dma_area;
-	dst += s->pcm_buffer_pointer;
+	dst = (void *)runtime->dma_area +
+			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
 
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < s->pcm_channels; ++c) {
@@ -544,15 +544,15 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle)
 		index = 0;
 	s->packet_index = index;
 
-	/* PCM buffer pointer arrangement, here 'pointer' means frame count */
+	/* calcurate period and buffer borders */
 	if (pcm != NULL) {
-		ptr = s->pcm_buffer_pointer + s->pcm_channels;
+		ptr = s->pcm_buffer_pointer + frames;
 		if (ptr >= pcm->runtime->buffer_size) {
 			ptr -= pcm->runtime->buffer_size;
 		}
 		ACCESS_ONCE(s->pcm_buffer_pointer) = ptr;
 
-		s->pcm_period_pointer += s->pcm_channels;
+		s->pcm_period_pointer += frames;
 		if (s->pcm_period_pointer >= pcm->runtime->period_size) {
 			s->pcm_period_pointer -= pcm->runtime->period_size;
 			s->pointer_flush = false;
