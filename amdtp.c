@@ -14,9 +14,6 @@
 #include <sound/pcm.h>
 #include "amdtp.h"
 
-/* should be remove */
-#include <sound/core.h>
-
 #define TICKS_PER_CYCLE		3072
 #define CYCLES_PER_SECOND	8000
 #define TICKS_PER_SECOND	(TICKS_PER_CYCLE * CYCLES_PER_SECOND)
@@ -339,12 +336,15 @@ amdtp_read_s32(struct amdtp_out_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int i, c;
+	unsigned int channels, remaining_frames, frame_step, i, c;
 	u32 *dst;
 
 	/* here we don't use ALSA's DMA buffer as PCI devices do */
+	channels = s->pcm_channels;
 	dst  = (void *)runtime->dma_area +
 			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
+	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
+	frame_step = s->data_block_quadlets - channels;
 
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < s->pcm_channels; ++c) {
@@ -352,6 +352,9 @@ amdtp_read_s32(struct amdtp_out_stream *s,
 			dst += 1;
 			buffer += 1;
 		}
+		buffer += frame_step;
+		if (--remaining_frames == 0)
+			dst = (void *)runtime->dma_area;
 	}
 }
 
@@ -361,12 +364,15 @@ amdtp_read_s16(struct amdtp_out_stream *s,
 		__be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int i, c;
+	unsigned int channels, remaining_frames, frame_step, i, c;
 	u16 *dst;
 
 	/* here we don't use ALSA's DMA buffer as PCI devices do */
+	channels = s->pcm_channels;
 	dst = (void *)runtime->dma_area +
 			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
+	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
+	frame_step = s->data_block_quadlets - channels;
 
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < s->pcm_channels; ++c) {
@@ -374,6 +380,9 @@ amdtp_read_s16(struct amdtp_out_stream *s,
 			dst += 1;
 			buffer += 1;
 		}
+		buffer += frame_step;
+		if (--remaining_frames == 0)
+			dst = (void *)runtime->dma_area;
 	}
 }
 
@@ -480,7 +489,7 @@ static void queue_out_packet(struct amdtp_out_stream *s, unsigned int cycle)
 }
 
 static void
-handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle)
+handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 {
 	__be32 *buffer;
 	unsigned int index, data_blocks, frames, ptr;
@@ -502,7 +511,8 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle)
 			be32_to_cpu(buffer[0]), be32_to_cpu(buffer[1]));
 		return;
 	}
-	else if ((be32_to_cpu(buffer[1]) & 0x00FF0000) >> 16 == 0xFF) {	/* NO-DATA packet */
+	else if (data_quadlets < 3 ||					/* CIP headers only */
+	         (be32_to_cpu(buffer[1]) & 0x00FF0000) >> 16 == 0xFF) {	/* NO-DATA packet */
 		pcm = NULL;
 	}
 	else {
@@ -514,7 +524,7 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int cycle)
 		buffer += 2;
 
 		/* pick up samples from packet */
-		frames = data_blocks / (s->pcm_channels + s->midi_ports);
+		frames = (data_quadlets - 2) / data_blocks;
 		pcm = ACCESS_ONCE(s->pcm);
 		if (pcm)
 			s->transfer_samples(s, pcm, buffer, frames);
@@ -584,10 +594,35 @@ static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
 	cycle += QUEUE_LENGTH - packets;
 
 	for (i = 0; i < packets; ++i)
-		if (s->direction == AMDTP_STREAM_RECEIVE)
-			handle_receive_packet(s, ++cycle);
-		else
-			queue_out_packet(s, ++cycle);
+		queue_out_packet(s, ++cycle);
+
+	fw_iso_context_queue_flush(s->context);
+}
+
+static void
+in_packet_callback(struct fw_iso_context *context, u32 cycle,
+			size_t header_length, void *header, void *private_data)
+{
+	struct amdtp_out_stream *s = private_data;
+	unsigned int i, data_quadlets, packets = header_length / 4;
+	__be32 *headers = (__be32 *)header;
+
+	/* check isochronous packet header */
+	if (((be32_to_cpu(headers[0]) & 0x0000C000) >> 14) != 0x01 ||	/* Common Isochronous Packet */
+	    ((be32_to_cpu(headers[0]) & 0x000000F0) >>  4) != 0x0A) {	/* Isochronous Packet */
+		dev_err(&s->unit->device, "Isochronous headers error: %08X:%08X\n",
+			be32_to_cpu(headers[0]), be32_to_cpu(headers[1]));
+		return;
+	}
+	else {
+		data_quadlets = ((be32_to_cpu(headers[0]) & 0xFFFF0000) >> 16) / 4;
+	}
+
+	cycle += QUEUE_LENGTH - packets;
+
+	for (i = 0; i < packets; ++i)
+		handle_receive_packet(s, data_quadlets);
+
 	fw_iso_context_queue_flush(s->context);
 }
 
@@ -691,7 +726,7 @@ int amdtp_out_stream_start(struct amdtp_out_stream *s, int channel, int speed)
 		s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
 						   FW_ISO_CONTEXT_RECEIVE,
 						   channel, speed, 4,
-						   out_packet_callback, s);
+						   in_packet_callback, s);
 	else
 		s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
 						   FW_ISO_CONTEXT_TRANSMIT,
