@@ -339,7 +339,7 @@ amdtp_read_s32(struct amdtp_out_stream *s,
 	unsigned int channels, remaining_frames, frame_step, i, c;
 	u32 *dst;
 
-	/* here we don't use ALSA's DMA buffer as PCI devices do */
+	/* here ALSA's DMA buffer is not used in the same way as for PCI devices */
 	channels = s->pcm_channels;
 	dst  = (void *)runtime->dma_area +
 			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
@@ -347,7 +347,7 @@ amdtp_read_s32(struct amdtp_out_stream *s,
 	frame_step = s->data_block_quadlets - channels;
 
 	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < s->pcm_channels; ++c) {
+		for (c = 0; c < channels; ++c) {
 			*dst = be32_to_cpu(*buffer) << 8;
 			dst += 1;
 			buffer += 1;
@@ -367,7 +367,7 @@ amdtp_read_s16(struct amdtp_out_stream *s,
 	unsigned int channels, remaining_frames, frame_step, i, c;
 	u16 *dst;
 
-	/* here we don't use ALSA's DMA buffer as PCI devices do */
+	/* here ALSA's DMA buffer is not used in the same way as for PCI devices */
 	channels = s->pcm_channels;
 	dst = (void *)runtime->dma_area +
 			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
@@ -375,7 +375,7 @@ amdtp_read_s16(struct amdtp_out_stream *s,
 	frame_step = s->data_block_quadlets - channels;
 
 	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < s->pcm_channels; ++c) {
+		for (c = 0; c < channels; ++c) {
 			*dst = be32_to_cpu(*buffer) << 8;
 			dst += 1;
 			buffer += 1;
@@ -492,7 +492,7 @@ static void
 handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 {
 	__be32 *buffer;
-	unsigned int index, data_blocks, frames, ptr;
+	unsigned int index, frames, ptr;
 	struct snd_pcm_substream *pcm;
 	struct fw_iso_packet packet;
 	int err;
@@ -517,14 +517,14 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 	}
 	else {
 		/* NOTE: we do not check syt field */
-		data_blocks = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 16;
-		s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
+		s->data_block_quadlets = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 16;
+		s->data_block_counter = (s->data_block_counter + s->data_block_quadlets) & 0xff;
 
 		/* finish to check CIP header */
 		buffer += 2;
 
 		/* pick up samples from packet */
-		frames = (data_quadlets - 2) / data_blocks;
+		frames = (data_quadlets - 2) / s->data_block_quadlets;
 		pcm = ACCESS_ONCE(s->pcm);
 		if (pcm)
 			s->transfer_samples(s, pcm, buffer, frames);
@@ -533,12 +533,13 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 	}
 
 	/* queueing a packet for next cycle */
-	packet.payload_length = amdtp_out_stream_get_max_payload(s);
+	/* TODO: payload_length should be in a new function */
+	packet.payload_length = 8 + s->syt_interval * 4 * s->data_block_quadlets;
 	packet.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
 	packet.skip = 0;
 	packet.tag = TAG_CIP;
 	packet.sy = 0;
-	packet.header_length = 4;
+	packet.header_length = 4;	/* just check isochronous packet header */
 
 	err = fw_iso_context_queue(s->context, &packet, &s->buffer.iso_buffer,
 				   s->buffer.packets[index].offset);
@@ -580,7 +581,6 @@ static void pcm_period_tasklet(unsigned long data)
 		snd_pcm_period_elapsed(pcm);
 }
 
-/* TODO: rename */
 static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
 			size_t header_length, void *header, void *private_data)
 {
@@ -604,24 +604,24 @@ in_packet_callback(struct fw_iso_context *context, u32 cycle,
 			size_t header_length, void *header, void *private_data)
 {
 	struct amdtp_out_stream *s = private_data;
-	unsigned int i, data_quadlets, packets = header_length / 4;
-	__be32 *headers = (__be32 *)header;
+	unsigned int p, data_quadlets, packets = header_length / 4;
+	__be32 *headers = header;
 
-	/* check isochronous packet header */
-	if (((be32_to_cpu(headers[0]) & 0x0000C000) >> 14) != 0x01 ||	/* Common Isochronous Packet */
-	    ((be32_to_cpu(headers[0]) & 0x000000F0) >>  4) != 0x0A) {	/* Isochronous Packet */
-		dev_err(&s->unit->device, "Isochronous headers error: %08X:%08X\n",
-			be32_to_cpu(headers[0]), be32_to_cpu(headers[1]));
-		return;
-	}
-	else {
-		data_quadlets = ((be32_to_cpu(headers[0]) & 0xFFFF0000) >> 16) / 4;
-	}
+	for (p = 0; p < packets; p += 1) {
+		/* check isochronous packet header */
+		if (((be32_to_cpu(headers[p]) & 0x0000C000) >> 14) != 0x01 ||	/* Common Isochronous Packet */
+		    ((be32_to_cpu(headers[p]) & 0x000000F0) >>  4) != 0x0A) {	/* Isochronous Packet */
+			dev_err(&s->unit->device,
+				"Isochronous headers error: %08X\n", be32_to_cpu(headers[p]));
+			return;
+		}
 
-	cycle += QUEUE_LENGTH - packets;
+		/* how many quadlet for data in this packet */
+		data_quadlets = ((be32_to_cpu(headers[p]) & 0xFFFF0000) >> 16) / 4;
 
-	for (i = 0; i < packets; ++i)
+		/* handle each packet data */
 		handle_receive_packet(s, data_quadlets);
+	}
 
 	fw_iso_context_queue_flush(s->context);
 }
@@ -630,14 +630,16 @@ static int queue_initial_receive_packets(struct amdtp_out_stream *s)
 {
 	/* header length is needed for receive stream */
 	struct fw_iso_packet initial_packet = {
-		.payload_length	= amdtp_out_stream_get_max_payload(s),
 		.skip		= 0,
 		.tag		= TAG_CIP,
 		.sy		= 0,
-		.header_length	= 4
+		.header_length	= 4	/* just check isochronous pcaket header */
 	};
 	unsigned int i;
 	int err;
+
+	/* TODO: payload_length should be in a certain function */
+	initial_packet.payload_length = 8 + s->syt_interval * 4 * s->data_block_quadlets;
 
 	for (i = 0; i < QUEUE_LENGTH; ++i) {
 		initial_packet.interrupt = IS_ALIGNED(s->packet_index + 1,
@@ -715,9 +717,15 @@ int amdtp_out_stream_start(struct amdtp_out_stream *s, int channel, int speed)
 	s->syt_offset_state = initial_state[s->sfc].syt_offset;
 	s->last_syt_offset = TICKS_PER_CYCLE;
 
-	err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
-				      amdtp_out_stream_get_max_payload(s),
-				      DMA_TO_DEVICE);
+	/* TODO: max payload size should be in a new function */
+	if (s->direction == AMDTP_STREAM_RECEIVE)
+		err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
+						8 + s->syt_interval * 4 * s->data_block_quadlets,
+						DMA_FROM_DEVICE);
+	else
+		err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
+						amdtp_out_stream_get_max_payload(s),
+						DMA_TO_DEVICE);
 	if (err < 0)
 		goto err_unlock;
 
@@ -725,12 +733,12 @@ int amdtp_out_stream_start(struct amdtp_out_stream *s, int channel, int speed)
 	if (s->direction == AMDTP_STREAM_RECEIVE)
 		s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
 						   FW_ISO_CONTEXT_RECEIVE,
-						   channel, speed, 4,
+						   channel, speed, 4,	/* just check isochronous packet header */
 						   in_packet_callback, s);
 	else
 		s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
 						   FW_ISO_CONTEXT_TRANSMIT,
-						   channel, speed, 0,
+						   channel, speed, 4,	/* just check isochronous packet header */
 						   out_packet_callback, s);
 	if (IS_ERR(s->context)) {
 		err = PTR_ERR(s->context);
