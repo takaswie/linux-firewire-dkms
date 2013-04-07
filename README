@@ -1,6 +1,6 @@
 = Developing for snd-fireworks=
 
-2012/02/28 坂本 貴史
+2012/04/08 坂本 貴史
 Takashi Sakamoto <o-takashi@sakamocchi.jp>
 
 == General ==
@@ -51,13 +51,18 @@ oMPR/oPCR and receiving AMDTP, MIDI handling.
 
 == current status ==
 
-For device control:
 1. get/set sampling rate, clock source, digital I/O mode, digital I/O format via alsamixer
 2. get physical metering and internal monitoring via procfs
-3. playback PCM samples with any sampling rate (with bug, just second channel is available...)
-4. playback MIDI sequences
+3. playback and capturing PCM samples with any sampling rate
 
 Hardware information is in the end of this README.
+
+== rest of work ==
+
+1.MIDI handling
+2.interfaces for hardware monitoring, metering, mixer
+3.commit patches for snd-firewire-lib.ko to ALSA
+4.commit patches newly for snd-fireworks to ALSA
 
 == easy instraction with DKMS ==
 
@@ -80,7 +85,7 @@ sudo apt-get install dkms
 
 = snd-fireworks.koの開発 =
 
-2012/02/17 坂本 貴史
+2013/04/08 坂本 貴史
 Takashi Sakamoto <o-takashi@sakamocchi.jp>
 
 == 概要 ==
@@ -155,7 +160,7 @@ procfsが有効なカーネルでは、AV/Cコマンドの受信内容の一部�
 
 == いまできること ==
 
-1.PCM再生
+1.PCM再生・録音
 装置によりますが、標本化周波数32.0kHz〜192.0kHzでの再生が可能です。
 装置によりますが、クロックソースはどれでも使えます。
 装置の制約があり、チャンネル数は以下のようになります。
@@ -163,10 +168,7 @@ procfsが有効なカーネルでは、AV/Cコマンドの受信内容の一部�
 	 96.0kHz以下 アナログ入出力8chずつ、デジタル入出力4chずつ
 	192.0kHz以下 アナログ入出力8chずつ、デジタル入出力2chずつ
 
-ただし、バグがあるためどのモードで再生しても2チャンネル目しか装置から出力されません。	
-ドライバーがAMDTPの処理を適切に行えないことに原因があります。
-
-2.MIDIの入力・出力。
+2.MIDIの再生・録音
 まだ実装されていません。
 
 3.alsamixerやamixerを使い、装置の挙動の一部を変更可能
@@ -177,6 +179,12 @@ procfsが有効なカーネルでは、AV/Cコマンドの受信内容の一部�
 ハードウェア情報、入出力ルーティング、入出力モニター、入出力ミキサー、クロック情報を出
 力することができます。
 
+== 残りの作業 ==
+
+1.MIDIの再生・録音の実装
+2.ハードウェアモニター、メーター、ミキサーへのインターフェイスの実装
+3.ALSAにsnd-firewire-lib.koへのパッチをコミット
+4.ALSAにsnd-fireworks.koのパッチを新規にコミット
 
 == DKMSを使った簡単な導入 ==
 
