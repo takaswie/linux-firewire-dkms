@@ -520,6 +520,15 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 		s->data_block_quadlets = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 16;
 		s->data_block_counter = (s->data_block_counter + s->data_block_quadlets) & 0xff;
 
+		/*
+		 * NOTE: Echo Audio's Fireworks reports a fixed value for data block quadlets
+		 * but the actual value differs depending on current sampling rate.
+		 * This is a workaround for Fireworks.
+		 *
+		 * TODO: good for the other devices such as Dice or BeBoB
+		 */
+		s->data_block_quadlets = s->pcm_channels + s->midi_ports;
+
 		/* finish to check CIP header */
 		buffer += 2;
 
@@ -618,7 +627,6 @@ in_packet_callback(struct fw_iso_context *context, u32 cycle,
 
 		/* how many quadlet for data in this packet */
 		data_quadlets = ((be32_to_cpu(headers[p]) & 0xFFFF0000) >> 16) / 4;
-
 		/* handle each packet data */
 		handle_receive_packet(s, data_quadlets);
 	}
