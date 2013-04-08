@@ -492,7 +492,7 @@ static void
 handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 {
 	__be32 *buffer;
-	unsigned int index, frames, ptr;
+	unsigned int index, frames, data_block_quadlets, ptr;
 	struct snd_pcm_substream *pcm;
 	struct fw_iso_packet packet;
 	int err;
@@ -517,8 +517,8 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 	}
 	else {
 		/* NOTE: we do not check syt field */
-		s->data_block_quadlets = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 16;
-		s->data_block_counter = (s->data_block_counter + s->data_block_quadlets) & 0xff;
+		data_block_quadlets = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 16;
+		s->data_block_counter = (s->data_block_counter + data_block_quadlets) & 0xff;
 
 		/*
 		 * NOTE: Echo Audio's Fireworks reports a fixed value for data block quadlets
@@ -527,7 +527,10 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 		 *
 		 * TODO: good for the other devices such as Dice or BeBoB
 		 */
-		s->data_block_quadlets = s->pcm_channels + s->midi_ports;
+		if ((data_quadlets - 2) % data_block_quadlets > 0)
+			s->data_block_quadlets = s->pcm_channels + s->midi_ports;
+		else
+			s->data_block_quadlets = data_block_quadlets;
 
 		/* finish to check CIP header */
 		buffer += 2;
