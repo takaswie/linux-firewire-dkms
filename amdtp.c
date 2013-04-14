@@ -407,7 +407,6 @@ amdtp_fill_midi(struct amdtp_out_stream *s,
 {
 	unsigned int m, f, p, port;
 	int len;
-	u32 quadlet;
 	u8 b[4] = {0};
 
 	for (f = 0; f < frames; f += 1) {
@@ -421,14 +420,17 @@ amdtp_fill_midi(struct amdtp_out_stream *s,
 			/* MIDI stream number */
 			port = p * 8 + m;
 
+			/* AM824 label for MIDI comformant data */
+			b[0] = 0x80;
+			len = 0;
+
 			/* check the MIDI stream exists in this port */
 			if (s->midi[port] == NULL) {
-				b[0] = 0x80;
+				/* through */
 			}
 			/* check the MIDI stream untriggered */
 			else if (!test_bit(port, &s->midi_running)) {
 				/* MIDI Active Snesing */
-				b[0] = 0x80;
 				b[1] = 0xFE;
 			}
 			/* transfer MIDI data from stream to packet */
@@ -436,17 +438,15 @@ amdtp_fill_midi(struct amdtp_out_stream *s,
 				len = snd_rawmidi_transmit_peek(s->midi[port], b + 1, 3);
 				if (len <= 0) {
 					/* MIDI Active Sensing */
-					b[0] = 0x80;
 					b[1] = 0xFE;
 				} else {
 					snd_rawmidi_transmit_ack(s->midi[port], len);
-					b[0] = 0x80 | len;
+					b[0] += len;
 				}
 			}
-			quadlet = (b[0] << 24) & (b[1] << 16) & (b[2] << 8) & b[3];
-			buffer[p] = cpu_to_be32(quadlet);
+			buffer[p] = (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
 		}
-		buffer += s->midi_ports;
+		buffer += s->data_block_quadlets - s->pcm_channels;
 	}
 }
 
@@ -492,7 +492,7 @@ amdtp_pull_midi(struct amdtp_out_stream *s,
 					port, b[0], b[1], b[2], b[3]);
 			}
 		}
-		buffer += s->midi_ports;
+		buffer += s->data_block_quadlets - s->pcm_channels;
 	}
 }
 
