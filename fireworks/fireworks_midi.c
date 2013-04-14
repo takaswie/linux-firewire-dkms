@@ -18,22 +18,26 @@
  */
 #include "fireworks.h"
 
-#define MIDI_FIFO_SIZE 4096
-
 static int
 midi_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw_t *efw = substream->rmidi->private_data;
 	struct snd_efw_stream_t *stream;
-	int err;
+	int err, run;
 
-	if (substream->stream == SNDRV_RAWMIDI_STREAM_OUTPUT)
-		stream = &efw->transmit_stream;
-	else
+	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
 		stream = &efw->receive_stream;
+	else
+		stream = &efw->transmit_stream;
 
-	/* midi is already transferred */
-	if (stream->midi) {
+	/* check other streams */
+	run = amdtp_stream_midi_running(&stream->strm);
+
+	/* register pointer */
+	amdtp_stream_midi_register(&stream->strm, substream);
+
+	/* the other streams running */
+	if (run > 0) {
 		err = 0;
 		goto end;
 	}
@@ -56,13 +60,16 @@ midi_close(struct snd_rawmidi_substream *substream)
 	struct snd_efw_t *efw = substream->rmidi->private_data;
 	struct snd_efw_stream_t *stream;
 
-	if (substream->stream == SNDRV_RAWMIDI_STREAM_OUTPUT)
-		stream = &efw->transmit_stream;
-	else
+	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
 		stream = &efw->receive_stream;
+	else
+		stream = &efw->transmit_stream;
 
-	/* midi is already transferred */
-	if (!stream->midi)
+	/* unregister pointer */
+	amdtp_stream_midi_unregister(&stream->strm, substream);
+
+	/* the other streams running */
+	if (amdtp_stream_midi_running(&stream->strm) > 0)
 		goto end;
 
 	/* stop stream */
@@ -82,14 +89,14 @@ midi_trigger(struct snd_rawmidi_substream *substream, int up)
 	unsigned long *midi_running;
 	unsigned long flags;
 
+	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
+		midi_running = &efw->receive_stream.strm.midi_running;
+	else
+		midi_running = &efw->transmit_stream.strm.midi_running;
+
 	spin_lock_irqsave(&efw->lock, flags);
 
-	if (substream->stream == SNDRV_RAWMIDI_STREAM_OUTPUT)
-		midi_running = &efw->midi_transmit_running;
-	else
-		midi_running = &efw->midi_receive_running;
-
-	/* TODO: MIDI is not transferred yet... */
+	/* bit table shows MIDI stream has data or not */
 	if (up)
 		__set_bit(substream->number, midi_running);
 	else
@@ -100,19 +107,10 @@ midi_trigger(struct snd_rawmidi_substream *substream, int up)
 	return;
 }
 
-static void
-midi_drain(struct snd_rawmidi_substream *substream)
-{
-	/* FIXME: magic */
-	msleep(4 + 1);
-	return;
-}
-
 static struct snd_rawmidi_ops midi_output_ops = {
 	.open		= midi_open,
 	.close		= midi_close,
 	.trigger	= midi_trigger,
-	.drain		= midi_drain,
 };
 
 static struct snd_rawmidi_ops midi_input_ops = {
@@ -141,9 +139,14 @@ snd_efw_create_midi_devices(struct snd_efw_t *efw)
 	struct snd_rawmidi *rmidi;
 	struct snd_rawmidi_str *str;
 	struct snd_rawmidi_substream *subs;
-	int i;
 	int err;
 
+	/* check the number of midi stream */
+	if ((efw->midi_input_count > AMDTP_MAX_MIDI_STREAMS) |
+	    (efw->midi_output_count > AMDTP_MAX_MIDI_STREAMS))
+		return -EINVAL;
+
+	/* create midi ports */
 	err = snd_rawmidi_new(efw->card, efw->card->driver, 0,
 			      efw->midi_output_count, efw->midi_input_count,
 			      &rmidi);
@@ -154,27 +157,28 @@ snd_efw_create_midi_devices(struct snd_efw_t *efw)
 			"%s MIDI", efw->card->shortname);
 	rmidi->private_data = efw;
 
-	if (efw->midi_output_count > 0) {
-		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_OUTPUT;
-		snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_OUTPUT,
-				    &midi_output_ops);
-		str = &rmidi->streams[SNDRV_RAWMIDI_STREAM_OUTPUT];
-		list_for_each_entry(subs, &str->substreams, list)
-			efw->midi_outputs[subs->number].substream = subs;
-		set_midi_substream_names(efw, str);
-
-		/* TODO: */
-		for (i = 0; i < MAX_MIDI_OUTPUTS; i += 1)
-			efw->midi_outputs[i].fifo_max = (MIDI_FIFO_SIZE - 1) * 44100;
-	}
-
 	if (efw->midi_input_count > 0) {
 		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_INPUT;
+
 		snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_INPUT,
-				    &midi_input_ops);
+					&midi_input_ops);
+
 		str = &rmidi->streams[SNDRV_RAWMIDI_STREAM_INPUT];
+
+		set_midi_substream_names(efw, str);
+	}
+
+	if (efw->midi_output_count > 0) {
+		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_OUTPUT;
+
+		snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_OUTPUT,
+					&midi_output_ops);
+
+		str = &rmidi->streams[SNDRV_RAWMIDI_STREAM_OUTPUT];
+
 		list_for_each_entry(subs, &str->substreams, list)
-			efw->midi_inputs[subs->number] = subs;
+			efw->transmit_stream.strm.midi[subs->number] = subs;
+
 		set_midi_substream_names(efw, str);
 	}
 

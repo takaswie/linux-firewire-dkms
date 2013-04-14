@@ -12,6 +12,7 @@
 #include <linux/module.h>
 #include <linux/slab.h>
 #include <sound/pcm.h>
+#include <sound/rawmidi.h>
 #include "amdtp.h"
 
 #define TICKS_PER_CYCLE		3072
@@ -144,12 +145,14 @@ static void amdtp_write_s32(struct amdtp_out_stream *s,
 			    struct snd_pcm_substream *pcm,
 			    __be32 *buffer, unsigned int frames);
 
-static void amdtp_read_s16(struct amdtp_out_stream *s,
-			    struct snd_pcm_substream *pcm,
-			    __be32 *buffer, unsigned int frames);
-static void amdtp_read_s32(struct amdtp_out_stream *s,
-			    struct snd_pcm_substream *pcm,
-			    __be32 *buffer, unsigned int frames);
+static void
+amdtp_read_s16(struct amdtp_out_stream *s,
+		struct snd_pcm_substream *pcm,
+		__be32 *buffer, unsigned int frames);
+static void
+amdtp_read_s32(struct amdtp_out_stream *s,
+		struct snd_pcm_substream *pcm,
+		__be32 *buffer, unsigned int frames);
 
 /**
  * amdtp_out_stream_set_pcm_format - set the PCM format
@@ -332,8 +335,8 @@ static void amdtp_write_s16(struct amdtp_out_stream *s,
 
 static void
 amdtp_read_s32(struct amdtp_out_stream *s,
-			    struct snd_pcm_substream *pcm,
-			    __be32 *buffer, unsigned int frames)
+		struct snd_pcm_substream *pcm,
+		__be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
 	unsigned int channels, remaining_frames, frame_step, i, c;
@@ -398,26 +401,99 @@ static void amdtp_fill_pcm_silence(struct amdtp_out_stream *s,
 	}
 }
 
-static void amdtp_fill_midi(struct amdtp_out_stream *s,
-				__be32 *buffer, unsigned int frames)
+static void
+amdtp_fill_midi(struct amdtp_out_stream *s,
+		__be32 *buffer, unsigned int frames)
 {
-	unsigned int i;
+	unsigned int m, f, p, port;
+	int len;
+	u32 quadlet;
+	u8 b[4] = {0};
 
-	for (i = 0; i < frames; ++i)
-		buffer[s->pcm_channels + i * s->data_block_quadlets] =
-						cpu_to_be32(0x80000000);
+	for (f = 0; f < frames; f += 1) {
+		/* skip PCM data */
+		buffer += s->pcm_channels;
+
+		/* According to MMA/AMEI RP-027, one channels of AM824 can handle 8 MIDI streams */
+		m = (s->data_block_counter + f) % 8;
+
+		for (p = 0; p < s->midi_ports; p += 1) {
+			/* MIDI stream number */
+			port = p * 8 + m;
+
+			/* check the MIDI stream exists in this port */
+			if (s->midi[port] == NULL) {
+				b[0] = 0x80;
+			}
+			/* check the MIDI stream untriggered */
+			else if (!test_bit(port, &s->midi_running)) {
+				/* MIDI Active Snesing */
+				b[0] = 0x80;
+				b[1] = 0xFE;
+			}
+			/* transfer MIDI data from stream to packet */
+			else{
+				len = snd_rawmidi_transmit_peek(s->midi[port], b + 1, 3);
+				if (len <= 0) {
+					/* MIDI Active Sensing */
+					b[0] = 0x80;
+					b[1] = 0xFE;
+				} else {
+					snd_rawmidi_transmit_ack(s->midi[port], len);
+					b[0] = 0x80 | len;
+				}
+			}
+			quadlet = (b[0] << 24) & (b[1] << 16) & (b[2] << 8) & b[3];
+			buffer[p] = cpu_to_be32(quadlet);
+		}
+		buffer += s->midi_ports;
+	}
 }
 
-/* TODO: MIDI */
 static void
-amdtp_pull_midi(struct amdtp_out_stream *s, __be32 *buffer)
+amdtp_pull_midi(struct amdtp_out_stream *s,
+				__be32 *buffer, unsigned int frames)
 {
-	unsigned int i;
-	u32 sequence;
+	unsigned int m, f, p, port;
+	int len;
+	u8 *b;
 
-	for (i = 0; i < s->midi_ports; i += 1)
-		sequence = be32_to_cpu(buffer[s->pcm_channels +
-						i * s->data_block_quadlets]);
+	for (f = 0; f < frames; f += 1) {
+		/* skip PCM data */
+		buffer += s->pcm_channels;
+
+		/* According to MMA/AMEI RP-027, one channels of AM824 can handle 8 MIDI streams */
+		m = (s->data_block_counter + f) % 8;
+
+		for (p = 0; p < s->midi_ports; p += 1) {
+			/* for access per byte */
+			b = (u8 *)&buffer[p];
+
+			/* not MIDI comformant data or MIDI data with no byte */
+			if (b[0] < 0x81 || 0x83 < b[0])
+				continue;
+			len = b[0] - 0x80;
+
+			/* MIDI stream number */
+			port = p * 8 + m;
+
+			/* check the MIDI stream exists */
+			if (s->midi[port] == NULL) {
+				/* through */
+			}
+			/* check the MIDI stream untriggered */
+			else if (!test_bit(port, &s->midi_running)) {
+				/* through */
+			}
+			/* transfer MIDI data from packet to stream */
+			else if (snd_rawmidi_receive(s->midi[port], b + 1, len) != len) {
+				dev_err(&s->unit->device,
+					"MIDI[%d] receive error: %08X %08X %08X %08X\n",
+					port, b[0], b[1], b[2], b[3]);
+			}
+		}
+		buffer += s->midi_ports;
+	}
 }
 
 static void queue_out_packet(struct amdtp_out_stream *s, unsigned int cycle)
@@ -492,7 +568,7 @@ static void
 handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 {
 	__be32 *buffer;
-	unsigned int index, frames, data_block_quadlets, ptr;
+	unsigned int index, frames, data_block_quadlets, data_block_counter, ptr;
 	struct snd_pcm_substream *pcm;
 	struct fw_iso_packet packet;
 	int err;
@@ -503,7 +579,7 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 
 	buffer = s->buffer.packets[index].buffer;
 
-	/* checking CIP headers */
+	/* checking CIP headers for AMDTP with restriction of this module */
 	if (((be32_to_cpu(buffer[0]) & 0xC0000000) >> 30 != 0x00) ||	/* EOH_0 and form_0 */
 	    ((be32_to_cpu(buffer[1]) & 0xC0000000) >> 30 != 0x02) ||	/* EOH_1 and form_1 */
 	    ((be32_to_cpu(buffer[1]) & 0x3F000000) >> 24 != 0x10)) {	/* FMT not for AM824 */
@@ -516,16 +592,26 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 		pcm = NULL;
 	}
 	else {
-		/* NOTE: we do not check syt field */
-		data_block_quadlets = (be32_to_cpu(buffer[0]) & 0xFF0000) >> 16;
-		s->data_block_counter = (s->data_block_counter + data_block_quadlets) & 0xff;
+		/*
+		 * NOTE: we do not check dbc field and syt field
+		 *
+		 * Fireworks reports wrong number of data block counter.
+		 * Mostly it repots it with increment of 8 blocks
+		 * but sometimes it increments with NO-DATA packet.
+		 *
+		 * Handling syt field is related to time stamp,
+		 * but the cost is bigger than the effect.
+		 * this module don't support it.
+		 *
+		 */
+		data_block_quadlets = (be32_to_cpu(buffer[0]) & 0x00FF0000) >> 16;
+		data_block_counter  = (be32_to_cpu(buffer[0]) & 0x000000FF);
 
 		/*
 		 * NOTE: Echo Audio's Fireworks reports a fixed value for data block quadlets
 		 * but the actual value differs depending on current sampling rate.
 		 * This is a workaround for Fireworks.
 		 *
-		 * TODO: good for the other devices such as Dice or BeBoB
 		 */
 		if ((data_quadlets - 2) % data_block_quadlets > 0)
 			s->data_block_quadlets = s->pcm_channels + s->midi_ports;
@@ -536,12 +622,17 @@ handle_receive_packet(struct amdtp_out_stream *s, unsigned int data_quadlets)
 		buffer += 2;
 
 		/* pick up samples from packet */
+		/* NOTE: here "frames" is equivalent to "events" in IEC 61883-1 */
 		frames = (data_quadlets - 2) / s->data_block_quadlets;
 		pcm = ACCESS_ONCE(s->pcm);
 		if (pcm)
 			s->transfer_samples(s, pcm, buffer, frames);
 		if (s->midi_ports)
-			amdtp_pull_midi(s, buffer);
+			amdtp_pull_midi(s, buffer, frames);
+
+		/* for next packet */
+		s->data_block_quadlets = data_block_quadlets;
+		s->data_block_counter  = data_block_counter;
 	}
 
 	/* queueing a packet for next cycle */
@@ -871,3 +962,31 @@ void amdtp_out_stream_pcm_abort(struct amdtp_out_stream *s)
 	}
 }
 EXPORT_SYMBOL(amdtp_out_stream_pcm_abort);
+
+void
+amdtp_stream_midi_register(struct amdtp_out_stream *s,
+				struct snd_rawmidi_substream *substream)
+{
+	ACCESS_ONCE(s->midi[substream->number]) = substream;
+}
+EXPORT_SYMBOL(amdtp_stream_midi_register);
+
+void
+amdtp_stream_midi_unregister(struct amdtp_out_stream *s,
+	struct snd_rawmidi_substream *substream)
+{
+	ACCESS_ONCE(s->midi[substream->number]) = NULL;
+}
+EXPORT_SYMBOL(amdtp_stream_midi_unregister);
+
+int
+amdtp_stream_midi_running(struct amdtp_out_stream *s)
+{
+	int i, run = 0;
+	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1)
+		if (s->midi[i] != NULL)
+		run += 1;
+
+	return (run == 0);
+}
+EXPORT_SYMBOL(amdtp_stream_midi_running);

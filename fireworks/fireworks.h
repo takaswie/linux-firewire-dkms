@@ -107,27 +107,17 @@ struct snd_efw_t {
 	struct snd_efw_phys_group_t *input_groups;
 	unsigned int input_meter_counts;
 
-	/* mixer */
+	/* mixer parameters */
 	unsigned int mixer_output_channels;
 	unsigned int mixer_input_channels;
 
-	/* MIDI output */
+	/* MIDI parameters */
 	unsigned int midi_output_count;
-	struct {
-		struct snd_rawmidi_substream *substream;
-		int fifo_filled;
-		int fifo_max;
-	} midi_outputs[MAX_MIDI_OUTPUTS];
-
-	/* MIDI input */
 	unsigned int midi_input_count;
-	struct snd_rawmidi_substream *midi_inputs[MAX_MIDI_INPUTS];
 
-	/* PCM playback */
+	/* PCM parameters */
 	unsigned int pcm_playback_channels;
 	unsigned int pcm_playback_channels_sets[SND_EFW_MUITIPLIER_MODES];
-
-	/* PCM capture */
 	unsigned int pcm_capture_channels;
 	unsigned int pcm_capture_channels_sets[SND_EFW_MUITIPLIER_MODES];
 
@@ -137,9 +127,7 @@ struct snd_efw_t {
 
 	/* audio and music data transmittion protocol */
 	struct snd_efw_stream_t transmit_stream;
-	unsigned long midi_transmit_running;
 	struct snd_efw_stream_t receive_stream;
-	unsigned long midi_receive_running;
 };
 
 struct efc_hwinfo_t {

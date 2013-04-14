@@ -33,6 +33,9 @@ enum cip_sfc {
 #define AMDTP_OUT_PCM_FORMAT_BITS	(SNDRV_PCM_FMTBIT_S16 | \
 					 SNDRV_PCM_FMTBIT_S32)
 
+/* this is for convinient, not in specification */
+#define AMDTP_MAX_MIDI_STREAMS 16
+
 struct fw_unit;
 struct fw_iso_context;
 struct snd_pcm_substream;
@@ -51,8 +54,6 @@ struct amdtp_out_stream {
 
 	enum cip_sfc sfc;
 	unsigned int data_block_quadlets;
-	unsigned int pcm_channels;
-	unsigned int midi_ports;
 	void (*transfer_samples)(struct amdtp_out_stream *s,
 				 struct snd_pcm_substream *pcm,
 				 __be32 *buffer, unsigned int frames);
@@ -60,9 +61,6 @@ struct amdtp_out_stream {
 	unsigned int syt_interval;
 	unsigned int source_node_id_field;
 	struct iso_packets_buffer buffer;
-
-	struct snd_pcm_substream *pcm;
-	struct tasklet_struct period_tasklet;
 
 	int packet_index;
 	unsigned int data_block_counter;
@@ -72,9 +70,18 @@ struct amdtp_out_stream {
 	unsigned int last_syt_offset;
 	unsigned int syt_offset_state;
 
+	/* for PCM handling */
+	unsigned int pcm_channels;
 	unsigned int pcm_buffer_pointer;
 	unsigned int pcm_period_pointer;
+	struct snd_pcm_substream *pcm;
 	bool pointer_flush;
+	struct tasklet_struct period_tasklet;
+
+	/* for MIDI handling */
+	unsigned int midi_ports;
+	unsigned long midi_running;
+	struct snd_rawmidi_substream *midi[AMDTP_MAX_MIDI_STREAMS];
 };
 
 int amdtp_out_stream_init(struct amdtp_out_stream *s, struct fw_unit *unit,
@@ -93,6 +100,12 @@ void amdtp_out_stream_set_pcm_format(struct amdtp_out_stream *s,
 void amdtp_out_stream_pcm_prepare(struct amdtp_out_stream *s);
 unsigned long amdtp_out_stream_pcm_pointer(struct amdtp_out_stream *s);
 void amdtp_out_stream_pcm_abort(struct amdtp_out_stream *s);
+
+void amdtp_stream_midi_register(struct amdtp_out_stream *s,
+				struct snd_rawmidi_substream *substream);
+void amdtp_stream_midi_unregister(struct amdtp_out_stream *s,
+				struct snd_rawmidi_substream *substream);
+int amdtp_stream_midi_running(struct amdtp_out_stream *s);
 
 /**
  * amdtp_out_stream_set_pcm - configure format of PCM samples
