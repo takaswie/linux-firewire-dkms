@@ -407,7 +407,7 @@ amdtp_fill_midi(struct amdtp_out_stream *s,
 {
 	unsigned int m, f, p, port;
 	int len;
-	u8 b[4] = {0};
+	u8 b[4];
 
 	for (f = 0; f < frames; f += 1) {
 		/* skip PCM data */
@@ -422,6 +422,9 @@ amdtp_fill_midi(struct amdtp_out_stream *s,
 
 			/* AM824 label for MIDI comformant data */
 			b[0] = 0x80;
+			b[1] = 0x00;
+			b[2] = 0x00;
+			b[3] = 0x00;
 			len = 0;
 
 			/* check the MIDI stream exists in this port */
@@ -434,11 +437,14 @@ amdtp_fill_midi(struct amdtp_out_stream *s,
 				b[1] = 0xFE;
 			}
 			/* transfer MIDI data from stream to packet */
-			else{
+			else {
 				len = snd_rawmidi_transmit_peek(s->midi[port], b + 1, 3);
-				if (len <= 0) {
+				if ((len <= 0) | (len > 3)) {
 					/* MIDI Active Sensing */
 					b[1] = 0xFE;
+					b[2] = 0x00;
+					b[3] = 0x00;
+					len = 0;
 				} else {
 					snd_rawmidi_transmit_ack(s->midi[port], len);
 					b[0] += len;
