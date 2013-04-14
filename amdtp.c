@@ -450,7 +450,7 @@ amdtp_fill_midi(struct amdtp_out_stream *s,
 					b[0] += len;
 				}
 			}
-			buffer[p] = (b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3];
+			buffer[p] = be32_to_cpu((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]);
 		}
 		buffer += s->data_block_quadlets - s->pcm_channels;
 	}
