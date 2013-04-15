@@ -414,11 +414,11 @@ amdtp_fill_midi(struct amdtp_out_stream *s,
 		buffer += s->pcm_channels;
 
 		/* According to MMA/AMEI RP-027, one channels of AM824 can handle 8 MIDI streams */
-		m = (s->data_block_counter + f) % 8;
+		m = (s->data_block_counter + f) % s->midi_counter;
 
 		for (p = 0; p < s->midi_ports; p += 1) {
 			/* MIDI stream number */
-			port = p * 8 + m;
+			port = p * s->midi_counter + m;
 
 			/* AM824 label for MIDI comformant data */
 			b[0] = 0x80;
@@ -438,8 +438,8 @@ amdtp_fill_midi(struct amdtp_out_stream *s,
 			}
 			/* transfer MIDI data from stream to packet */
 			else {
-				len = snd_rawmidi_transmit_peek(s->midi[port], b + 1, 3);
-				if ((len <= 0) | (len > 3)) {
+				len = snd_rawmidi_transmit_peek(s->midi[port], b + 1, s->midi_max_bytes);
+				if ((len <= 0) | (len > s->midi_max_bytes)) {
 					/* MIDI Active Sensing */
 					b[1] = 0xFE;
 					b[2] = 0x00;
@@ -450,6 +450,7 @@ amdtp_fill_midi(struct amdtp_out_stream *s,
 					b[0] += len;
 				}
 			}
+
 			buffer[p] = be32_to_cpu((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]);
 		}
 		buffer += s->data_block_quadlets - s->pcm_channels;

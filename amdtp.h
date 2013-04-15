@@ -80,8 +80,13 @@ struct amdtp_out_stream {
 
 	/* for MIDI handling */
 	unsigned int midi_ports;
+	/* how many MIDI streams in one MIDI Conformant Channel of AMDTP */
+	unsigned int midi_counter;
+	/* bit flags for each MIDI substream */
 	unsigned long midi_running;
 	struct snd_rawmidi_substream *midi[AMDTP_MAX_MIDI_STREAMS];
+	/* 1, 2, 3 bytes are allowed for MIDI Conformant Data */
+	unsigned int midi_max_bytes:2;
 };
 
 int amdtp_out_stream_init(struct amdtp_out_stream *s, struct fw_unit *unit,
@@ -131,9 +136,13 @@ static inline void amdtp_out_stream_set_pcm(struct amdtp_out_stream *s,
  */
 /* TODO: rename*/
 static inline void amdtp_out_stream_set_midi(struct amdtp_out_stream *s,
-					     unsigned int midi_ports)
+					unsigned int midi_ports,
+					unsigned int midi_counter,
+					unsigned int midi_max_bytes)
 {
 	s->midi_ports = midi_ports;
+	s->midi_counter = midi_counter;
+	s->midi_max_bytes = midi_max_bytes;
 }
 
 /**
