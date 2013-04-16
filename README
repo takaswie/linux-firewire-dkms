@@ -1,6 +1,6 @@
 = Developing for snd-fireworks=
 
-2012/04/08 坂本 貴史
+2012/04/16 坂本 貴史
 Takashi Sakamoto <o-takashi@sakamocchi.jp>
 
 == General ==
@@ -54,15 +54,33 @@ oMPR/oPCR and receiving AMDTP, MIDI handling.
 1. get/set sampling rate, clock source, digital I/O mode, digital I/O format via alsamixer
 2. get physical metering and internal monitoring via procfs
 3. playback and capturing PCM samples with any sampling rate
+4. playback and capturing MIDI streams when PCM running
 
 Hardware information is in the end of this README.
 
 == rest of work ==
 
-1.MIDI handling
-2.interfaces for hardware monitoring, metering, mixer
-3.commit patches for snd-firewire-lib.ko to ALSA
-4.commit patches newly for snd-fireworks to ALSA
+ 0.[done]write loadable ALSA codes
+ 1.[done]handling Echo Fireworks Commands
+ 2.[done]implementing Basic control implementing
+ 3.[done]PCM transmit with snd-firewire-lib.ko
+ 4.[done]PCM receive with adding codes to snd-firewire-lib
+ 5.[done]MIDI receive with adding codes to snd-firewire-lib
+ 6.[done]MIDI transmit with adding codes to snd-firewire-lib
+   6.5.FIX FFADO issue of MIDI transmit
+ 7.commit patches for snd-firewire-lib.ko to ALSA
+   7.0.search for the way to stream in BeBoB and Dice devices
+   7.1.look for patch reviewer
+   7.2.request for comment
+   7.3.fix inappropriate issue
+   7.4.commit request
+ 8.interfaces for hardware monitoring, metering, mixer
+   7.0.research for what types of control the other devices such as BeBoB and Dice support
+   7.1.ask the better way for interface in ALSA
+   7.2.implement
+   7.3.commit request if needed
+ 9.commit patches newly for snd-fireworks to ALSA
+10.write user-land utility
 
 == easy instraction with DKMS ==
 
@@ -85,7 +103,7 @@ sudo apt-get install dkms
 
 = snd-fireworks.koの開発 =
 
-2013/04/08 坂本 貴史
+2013/04/016 坂本 貴史
 Takashi Sakamoto <o-takashi@sakamocchi.jp>
 
 == 概要 ==
@@ -169,7 +187,7 @@ procfsが有効なカーネルでは、AV/Cコマンドの受信内容の一部�
 	192.0kHz以下 アナログ入出力8chずつ、デジタル入出力2chずつ
 
 2.MIDIの再生・録音
-まだ実装されていません。
+PCM再生・録音が始まっているときに可能です。
 
 3.alsamixerやamixerを使い、装置の挙動の一部を変更可能
 現在、標本化周波数、クロック源、デジタル出力モード、S/PDIFフォーマットを変更できます。
@@ -185,6 +203,28 @@ procfsが有効なカーネルでは、AV/Cコマンドの受信内容の一部�
 2.ハードウェアモニター、メーター、ミキサーへのインターフェイスの実装
 3.ALSAにsnd-firewire-lib.koへのパッチをコミット
 4.ALSAにsnd-fireworks.koのパッチを新規にコミット
+
+ 0.[done]ロード可能なALSAのコードを書く
+ 1.[done]Echo Fireworks Commandを扱う
+ 2.[done]基本的なコントロールの実装
+ 3.[done]snd-firewire-libを使いPCMを送る
+ 4.[done]snd-firewire-libにコードを追加してPCMを受信する
+ 5.[done]snd-firewire-libにコードを追加してMIDIを受信する
+ 6.[done]snd-firewire-libにコードを追加してMIDIを送信する
+ 6.5.FFADOのMIDI送信バグを修正する
+ 7.ALSAにsnd-firewire-libの修正パッチをコミットする
+   7.0.BeBoBとDiceがストリームする方法を調べる
+   7.1.パッチレビュワーを探す
+   7.2.Request For Commentを送る
+   7.3.指摘された問題を修正する
+   7.4.コミットリクエスト
+ 8.ハードウェアモニタリング・メータリング・ミキサー用インターフェイスの実装
+   7.0.BeBoBやDiceがサポートするコントロールの種類を調べる
+   7.1.インターフェイスのよさそうなインターフェイスを質問する
+   7.2.実装
+   7.3.必要に応じてコミットリクエスト
+ 9.ALSAへのsnd-fireworksのコミット
+10.ユーザーランドのユーティリティを書く
 
 == DKMSを使った簡単な導入 ==
 
