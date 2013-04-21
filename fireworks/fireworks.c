@@ -279,23 +279,30 @@ static int snd_efw_probe(struct device *dev)
 	struct snd_efw_t *efw;
 	int err;
 
-	if (!match_fireworks_device_name(unit))
-		return -ENODEV;
+	/* check device name */
+	if (!match_fireworks_device_name(unit)) {
+		err = -ENODEV;
+		goto end;
+	}
 
+	/* check registered card */
 	mutex_lock(&devices_mutex);
 	for (card_index = 0; card_index < SNDRV_CARDS; ++card_index)
 		if (!(devices_used & (1 << card_index)) && enable[card_index])
 			break;
 	if (card_index >= SNDRV_CARDS) {
 		err = -ENOENT;
-		goto error_mutex;
+		goto end;
 	}
+
+	/* create card */
 	err = snd_card_create(index[card_index], id[card_index],
 			THIS_MODULE, sizeof(struct snd_efw_t), &card);
 	if (err < 0)
-		goto error_mutex;
+		goto end;
 	card->private_free = snd_efw_card_free;
 
+	/* initialize myself */
 	efw = card->private_data;
 	efw->card = card;
 	efw->device = fw_parent_device(unit);
@@ -306,17 +313,17 @@ static int snd_efw_probe(struct device *dev)
 
 	/* identifing */
 	if (snd_efw_command_identify(efw) < 0)
-		goto error_card;
+		goto error;
 
 	/* get hardware information */
 	err = snd_efw_get_hardware_info(efw);
 	if (err < 0)
-		goto error_card;
+		goto error;
 
 	/* get the number of hardware meters */
 	err = snd_efw_get_hardware_meters_count(efw);
 	if (err < 0)
-		goto error_card;
+		goto error;
 
 	/* create proc interface */
 	snd_efw_proc_init(efw);
@@ -324,39 +331,37 @@ static int snd_efw_probe(struct device *dev)
 	/* create hardware control */
 	err = snd_efw_create_control_devices(efw);
 	if (err < 0)
-		goto error_card;
+		goto error;
 
 	/* create PCM interface */
 	err = snd_efw_create_pcm_devices(efw);
 	if (err < 0)
-		goto error_card;
+		goto error;
 
 	/* create midi interface */
 	if (efw->midi_output_count || efw->midi_input_count) {
 		err = snd_efw_create_midi_devices(efw);
 		if (err < 0)
-			goto error_card;
+			goto error;
 	}
 
+	/* register card and device */
 	snd_card_set_dev(card, dev);
 	err = snd_card_register(card);
 	if (err < 0)
-		goto error_card;
-
+		goto error;
 	dev_set_drvdata(dev, card);
 	devices_used |= 1 << card_index;
 	efw->card_index = card_index;
 
-	mutex_unlock(&devices_mutex);
+	/* proved */
+	err = 0;
+	goto end;
 
-	return 0;
-
-error_card:
-	mutex_unlock(&devices_mutex);
+error:
 	snd_card_free(card);
-	return err;
 
-error_mutex:
+end:
 	mutex_unlock(&devices_mutex);
 	return err;
 }
