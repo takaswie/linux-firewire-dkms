@@ -49,7 +49,7 @@ void cmp_error(struct cmp_connection *c, const char *fmt, ...)
 
 	va_start(va, fmt);
 	dev_err(&c->resources.unit->device, "%cPCR%u: %pV",
-		(c->direction == CMP_INPUT) ? 'i': 'o',
+		(c->direction == CMP_OUTPUT) ? 'o': 'i',
 		c->pcr_index, &(struct va_format){ fmt, &va });
 	va_end(va);
 }
@@ -66,10 +66,10 @@ static int pcr_modify(struct cmp_connection *c,
 	unsigned long long offset;
 	int err;
 
-	if (c->direction == CMP_INPUT)
-		offset = CSR_REGISTER_BASE + CSR_IPCR(c->pcr_index);
-	else
+	if (c->direction == CMP_OUTPUT)
 		offset = CSR_REGISTER_BASE + CSR_OPCR(c->pcr_index);
+	else
+		offset = CSR_REGISTER_BASE + CSR_IPCR(c->pcr_index);
 
 	buffer[0] = c->last_pcr_value;
 	for (;;) {
@@ -124,10 +124,10 @@ int cmp_connection_init(struct cmp_connection *c,
 	unsigned long long offset;
 	int err;
 
-	if (c->direction == CMP_INPUT)
-		offset = CSR_REGISTER_BASE + CSR_IMPR;
-	else
+	if (c->direction == CMP_OUTPUT)
 		offset = CSR_REGISTER_BASE + CSR_OMPR;
+	else
+		offset = CSR_REGISTER_BASE + CSR_IMPR;
 
 	err = snd_fw_transaction(unit, TCODE_READ_QUADLET_REQUEST,
 				 offset, &mpr_be, 4);
