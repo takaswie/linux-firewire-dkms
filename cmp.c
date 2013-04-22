@@ -30,8 +30,10 @@
 #define PCR_CHANNEL_SHIFT	16
 
 /* oPCR specific fields */
-#define OPCR_DATA_RATE_MASK	0x0000C000
-#define OPCR_DATA_RATE_SHIFT	14
+#define OPCR_XSPEED_MASK	0x00C00000
+#define OPCR_XSPEED_SHIFT	22
+#define OPCR_SPEED_MASK		0x0000C000
+#define OPCR_SPEED_SHIFT	14
 #define OPCR_OVERHEAD_ID_MASK	0x00003C00
 #define OPCR_OVERHEAD_ID_SHIFT	10
 #define OPCR_PAYLOAD_MASK	0x000003FF
@@ -49,7 +51,7 @@ void cmp_error(struct cmp_connection *c, const char *fmt, ...)
 
 	va_start(va, fmt);
 	dev_err(&c->resources.unit->device, "%cPCR%u: %pV",
-		(c->direction == CMP_OUTPUT) ? 'o': 'i',
+		(c->direction == CMP_INPUT) ? 'i': 'o',
 		c->pcr_index, &(struct va_format){ fmt, &va });
 	va_end(va);
 }
@@ -66,10 +68,10 @@ static int pcr_modify(struct cmp_connection *c,
 	unsigned long long offset;
 	int err;
 
-	if (c->direction == CMP_OUTPUT)
-		offset = CSR_REGISTER_BASE + CSR_OPCR(c->pcr_index);
-	else
+	if (c->direction == CMP_INPUT)
 		offset = CSR_REGISTER_BASE + CSR_IPCR(c->pcr_index);
+	else
+		offset = CSR_REGISTER_BASE + CSR_OPCR(c->pcr_index);
 
 	buffer[0] = c->last_pcr_value;
 	for (;;) {
@@ -124,10 +126,10 @@ int cmp_connection_init(struct cmp_connection *c,
 	unsigned long long offset;
 	int err;
 
-	if (c->direction == CMP_OUTPUT)
-		offset = CSR_REGISTER_BASE + CSR_OMPR;
-	else
+	if (c->direction == CMP_INPUT)
 		offset = CSR_REGISTER_BASE + CSR_IMPR;
+	else
+		offset = CSR_REGISTER_BASE + CSR_OMPR;
 
 	err = snd_fw_transaction(unit, TCODE_READ_QUADLET_REQUEST,
 				 offset, &mpr_be, 4);
@@ -183,13 +185,10 @@ static int get_overhead_id(struct cmp_connection *c)
 {
 	int id;
 
-	/* convert to oPCR overhead ID encoding */
 	/*
-	 * TODO:
-	 * ask the developer about the implementation of current_bandwidth_overhead()
-	 * in iso-resource.c because the return value is sometimes over the range of
-	 * the value which can be encoded by overhead id table (it's 32 to 512).
-	 * Here I use 512 if the value is over the range.
+	 * apply "oPCR overhead ID encoding"
+	 * the encoding table can convert up to 512.
+	 * here the value over 512 is converted as the same way as 512.
 	 */
 	for (id = 1; id < 16; id += 1) {
 		if (c->resources.bandwidth_overhead < (id << 5))
@@ -203,21 +202,38 @@ static int get_overhead_id(struct cmp_connection *c)
 
 static __be32 opcr_set_modify(struct cmp_connection *c, __be32 opcr)
 {
+	unsigned int spd, xspd;
+
+	/* generate speed and extended speed field value */
+	if (c->speed > SCODE_400) {
+		spd  = SCODE_800;
+		xspd = c->speed - SCODE_800;
+	}
+	else {
+		spd = c->speed;
+		xspd = 0;
+	}
+
 	opcr &= ~cpu_to_be32(PCR_BCAST_CONN |
 			     PCR_P2P_CONN_MASK |
+			     OPCR_XSPEED_MASK |
 			     PCR_CHANNEL_MASK |
-			     OPCR_DATA_RATE_MASK |
-			     OPCR_OVERHEAD_ID_MASK);
+			     OPCR_SPEED_MASK |
+			     OPCR_OVERHEAD_ID_MASK |
+			     OPCR_PAYLOAD_MASK);
 	opcr |= cpu_to_be32(1 << PCR_P2P_CONN_SHIFT);
+	opcr |= cpu_to_be32(xspd << OPCR_XSPEED_SHIFT);
 	opcr |= cpu_to_be32(c->resources.channel << PCR_CHANNEL_SHIFT);
-	opcr |= cpu_to_be32(c->speed << OPCR_DATA_RATE_SHIFT);
+	opcr |= cpu_to_be32(spd << OPCR_SPEED_SHIFT);
 	opcr |= cpu_to_be32(get_overhead_id(c) << OPCR_OVERHEAD_ID_SHIFT);
-
 	/*
-	 * TODO:
-	 * investigate the reason that setting payload size is no need here.
-	 * target set it or specification eratta?
+	 * here zero is applied to payload field.
+	 * it means the maximum number of quadlets in an isochronous packet is
+	 * 1024 when spd is less than three, 1024 * 2 * xspd + 1 when spd is
+	 * equal to three. An arbitrary value can be set but this implementation
+	 * is enough.
 	 */
+	opcr |= cpu_to_be32(0 << OPCR_PAYLOAD_SHIFT);
 
 	return opcr;
 }
