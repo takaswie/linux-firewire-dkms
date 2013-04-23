@@ -308,10 +308,10 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	/* set AMDTP parameters for transmit stream */
-	amdtp_out_stream_set_rate(&stream->strm, params_rate(hw_params));
-	amdtp_out_stream_set_pcm(&stream->strm, params_channels(hw_params));
-	amdtp_out_stream_set_pcm_format(&stream->strm, params_format(hw_params));
-	amdtp_out_stream_set_midi(&stream->strm, midi_count, 16, 1);
+	amdtp_stream_set_rate(&stream->strm, params_rate(hw_params));
+	amdtp_stream_set_pcm(&stream->strm, params_channels(hw_params));
+	amdtp_stream_set_pcm_format(&stream->strm, params_format(hw_params));
+	amdtp_stream_set_midi(&stream->strm, midi_count, 16, 1);
 end:
 	return err;
 }
@@ -353,7 +353,7 @@ pcm_prepare(struct snd_pcm_substream *substream)
 	stream->pcm = true;
 
 	/* initialize buffer pointer */
-	amdtp_out_stream_pcm_prepare(&stream->strm);
+	amdtp_stream_pcm_prepare(&stream->strm);
 
 end:
 	return err;
@@ -377,9 +377,9 @@ pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	}
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		amdtp_out_stream_pcm_trigger(&efw->receive_stream.strm, pcm);
+		amdtp_stream_pcm_trigger(&efw->receive_stream.strm, pcm);
 	else
-		amdtp_out_stream_pcm_trigger(&efw->transmit_stream.strm, pcm);
+		amdtp_stream_pcm_trigger(&efw->transmit_stream.strm, pcm);
 
 	return 0;
 }
@@ -389,9 +389,9 @@ static snd_pcm_uframes_t pcm_pointer(struct snd_pcm_substream *substream)
 	struct snd_efw_t *efw = substream->private_data;
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		return amdtp_out_stream_pcm_pointer(&efw->receive_stream.strm);
+		return amdtp_stream_pcm_pointer(&efw->receive_stream.strm);
 	else
-		return amdtp_out_stream_pcm_pointer(&efw->transmit_stream.strm);
+		return amdtp_stream_pcm_pointer(&efw->transmit_stream.strm);
 }
 
 static struct snd_pcm_ops pcm_playback_ops = {
@@ -451,12 +451,12 @@ end:
 
 void snd_efw_destroy_pcm_devices(struct snd_efw_t *efw)
 {
-	amdtp_out_stream_pcm_abort(&efw->transmit_stream.strm);
-	amdtp_out_stream_stop(&efw->transmit_stream.strm);
+	amdtp_stream_pcm_abort(&efw->transmit_stream.strm);
+	amdtp_stream_stop(&efw->transmit_stream.strm);
 	snd_efw_stream_destroy(&efw->transmit_stream);
 
-	amdtp_out_stream_pcm_abort(&efw->receive_stream.strm);
-	amdtp_out_stream_stop(&efw->receive_stream.strm);
+	amdtp_stream_pcm_abort(&efw->receive_stream.strm);
+	amdtp_stream_stop(&efw->receive_stream.strm);
 	snd_efw_stream_destroy(&efw->receive_stream);
 
 	return;

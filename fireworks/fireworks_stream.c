@@ -36,7 +36,7 @@ snd_efw_stream_init(struct snd_efw_t *efw, struct snd_efw_stream_t *stream)
 	if (err < 0)
 		goto end;
 
-	err = amdtp_out_stream_init(&stream->strm, efw->unit, s_direction, CIP_NONBLOCKING);
+	err = amdtp_stream_init(&stream->strm, efw->unit, s_direction, CIP_NONBLOCKING);
 	if (err < 0) {
 		cmp_connection_destroy(&stream->conn);
 		goto end;
@@ -64,12 +64,12 @@ snd_efw_stream_start(struct snd_efw_stream_t *stream)
 	 * establish connection via CMP
 	 */
 	err = cmp_connection_establish(&stream->conn,
-		amdtp_out_stream_get_max_payload(&stream->strm));
+		amdtp_stream_get_max_payload(&stream->strm));
 	if (err < 0)
 		goto end;
 
 	/* start amdtp stream */
-	err = amdtp_out_stream_start(&stream->strm,
+	err = amdtp_stream_start(&stream->strm,
 		stream->conn.resources.channel,
 		stream->conn.speed);
 	if (err < 0)
@@ -85,7 +85,7 @@ snd_efw_stream_stop(struct snd_efw_stream_t *stream)
 	if (!!IS_ERR(stream->strm.context))
 		goto end;
 
-	amdtp_out_stream_stop(&stream->strm);
+	amdtp_stream_stop(&stream->strm);
 	cmp_connection_break(&stream->conn);
 end:
 	return;

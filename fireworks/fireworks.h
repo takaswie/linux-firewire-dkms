@@ -71,7 +71,7 @@ struct snd_efw_phys_group_t {
 /* for IEC61883-1 and -6 stream */
 struct snd_efw_stream_t {
 	struct cmp_connection conn;
-	struct amdtp_out_stream strm;
+	struct amdtp_stream strm;
 	bool pcm;
 	bool midi;
 };
