@@ -7,13 +7,13 @@
 #include "packets-buffer.h"
 
 /**
- * enum cip_out_flags - describes details of the streaming protocol
+ * enum cip_flags - describes details of the streaming protocol
  * @CIP_NONBLOCKING: In non-blocking mode, each packet contains
  *	sample_rate/8000 samples, with rounding up or down to adjust
  *	for clock skew and left-over fractional samples.  This should
  *	be used if supported by the device.
  */
-enum cip_out_flags {
+enum cip_flags {
 	CIP_NONBLOCKING = 0,
 };
 
@@ -48,12 +48,14 @@ enum amdtp_stream_direction {
 struct amdtp_stream {
 	struct fw_unit *unit;
 	enum amdtp_stream_direction direction;
-	enum cip_out_flags flags;
+	enum cip_flags flags;
 	struct fw_iso_context *context;
 	struct mutex mutex;
 
 	enum cip_sfc sfc;
 	unsigned int data_block_quadlets;
+	unsigned int pcm_channels;
+	unsigned int midi_ports;
 	void (*transfer_samples)(struct amdtp_stream *s,
 				 struct snd_pcm_substream *pcm,
 				 __be32 *buffer, unsigned int frames);
@@ -61,6 +63,9 @@ struct amdtp_stream {
 	unsigned int syt_interval;
 	unsigned int source_node_id_field;
 	struct iso_packets_buffer buffer;
+
+	struct snd_pcm_substream *pcm;
+	struct tasklet_struct period_tasklet;
 
 	int packet_index;
 	unsigned int data_block_counter;
@@ -70,16 +75,11 @@ struct amdtp_stream {
 	unsigned int last_syt_offset;
 	unsigned int syt_offset_state;
 
-	/* for PCM handling */
-	unsigned int pcm_channels;
+	/* for ALSA PCM DMA buffer */
 	unsigned int pcm_buffer_pointer;
 	unsigned int pcm_period_pointer;
-	struct snd_pcm_substream *pcm;
 	bool pointer_flush;
-	struct tasklet_struct period_tasklet;
 
-	/* for MIDI handling */
-	unsigned int midi_ports;
 	/* how many MIDI streams in one MIDI Conformant Channel of AMDTP */
 	unsigned int midi_counter;
 	/* bit flags for each MIDI substream */
@@ -90,7 +90,7 @@ struct amdtp_stream {
 };
 
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
-			enum amdtp_stream_direction, enum cip_out_flags flags);
+			enum amdtp_stream_direction, enum cip_flags flags);
 void amdtp_stream_destroy(struct amdtp_stream *s);
 
 void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate);
@@ -114,13 +114,12 @@ int amdtp_stream_midi_running(struct amdtp_stream *s);
 
 /**
  * amdtp_stream_set_pcm - configure format of PCM samples
- * @s: the AMDTP output stream to be configured
+ * @s: the AMDTP stream to be configured
  * @pcm_channels: the number of PCM samples in each data block, to be encoded
  *                as AM824 multi-bit linear audio
  *
  * This function must not be called while the stream is running.
  */
-/* TODO: rename */
 static inline void amdtp_stream_set_pcm(struct amdtp_stream *s,
 					    unsigned int pcm_channels)
 {
@@ -129,12 +128,11 @@ static inline void amdtp_stream_set_pcm(struct amdtp_stream *s,
 
 /**
  * amdtp_stream_set_midi - configure format of MIDI data
- * @s: the AMDTP output stream to be configured
+ * @s: the AMDTP stream to be configured
  * @midi_ports: the number of MIDI ports (i.e., MPX-MIDI Data Channels)
  *
  * This function must not be called while the stream is running.
  */
-/* TODO: rename*/
 static inline void amdtp_stream_set_midi(struct amdtp_stream *s,
 					unsigned int midi_ports,
 					unsigned int midi_counter,
@@ -147,12 +145,11 @@ static inline void amdtp_stream_set_midi(struct amdtp_stream *s,
 
 /**
  * amdtp_streaming_error - check for streaming error
- * @s: the AMDTP output stream
+ * @s: the AMDTP stream
  *
  * If this function returns true, the stream's packet queue has stopped due to
  * an asynchronous error.
  */
-/* TODO: rename*/
 static inline bool amdtp_streaming_error(struct amdtp_stream *s)
 {
 	return s->packet_index < 0;
@@ -160,14 +157,13 @@ static inline bool amdtp_streaming_error(struct amdtp_stream *s)
 
 /**
  * amdtp_stream_pcm_trigger - start/stop playback from a PCM device
- * @s: the AMDTP output stream
+ * @s: the AMDTP stream
  * @pcm: the PCM device to be started, or %NULL to stop the current device
  *
  * Call this function on a running isochronous stream to enable the actual
  * transmission of PCM data.  This function should be called from the PCM
  * device's .trigger callback.
  */
-/* TODO: rename*/
 static inline void amdtp_stream_pcm_trigger(struct amdtp_stream *s,
 						struct snd_pcm_substream *pcm)
 {

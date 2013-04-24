@@ -238,14 +238,14 @@ static __be32 opcr_set_modify(struct cmp_connection *c, __be32 opcr)
 	return opcr;
 }
 
-static int pcr_set_check(struct cmp_connection *c, __be32 opcr)
+static int pcr_set_check(struct cmp_connection *c, __be32 pcr)
 {
-	if (opcr & cpu_to_be32(PCR_BCAST_CONN |
+	if (pcr & cpu_to_be32(PCR_BCAST_CONN |
 			       PCR_P2P_CONN_MASK)) {
 		cmp_error(c, "plug is already in use\n");
 		return -EBUSY;
 	}
-	if (!(opcr & cpu_to_be32(PCR_ONLINE))) {
+	if (!(pcr & cpu_to_be32(PCR_ONLINE))) {
 		cmp_error(c, "plug is not on-line\n");
 		return -ECONNREFUSED;
 	}
