@@ -51,7 +51,7 @@ void cmp_error(struct cmp_connection *c, const char *fmt, ...)
 
 	va_start(va, fmt);
 	dev_err(&c->resources.unit->device, "%cPCR%u: %pV",
-		(c->direction == CMP_INPUT) ? 'i': 'o',
+		(c->direction == CMP_INPUT) ? 'i' : 'o',
 		c->pcr_index, &(struct va_format){ fmt, &va });
 	va_end(va);
 }
@@ -208,8 +208,7 @@ static __be32 opcr_set_modify(struct cmp_connection *c, __be32 opcr)
 	if (c->speed > SCODE_400) {
 		spd  = SCODE_800;
 		xspd = c->speed - SCODE_800;
-	}
-	else {
+	} else {
 		spd = c->speed;
 		xspd = 0;
 	}
@@ -230,8 +229,8 @@ static __be32 opcr_set_modify(struct cmp_connection *c, __be32 opcr)
 	 * here zero is applied to payload field.
 	 * it means the maximum number of quadlets in an isochronous packet is
 	 * 1024 when spd is less than three, 1024 * 2 * xspd + 1 when spd is
-	 * equal to three. An arbitrary value can be set but this implementation
-	 * is enough.
+	 * equal to three. An arbitrary value can be set here but 0 is enough
+	 * for our purpose.
 	 */
 	opcr |= cpu_to_be32(0 << OPCR_PAYLOAD_SHIFT);
 

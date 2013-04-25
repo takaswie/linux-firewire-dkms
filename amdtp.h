@@ -90,11 +90,11 @@ struct amdtp_stream {
 };
 
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
-			enum amdtp_stream_direction, enum cip_flags flags);
+		enum amdtp_stream_direction direction, enum cip_flags flags);
 void amdtp_stream_destroy(struct amdtp_stream *s);
 
 void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate);
-unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s);
+unsigned int amdtp_out_stream_get_max_payload(struct amdtp_stream *s);
 
 int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed);
 void amdtp_stream_update(struct amdtp_stream *s);

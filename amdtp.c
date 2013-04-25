@@ -25,6 +25,7 @@
 
 #define CIP_EOH			(1u << 31)
 #define CIP_FMT_AM		(0x10 << 24)
+#define CIP_NO_DATA		(0xFF << 16)
 #define AMDTP_FDF_AM824		(0 << 19)
 #define AMDTP_FDF_SFC_SHIFT	16
 
@@ -108,14 +109,14 @@ void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate)
 EXPORT_SYMBOL(amdtp_stream_set_rate);
 
 /**
- * amdtp_stream_get_max_payload - get the stream's packet size
- * @s: the AMDTP stream
+ * amdtp_out_stream_get_max_payload - get the stream's packet size
+ * @s: the AMDTP output stream
  *
  * This function must not be called before the stream has been configured
  * with amdtp_stream_set_hw_params(), amdtp_stream_set_pcm(), and
  * amdtp_stream_set_midi().
  */
-unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s)
+unsigned int amdtp_out_stream_get_max_payload(struct amdtp_stream *s)
 {
 	static const unsigned int max_data_blocks[] = {
 		[CIP_SFC_32000]  =  4,
@@ -132,7 +133,7 @@ unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s)
 
 	return 8 + max_data_blocks[s->sfc] * 4 * s->data_block_quadlets;
 }
-EXPORT_SYMBOL(amdtp_stream_get_max_payload);
+EXPORT_SYMBOL(amdtp_out_stream_get_max_payload);
 
 static unsigned int amdtp_receive_stream_get_max_payload(struct amdtp_stream *s)
 {
@@ -338,7 +339,6 @@ static void amdtp_read_s32(struct amdtp_stream *s,
 	unsigned int channels, remaining_frames, frame_step, i, c;
 	u32 *dst;
 
-	/* here ALSA's DMA buffer is not used in the same way as for PCI devices */
 	channels = s->pcm_channels;
 	dst  = (void *)runtime->dma_area +
 			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
@@ -365,7 +365,6 @@ static void amdtp_read_s16(struct amdtp_stream *s,
 	unsigned int channels, remaining_frames, frame_step, i, c;
 	u16 *dst;
 
-	/* here ALSA's DMA buffer is not used in the same way as for PCI devices */
 	channels = s->pcm_channels;
 	dst = (void *)runtime->dma_area +
 			s->pcm_buffer_pointer * (runtime->frame_bits / 8);
@@ -564,10 +563,12 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle)
 	}
 }
 
-static void handle_receive_packet(struct amdtp_stream *s, unsigned int data_quadlets)
+static void handle_receive_packet(struct amdtp_stream *s,
+						unsigned int data_quadlets)
 {
 	__be32 *buffer;
-	unsigned int index, frames, data_block_quadlets, data_block_counter, ptr;
+	unsigned int index, frames, data_block_quadlets,
+					data_block_counter, ptr;
 	struct snd_pcm_substream *pcm;
 	struct fw_iso_packet packet;
 	int err;
@@ -579,18 +580,16 @@ static void handle_receive_packet(struct amdtp_stream *s, unsigned int data_quad
 	buffer = s->buffer.packets[index].buffer;
 
 	/* checking CIP headers for AMDTP with restriction of this module */
-	if (((be32_to_cpu(buffer[0]) & 0xC0000000) >> 30 != 0x00) ||	/* EOH_0 and form_0 */
-	    ((be32_to_cpu(buffer[1]) & 0xC0000000) >> 30 != 0x02) ||	/* EOH_1 and form_1 */
-	    ((be32_to_cpu(buffer[1]) & 0x3F000000) >> 24 != 0x10)) {	/* FMT not for AM824 */
+	if (((be32_to_cpu(buffer[0]) & 0xC0000000) == CIP_EOH) ||
+	    ((be32_to_cpu(buffer[1]) & 0xC0000000) != CIP_EOH) ||
+	    ((be32_to_cpu(buffer[1]) & 0x3F000000) != CIP_FMT_AM)) {
 		dev_err(&s->unit->device, "CIP headers error: %08X:%08X\n",
 			be32_to_cpu(buffer[0]), be32_to_cpu(buffer[1]));
 		return;
-	}
-	else if (data_quadlets < 3 ||					/* CIP headers only */
-	         (be32_to_cpu(buffer[1]) & 0x00FF0000) >> 16 == 0xFF) {	/* NO-DATA packet */
+	} else if (data_quadlets < 3 ||
+	           (be32_to_cpu(buffer[1]) & 0x00FF0000) == CIP_NO_DATA) {
 		pcm = NULL;
-	}
-	else {
+	} else {
 		/*
 		 * NOTE: we do not check dbc field and syt field
 		 *
@@ -601,27 +600,29 @@ static void handle_receive_packet(struct amdtp_stream *s, unsigned int data_quad
 		 * Handling syt field is related to time stamp,
 		 * but the cost is bigger than the effect.
 		 * this module don't support it.
-		 *
 		 */
-		data_block_quadlets = (be32_to_cpu(buffer[0]) & 0x00FF0000) >> 16;
+		data_block_quadlets =
+				(be32_to_cpu(buffer[0]) & 0x00FF0000) >> 16;
 		data_block_counter  = (be32_to_cpu(buffer[0]) & 0x000000FF);
 
 		/*
-		 * NOTE: Echo Audio's Fireworks reports a fixed value for data block quadlets
-		 * but the actual value differs depending on current sampling rate.
-		 * This is a workaround for Fireworks.
-		 *
+		 * NOTE: Echo Audio's Fireworks reports a fixed value for data
+		 * block quadlets but the actual value differs depending on
+		 * current sampling rate. This is a workaround for Fireworks.
 		 */
 		if ((data_quadlets - 2) % data_block_quadlets > 0)
-			s->data_block_quadlets = s->pcm_channels + s->midi_ports;
+			s->data_block_quadlets =
+					s->pcm_channels + s->midi_ports;
 		else
 			s->data_block_quadlets = data_block_quadlets;
 
 		/* finish to check CIP header */
 		buffer += 2;
 
-		/* pick up samples from packet */
-		/* NOTE: here "frames" is equivalent to "events" in IEC 61883-1 */
+		/*
+		 * NOTE: here "frames" is equivalent to "events"
+		 * in IEC 61883-1
+		 */
 		frames = (data_quadlets - 2) / s->data_block_quadlets;
 		pcm = ACCESS_ONCE(s->pcm);
 		if (pcm)
@@ -640,7 +641,7 @@ static void handle_receive_packet(struct amdtp_stream *s, unsigned int data_quad
 	packet.skip = 0;
 	packet.tag = TAG_CIP;
 	packet.sy = 0;
-	packet.header_length = 4;	/* just check isochronous packet header */
+	packet.header_length = 4;
 
 	err = fw_iso_context_queue(s->context, &packet, &s->buffer.iso_buffer,
 				   s->buffer.packets[index].offset);
@@ -659,9 +660,8 @@ static void handle_receive_packet(struct amdtp_stream *s, unsigned int data_quad
 	/* calcurate period and buffer borders */
 	if (pcm != NULL) {
 		ptr = s->pcm_buffer_pointer + frames;
-		if (ptr >= pcm->runtime->buffer_size) {
+		if (ptr >= pcm->runtime->buffer_size)
 			ptr -= pcm->runtime->buffer_size;
-		}
 		ACCESS_ONCE(s->pcm_buffer_pointer) = ptr;
 
 		s->pcm_period_pointer += frames;
@@ -683,10 +683,11 @@ static void pcm_period_tasklet(unsigned long data)
 }
 
 static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
-				size_t header_length, void *header, void *private_data)
+			size_t header_length, void *header, void *private_data)
 {
 	struct amdtp_stream *s = private_data;
 	unsigned int i, packets = header_length / 4;
+
 	/*
 	 * Compute the cycle of the last queued packet.
 	 * (We need only the four lowest bits for the SYT, so we can ignore
@@ -708,15 +709,17 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 
 	for (p = 0; p < packets; p += 1) {
 		/* check isochronous packet header */
-		if (((be32_to_cpu(headers[p]) & 0x0000C000) >> 14) != 0x01 ||	/* Common Isochronous Packet */
-		    ((be32_to_cpu(headers[p]) & 0x000000F0) >>  4) != 0x0A) {	/* Isochronous Packet */
+		if (((be32_to_cpu(headers[p]) & 0x0000C000) >> 14) != 0x01 ||
+		    ((be32_to_cpu(headers[p]) & 0x000000F0) >>  4) != 0x0A) {
 			dev_err(&s->unit->device,
-				"Isochronous headers error: %08X\n", be32_to_cpu(headers[p]));
+				"Isochronous headers error: %08X\n",
+				be32_to_cpu(headers[p]));
 			return;
 		}
 
 		/* how many quadlet for data in this packet */
-		data_quadlets = ((be32_to_cpu(headers[p]) & 0xFFFF0000) >> 16) / 4;
+		data_quadlets =
+			((be32_to_cpu(headers[p]) & 0xFFFF0000) >> 16) / 4;
 		/* handle each packet data */
 		handle_receive_packet(s, data_quadlets);
 	}
@@ -731,7 +734,7 @@ static int queue_initial_receive_packets(struct amdtp_stream *s)
 		.skip		= 0,
 		.tag		= TAG_CIP,
 		.sy		= 0,
-		.header_length	= 4	/* just check isochronous pcaket header */
+		.header_length	= 4
 	};
 	unsigned int i;
 	int err;
@@ -815,26 +818,28 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	/* initialize packet buffer */
 	if (s->direction == AMDTP_STREAM_RECEIVE)
 		err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
-						amdtp_receive_stream_get_max_payload(s),
-						DMA_FROM_DEVICE);
+					amdtp_receive_stream_get_max_payload(s),
+					DMA_FROM_DEVICE);
 	else
 		err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
-						amdtp_stream_get_max_payload(s),
-						DMA_TO_DEVICE);
+					amdtp_out_stream_get_max_payload(s),
+					DMA_TO_DEVICE);
 	if (err < 0)
 		goto err_unlock;
 
 	/* create isochronous context */
 	if (s->direction == AMDTP_STREAM_RECEIVE)
-		s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
-						   FW_ISO_CONTEXT_RECEIVE,
-						   channel, speed, 4,	/* just check isochronous packet header */
-						   in_packet_callback, s);
+		s->context =
+			fw_iso_context_create(fw_parent_device(s->unit)->card,
+					FW_ISO_CONTEXT_RECEIVE,
+					channel, speed, 4,
+					in_packet_callback, s);
 	else
-		s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
-						   FW_ISO_CONTEXT_TRANSMIT,
-						   channel, speed, 4,	/* just check isochronous packet header */
-						   out_packet_callback, s);
+		s->context =
+			fw_iso_context_create(fw_parent_device(s->unit)->card,
+					FW_ISO_CONTEXT_TRANSMIT,
+					channel, speed, 4,
+					out_packet_callback, s);
 	if (IS_ERR(s->context)) {
 		err = PTR_ERR(s->context);
 		if (err == -EBUSY)
@@ -855,7 +860,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	if (err < 0)
 		goto err_context;
 
-	err = fw_iso_context_start(s->context, -1, 0, FW_ISO_CONTEXT_MATCH_ALL_TAGS);
+	err = fw_iso_context_start(s->context, -1, 0, 0);
 	if (err < 0)
 		goto err_context;
 
