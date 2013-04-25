@@ -876,9 +876,9 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	if (err < 0)
 		goto err_context;
 
-	/* NOTE: TAG2 matches CIP */
+	/* NOTE: TAG1 matches CIP */
 	err = fw_iso_context_start(s->context, -1, 0,
-					FW_ISO_CONTEXT_MATCH_TAG2);
+					FW_ISO_CONTEXT_MATCH_TAG1);
 	if (err < 0)
 		goto err_context;
 
