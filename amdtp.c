@@ -39,12 +39,11 @@
 #define AMDTP_FDF_MASK		0x00FF0000
 #define AMDTP_FDF_SFC_SHIFT	16
 #define AMDTP_FDF_NO_DATA	(0xFF << AMDTP_FDF_SFC_SHIFT)
-/* "Clock-based rate controll mode" is supported */
+/* only "Clock-based rate controll mode" is supported */
 #define AMDTP_FDF_AM824		(0 << (AMDTP_FDF_SFC_SHIFT + 3))
 #define AMDTP_DBS_MASK		0x00FF0000
 #define AMDTP_DBS_SHIFT		16
 #define AMDTP_DBC_MASK		0x000000FF
-
 
 /* TODO: make these configurable */
 #define INTERRUPT_INTERVAL	16
@@ -604,7 +603,7 @@ static void handle_receive_packet(struct amdtp_stream *s,
 			be32_to_cpu(buffer[0]), be32_to_cpu(buffer[1]));
 		return;
 	} else if ((data_quadlets < 3) ||
-	           ((be32_to_cpu(buffer[1]) & AMDTP_FDF_MASK) ==
+		   ((be32_to_cpu(buffer[1]) & AMDTP_FDF_MASK) ==
 							AMDTP_FDF_NO_DATA)) {
 		pcm = NULL;
 	} else {
@@ -739,7 +738,7 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 		/* how many quadlet for data in this packet */
 		data_quadlets =
 			((be32_to_cpu(headers[p]) & ISO_DATA_LENGTH_MASK)
-						 >> ISO_DATA_LENGTH_SHIFT) / 4;
+						>> ISO_DATA_LENGTH_SHIFT) / 4;
 		/* handle each packet data */
 		handle_receive_packet(s, data_quadlets);
 	}
@@ -878,7 +877,8 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		goto err_context;
 
 	/* NOTE: TAG2 matches CIP */
-	err = fw_iso_context_start(s->context, -1, 0, FW_ISO_CONTEXT_MATCH_TAG2);
+	err = fw_iso_context_start(s->context, -1, 0,
+					FW_ISO_CONTEXT_MATCH_TAG2);
 	if (err < 0)
 		goto err_context;
 
