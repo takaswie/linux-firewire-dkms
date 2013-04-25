@@ -28,9 +28,9 @@
 #define TAG_CIP			1
 #define ISO_TCODE_MASK		0x000000F0
 #define ISO_TCODE_SHIFT		4
-#define ISO_TCODE_DATA_PACKET	(0xA << ISO_TCODE_SHIFT)
+#define ISO_TCODE_ISO_PACKET	(0xA << ISO_TCODE_SHIFT)
 
-#define CIP_EOH_MASK		0x40000000
+#define CIP_EOH_MASK		0x80000000
 #define CIP_EOH_SHIFT		31
 #define CIP_EOH			(1u << CIP_EOH_SHIFT)
 #define CIP_FMT_MASK		0x3F000000
@@ -548,6 +548,8 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle)
 	packet.payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
 	packet.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
 	packet.skip = 0;
+	packet.tag = TAG_CIP;
+	packet.sy = 0;
 	packet.header_length = 0;
 
 	err = fw_iso_context_queue(s->context, &packet, &s->buffer.iso_buffer,
@@ -595,15 +597,15 @@ static void handle_receive_packet(struct amdtp_stream *s,
 	buffer = s->buffer.packets[index].buffer;
 
 	/* checking CIP headers for AMDTP with restriction of this module */
-	if (((be32_to_cpu(buffer[0]) & 0xC0000000) == CIP_EOH) ||
-	    ((be32_to_cpu(buffer[1]) & 0xC0000000) != CIP_EOH) ||
-	    ((be32_to_cpu(buffer[1]) & 0x3F000000) != CIP_FMT_AM)) {
+	if (((be32_to_cpu(buffer[0]) & CIP_EOH_MASK) == CIP_EOH) ||
+	    ((be32_to_cpu(buffer[1]) & CIP_EOH_MASK) != CIP_EOH) ||
+	    ((be32_to_cpu(buffer[1]) & CIP_FMT_MASK) != CIP_FMT_AM)) {
 		dev_err(&s->unit->device, "CIP headers error: %08X:%08X\n",
 			be32_to_cpu(buffer[0]), be32_to_cpu(buffer[1]));
 		return;
-	} else if (data_quadlets < 3 ||
-	           (be32_to_cpu(buffer[1]) & AMDTP_FDF_MASK) ==
-							AMDTP_FDF_NO_DATA) {
+	} else if ((data_quadlets < 3) ||
+	           ((be32_to_cpu(buffer[1]) & AMDTP_FDF_MASK) ==
+							AMDTP_FDF_NO_DATA)) {
 		pcm = NULL;
 	} else {
 		/*
@@ -727,7 +729,7 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 		if (((be32_to_cpu(headers[p]) & ISO_TAG_MASK) !=
 					(TAG_CIP << ISO_TAG_SHIFT)) ||
 		    ((be32_to_cpu(headers[p]) & ISO_TCODE_MASK) !=
-						ISO_TCODE_DATA_PACKET)) {
+						ISO_TCODE_ISO_PACKET)) {
 			dev_err(&s->unit->device,
 				"Isochronous headers error: %08X\n",
 				be32_to_cpu(headers[p]));
@@ -875,7 +877,8 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	if (err < 0)
 		goto err_context;
 
-	err = fw_iso_context_start(s->context, -1, 0, 0);
+	/* NOTE: TAG2 matches CIP */
+	err = fw_iso_context_start(s->context, -1, 0, FW_ISO_CONTEXT_MATCH_TAG2);
 	if (err < 0)
 		goto err_context;
 
