@@ -21,13 +21,30 @@
 
 #define TRANSFER_DELAY_TICKS	0x2e00 /* 479.17 µs */
 
+#define ISO_DATA_LENGTH_MASK	0xFFFF0000
+#define ISO_DATA_LENGTH_SHIFT	16
+#define ISO_TAG_MASK		0x0000C000
+#define ISO_TAG_SHIFT		14
 #define TAG_CIP			1
+#define ISO_TCODE_MASK		0x000000F0
+#define ISO_TCODE_SHIFT		4
+#define ISO_TCODE_DATA_PACKET	(0xA << ISO_TCODE_SHIFT)
 
-#define CIP_EOH			(1u << 31)
-#define CIP_FMT_AM		(0x10 << 24)
-#define CIP_NO_DATA		(0xFF << 16)
-#define AMDTP_FDF_AM824		(0 << 19)
+#define CIP_EOH_MASK		0x40000000
+#define CIP_EOH_SHIFT		31
+#define CIP_EOH			(1u << CIP_EOH_SHIFT)
+#define CIP_FMT_MASK		0x3F000000
+#define CIP_FMT_SHIFT		24
+#define CIP_FMT_AM		(0x10 << CIP_FMT_SHIFT)
+#define AMDTP_FDF_MASK		0x00FF0000
 #define AMDTP_FDF_SFC_SHIFT	16
+#define AMDTP_FDF_NO_DATA	(0xFF << AMDTP_FDF_SFC_SHIFT)
+/* "Clock-based rate controll mode" is supported */
+#define AMDTP_FDF_AM824		(0 << (AMDTP_FDF_SFC_SHIFT + 3))
+#define AMDTP_DBS_MASK		0x00FF0000
+#define AMDTP_DBS_SHIFT		16
+#define AMDTP_DBC_MASK		0x000000FF
+
 
 /* TODO: make these configurable */
 #define INTERRUPT_INTERVAL	16
@@ -512,7 +529,7 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle)
 
 	buffer = s->buffer.packets[index].buffer;
 	buffer[0] = cpu_to_be32(ACCESS_ONCE(s->source_node_id_field) |
-				(s->data_block_quadlets << 16) |
+				(s->data_block_quadlets << AMDTP_DBS_SHIFT) |
 				s->data_block_counter);
 	buffer[1] = cpu_to_be32(CIP_EOH | CIP_FMT_AM | AMDTP_FDF_AM824 |
 				(s->sfc << AMDTP_FDF_SFC_SHIFT) | syt);
@@ -531,8 +548,6 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle)
 	packet.payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
 	packet.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
 	packet.skip = 0;
-	packet.tag = TAG_CIP;
-	packet.sy = 0;
 	packet.header_length = 0;
 
 	err = fw_iso_context_queue(s->context, &packet, &s->buffer.iso_buffer,
@@ -587,7 +602,8 @@ static void handle_receive_packet(struct amdtp_stream *s,
 			be32_to_cpu(buffer[0]), be32_to_cpu(buffer[1]));
 		return;
 	} else if (data_quadlets < 3 ||
-	           (be32_to_cpu(buffer[1]) & 0x00FF0000) == CIP_NO_DATA) {
+	           (be32_to_cpu(buffer[1]) & AMDTP_FDF_MASK) ==
+							AMDTP_FDF_NO_DATA) {
 		pcm = NULL;
 	} else {
 		/*
@@ -602,8 +618,9 @@ static void handle_receive_packet(struct amdtp_stream *s,
 		 * this module don't support it.
 		 */
 		data_block_quadlets =
-				(be32_to_cpu(buffer[0]) & 0x00FF0000) >> 16;
-		data_block_counter  = (be32_to_cpu(buffer[0]) & 0x000000FF);
+				(be32_to_cpu(buffer[0]) & AMDTP_DBS_MASK) >>
+								AMDTP_DBS_SHIFT;
+		data_block_counter  = (be32_to_cpu(buffer[0]) & AMDTP_DBC_MASK);
 
 		/*
 		 * NOTE: Echo Audio's Fireworks reports a fixed value for data
@@ -639,8 +656,6 @@ static void handle_receive_packet(struct amdtp_stream *s,
 	packet.payload_length = amdtp_receive_stream_get_max_payload(s);
 	packet.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
 	packet.skip = 0;
-	packet.tag = TAG_CIP;
-	packet.sy = 0;
 	packet.header_length = 4;
 
 	err = fw_iso_context_queue(s->context, &packet, &s->buffer.iso_buffer,
@@ -709,8 +724,10 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 
 	for (p = 0; p < packets; p += 1) {
 		/* check isochronous packet header */
-		if (((be32_to_cpu(headers[p]) & 0x0000C000) >> 14) != 0x01 ||
-		    ((be32_to_cpu(headers[p]) & 0x000000F0) >>  4) != 0x0A) {
+		if (((be32_to_cpu(headers[p]) & ISO_TAG_MASK) !=
+					(TAG_CIP << ISO_TAG_SHIFT)) ||
+		    ((be32_to_cpu(headers[p]) & ISO_TCODE_MASK) !=
+						ISO_TCODE_DATA_PACKET)) {
 			dev_err(&s->unit->device,
 				"Isochronous headers error: %08X\n",
 				be32_to_cpu(headers[p]));
@@ -719,7 +736,8 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 
 		/* how many quadlet for data in this packet */
 		data_quadlets =
-			((be32_to_cpu(headers[p]) & 0xFFFF0000) >> 16) / 4;
+			((be32_to_cpu(headers[p]) & ISO_DATA_LENGTH_MASK)
+						 >> ISO_DATA_LENGTH_SHIFT) / 4;
 		/* handle each packet data */
 		handle_receive_packet(s, data_quadlets);
 	}
@@ -730,16 +748,13 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 static int queue_initial_receive_packets(struct amdtp_stream *s)
 {
 	/* header length is needed for receive stream */
-	struct fw_iso_packet initial_packet = {
-		.skip		= 0,
-		.tag		= TAG_CIP,
-		.sy		= 0,
-		.header_length	= 4
-	};
+	struct fw_iso_packet initial_packet;
 	unsigned int i;
 	int err;
 
 	initial_packet.payload_length = amdtp_receive_stream_get_max_payload(s);
+	initial_packet.skip = 0;
+	initial_packet.header_length = 4;
 
 	for (i = 0; i < QUEUE_LENGTH; ++i) {
 		initial_packet.interrupt = IS_ALIGNED(s->packet_index + 1,
