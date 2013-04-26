@@ -21,15 +21,8 @@
 
 #define TRANSFER_DELAY_TICKS	0x2e00 /* 479.17 µs */
 
-#define ISO_DATA_LENGTH_MASK	0xFFFF0000
 #define ISO_DATA_LENGTH_SHIFT	16
-#define ISO_TAG_MASK		0x0000C000
-#define ISO_TAG_SHIFT		14
 #define TAG_CIP			1
-#define ISO_TCODE_MASK		0x000000F0
-#define ISO_TCODE_SHIFT		4
-#define ISO_TCODE_ISO_PACKET	(0xA << ISO_TCODE_SHIFT)
-
 #define CIP_EOH_MASK		0x80000000
 #define CIP_EOH_SHIFT		31
 #define CIP_EOH			(1u << CIP_EOH_SHIFT)
@@ -723,22 +716,11 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 	unsigned int p, data_quadlets, packets = header_length / 4;
 	__be32 *headers = header;
 
+	/* each fields in an isochronous header are already used in juju */
 	for (p = 0; p < packets; p += 1) {
-		/* check isochronous packet header */
-		if (((be32_to_cpu(headers[p]) & ISO_TAG_MASK) !=
-					(TAG_CIP << ISO_TAG_SHIFT)) ||
-		    ((be32_to_cpu(headers[p]) & ISO_TCODE_MASK) !=
-						ISO_TCODE_ISO_PACKET)) {
-			dev_err(&s->unit->device,
-				"Isochronous headers error: %08X\n",
-				be32_to_cpu(headers[p]));
-			return;
-		}
-
 		/* how many quadlet for data in this packet */
 		data_quadlets =
-			((be32_to_cpu(headers[p]) & ISO_DATA_LENGTH_MASK)
-						>> ISO_DATA_LENGTH_SHIFT) / 4;
+			(be32_to_cpu(headers[p]) >> ISO_DATA_LENGTH_SHIFT) / 4;
 		/* handle each packet data */
 		handle_receive_packet(s, data_quadlets);
 	}
