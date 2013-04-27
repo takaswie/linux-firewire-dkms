@@ -118,14 +118,14 @@ void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate)
 EXPORT_SYMBOL(amdtp_stream_set_rate);
 
 /**
- * amdtp_out_stream_get_max_payload - get the stream's packet size
- * @s: the AMDTP output stream
+ * amdtp_stream_get_max_payload - get the stream's packet size
+ * @s: the AMDTP stream
  *
  * This function must not be called before the stream has been configured
  * with amdtp_stream_set_hw_params(), amdtp_stream_set_pcm(), and
  * amdtp_stream_set_midi().
  */
-unsigned int amdtp_out_stream_get_max_payload(struct amdtp_stream *s)
+unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s)
 {
 	static const unsigned int max_data_blocks[] = {
 		[CIP_SFC_32000]  =  4,
@@ -140,14 +140,12 @@ unsigned int amdtp_out_stream_get_max_payload(struct amdtp_stream *s)
 	s->data_block_quadlets = s->pcm_channels;
 	s->data_block_quadlets += DIV_ROUND_UP(s->midi_ports, 8);
 
-	return 8 + max_data_blocks[s->sfc] * 4 * s->data_block_quadlets;
+	if (s->direction == AMDTP_STREAM_RECEIVE)
+		return 8 + s->syt_interval * s->data_block_quadlets * 4;
+	else
+		return 8 + max_data_blocks[s->sfc] * 4 * s->data_block_quadlets;
 }
-EXPORT_SYMBOL(amdtp_out_stream_get_max_payload);
-
-static unsigned int amdtp_receive_stream_get_max_payload(struct amdtp_stream *s)
-{
-	return 8 + s->syt_interval * s->data_block_quadlets * 4;
-}
+EXPORT_SYMBOL(amdtp_stream_get_max_payload);
 
 static void amdtp_write_s16(struct amdtp_stream *s,
 			    struct snd_pcm_substream *pcm,
@@ -647,7 +645,7 @@ static void handle_receive_packet(struct amdtp_stream *s,
 	}
 
 	/* queueing a packet for next cycle */
-	packet.payload_length = amdtp_receive_stream_get_max_payload(s);
+	packet.payload_length = amdtp_stream_get_max_payload(s);
 	packet.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
 	packet.skip = 0;
 	packet.header_length = 4;
@@ -735,7 +733,7 @@ static int queue_initial_receive_packets(struct amdtp_stream *s)
 	unsigned int i;
 	int err;
 
-	initial_packet.payload_length = amdtp_receive_stream_get_max_payload(s);
+	initial_packet.payload_length = amdtp_stream_get_max_payload(s);
 	initial_packet.skip = 0;
 	initial_packet.header_length = 4;
 
@@ -816,11 +814,11 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	/* initialize packet buffer */
 	if (s->direction == AMDTP_STREAM_RECEIVE)
 		err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
-					amdtp_receive_stream_get_max_payload(s),
+					amdtp_stream_get_max_payload(s),
 					DMA_FROM_DEVICE);
 	else
 		err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
-					amdtp_out_stream_get_max_payload(s),
+					amdtp_stream_get_max_payload(s),
 					DMA_TO_DEVICE);
 	if (err < 0)
 		goto err_unlock;

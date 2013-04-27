@@ -64,7 +64,7 @@ snd_efw_stream_start(struct snd_efw_stream_t *stream)
 	 * establish connection via CMP
 	 */
 	err = cmp_connection_establish(&stream->conn,
-		amdtp_out_stream_get_max_payload(&stream->strm));
+		amdtp_stream_get_max_payload(&stream->strm));
 	if (err < 0)
 		goto end;
 

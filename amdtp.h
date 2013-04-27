@@ -94,7 +94,7 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 void amdtp_stream_destroy(struct amdtp_stream *s);
 
 void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate);
-unsigned int amdtp_out_stream_get_max_payload(struct amdtp_stream *s);
+unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s);
 
 int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed);
 void amdtp_stream_update(struct amdtp_stream *s);
