@@ -570,7 +570,7 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle)
 	}
 }
 
-static void handle_receive_packet(struct amdtp_stream *s,
+static void handle_in_packet_data(struct amdtp_stream *s,
 						unsigned int data_quadlets)
 {
 	__be32 *buffer;
@@ -720,19 +720,19 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 		data_quadlets =
 			(be32_to_cpu(headers[p]) >> ISO_DATA_LENGTH_SHIFT) / 4;
 		/* handle each packet data */
-		handle_receive_packet(s, data_quadlets);
+		handle_in_packet_data(s, data_quadlets);
 	}
 
 	fw_iso_context_queue_flush(s->context);
 }
 
-static int queue_initial_receive_packets(struct amdtp_stream *s)
+static int queue_initial_packets(struct amdtp_stream *s)
 {
-	/* header length is needed for receive stream */
 	struct fw_iso_packet initial_packet;
 	unsigned int i;
 	int err;
 
+	/* header length is needed for receive stream */
 	initial_packet.payload_length = amdtp_stream_get_max_payload(s);
 	initial_packet.skip = 0;
 	initial_packet.header_length = 4;
@@ -850,7 +850,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	s->data_block_counter = 0;
 
 	if (s->direction == AMDTP_STREAM_RECEIVE)
-		err = queue_initial_receive_packets(s);
+		err = queue_initial_packets(s);
 	else
 		err = queue_initial_skip_packets(s);
 	if (err < 0)
