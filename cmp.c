@@ -114,7 +114,7 @@ bus_reset:
  * cmp_connection_init - initializes a connection manager
  * @c: the connection manager to initialize
  * @unit: a unit of the target device
- * @ipcr_index: the index of the iPCR on the target device
+ * @pcr_index: the index of the iPCR/oPCR on the target device
  */
 int cmp_connection_init(struct cmp_connection *c,
 			struct fw_unit *unit,
@@ -259,9 +259,9 @@ static int pcr_set_check(struct cmp_connection *c, __be32 pcr)
  *
  * This function establishes a point-to-point connection from the local
  * computer to the target by allocating isochronous resources (channel and
- * bandwidth) and setting the target's input plug control register.  When this
- * function succeeds, the caller is responsible for starting transmitting
- * packets.
+ * bandwidth) and setting the target's input/output plug control register.
+ * When this function succeeds, the caller is responsible for starting
+ * transmitting packets.
  */
 int cmp_connection_establish(struct cmp_connection *c,
 			     unsigned int max_payload_bytes)
@@ -315,8 +315,8 @@ EXPORT_SYMBOL(cmp_connection_establish);
  * cmp_connection_update - update the connection after a bus reset
  * @c: the connection manager
  *
- * This function must be called from the driver's .update handler to reestablish
- * any connection that might have been active.
+ * This function must be called from the driver's .update handler to
+ * reestablish any connection that might have been active.
  *
  * Returns zero on success, or a negative error code.  On an error, the
  * connection is broken and the caller must stop transmitting iso packets.
@@ -360,7 +360,6 @@ err_unconnect:
 }
 EXPORT_SYMBOL(cmp_connection_update);
 
-
 static __be32 pcr_break_modify(struct cmp_connection *c, __be32 pcr)
 {
 	return pcr & ~cpu_to_be32(PCR_BCAST_CONN | PCR_P2P_CONN_MASK);
@@ -370,9 +369,9 @@ static __be32 pcr_break_modify(struct cmp_connection *c, __be32 pcr)
  * cmp_connection_break - break the connection to the target
  * @c: the connection manager
  *
- * This function deactives the connection in the target's input plug control
- * register, and frees the isochronous resources of the connection.  Before
- * calling this function, the caller should cease transmitting packets.
+ * This function deactives the connection in the target's input/output plug
+ * control register, and frees the isochronous resources of the connection.
+ * Before calling this function, the caller should cease transmitting packets.
  */
 void cmp_connection_break(struct cmp_connection *c)
 {
