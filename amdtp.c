@@ -51,7 +51,7 @@ static void pcm_period_tasklet(unsigned long data);
  * @flags: the packet transmission method to use
  */
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
-		enum amdtp_stream_direction direction, enum cip_flags flags)
+		      enum amdtp_stream_direction direction, enum cip_flags flags)
 {
 	if (flags != CIP_NONBLOCKING)
 		return -EINVAL;
