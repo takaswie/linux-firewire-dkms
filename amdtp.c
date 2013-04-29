@@ -574,6 +574,7 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 				  unsigned int data_quadlets)
 {
 	__be32 *buffer;
+	u32 cip_header[2];
 	unsigned int index, frames, data_block_quadlets,
 					data_block_counter, ptr;
 	struct snd_pcm_substream *pcm;
@@ -585,34 +586,34 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 	index = s->packet_index;
 
 	buffer = s->buffer.packets[index].buffer;
+	cip_header[0] = be32_to_cpu(buffer[0]);
+	cip_header[1] = be32_to_cpu(buffer[1]);
 
 	/* checking CIP headers for AMDTP with restriction of this module */
-	if (((be32_to_cpu(buffer[0]) & CIP_EOH_MASK) == CIP_EOH) ||
-	    ((be32_to_cpu(buffer[1]) & CIP_EOH_MASK) != CIP_EOH) ||
-	    ((be32_to_cpu(buffer[1]) & CIP_FMT_MASK) != CIP_FMT_AM)) {
-		dev_err(&s->unit->device, "CIP headers error: %08X:%08X\n",
-			be32_to_cpu(buffer[0]), be32_to_cpu(buffer[1]));
-		return;
+	if (((cip_header[0] & CIP_EOH_MASK) == CIP_EOH) ||
+	    ((cip_header[1] & CIP_EOH_MASK) != CIP_EOH) ||
+	    ((cip_header[1] & CIP_FMT_MASK) != CIP_FMT_AM)) {
+		dev_err(&s->unit->device, "CIP header error: %08X:%08X\n",
+			cip_header[0], cip_header[1]);
+		pcm = NULL;
 	} else if ((data_quadlets < 3) ||
-		   ((be32_to_cpu(buffer[1]) & AMDTP_FDF_MASK) ==
-							AMDTP_FDF_NO_DATA)) {
+		   ((cip_header[1] & AMDTP_FDF_MASK) == AMDTP_FDF_NO_DATA)) {
 		pcm = NULL;
 	} else {
 		/*
 		 * NOTE: this module doesn't check dbc and syt field
 		 *
 		 * Echo Audio's Fireworks reports wrong number of data block
-		 * counter. Mostly it reports it with increment of 8 blocks
-		 * but sometimes it increments with NO-DATA packet.
+		 * counter. It always reports it with increment by 8 blocks
+		 * even if actual data block quadlets different from 8.
 		 *
-		 * Handling syt field is related to time stamp,
-		 * but the cost is bigger than the effect.
-		 * this module don't support it.
+		 * Handling syt field is related to "presentation" time stamp,
+		 * but ALSA has no implements equivalent to it so this module
+		 * don't support it.
 		 */
-		data_block_quadlets =
-				(be32_to_cpu(buffer[0]) & AMDTP_DBS_MASK) >>
+		data_block_quadlets = (cip_header[0] & AMDTP_DBS_MASK) >>
 								AMDTP_DBS_SHIFT;
-		data_block_counter  = (be32_to_cpu(buffer[0]) & AMDTP_DBC_MASK);
+		data_block_counter  = cip_header[0] & AMDTP_DBC_MASK;
 
 		/*
 		 * NOTE: Echo Audio's Fireworks reports a fixed value for data
@@ -659,12 +660,12 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 		return;
 	}
 
-	/* calcurate packet index */
+	/* calculate packet index */
 	if (++index >= QUEUE_LENGTH)
 		index = 0;
 	s->packet_index = index;
 
-	/* calcurate period and buffer borders */
+	/* calculate period and buffer borders */
 	if (pcm != NULL) {
 		ptr = s->pcm_buffer_pointer + frames;
 		if (ptr >= pcm->runtime->buffer_size)
