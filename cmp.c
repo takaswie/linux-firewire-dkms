@@ -56,6 +56,25 @@ void cmp_error(struct cmp_connection *c, const char *fmt, ...)
 	va_end(va);
 }
 
+static unsigned long long get_offset(struct cmp_connection *c, bool master)
+{
+	unsigned long long offset = CSR_REGISTER_BASE;
+
+	if (!master) {
+		if (c->direction == CMP_INPUT)
+			offset += CSR_IPCR(c->pcr_index);
+		else
+			offset += CSR_OPCR(c->pcr_index);
+	} else {
+		if (c->direction == CMP_INPUT)
+			offset += CSR_IMPR;
+		else
+			offset += CSR_OMPR;
+	}
+
+	return offset;
+}
+
 static int pcr_modify(struct cmp_connection *c,
 		      __be32 (*modify)(struct cmp_connection *c, __be32 old),
 		      int (*check)(struct cmp_connection *c, __be32 pcr),
@@ -65,13 +84,7 @@ static int pcr_modify(struct cmp_connection *c,
 	int generation = c->resources.generation;
 	int rcode, errors = 0;
 	__be32 old_arg, buffer[2];
-	unsigned long long offset;
 	int err;
-
-	if (c->direction == CMP_INPUT)
-		offset = CSR_REGISTER_BASE + CSR_IPCR(c->pcr_index);
-	else
-		offset = CSR_REGISTER_BASE + CSR_OPCR(c->pcr_index);
 
 	buffer[0] = c->last_pcr_value;
 	for (;;) {
@@ -81,7 +94,7 @@ static int pcr_modify(struct cmp_connection *c,
 		rcode = fw_run_transaction(
 				device->card, TCODE_LOCK_COMPARE_SWAP,
 				device->node_id, generation, device->max_speed,
-				offset, buffer, 8);
+				get_offset(c, false), buffer, 8);
 
 		if (rcode == RCODE_COMPLETE) {
 			if (buffer[0] == old_arg) /* success? */
@@ -123,16 +136,10 @@ int cmp_connection_init(struct cmp_connection *c,
 {
 	__be32 mpr_be;
 	u32 mpr;
-	unsigned long long offset;
 	int err;
 
-	if (c->direction == CMP_INPUT)
-		offset = CSR_REGISTER_BASE + CSR_IMPR;
-	else
-		offset = CSR_REGISTER_BASE + CSR_OMPR;
-
 	err = snd_fw_transaction(unit, TCODE_READ_QUADLET_REQUEST,
-				 offset, &mpr_be, 4);
+				 get_offset(c, true), &mpr_be, 4);
 	if (err < 0)
 		return err;
 	mpr = be32_to_cpu(mpr_be);
@@ -186,15 +193,12 @@ static int get_overhead_id(struct cmp_connection *c)
 	int id;
 
 	/*
-	 * apply "oPCR overhead ID encoding"
-	 * the encoding table can convert up to 512.
-	 * here the value over 512 is converted as the same way as 512.
+	 * Apply "oPCR overhead ID encoding"
+	 * The encoding table can convert up to 512.
+	 * Here the value over 512 is converted as the same way as 512.
 	 */
-	for (id = 1; id < 16; id += 1) {
-		if (c->resources.bandwidth_overhead < (id << 5))
-			break;
-	}
-	if (id == 16)
+	id = DIV_ROUND_UP(c->resources.bandwidth_overhead, 32);
+	if (id >= 16)
 		id = 0;
 
 	return id;
@@ -204,7 +208,6 @@ static __be32 opcr_set_modify(struct cmp_connection *c, __be32 opcr)
 {
 	unsigned int spd, xspd;
 
-	/* generate speed and extended speed field value */
 	if (c->speed > SCODE_400) {
 		spd  = SCODE_800;
 		xspd = c->speed - SCODE_800;
@@ -218,21 +221,14 @@ static __be32 opcr_set_modify(struct cmp_connection *c, __be32 opcr)
 			     OPCR_XSPEED_MASK |
 			     PCR_CHANNEL_MASK |
 			     OPCR_SPEED_MASK |
-			     OPCR_OVERHEAD_ID_MASK |
-			     OPCR_PAYLOAD_MASK);
+			     OPCR_OVERHEAD_ID_MASK);
 	opcr |= cpu_to_be32(1 << PCR_P2P_CONN_SHIFT);
 	opcr |= cpu_to_be32(xspd << OPCR_XSPEED_SHIFT);
 	opcr |= cpu_to_be32(c->resources.channel << PCR_CHANNEL_SHIFT);
 	opcr |= cpu_to_be32(spd << OPCR_SPEED_SHIFT);
 	opcr |= cpu_to_be32(get_overhead_id(c) << OPCR_OVERHEAD_ID_SHIFT);
-	/*
-	 * here zero is applied to payload field.
-	 * it means the maximum number of quadlets in an isochronous packet is
-	 * 1024 when spd is less than three, 1024 * 2 * xspd + 1 when spd is
-	 * equal to three. An arbitrary value can be set here but 0 is enough
-	 * for our purpose.
-	 */
-	opcr |= cpu_to_be32(0 << OPCR_PAYLOAD_SHIFT);
+
+	/* NOTE: payload field is set by target device */
 
 	return opcr;
 }
