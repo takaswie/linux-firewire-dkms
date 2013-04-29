@@ -75,7 +75,6 @@ struct amdtp_stream {
 	unsigned int last_syt_offset;
 	unsigned int syt_offset_state;
 
-	/* for ALSA PCM DMA buffer */
 	unsigned int pcm_buffer_pointer;
 	unsigned int pcm_period_pointer;
 	bool pointer_flush;
@@ -90,7 +89,7 @@ struct amdtp_stream {
 };
 
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
-		      enum amdtp_stream_direction direction, enum cip_flags flags);
+		enum amdtp_stream_direction direction, enum cip_flags flags);
 void amdtp_stream_destroy(struct amdtp_stream *s);
 
 void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate);

@@ -51,7 +51,7 @@ static void pcm_period_tasklet(unsigned long data);
  * @flags: the packet transmission method to use
  */
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
-		      enum amdtp_stream_direction direction, enum cip_flags flags)
+		enum amdtp_stream_direction direction, enum cip_flags flags)
 {
 	if (flags != CIP_NONBLOCKING)
 		return -EINVAL;
@@ -691,7 +691,7 @@ static void pcm_period_tasklet(unsigned long data)
 }
 
 static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
-				size_t header_length, void *header, void *private_data)
+			size_t header_length, void *header, void *private_data)
 {
 	struct amdtp_stream *s = private_data;
 	unsigned int i, packets = header_length / 4;
@@ -709,7 +709,7 @@ static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
 }
 
 static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
-			       size_t header_length, void *header, void *private_data)
+			size_t header_length, void *header, void *private_data)
 {
 	struct amdtp_stream *s = private_data;
 	unsigned int p, data_quadlets, packets = header_length / 4;
