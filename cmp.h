@@ -17,7 +17,7 @@ enum cmp_direction {
  * @speed: the connection's actual speed
  *
  * This structure manages (using CMP) an isochronous stream between the local
- * computer and a device's input and output plug (iPCR/oPCR).
+ * computer and a device's input plug (iPCR) and output plug (oPCR).
  *
  * There is no corresponding oPCR created on the local computer, so it is not
  * possible to overlay connections on top of this one.

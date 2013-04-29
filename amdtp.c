@@ -599,10 +599,10 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 		pcm = NULL;
 	} else {
 		/*
-		 * NOTE: we do not check dbc field and syt field
+		 * NOTE: this module doesn't check dbc and syt field
 		 *
-		 * Fireworks reports wrong number of data block counter.
-		 * Mostly it reports it with increment of 8 blocks
+		 * Echo Audio's Fireworks reports wrong number of data block
+		 * counter. Mostly it reports it with increment of 8 blocks
 		 * but sometimes it increments with NO-DATA packet.
 		 *
 		 * Handling syt field is related to time stamp,
@@ -856,7 +856,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	if (err < 0)
 		goto err_context;
 
-	/* NOTE: TAG1 matches CIP */
+	/* NOTE: TAG1 matches CIP. This just affects receive stream */
 	err = fw_iso_context_start(s->context, -1, 0,
 					FW_ISO_CONTEXT_MATCH_TAG1);
 	if (err < 0)

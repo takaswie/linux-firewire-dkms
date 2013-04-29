@@ -47,8 +47,8 @@ enum amdtp_stream_direction {
 
 struct amdtp_stream {
 	struct fw_unit *unit;
-	enum amdtp_stream_direction direction;
 	enum cip_flags flags;
+	enum amdtp_stream_direction direction;
 	struct fw_iso_context *context;
 	struct mutex mutex;
 
@@ -75,7 +75,6 @@ struct amdtp_stream {
 	unsigned int last_syt_offset;
 	unsigned int syt_offset_state;
 
-	/* for ALSA PCM DMA buffer */
 	unsigned int pcm_buffer_pointer;
 	unsigned int pcm_period_pointer;
 	bool pointer_flush;
