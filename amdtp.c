@@ -605,7 +605,7 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 		 *
 		 * Echo Audio's Fireworks reports wrong number of data block
 		 * counter. It always reports it with increment by 8 blocks
-		 * even if actual data block quadlets different from 8.
+		 * even if actual data blocks different from 8.
 		 *
 		 * Handling syt field is related to "presentation" time stamp,
 		 * but ALSA has no implements equivalent to it so this module
