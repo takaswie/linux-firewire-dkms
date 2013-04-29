@@ -170,7 +170,7 @@ static void amdtp_read_s32(struct amdtp_stream *s,
  * changed while the stream is running.
  */
 void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
-				     snd_pcm_format_t format)
+				 snd_pcm_format_t format)
 {
 	if (WARN_ON(!IS_ERR(s->context)))
 		return;
@@ -571,7 +571,7 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle)
 }
 
 static void handle_in_packet_data(struct amdtp_stream *s,
-						unsigned int data_quadlets)
+				  unsigned int data_quadlets)
 {
 	__be32 *buffer;
 	unsigned int index, frames, data_block_quadlets,
@@ -690,7 +690,7 @@ static void pcm_period_tasklet(unsigned long data)
 }
 
 static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
-			size_t header_length, void *header, void *private_data)
+				size_t header_length, void *header, void *private_data)
 {
 	struct amdtp_stream *s = private_data;
 	unsigned int i, packets = header_length / 4;
@@ -708,7 +708,7 @@ static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
 }
 
 static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
-			size_t header_length, void *header, void *private_data)
+			       size_t header_length, void *header, void *private_data)
 {
 	struct amdtp_stream *s = private_data;
 	unsigned int p, data_quadlets, packets = header_length / 4;
@@ -956,7 +956,7 @@ EXPORT_SYMBOL(amdtp_stream_pcm_abort);
 
 void
 amdtp_stream_midi_register(struct amdtp_stream *s,
-				struct snd_rawmidi_substream *substream)
+			   struct snd_rawmidi_substream *substream)
 {
 	ACCESS_ONCE(s->midi[substream->number]) = substream;
 }
@@ -964,7 +964,7 @@ EXPORT_SYMBOL(amdtp_stream_midi_register);
 
 void
 amdtp_stream_midi_unregister(struct amdtp_stream *s,
-	struct snd_rawmidi_substream *substream)
+			     struct snd_rawmidi_substream *substream)
 {
 	ACCESS_ONCE(s->midi[substream->number]) = NULL;
 }

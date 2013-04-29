@@ -75,6 +75,7 @@ struct amdtp_stream {
 	unsigned int last_syt_offset;
 	unsigned int syt_offset_state;
 
+	/* for ALSA PCM DMA buffer */
 	unsigned int pcm_buffer_pointer;
 	unsigned int pcm_period_pointer;
 	bool pointer_flush;
@@ -89,7 +90,7 @@ struct amdtp_stream {
 };
 
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
-		enum amdtp_stream_direction direction, enum cip_flags flags);
+		      enum amdtp_stream_direction direction, enum cip_flags flags);
 void amdtp_stream_destroy(struct amdtp_stream *s);
 
 void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate);
@@ -100,7 +101,7 @@ void amdtp_stream_update(struct amdtp_stream *s);
 void amdtp_stream_stop(struct amdtp_stream *s);
 
 void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
-				     snd_pcm_format_t format);
+				 snd_pcm_format_t format);
 void amdtp_stream_pcm_prepare(struct amdtp_stream *s);
 unsigned long amdtp_stream_pcm_pointer(struct amdtp_stream *s);
 void amdtp_stream_pcm_abort(struct amdtp_stream *s);
@@ -108,7 +109,7 @@ void amdtp_stream_pcm_abort(struct amdtp_stream *s);
 void amdtp_stream_midi_register(struct amdtp_stream *s,
 				struct snd_rawmidi_substream *substream);
 void amdtp_stream_midi_unregister(struct amdtp_stream *s,
-				struct snd_rawmidi_substream *substream);
+				  struct snd_rawmidi_substream *substream);
 int amdtp_stream_midi_running(struct amdtp_stream *s);
 
 /**
@@ -120,7 +121,7 @@ int amdtp_stream_midi_running(struct amdtp_stream *s);
  * This function must not be called while the stream is running.
  */
 static inline void amdtp_stream_set_pcm(struct amdtp_stream *s,
-					    unsigned int pcm_channels)
+					unsigned int pcm_channels)
 {
 	s->pcm_channels = pcm_channels;
 }
@@ -133,9 +134,9 @@ static inline void amdtp_stream_set_pcm(struct amdtp_stream *s,
  * This function must not be called while the stream is running.
  */
 static inline void amdtp_stream_set_midi(struct amdtp_stream *s,
-					unsigned int midi_ports,
-					unsigned int midi_counter,
-					unsigned int midi_max_bytes)
+					 unsigned int midi_ports,
+					 unsigned int midi_counter,
+					 unsigned int midi_max_bytes)
 {
 	s->midi_ports = midi_ports;
 	s->midi_counter = midi_counter;
@@ -164,7 +165,7 @@ static inline bool amdtp_streaming_error(struct amdtp_stream *s)
  * device's .trigger callback.
  */
 static inline void amdtp_stream_pcm_trigger(struct amdtp_stream *s,
-						struct snd_pcm_substream *pcm)
+					    struct snd_pcm_substream *pcm)
 {
 	ACCESS_ONCE(s->pcm) = pcm;
 }
