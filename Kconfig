@@ -46,4 +46,34 @@ config SND_SCS1X
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-scs1x.
 
+config SND_FIREWORKS
+        tristate "Echo Fireworks chipset support"
+        select SND_PCM
+        select SND_RAWMIDI
+	select SND_FIREWIRE_LIB
+        help
+          Say Y here to include support for FireWire devices based
+          on Echo Digital Audio's Fireworks architecture:
+          * Echo AudioFire 2/4/8/8a/Pre8/12
+          * Echo Fireworks 8/HDMI
+          * Gibson Goldtop/RIP
+          * Mackie Onyx 400F/1200F
+
+          To compile this driver as a module, choose M here: the module
+          will be called snd-fireworks.
+
+config SND_BEBOB
+	tristate "Bridge Co. BeBoB chipset support"
+        select SND_PCM
+        select SND_RAWMIDI
+	select SND_FIREWIRE_LIB
+        help
+          Say Y here to include support for FireWire devices based
+          on Bridge Co.'s BeBoB architecture:
+          * M-Audio Firewire 410/1814/Solo/AudioPhile
+	  * M-Audio Ozonic
+
+          To compile this driver as a module, choose M here: the module
+          will be called snd-fireworks.
+
 endif # SND_FIREWIRE

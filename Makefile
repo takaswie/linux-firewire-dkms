@@ -10,7 +10,9 @@ obj-$(CONFIG_SND_ISIGHT) += snd-isight.o
 obj-$(CONFIG_SND_SCS1X) += snd-scs1x.o
 
 #obj-$(CONFIG_SND_FIREWIRE) += fireworks/
+#obj-$(CONFIG_SND_FIREWIRE) += bebob/
 obj-m += fireworks/
+obj-m += bebob/
 
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
