@@ -32,13 +32,13 @@ snd_efw_stream_init(struct snd_efw_t *efw, struct snd_efw_stream_t *stream)
 		s_direction = AMDTP_STREAM_TRANSMIT;
 	}
 
-	err = cmp_connection_init(&stream->conn, efw->unit, c_direction, 0);
+	err = cmp_connection_init(&stream->cmp, efw->unit, c_direction, 0);
 	if (err < 0)
 		goto end;
 
-	err = amdtp_stream_init(&stream->strm, efw->unit, s_direction, CIP_NONBLOCKING);
+	err = amdtp_stream_init(&stream->amdtp, efw->unit, s_direction, CIP_NONBLOCKING);
 	if (err < 0) {
-		cmp_connection_destroy(&stream->conn);
+		cmp_connection_destroy(&stream->cmp);
 		goto end;
 	}
 
@@ -55,7 +55,7 @@ snd_efw_stream_start(struct snd_efw_stream_t *stream)
 	int err;
 
 	/* already running */
-	if (!IS_ERR(stream->strm.context)) {
+	if (!IS_ERR(stream->amdtp.context)) {
 		err = 0;
 		goto end;
 	}
@@ -63,17 +63,17 @@ snd_efw_stream_start(struct snd_efw_stream_t *stream)
 	/*
 	 * establish connection via CMP
 	 */
-	err = cmp_connection_establish(&stream->conn,
-		amdtp_stream_get_max_payload(&stream->strm));
+	err = cmp_connection_establish(&stream->cmp,
+		amdtp_stream_get_max_payload(&stream->amdtp));
 	if (err < 0)
 		goto end;
 
 	/* start amdtp stream */
-	err = amdtp_stream_start(&stream->strm,
-		stream->conn.resources.channel,
-		stream->conn.speed);
+	err = amdtp_stream_start(&stream->amdtp,
+		stream->cmp.resources.channel,
+		stream->cmp.speed);
 	if (err < 0)
-		cmp_connection_break(&stream->conn);
+		cmp_connection_break(&stream->cmp);
 
 end:
 	return err;
@@ -82,11 +82,11 @@ end:
 void
 snd_efw_stream_stop(struct snd_efw_stream_t *stream)
 {
-	if (!!IS_ERR(stream->strm.context))
+	if (!!IS_ERR(stream->amdtp.context))
 		goto end;
 
-	amdtp_stream_stop(&stream->strm);
-	cmp_connection_break(&stream->conn);
+	amdtp_stream_stop(&stream->amdtp);
+	cmp_connection_break(&stream->cmp);
 end:
 	return;
 }
@@ -95,6 +95,6 @@ void
 snd_efw_stream_destroy(struct snd_efw_stream_t *stream)
 {
 	snd_efw_stream_stop(stream);
-	cmp_connection_destroy(&stream->conn);
+	cmp_connection_destroy(&stream->cmp);
 	return;
 }
