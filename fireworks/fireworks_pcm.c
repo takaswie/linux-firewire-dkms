@@ -311,7 +311,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	amdtp_stream_set_rate(&stream->strm, params_rate(hw_params));
 	amdtp_stream_set_pcm(&stream->strm, params_channels(hw_params));
 	amdtp_stream_set_pcm_format(&stream->strm, params_format(hw_params));
-	amdtp_stream_set_midi(&stream->strm, midi_count, 16, 1);
+	amdtp_stream_set_midi(&stream->strm, midi_count, 1);
 end:
 	return err;
 }

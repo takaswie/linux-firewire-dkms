@@ -31,7 +31,7 @@ midi_open(struct snd_rawmidi_substream *substream)
 		stream = &efw->transmit_stream;
 
 	/* check other streams */
-	run = amdtp_stream_midi_running(&stream->strm);
+	run = stream->strm.midi_triggered;
 
 	/* register pointer */
 	amdtp_stream_midi_register(&stream->strm, substream);
@@ -86,21 +86,21 @@ static void
 midi_trigger(struct snd_rawmidi_substream *substream, int up)
 {
 	struct snd_efw_t *efw = substream->rmidi->private_data;
-	unsigned long *midi_running;
+	unsigned long *midi_triggered;
 	unsigned long flags;
 
 	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
-		midi_running = &efw->receive_stream.strm.midi_running;
+		midi_triggered = &efw->receive_stream.strm.midi_triggered;
 	else
-		midi_running = &efw->transmit_stream.strm.midi_running;
+		midi_triggered = &efw->transmit_stream.strm.midi_triggered;
 
 	spin_lock_irqsave(&efw->lock, flags);
 
 	/* bit table shows MIDI stream has data or not */
 	if (up)
-		__set_bit(substream->number, midi_running);
+		__set_bit(substream->number, midi_triggered);
 	else
-		__clear_bit(substream->number, midi_running);
+		__clear_bit(substream->number, midi_triggered);
 
 	spin_unlock_irqrestore(&efw->lock, flags);
 

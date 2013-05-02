@@ -413,12 +413,15 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 		/* skip PCM data */
 		buffer += s->pcm_channels;
 
-		/* According to MMA/AMEI RP-027, one channels of AM824 can handle 8 MIDI streams */
-		m = (s->data_block_counter + f) % s->midi_counter;
+		/*
+		 * According to MMA/AMEI RP-027, one channels of AM824 can
+		 * handle 8 MIDI streams
+		 */
+		m = (s->data_block_counter + f) % 8;
 
 		for (p = 0; p < s->midi_ports; p += 1) {
 			/* MIDI stream number */
-			port = p * s->midi_counter + m;
+			port = p * 8 + m;
 
 			/* AM824 label for MIDI comformant data */
 			b[0] = 0x80;
@@ -432,13 +435,13 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 				/* through */
 			}
 			/* check the MIDI stream untriggered */
-			else if (!test_bit(port, &s->midi_running)) {
-				/* MIDI Active Snesing */
-				b[1] = 0xFE;
+			else if (!test_bit(port, &s->midi_triggered)) {
+				/* through */
 			}
 			/* transfer MIDI data from stream to packet */
 			else {
-				len = snd_rawmidi_transmit_peek(s->midi[port], b + 1, s->midi_max_bytes);
+				len = snd_rawmidi_transmit_peek(s->midi[port],
+						b + 1, s->midi_max_bytes);
 				if ((len <= 0) | (len > s->midi_max_bytes)) {
 					/* MIDI Active Sensing */
 					b[1] = 0xFE;
@@ -446,12 +449,14 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 					b[3] = 0x00;
 					len = 0;
 				} else {
-					snd_rawmidi_transmit_ack(s->midi[port], len);
+					snd_rawmidi_transmit_ack(s->midi[port],
+								 len);
 					b[0] += len;
 				}
 			}
-
-			buffer[p] = be32_to_cpu((b[0] << 24) | (b[1] << 16) | (b[2] << 8) | b[3]);
+			buffer[p] = (b[0] << 24) | (b[1] << 16) |
+							(b[2] << 8) | b[3];
+			buffer[p] = be32_to_cpu(buffer[p]);
 		}
 		buffer += s->data_block_quadlets - s->pcm_channels;
 	}
@@ -488,7 +493,7 @@ static void amdtp_pull_midi(struct amdtp_stream *s,
 				/* through */
 			}
 			/* check the MIDI stream untriggered */
-			else if (!test_bit(port, &s->midi_running)) {
+			else if (!test_bit(port, &s->midi_triggered)) {
 				/* through */
 			}
 			/* transfer MIDI data from packet to stream */
@@ -974,11 +979,12 @@ EXPORT_SYMBOL(amdtp_stream_midi_unregister);
 int
 amdtp_stream_midi_running(struct amdtp_stream *s)
 {
-	int i, run = 0;
-	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1)
+	int i;
+	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1) {
 		if (s->midi[i] != NULL)
-		run += 1;
+			return true;
+	}
 
-	return (run == 0);
+	return false;
 }
 EXPORT_SYMBOL(amdtp_stream_midi_running);
