@@ -68,14 +68,6 @@ struct snd_efw_phys_group_t {
 	u8 count;
 } __attribute__((packed));
 
-/* for IEC61883-1 and -6 stream */
-struct snd_efw_stream_t {
-	struct cmp_connection cmp;
-	struct amdtp_stream amdtp;
-	bool pcm;
-	bool midi;
-};
-
 struct snd_efw_t {
 	struct snd_card *card;
 	struct fw_device *device;
@@ -125,9 +117,12 @@ struct snd_efw_t {
 	struct snd_ctl_elem_id *control_id_sampling_rate;
 	struct snd_ctl_elem_id *control_id_clock_source;
 
-	/* audio and music data transmittion protocol */
-	struct snd_efw_stream_t transmit_stream;
-	struct snd_efw_stream_t receive_stream;
+	/* for IEC 61883-1 and -6 streaming */
+	struct amdtp_stream receive_stream;
+	struct amdtp_stream transmit_stream;
+	/* Fireworks has only two plugs */
+	struct cmp_connection output_connection;
+	struct cmp_connection input_connection;
 };
 
 struct efc_hwinfo_t {
@@ -238,10 +233,10 @@ int snd_efw_command_capture(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
 int snd_efw_command_phys_in(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
 
 /* for AMDTP stream and CMP */
-int snd_efw_stream_init(struct snd_efw_t *efw, struct snd_efw_stream_t *stream);
-int snd_efw_stream_start(struct snd_efw_stream_t *stream);
-void snd_efw_stream_stop(struct snd_efw_stream_t *stream);
-void snd_efw_stream_destroy(struct snd_efw_stream_t *stream);
+int snd_efw_stream_init(struct snd_efw_t *efw, struct amdtp_stream *stream);
+int snd_efw_stream_start(struct snd_efw_t *efw, struct amdtp_stream *stream);
+void snd_efw_stream_stop(struct snd_efw_t *efw, struct amdtp_stream *stream);
+void snd_efw_stream_destroy(struct snd_efw_t *efw, struct amdtp_stream *stream);
 
 /* for procfs subsystem */
 void snd_efw_proc_init(struct snd_efw_t *efw);

@@ -17,84 +17,91 @@
  */
 #include "./fireworks.h"
 
-int
-snd_efw_stream_init(struct snd_efw_t *efw, struct snd_efw_stream_t *stream)
+int snd_efw_stream_init(struct snd_efw_t *efw, struct amdtp_stream *stream)
 {
-	enum cmp_direction c_direction;
-	enum amdtp_stream_direction s_direction;
+	struct cmp_connection *connection;
+	enum cmp_direction c_dir;
+	enum amdtp_stream_direction s_dir;
 	int err;
 
 	if (stream == &efw->receive_stream) {
-		c_direction = CMP_OUTPUT;
-		s_direction = AMDTP_STREAM_RECEIVE;
+		connection = &efw->output_connection;
+		c_dir = CMP_OUTPUT;
+		s_dir = AMDTP_STREAM_RECEIVE;
 	} else {
-		c_direction = CMP_INPUT;
-		s_direction = AMDTP_STREAM_TRANSMIT;
+		connection = &efw->input_connection;
+		c_dir = CMP_INPUT;
+		s_dir = AMDTP_STREAM_TRANSMIT;
 	}
 
-	err = cmp_connection_init(&stream->cmp, efw->unit, c_direction, 0);
+	err = cmp_connection_init(connection, efw->unit, c_dir, 0);
 	if (err < 0)
 		goto end;
 
-	err = amdtp_stream_init(&stream->amdtp, efw->unit, s_direction, CIP_NONBLOCKING);
+	err = amdtp_stream_init(stream, efw->unit, s_dir, CIP_NONBLOCKING);
 	if (err < 0) {
-		cmp_connection_destroy(&stream->cmp);
+		cmp_connection_destroy(connection);
 		goto end;
 	}
-
-	stream->pcm = false;
-	stream->midi = false;
 
 end:
 	return err;
 }
 
-int
-snd_efw_stream_start(struct snd_efw_stream_t *stream)
+int snd_efw_stream_start(struct snd_efw_t *efw, struct amdtp_stream *stream)
 {
-	int err;
+	struct cmp_connection *connection;
+	int err = 0;
 
 	/* already running */
-	if (!IS_ERR(stream->amdtp.context)) {
-		err = 0;
+	if (!IS_ERR(stream->context))
 		goto end;
-	}
 
-	/*
-	 * establish connection via CMP
-	 */
-	err = cmp_connection_establish(&stream->cmp,
-		amdtp_stream_get_max_payload(&stream->amdtp));
+	if (stream == &efw->receive_stream)
+		connection = &efw->output_connection;
+	else
+		connection = &efw->input_connection;
+
+	/*  establish connection via CMP */
+	err = cmp_connection_establish(connection,
+				amdtp_stream_get_max_payload(stream));
 	if (err < 0)
 		goto end;
 
 	/* start amdtp stream */
-	err = amdtp_stream_start(&stream->amdtp,
-		stream->cmp.resources.channel,
-		stream->cmp.speed);
+	err = amdtp_stream_start(stream,
+				 connection->resources.channel,
+				 connection->speed);
 	if (err < 0)
-		cmp_connection_break(&stream->cmp);
+		cmp_connection_break(connection);
 
 end:
 	return err;
 }
 
-void
-snd_efw_stream_stop(struct snd_efw_stream_t *stream)
+void snd_efw_stream_stop(struct snd_efw_t *efw, struct amdtp_stream *stream)
 {
-	if (!!IS_ERR(stream->amdtp.context))
+	if (!!IS_ERR(stream->context))
 		goto end;
 
-	amdtp_stream_stop(&stream->amdtp);
-	cmp_connection_break(&stream->cmp);
+	amdtp_stream_stop(stream);
+
+	if (stream == &efw->receive_stream)
+		cmp_connection_break(&efw->output_connection);
+	else
+		cmp_connection_break(&efw->input_connection);
 end:
 	return;
 }
 
-void
-snd_efw_stream_destroy(struct snd_efw_stream_t *stream)
+void snd_efw_stream_destroy(struct snd_efw_t *efw, struct amdtp_stream *stream)
 {
-	snd_efw_stream_stop(stream);
-	cmp_connection_destroy(&stream->cmp);
+	snd_efw_stream_stop(efw, stream);
+
+	if (stream == &efw->receive_stream)
+		cmp_connection_destroy(&efw->output_connection);
+	else
+		cmp_connection_destroy(&efw->input_connection);
+
 	return;
 }

@@ -200,22 +200,22 @@ snd_efw_update(struct fw_unit *unit)
 	fcp_bus_reset(efw->unit);
 
 	/* bus reset for isochronous transmit stream */
-	if (cmp_connection_update(&efw->receive_stream.cmp) < 0) {
-		amdtp_stream_pcm_abort(&efw->receive_stream.amdtp);
+	if (cmp_connection_update(&efw->output_connection) < 0) {
+		amdtp_stream_pcm_abort(&efw->receive_stream);
 		mutex_lock(&efw->mutex);
-		snd_efw_stream_stop(&efw->receive_stream);
+		snd_efw_stream_stop(efw, &efw->receive_stream);
 		mutex_unlock(&efw->mutex);
 	}
-	amdtp_stream_update(&efw->receive_stream.amdtp);
+	amdtp_stream_update(&efw->receive_stream);
 
 	/* bus reset for isochronous receive stream */
-	if (cmp_connection_update(&efw->transmit_stream.cmp) < 0) {
-		amdtp_stream_pcm_abort(&efw->transmit_stream.amdtp);
+	if (cmp_connection_update(&efw->input_connection) < 0) {
+		amdtp_stream_pcm_abort(&efw->transmit_stream);
 		mutex_lock(&efw->mutex);
-		snd_efw_stream_stop(&efw->transmit_stream);
+		snd_efw_stream_stop(efw, &efw->transmit_stream);
 		mutex_unlock(&efw->mutex);
 	}
-	amdtp_stream_update(&efw->transmit_stream.amdtp);
+	amdtp_stream_update(&efw->transmit_stream);
 
 	return;
 }

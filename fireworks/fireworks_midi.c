@@ -22,7 +22,7 @@ static int
 midi_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw_t *efw = substream->rmidi->private_data;
-	struct snd_efw_stream_t *stream;
+	struct amdtp_stream *stream;
 	int err, run;
 
 	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
@@ -31,10 +31,10 @@ midi_open(struct snd_rawmidi_substream *substream)
 		stream = &efw->transmit_stream;
 
 	/* check other streams */
-	run = stream->amdtp.midi_triggered;
+	run = stream->midi_triggered;
 
 	/* register pointer */
-	amdtp_stream_midi_register(&stream->amdtp, substream);
+	amdtp_stream_midi_register(stream, substream);
 
 	/* the other streams running */
 	if (run > 0) {
@@ -43,12 +43,9 @@ midi_open(struct snd_rawmidi_substream *substream)
 	}
 
 	/* start stream */
-	err = snd_efw_stream_start(stream);
+	err = snd_efw_stream_start(efw, stream);
 	if (err < 0)
 		goto end;
-
-	/* midi is transferred */
-	stream->midi = true;
 
 end:
 	return err;
@@ -58,7 +55,7 @@ static int
 midi_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw_t *efw = substream->rmidi->private_data;
-	struct snd_efw_stream_t *stream;
+	struct amdtp_stream *stream;
 
 	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
 		stream = &efw->receive_stream;
@@ -66,17 +63,14 @@ midi_close(struct snd_rawmidi_substream *substream)
 		stream = &efw->transmit_stream;
 
 	/* unregister pointer */
-	amdtp_stream_midi_unregister(&stream->amdtp, substream);
+	amdtp_stream_midi_unregister(stream, substream);
 
 	/* the other streams running */
-	if (amdtp_stream_midi_running(&stream->amdtp) > 0)
+	if (amdtp_stream_midi_running(stream) > 0)
 		goto end;
 
 	/* stop stream */
-	snd_efw_stream_stop(stream);
-
-	/* midi is not transferred */
-	stream->midi = false;
+	snd_efw_stream_stop(efw, stream);
 
 end:
 	return 0;
@@ -90,9 +84,9 @@ midi_trigger(struct snd_rawmidi_substream *substream, int up)
 	unsigned long flags;
 
 	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
-		midi_triggered = &efw->receive_stream.amdtp.midi_triggered;
+		midi_triggered = &efw->receive_stream.midi_triggered;
 	else
-		midi_triggered = &efw->transmit_stream.amdtp.midi_triggered;
+		midi_triggered = &efw->transmit_stream.midi_triggered;
 
 	spin_lock_irqsave(&efw->lock, flags);
 
@@ -177,7 +171,7 @@ snd_efw_create_midi_devices(struct snd_efw_t *efw)
 		str = &rmidi->streams[SNDRV_RAWMIDI_STREAM_OUTPUT];
 
 		list_for_each_entry(subs, &str->substreams, list)
-			efw->transmit_stream.amdtp.midi[subs->number] = subs;
+			efw->transmit_stream.midi[subs->number] = subs;
 
 		set_midi_substream_names(efw, str);
 	}
