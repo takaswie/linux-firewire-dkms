@@ -56,6 +56,18 @@ Firewire 1814
 - Digital-out 8ch(ADAT)48kHz/4ch(ADAT S/MUX)/96kHz/2chSPDIF
 - Endless Rotery Encoder (SW Return Bus1-4/Output/Input1-16/Aux Send)
 - Internal/External(ADAT/SPDIF)/WordClock
+- TSB41AB2
+  41ATH21C
+- bridgeCo
+  L6A0018
+  BCOIC
+  G 0406
+  WPG06804
+- bridgeCo
+  L5A9625
+  BCOIC
+  DM1000-CQ
+  G 0347
 
 Ozonic
 2004/10/08
