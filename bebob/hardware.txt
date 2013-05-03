@@ -1,0 +1,72 @@
+FW Solo
+- 2004/10/29
+- 24bit
+- 44.1/48.0/88.2/96.0kHz
+- Analog-in 2ch/ Digital-in 2ch
+- Analog-out 2ch/Digital-out 2ch
+- Internal/external(SPDIF) clock
+- MIDI-in 1ch/MIDI-out 1ch
+- TSB41AB2
+  71EL TL TC
+- bridgeCo
+  L5B9625
+  BCOIC
+  DM1000E-CQL
+  G 0642
+  WY142014.1
+
+FW Audiophile
+- 2005/0805
+- BridgeCo DM1000(Based on ARM946)
+- 16/20/24bit
+- 44.1/48.0/88.2/96.0kHz
+(Analog can support 32.0kHz)
+- Analog-in 2ch/Digital-in 2ch
+- Analog-out 4ch/Digital-out 2ch
+- Internal/External(SPDIF) clock
+- TSB41AB2
+  41E679TC
+- bridgeCo
+  L5B9625
+  BCOIC
+  DM1000E-CQL
+  G 5510
+  WYH10083
+
+Firewire 410
+- 16/20/24bit
+- 44.1/48.0/88.2/96.0kHz
+- Analog-in 2ch
+- Digital-in
+- Analog-out 8ch(2ch -192kHz)
+- TSB41AB2
+  38E8LKTC
+- bridgeCo
+  L5A9625
+  BCOIC
+  DM1000-CQ
+  G 0308
+
+Firewire 1814
+- 2004/06/08
+- 44.1/48.0/88.2/96.0kHz
+- Analog-in 8ch(-96.0)/2ch(-192.0kHz)
+- Digital-in 8ch(ADAT)48kHz/4ch(ADAT S/MUX)96kHz/2chSPDIF
+- Analog-out 4ch(-96.0kHz)/2ch(-192.0kHz)
+- Digital-out 8ch(ADAT)48kHz/4ch(ADAT S/MUX)/96kHz/2chSPDIF
+- Endless Rotery Encoder (SW Return Bus1-4/Output/Input1-16/Aux Send)
+- Internal/External(ADAT/SPDIF)/WordClock
+
+Ozonic
+2004/10/08
+- 44.1/48.0/88.2/96.0kHz
+- Analog-in 4ch
+- Analog-out 4ch
+- TSB41AB2
+  14ADK01C
+- bridgeCo
+  L5B9625
+  BCOIC
+  DM1000E-COL
+  G 0510 
+  WYH20082
