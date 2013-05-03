@@ -194,6 +194,7 @@ snd_bebob_remove(struct device *dev)
 #define MODEL_MAUDIO_FW_BOOTLOADER		0x00010058
 #define MODEL_MAUDIO_AUDIOPHILE_BOOTLOADER	0x00010060
 #define MODEL_MAUDIO_SOLO			0x00010062
+#define MODEL_MAUDIO_FW_1814_BOOTLOADER		0x00010070
 #define SPECIFIER_1394TA			0x0000a02d
 
 static const struct ieee1394_device_id snd_bebob_id_table[] = {
@@ -230,6 +231,13 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 				  IEEE1394_MATCH_MODEL_ID,
 		.vendor_id	= VENDOR_MAUDIO_2ND,
 		.model_id	= MODEL_MAUDIO_SOLO,
+		.specifier_id	= SPECIFIER_1394TA,
+	},
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= VENDOR_MAUDIO_2ND,
+		.model_id	= MODEL_MAUDIO_FW_1814_BOOTLOADER,
 		.specifier_id	= SPECIFIER_1394TA,
 	},
 	{}
