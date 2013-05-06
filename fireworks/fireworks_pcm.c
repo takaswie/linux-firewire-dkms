@@ -196,7 +196,7 @@ pcm_init_hw_params(struct snd_efw_t *efw,
 				hw_rule_capture_rate, efw,
 				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 	} else {
-		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS,
+		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
 		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_playback_channels, efw,
 				SNDRV_PCM_HW_PARAM_RATE, -1);
