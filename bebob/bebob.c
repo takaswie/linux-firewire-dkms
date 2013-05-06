@@ -1,15 +1,7 @@
 #include "bebob.h"
 #include <sound/core.h>
 
-struct snd_bebob_t {
-	struct snd_card *card;
-	struct fw_device *device;
-	struct fw_unit *unit;
-	int card_index;
-
-	struct mutex mutex;
-	spinlock_t lock;
-};
+#define VENDOR_MAUDIO	0x00000d6c
 
 MODULE_DESCRIPTION("bridgeCo BeBoB driver");
 MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp>");
@@ -29,49 +21,102 @@ MODULE_PARM_DESC(enable, "enable BeBoB sound card");
 static DEFINE_MUTEX(devices_mutex);
 static unsigned int devices_used;
 
-static void
-maudio_proving(struct fw_unit *unit)
+/*
+ * return value:
+ *  < 0: error code
+ *  = 0: now loading
+ *  > 0: loaded
+ */
+static int
+snd_bebob_loader(struct fw_unit *unit)
 {
-	char name[16] = {0};
-	__be32 data[4] = {0};
-	int err;
+	struct fw_device *fw_dev = fw_parent_device(unit);
+	struct fw_csr_iterator i;
+	int key, value;
 
-	/* get current model name */
-	err = fw_csr_string(unit->directory, CSR_MODEL, name, sizeof(name));
+	fw_csr_iterator_init(&i, fw_dev->config_rom);
+	while (fw_csr_iterator_next(&i, &key, &value)) {
+		if (key == CSR_VENDOR) {
+			switch (value) {
+			case VENDOR_MAUDIO:
+				return snd_bebob_maudio_detect(unit);
+			}
+		}
+	}
+	return -1;
+}
+
+static int
+snd_bebob_get_hardware_info(struct snd_bebob *bebob)
+{
+	struct snd_bebob_device_info info = {0};
+
+	char vendor[24];
+	char model[24];
+	u32 id;
+	u32 data[2];
+	u32 revision;
+	int err = 0;
+
+	/* get vendor name
+	err = fw_csr_string(bebob->unit->directory,
+			    CSR_VENDOR, vendor, 24);
 	if (err < 0)
-		return;
-	name[15] = '\0';
-	snd_printk(KERN_INFO "BeBoB name: %s\n", name);
+		goto end;*/
+	strcpy(vendor, "M-Audio");
 
-	/* get chip vendor name */
-	err = snd_fw_transaction(unit, TCODE_READ_BLOCK_REQUEST,
-				0xFFFFC8020000, data, 8);
+	/* get hardware revision */
+	err = snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
+				BEBOB_ADDR_REG_INFO, &info, sizeof(info));
 	if (err < 0)
-		return;
-	snd_printk("chip vendor: %08X %08X\n", data[0], data[1]);
+		goto end;
 
-	/* get bootloader timestamp */
-	err = snd_fw_transaction(unit, TCODE_READ_BLOCK_REQUEST,
-				0xFFFFC8020020, data, 16);
+	/* get model name */
+	err = fw_csr_string(bebob->unit->directory,
+			    CSR_MODEL, model, 24);
 	if (err < 0)
-		return;
-	snd_printk("bootloader timestamp: %08X %08X %08X %08X\n", data[0], data[1], data[2], data[3]);
+		goto end;
 
-	/* get firmware timestamp */
-	err = snd_fw_transaction(unit, TCODE_READ_BLOCK_REQUEST,
-				0xFFFFC8020040, data, 16);
+	/* get hardware id */
+	err = snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
+			0xffffc8020018, &id, 4);
 	if (err < 0)
-		return;
-	snd_printk("firmware timestamp: %08X %08X %08X %08X\n", data[0], data[1], data[2], data[3]);
+		goto end;
 
-	return;
+	/* get hardware revision */
+	err = snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
+			0xffffc802001c, &revision, 4);
+	if (err < 0)
+		goto end;
+
+	/* get GUID */
+	err = snd_fw_transaction(bebob->unit, TCODE_READ_BLOCK_REQUEST,
+			0xffffc8020010, data, 8);
+	if (err < 0)
+		goto end;
+
+	strcpy(bebob->card->driver, "BeBoB");
+	strcpy(bebob->card->shortname, model);
+	snprintf(bebob->card->longname, sizeof(bebob->card->longname),
+		"%s %s (%d) r%d, GUID %08x%08x at %s, S%d",
+		vendor, model,
+		id, revision,
+		data[0], data[1],
+		dev_name(&bebob->unit->device), 100 << bebob->device->max_speed);
+
+	/* TODO: set hardware specification */
+	bebob->pcm_capture_channels = 4;
+	bebob->pcm_playback_channels = 4;
+
+end:
+	return err;
 }
 
 static void
 snd_bebob_update(struct fw_unit *unit)
 {
 	struct snd_card *card = dev_get_drvdata(&unit->device);
-	struct snd_bebob_t *bebob = card->private_data;
+	struct snd_bebob *bebob = card->private_data;
 
 	fcp_bus_reset(bebob->unit);
 
@@ -99,7 +144,7 @@ snd_bebob_update(struct fw_unit *unit)
 static void
 snd_bebob_card_free(struct snd_card *card)
 {
-	struct snd_bebob_t *bebob = card->private_data;
+	struct snd_bebob *bebob = card->private_data;
 
 	if (bebob->card_index >= 0) {
 		mutex_lock(&devices_mutex);
@@ -118,13 +163,14 @@ snd_bebob_probe(struct device *dev)
 	struct fw_unit *unit = fw_unit(dev);
 	int card_index;
 	struct snd_card *card;
-	struct snd_bebob_t *bebob;
-	int err;
+	struct snd_bebob *bebob;
+	int err = 0;
 
 	mutex_lock(&devices_mutex);
 
-	/* TODO: startup firmware if it's M-Audio */
-	maudio_proving(unit);
+	/* some M-Audio devices need cue to load firmware, then bus reset */
+	if (snd_bebob_loader(unit) <= 0 )
+		goto end;
 
 	/* check registered cards */
 	for (card_index = 0; card_index < SNDRV_CARDS; card_index += 1) {
@@ -138,7 +184,7 @@ snd_bebob_probe(struct device *dev)
 
 	/* create card */
 	err = snd_card_create(index[card_index], id[card_index],
-			THIS_MODULE, sizeof(struct snd_bebob_t), &card);
+			THIS_MODULE, sizeof(struct snd_bebob), &card);
 	if (err < 0)
 		goto end;
 	card->private_free = snd_bebob_card_free;
@@ -151,13 +197,24 @@ snd_bebob_probe(struct device *dev)
 	bebob->card_index = -1;
 	mutex_init(&bebob->mutex);
 	spin_lock_init(&bebob->lock);
+	bebob->loaded = false;
+
+	/* retrieve hardware information */
+	err = snd_bebob_get_hardware_info(bebob);
+	if (err < 0)
+		goto error;
+
+	/* create devices */
+	err = snd_bebob_create_pcm_devices(bebob);
+	if (err < 0)
+		goto error;
 
 	/* register card and device */
 	snd_card_set_dev(card, dev);
 	err = snd_card_register(card);
 	if (err < 0) {
 		snd_card_free(card);
-		goto end;
+		goto error;
 	}
 
 	dev_set_drvdata(dev, card);
@@ -165,7 +222,10 @@ snd_bebob_probe(struct device *dev)
 	bebob->card_index = card_index;
 
 	/* proved */
-	err = 0;
+	goto end;
+
+error:
+	snd_card_free(card);
 
 end:
 	mutex_unlock(&devices_mutex);
@@ -176,7 +236,13 @@ static int
 snd_bebob_remove(struct device *dev)
 {
 	struct snd_card *card = dev_get_drvdata(dev);
-	struct snd_bebob_t *bebob = card->private_data;
+	struct snd_bebob *bebob = card->private_data;
+
+	if (!card)
+		goto end;
+
+	/* destroy devices */
+	snd_bebob_destroy_pcm_devices(bebob);
 
 	/* do something */
 	snd_printk(KERN_INFO "BeBoB removed\n");
@@ -184,61 +250,65 @@ snd_bebob_remove(struct device *dev)
 	snd_card_disconnect(card);
 	snd_card_free_when_closed(card);
 
+end:
 	return 0;
 }
 
-#define VENDOR_MAUDIO_1ST			0x000007f5
-#define VENDOR_MAUDIO_2ND			0x00000d6c
-#define MODEL_MAUDIO_FW_410			0x00010046
 #define MODEL_MAUDIO_OZONIC			0x0000000A
 #define MODEL_MAUDIO_FW_BOOTLOADER		0x00010058
-#define MODEL_MAUDIO_AUDIOPHILE_BOOTLOADER	0x00010060
+#define MODEL_MAUDIO_FW_410			0x00010046
+#define MODEL_MAUDIO_AUDIOPHILE_BOTH		0x00010060
 #define MODEL_MAUDIO_SOLO			0x00010062
 #define MODEL_MAUDIO_FW_1814_BOOTLOADER		0x00010070
-#define SPECIFIER_1394TA			0x0000a02d
+#define MODEL_MAUDIO_FW_1814			0x00010071
 
 static const struct ieee1394_device_id snd_bebob_id_table[] = {
+	/* Ozonic has one ID, no bootloader */
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO_1ST,
-		.model_id	= MODEL_MAUDIO_FW_410,
-		.specifier_id	= SPECIFIER_1394TA,
-	},
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO_1ST,
-		.model_id	= MODEL_MAUDIO_FW_BOOTLOADER,
-		.specifier_id	= SPECIFIER_1394TA,
-	},
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO_2ND,
+		.vendor_id	= VENDOR_MAUDIO,
 		.model_id	= MODEL_MAUDIO_OZONIC,
-		.specifier_id	= SPECIFIER_1394TA,
+	},
+	/* Firewire 410 has two IDs, for bootloader and itself */
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= VENDOR_MAUDIO,
+		.model_id	= MODEL_MAUDIO_FW_BOOTLOADER,
 	},
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO_2ND,
-		.model_id	= MODEL_MAUDIO_AUDIOPHILE_BOOTLOADER,
-		.specifier_id	= SPECIFIER_1394TA,
+		.vendor_id	= VENDOR_MAUDIO,
+		.model_id	= MODEL_MAUDIO_FW_410,
 	},
+	/* Firewire Audiophile has one ID for both bootloader and itself */
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO_2ND,
+		.vendor_id	= VENDOR_MAUDIO,
+		.model_id	= MODEL_MAUDIO_AUDIOPHILE_BOTH,
+	},
+	/* Firewire Solo has one ID, no bootloader */
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= VENDOR_MAUDIO,
 		.model_id	= MODEL_MAUDIO_SOLO,
-		.specifier_id	= SPECIFIER_1394TA,
+	},
+	/* Firewire 1814 has two IDs, for bootloader and itself */
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= VENDOR_MAUDIO,
+		.model_id	= MODEL_MAUDIO_FW_1814_BOOTLOADER,
 	},
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO_2ND,
-		.model_id	= MODEL_MAUDIO_FW_1814_BOOTLOADER,
-		.specifier_id	= SPECIFIER_1394TA,
+		.vendor_id	= VENDOR_MAUDIO,
+		.model_id	= MODEL_MAUDIO_FW_1814,
 	},
 	{}
 };
