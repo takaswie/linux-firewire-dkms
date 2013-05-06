@@ -98,7 +98,7 @@ snd_bebob_get_hardware_info(struct snd_bebob *bebob)
 	strcpy(bebob->card->driver, "BeBoB");
 	strcpy(bebob->card->shortname, model);
 	snprintf(bebob->card->longname, sizeof(bebob->card->longname),
-		"%s %s (%d) r%d, GUID %08x%08x at %s, S%d",
+		"%s %s (id%d, r%d), GUID %08x%08x at %s, S%d",
 		vendor, model,
 		id, revision,
 		data[0], data[1],

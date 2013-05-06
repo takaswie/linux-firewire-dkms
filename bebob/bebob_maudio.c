@@ -35,7 +35,7 @@ int snd_bebob_maudio_detect(struct fw_unit *unit)
 		goto end;
 	}
 
-snd_printk(KERN_INFO"M-Audio loading\n");
+snd_printk(KERN_INFO"M-Audio loading...\n");
 
 	cues[0] = cpu_to_be32(MAUDIO_LOADER_CUE1);
 	cues[1] = cpu_to_be32(MAUDIO_LOADER_CUE2);
