@@ -80,8 +80,8 @@ static int snd_efw_get_hardware_info(struct snd_efw_t *efw)
 	if (hwinfo->flags & (1 << FLAG_SPDIF_COAX_SUPPORTED)) {
 		efw->supported_digital_mode = BIT(2) | BIT(3);
 		/* find better way... */
-		if (strcmp(hwinfo->vendor_name, "AudioFire8a")
-		 || strcmp(hwinfo->vendor_name, "AudioFirePre8"))
+		if (strcmp(hwinfo->model_name, "AudioFire8a")
+		 || strcmp(hwinfo->model_name, "AudioFirePre8"))
 			efw->supported_digital_mode |= BIT(0);
 	}
 
