@@ -107,6 +107,8 @@ snd_bebob_get_hardware_info(struct snd_bebob *bebob)
 	/* TODO: set hardware specification */
 	bebob->pcm_capture_channels = 4;
 	bebob->pcm_playback_channels = 4;
+	bebob->midi_input_ports = 0;
+	bebob->midi_output_ports = 0;
 
 end:
 	return err;
