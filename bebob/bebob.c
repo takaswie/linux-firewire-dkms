@@ -211,6 +211,9 @@ snd_bebob_probe(struct device *dev)
 	if (err < 0)
 		goto error;
 
+	/* proc interfaces */
+	snd_bebob_proc_init(bebob);
+
 	/* register card and device */
 	snd_card_set_dev(card, dev);
 	err = snd_card_register(card);

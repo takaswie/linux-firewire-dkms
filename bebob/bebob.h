@@ -103,8 +103,15 @@ int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream)
 void snd_bebob_stream_stop(struct snd_bebob *bebob, struct amdtp_stream *stream);
 void snd_bebob_stream_destroy(struct snd_bebob *bebob, struct amdtp_stream *stream);
 
+int set_sampling_rate(struct fw_unit *unit, int rate,
+		      int direction, unsigned short plug);
+int get_sampling_rate(struct fw_unit *unit, int *rate,
+		      int direction, unsigned short plug);
+
 void snd_bebob_destroy_pcm_devices(struct snd_bebob *bebob);
 int snd_bebob_create_pcm_devices(struct snd_bebob *bebob);
+
+void snd_bebob_proc_init(struct snd_bebob *bebob);
 
 int snd_bebob_maudio_detect(struct fw_unit *unit);
 
