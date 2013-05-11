@@ -17,6 +17,112 @@
  */
 #include "./bebob.h"
 
+static int amdtp_sfc_table[] = {
+	[CIP_SFC_32000]	 = 32000,
+	[CIP_SFC_44100]	 = 44100,
+	[CIP_SFC_48000]	 = 48000,
+	[CIP_SFC_88200]	 = 88200,
+	[CIP_SFC_96000]	 = 96000,
+	[CIP_SFC_176400] = 176400,
+	[CIP_SFC_192000] = 192000};
+
+int set_sampling_rate(struct fw_unit *unit, int rate,
+		      int direction, unsigned short plug)
+{
+	int sfc;
+	u8 *buf;
+	int err;
+
+	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_sfc_table); sfc += 1)
+		if (amdtp_sfc_table[sfc] == rate)
+			break;
+
+	buf = kmalloc(8, GFP_KERNEL);
+	if (!buf) {
+		return -ENOMEM;
+	}
+
+	buf[0] = 0x00;		/* AV/C CONTROL */
+	buf[1] = 0xff;		/* unit */
+	if (direction > 0)
+		buf[2] = 0x19;	/* INPUT PLUG SIGNAL FORMAT */
+	else
+		buf[2] = 0x18;	/* OUTPUT PLUG SIGNAL FORMAT */
+	buf[3] = 0xff & plug;	/* plug */
+	buf[4] = 0x90;		/* EOH_1, Form_1, FMT means audio and music */
+	buf[5] = 0x00 | sfc;	/* FDF-hi */
+	buf[6] = 0xff;		/* FDF-mid */
+	buf[7] = 0xff;		/* FDF-low */
+
+	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 6) | (buf[0] != 0x09) /* ACCEPTED */) {
+		dev_err(&unit->device, "failed to set sampe rate\n");
+		err = -EIO;
+		goto end;
+	}
+
+	err = 0;
+end:
+	kfree(buf);
+	return err;
+}
+
+int get_sampling_rate(struct fw_unit *unit, int *rate,
+		      int direction, unsigned short plug)
+{
+	int sfc, evt;
+	u8 *buf;
+	int err;
+
+	buf = kmalloc(8, GFP_KERNEL);
+	if (!buf) {
+		return -ENOMEM;
+	}
+
+	buf[0] = 0x01;		/* AV/C STATUS */
+	buf[1] = 0xff;		/* unit */
+	if (direction > 0)
+		buf[2] = 0x19;	/* INPUT PLUG SIGNAL FORMAT */
+	else
+		buf[2] = 0x18;	/* OUTPUT PLUG SIGNAL FORMAT */
+	buf[3] = 0xff & plug;	/* plug */
+	buf[4] = 0x90;		/* EOH_1, Form_1, FMT means audio and music */
+	buf[5] = 0xff;		/* FDF-hi */
+	buf[6] = 0xff;		/* FDF-mid */
+	buf[7] = 0xff;		/* FDF-low */
+
+	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 6) | (buf[0] != 0x0c) /* IMPLEMENTED/STABLE */) {
+		dev_err(&unit->device, "failed to get sampe rate\n");
+		err = -EIO;
+		goto end;
+	}
+
+	/* check EVT field */
+	evt = (0x30 & buf[5]) >> 4;
+	if (evt != 0) {	/* not AM824 */
+		err = -EINVAL;
+		goto end;
+	}
+
+	/* check sfc field */
+	sfc = 0x07 & buf[5];
+	if (sfc >= ARRAY_SIZE(amdtp_sfc_table)) {
+		err = -EINVAL;
+		goto end;
+	}
+
+	*rate = amdtp_sfc_table[sfc];
+	err = 0;
+end:
+	kfree(buf);
+	return err;
+}
+
 static int
 pcm_init_hw_params(struct snd_bebob *bebob,
 			struct snd_pcm_substream *substream)
