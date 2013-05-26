@@ -138,7 +138,8 @@ unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s)
 	};
 
 	s->data_block_quadlets = s->pcm_channels;
-	s->data_block_quadlets += DIV_ROUND_UP(s->midi_ports, 8);
+	if (s->midi_ports > 0)
+		s->data_block_quadlets += DIV_ROUND_UP(s->midi_ports, 8);
 
 	if (s->direction == AMDTP_STREAM_RECEIVE)
 		return 8 + s->syt_interval * s->data_block_quadlets * 4;
