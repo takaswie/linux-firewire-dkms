@@ -108,7 +108,7 @@ void amdtp_stream_midi_register(struct amdtp_stream *s,
 				struct snd_rawmidi_substream *substream);
 void amdtp_stream_midi_unregister(struct amdtp_stream *s,
 				  struct snd_rawmidi_substream *substream);
-int amdtp_stream_midi_running(struct amdtp_stream *s);
+bool amdtp_stream_midi_running(struct amdtp_stream *s);
 
 /**
  * amdtp_stream_set_pcm - configure format of PCM samples

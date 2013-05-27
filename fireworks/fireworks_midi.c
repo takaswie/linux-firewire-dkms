@@ -18,17 +18,41 @@
  */
 #include "fireworks.h"
 
+/*
+ * According to IEC 61883-6, MIDI stream is multiplexed with PCM stream in an
+ * Firewire isochronous stream. Then this module use the rules below:
+ * [MIDI stream side]
+ *  1.When no stream in both direction is started, start stream with 48000
+ *  2.When stream in opposite direction is started, start stream with the same
+ *    sampling rate.
+ *  3.When stream in the same direction has PCM stream and request to stop MIDI
+ *    stream, don't stop stream itself.
+ * [PCM stream side]
+ * 1.When stream in the both direction is started and has no PCM stream, just
+ *   MIDI stream, stop the stream and restart it with requested sampling rate.
+ *
+ * It's a bit complicated but needed for management for both streams.
+ */
+
 static int
 midi_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw_t *efw = substream->rmidi->private_data;
 	struct amdtp_stream *stream;
-	int err, run;
+	struct amdtp_stream *opposite;
+	int *pcm_channels_sets;
+	int run, mode, sampling_rate = 48000;
+	int err;
 
-	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
+	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT) {
 		stream = &efw->receive_stream;
-	else
+		pcm_channels_sets = efw->pcm_capture_channels_sets;
+		opposite = &efw->transmit_stream;
+	} else {
 		stream = &efw->transmit_stream;
+		pcm_channels_sets = efw->pcm_playback_channels_sets;
+		opposite = &efw->receive_stream;
+	}
 
 	/* check other streams */
 	run = stream->midi_triggered;
@@ -41,8 +65,25 @@ midi_open(struct snd_rawmidi_substream *substream)
 		err = 0;
 		goto end;
 	}
+	/* PCM stream seems to start the stream */
+	else if (!IS_ERR(stream->context)) {
+		err = 0;
+		goto end;
+	}
 
-	/* start stream */
+	/* opposite stream is running then use the same sampling rate */
+	if (!IS_ERR(opposite->context))
+		err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
+	else
+		err = snd_efw_command_set_sampling_rate(efw, sampling_rate);
+	if (err < 0)
+		goto end;
+	amdtp_stream_set_rate(stream, sampling_rate);
+
+	mode = get_multiplier_mode(get_sampling_rate_index(sampling_rate));
+	amdtp_stream_set_pcm(stream, pcm_channels_sets[mode]);
+
+	/* start stream just for MIDI */
 	err = snd_efw_stream_start(efw, stream);
 	if (err < 0)
 		goto end;
@@ -65,8 +106,12 @@ midi_close(struct snd_rawmidi_substream *substream)
 	/* unregister pointer */
 	amdtp_stream_midi_unregister(stream, substream);
 
-	/* the other streams running */
+	/* the other streams is running */
 	if (amdtp_stream_midi_running(stream) > 0)
+		goto end;
+
+	/* PCM stream is running */
+	if (stream->pcm)
 		goto end;
 
 	/* stop stream */
@@ -136,13 +181,13 @@ snd_efw_create_midi_devices(struct snd_efw_t *efw)
 	int err;
 
 	/* check the number of midi stream */
-	if ((efw->midi_input_count > AMDTP_MAX_MIDI_STREAMS) |
-	    (efw->midi_output_count > AMDTP_MAX_MIDI_STREAMS))
+	if ((efw->midi_input_ports > AMDTP_MAX_MIDI_STREAMS) |
+	    (efw->midi_output_ports > AMDTP_MAX_MIDI_STREAMS))
 		return -EINVAL;
 
 	/* create midi ports */
 	err = snd_rawmidi_new(efw->card, efw->card->driver, 0,
-			      efw->midi_output_count, efw->midi_input_count,
+			      efw->midi_output_ports, efw->midi_input_ports,
 			      &rmidi);
 	if (err < 0)
 		return err;
@@ -151,7 +196,7 @@ snd_efw_create_midi_devices(struct snd_efw_t *efw)
 			"%s MIDI", efw->card->shortname);
 	rmidi->private_data = efw;
 
-	if (efw->midi_input_count > 0) {
+	if (efw->midi_input_ports > 0) {
 		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_INPUT;
 
 		snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_INPUT,
@@ -160,9 +205,10 @@ snd_efw_create_midi_devices(struct snd_efw_t *efw)
 		str = &rmidi->streams[SNDRV_RAWMIDI_STREAM_INPUT];
 
 		set_midi_substream_names(efw, str);
+		amdtp_stream_set_midi(&efw->receive_stream, efw->midi_input_ports, 1);
 	}
 
-	if (efw->midi_output_count > 0) {
+	if (efw->midi_output_ports > 0) {
 		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_OUTPUT;
 
 		snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_OUTPUT,
@@ -174,9 +220,10 @@ snd_efw_create_midi_devices(struct snd_efw_t *efw)
 			efw->transmit_stream.midi[subs->number] = subs;
 
 		set_midi_substream_names(efw, str);
+		amdtp_stream_set_midi(&efw->transmit_stream, efw->midi_output_ports, 1);
 	}
 
-	if ((efw->midi_output_count > 0) && (efw->midi_input_count > 0))
+	if ((efw->midi_output_ports > 0) && (efw->midi_input_ports > 0))
 		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_DUPLEX;
 
 	return 0;

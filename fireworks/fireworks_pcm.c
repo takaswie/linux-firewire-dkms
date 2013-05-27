@@ -51,7 +51,17 @@ static unsigned int freq_table[] = {
 	[6] = 192000,
 };
 
-static int
+int get_sampling_rate_index(int sampling_rate)
+{
+	int i;
+	for (i = 0; i < sizeof(freq_table); i += 1)
+		if (freq_table[i] == sampling_rate)
+			return i;
+
+	return -1;
+}
+
+int
 get_multiplier_mode(int index)
 {
 	return ((int)index - 1) / 2;
@@ -275,11 +285,14 @@ pcm_open(struct snd_pcm_substream *substream)
 	if (err < 0)
 		goto end;
 
-	/* TODO: AMDTP stream just with MIDI comformatnt data should be stop here. */
-
-	/* the same sampling rate must be used for transmit and receive stream */
-	if (!IS_ERR(efw->receive_stream.context) ||
-	    !IS_ERR(efw->transmit_stream.context)) {
+	/*
+	 * The same sampling rate must be used for transmit and receive stream
+	 * as long as the streams include PCM samples
+	 */
+	if ((!IS_ERR(efw->receive_stream.context) &&
+				efw->receive_stream.pcm) ||
+	    (!IS_ERR(efw->transmit_stream.context) &&
+				efw->transmit_stream.pcm)) {
 		err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
 		if (err < 0)
 			goto end;
@@ -305,7 +318,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_efw_t *efw = substream->private_data;
 	struct amdtp_stream *stream;
-	int midi_count;
+	struct amdtp_stream *opposite;
 	int err;
 
 	/* keep PCM ring buffer */
@@ -313,6 +326,16 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 				params_buffer_bytes(hw_params));
 	if (err < 0)
 		goto end;
+
+	/* stop stream if it's just for MIDI */
+	if (!IS_ERR(efw->receive_stream.context) &&
+	    !efw->receive_stream.pcm &&
+	    amdtp_stream_midi_running(&efw->receive_stream))
+		snd_efw_stream_stop(efw, &efw->receive_stream);
+	if (!IS_ERR(efw->transmit_stream.context) &&
+	    !efw->transmit_stream.pcm &&
+	    amdtp_stream_midi_running(&efw->transmit_stream))
+		snd_efw_stream_stop(efw, &efw->transmit_stream);
 
 	/* set sampling rate if fw isochronous stream is not running */
 	if (!!IS_ERR(efw->transmit_stream.context) ||
@@ -327,17 +350,24 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		stream = &efw->receive_stream;
-		midi_count = efw->midi_input_count;
+		opposite = &efw->transmit_stream;
 	} else {
 		stream = &efw->transmit_stream;
-		midi_count = efw->midi_output_count;
+		opposite = &efw->receive_stream;
 	}
 
 	/* set AMDTP parameters for transmit stream */
 	amdtp_stream_set_rate(stream, params_rate(hw_params));
 	amdtp_stream_set_pcm(stream, params_channels(hw_params));
 	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
-	amdtp_stream_set_midi(stream, midi_count, 1);
+
+	/* need to start if opposite stream has MIDI stream */
+	if (!opposite->pcm && amdtp_stream_midi_running(opposite)) {
+		amdtp_stream_set_rate(opposite, params_rate(hw_params));
+		/* TODO: error handling */
+		snd_efw_stream_start(efw, opposite);
+	}
+
 end:
 	return err;
 }
@@ -347,18 +377,15 @@ pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_efw_t *efw = substream->private_data;
 	struct amdtp_stream *stream;
-	struct cmp_connection *connection;
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		stream = &efw->receive_stream;
-		connection = &efw->input_connection;
-	} else {
+	else
 		stream = &efw->transmit_stream;
-		connection = &efw->output_connection;
-	}
 
-	/* stop fw isochronous stream of AMDTP with CMP */
-	snd_efw_stream_stop(efw, stream);
+	/* don't stop stream if MIDI stream is still running */
+	if (!amdtp_stream_midi_running(stream))
+		snd_efw_stream_stop(efw, stream);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }

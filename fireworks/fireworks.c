@@ -177,8 +177,8 @@ static int snd_efw_get_hardware_info(struct snd_efw_t *efw)
 		efw->supported_sampling_rate |= SNDRV_PCM_RATE_192000;
 
 	/* MIDI/PCM inputs and outputs */
-	efw->midi_output_count = hwinfo->nb_midi_out;
-	efw->midi_input_count = hwinfo->nb_midi_in;
+	efw->midi_output_ports = hwinfo->nb_midi_out;
+	efw->midi_input_ports = hwinfo->nb_midi_in;
 
 end:
 	if (hwinfo != NULL)
@@ -339,7 +339,7 @@ static int snd_efw_probe(struct device *dev)
 		goto error;
 
 	/* create midi interface */
-	if (efw->midi_output_count || efw->midi_input_count) {
+	if (efw->midi_output_ports || efw->midi_input_ports) {
 		err = snd_efw_create_midi_devices(efw);
 		if (err < 0)
 			goto error;

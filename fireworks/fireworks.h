@@ -104,8 +104,8 @@ struct snd_efw_t {
 	unsigned int mixer_input_channels;
 
 	/* MIDI parameters */
-	unsigned int midi_output_count;
-	unsigned int midi_input_count;
+	unsigned int midi_output_ports;
+	unsigned int midi_input_ports;
 
 	/* PCM parameters */
 	unsigned int pcm_playback_channels;
@@ -250,5 +250,8 @@ int snd_efw_create_midi_devices(struct snd_efw_t *ef);
 /* for pcm component */
 int snd_efw_create_pcm_devices(struct snd_efw_t *efw);
 void snd_efw_destroy_pcm_devices(struct snd_efw_t *efw);
+
+int get_sampling_rate_index(int sampling_rate);
+int get_multiplier_mode(int index);
 
 #endif

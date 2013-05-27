@@ -977,7 +977,7 @@ amdtp_stream_midi_unregister(struct amdtp_stream *s,
 }
 EXPORT_SYMBOL(amdtp_stream_midi_unregister);
 
-int
+bool
 amdtp_stream_midi_running(struct amdtp_stream *s)
 {
 	int i;
