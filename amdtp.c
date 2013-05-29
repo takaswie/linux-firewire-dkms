@@ -1,6 +1,7 @@
 /*
  * Audio and Music Data Transmission Protocol (IEC 61883-6) streams
- * with Common Isochronous Packet (IEC 61883-1) headers
+ * with Common Isochronous Packet (IEC 61883-1) headers and MIDI comformant
+ * data (MMA/AMEI RP-027).
  *
  * Copyright (c) Clemens Ladisch <clemens@ladisch.de>
  * Licensed under the terms of the GNU General Public License, version 2.
@@ -138,7 +139,7 @@ unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s)
 	};
 
 	s->data_block_quadlets = s->pcm_channels;
-	if (s->midi_ports > 0)
+	if (s->midi_ports)
 		s->data_block_quadlets += DIV_ROUND_UP(s->midi_ports, 8);
 
 	if (s->direction == AMDTP_STREAM_RECEIVE)
@@ -416,7 +417,9 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 
 		/*
 		 * According to MMA/AMEI RP-027, one channels of AM824 can
-		 * handle 8 MIDI streams
+		 * handle 8 MIDI streams. This module can transfer 1 byte for
+		 * MIDI message because can't support "negotiation procedure"
+		 * in MMA/AMEI RP-027.
 		 */
 		m = (s->data_block_counter + f) % 8;
 
@@ -424,37 +427,22 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 			/* MIDI stream number */
 			port = p * 8 + m;
 
-			/* AM824 label for MIDI comformant data */
 			b[0] = 0x80;
 			b[1] = 0x00;
 			b[2] = 0x00;
 			b[3] = 0x00;
 			len = 0;
 
-			/* check the MIDI stream exists in this port */
-			if (s->midi[port] == NULL) {
-				/* through */
+			if ((s->midi[port] != NULL) ||
+			    test_bit(port, &s->midi_triggered)) {
+				len = snd_rawmidi_transmit(s->midi[port],
+								b + 1, 1);
+				if (len <= 0)
+					b[1] = 0x00;
+				else
+					b[0] = 0x81;
 			}
-			/* check the MIDI stream untriggered */
-			else if (!test_bit(port, &s->midi_triggered)) {
-				/* through */
-			}
-			/* transfer MIDI data from stream to packet */
-			else {
-				len = snd_rawmidi_transmit_peek(s->midi[port],
-						b + 1, s->midi_max_bytes);
-				if ((len <= 0) | (len > s->midi_max_bytes)) {
-					/* MIDI Active Sensing */
-					b[1] = 0xFE;
-					b[2] = 0x00;
-					b[3] = 0x00;
-					len = 0;
-				} else {
-					snd_rawmidi_transmit_ack(s->midi[port],
-								 len);
-					b[0] += len;
-				}
-			}
+
 			buffer[p] = (b[0] << 24) | (b[1] << 16) |
 							(b[2] << 8) | b[3];
 			buffer[p] = be32_to_cpu(buffer[p]);
@@ -467,41 +455,34 @@ static void amdtp_pull_midi(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
 	unsigned int m, f, p, port;
-	int len;
+	int len, ret;
 	u8 *b;
 
 	for (f = 0; f < frames; f += 1) {
-		/* skip PCM data */
 		buffer += s->pcm_channels;
 
-		/* According to MMA/AMEI RP-027, one channels of AM824 can handle 8 MIDI streams */
 		m = (s->data_block_counter + f) % 8;
 
 		for (p = 0; p < s->midi_ports; p += 1) {
-			/* for access per byte */
 			b = (u8 *)&buffer[p];
 
-			/* not MIDI comformant data or MIDI data with no byte */
 			if (b[0] < 0x81 || 0x83 < b[0])
 				continue;
+
 			len = b[0] - 0x80;
 
 			/* MIDI stream number */
 			port = p * 8 + m;
 
-			/* check the MIDI stream exists */
-			if (s->midi[port] == NULL) {
-				/* through */
-			}
-			/* check the MIDI stream untriggered */
-			else if (!test_bit(port, &s->midi_triggered)) {
-				/* through */
-			}
-			/* transfer MIDI data from packet to stream */
-			else if (snd_rawmidi_receive(s->midi[port], b + 1, len) != len) {
+			if ((s->midi[port] == NULL) ||
+			    !test_bit(port, &s->midi_triggered))
+				continue;
+
+			ret = snd_rawmidi_receive(s->midi[port], b + 1, len);
+			if (ret != len) {
 				dev_err(&s->unit->device,
-					"MIDI[%d] receive error: %08X %08X %08X %08X\n",
-					port, b[0], b[1], b[2], b[3]);
+				"MIDI[%d] receive: %08X %08X %08X %08X\n",
+				port, b[0], b[1], b[2], b[3]);
 			}
 		}
 		buffer += s->data_block_quadlets - s->pcm_channels;
@@ -626,10 +607,12 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 		 * block quadlets but the actual value differs depending on
 		 * current sampling rate. This is a workaround for Fireworks.
 		 */
-		if ((data_quadlets - 2) % data_block_quadlets > 0)
-			s->data_block_quadlets =
-					s->pcm_channels + s->midi_ports;
-		else
+		if ((data_quadlets - 2) % data_block_quadlets > 0) {
+			s->data_block_quadlets = s->pcm_channels;
+			if (s->midi_ports)
+				s->data_block_quadlets +=
+					DIV_ROUND_UP(s->midi_ports, 8);
+		} else
 			s->data_block_quadlets = data_block_quadlets;
 
 		/* finish to check CIP header */

@@ -19,8 +19,10 @@
 #include "fireworks.h"
 
 /*
- * According to IEC 61883-6, MIDI stream is multiplexed with PCM stream in an
- * Firewire isochronous stream. Then this module use the rules below:
+ * According to MMA/AMEI-027, MIDI stream is multiplexed with PCM stream in an
+ * Firewire isochronous stream. And fireworks need to handle input and output
+ * stream with the same sampling rate. Then this module use the rules below:
+ *
  * [MIDI stream side]
  *  1.When no stream in both direction is started, start stream with 48000
  *  2.When stream in opposite direction is started, start stream with the same
@@ -28,10 +30,11 @@
  *  3.When stream in the same direction has PCM stream and request to stop MIDI
  *    stream, don't stop stream itself.
  * [PCM stream side]
- * 1.When stream in the both direction is started and has no PCM stream, just
- *   MIDI stream, stop the stream and restart it with requested sampling rate.
- *
- * It's a bit complicated but needed for management for both streams.
+ *  1.When stream in the both direction is started and has no PCM stream, stop
+ *    the stream because it include just MIDI stream. Then restart it with
+ *    requested sampling rate by PCM component.
+ *  2.When MIDI stream is going to be closed but PCM stream is still running,
+ *    the stream is kept to be running.
  */
 
 static int
@@ -205,7 +208,7 @@ snd_efw_create_midi_devices(struct snd_efw_t *efw)
 		str = &rmidi->streams[SNDRV_RAWMIDI_STREAM_INPUT];
 
 		set_midi_substream_names(efw, str);
-		amdtp_stream_set_midi(&efw->receive_stream, efw->midi_input_ports, 1);
+		amdtp_stream_set_midi(&efw->receive_stream, efw->midi_input_ports);
 	}
 
 	if (efw->midi_output_ports > 0) {
@@ -220,7 +223,7 @@ snd_efw_create_midi_devices(struct snd_efw_t *efw)
 			efw->transmit_stream.midi[subs->number] = subs;
 
 		set_midi_substream_names(efw, str);
-		amdtp_stream_set_midi(&efw->transmit_stream, efw->midi_output_ports, 1);
+		amdtp_stream_set_midi(&efw->transmit_stream, efw->midi_output_ports);
 	}
 
 	if ((efw->midi_output_ports > 0) && (efw->midi_input_ports > 0))

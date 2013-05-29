@@ -319,6 +319,8 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	struct snd_efw_t *efw = substream->private_data;
 	struct amdtp_stream *stream;
 	struct amdtp_stream *opposite;
+	unsigned int *pcm_channels_sets;
+	int index, mode;
 	int err;
 
 	/* keep PCM ring buffer */
@@ -327,33 +329,33 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	if (err < 0)
 		goto end;
 
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+		stream = &efw->receive_stream;
+		opposite = &efw->transmit_stream;
+		pcm_channels_sets = efw->pcm_playback_channels_sets;
+	} else {
+		stream = &efw->transmit_stream;
+		opposite = &efw->receive_stream;
+		pcm_channels_sets = efw->pcm_capture_channels_sets;
+	}
+
 	/* stop stream if it's just for MIDI */
-	if (!IS_ERR(efw->receive_stream.context) &&
-	    !efw->receive_stream.pcm &&
-	    amdtp_stream_midi_running(&efw->receive_stream))
-		snd_efw_stream_stop(efw, &efw->receive_stream);
-	if (!IS_ERR(efw->transmit_stream.context) &&
-	    !efw->transmit_stream.pcm &&
-	    amdtp_stream_midi_running(&efw->transmit_stream))
-		snd_efw_stream_stop(efw, &efw->transmit_stream);
+	if (!IS_ERR(stream->context) && !stream->pcm &&
+	    amdtp_stream_midi_running(stream))
+		snd_efw_stream_stop(efw, stream);
+	if (!IS_ERR(opposite->context) && !opposite->pcm &&
+	    amdtp_stream_midi_running(opposite)) {
+		snd_efw_stream_stop(efw, opposite);
+	}
 
 	/* set sampling rate if fw isochronous stream is not running */
-	if (!!IS_ERR(efw->transmit_stream.context) ||
-	    !!IS_ERR(efw->receive_stream.context)) {
+	if (!!IS_ERR(stream->context) || !!IS_ERR(stream->context)) {
 		err = snd_efw_command_set_sampling_rate(efw,
 					params_rate(hw_params));
 		if (err < 0)
 			return err;
 		snd_ctl_notify(efw->card, SNDRV_CTL_EVENT_MASK_VALUE,
 					efw->control_id_sampling_rate);
-	}
-
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		stream = &efw->receive_stream;
-		opposite = &efw->transmit_stream;
-	} else {
-		stream = &efw->transmit_stream;
-		opposite = &efw->receive_stream;
 	}
 
 	/* set AMDTP parameters for transmit stream */
@@ -364,8 +366,10 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	/* need to start if opposite stream has MIDI stream */
 	if (!opposite->pcm && amdtp_stream_midi_running(opposite)) {
 		amdtp_stream_set_rate(opposite, params_rate(hw_params));
-		/* TODO: error handling */
-		snd_efw_stream_start(efw, opposite);
+		index = get_sampling_rate_index(params_rate(hw_params));
+		mode = get_multiplier_mode(index);
+		amdtp_stream_set_pcm(opposite, pcm_channels_sets[mode]);
+		err = snd_efw_stream_start(efw, opposite);
 	}
 
 end:
