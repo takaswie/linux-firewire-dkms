@@ -139,8 +139,7 @@ unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s)
 	};
 
 	s->data_block_quadlets = s->pcm_channels;
-	if (s->midi_ports)
-		s->data_block_quadlets += DIV_ROUND_UP(s->midi_ports, 8);
+	s->data_block_quadlets += DIV_ROUND_UP(s->midi_ports, 8);
 
 	if (s->direction == AMDTP_STREAM_RECEIVE)
 		return 8 + s->syt_interval * s->data_block_quadlets * 4;
@@ -407,9 +406,26 @@ static void amdtp_fill_pcm_silence(struct amdtp_stream *s,
 static void amdtp_fill_midi(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
-	unsigned int m, f, p, port;
+	unsigned int m, f, c, port;
 	int len;
 	u8 b[4];
+
+	/*
+	 * This module can't support "negotiation procedure" in
+	 * MMA/AMEI RP-027. Then a maximum data rate is 3,125 bytes per second
+	 * with 1 byte label. This table is for the restriction. With this
+	 * table, the maximum data rate is between 2,756 to 3,000 bytes per
+	 * second.
+	 */
+	static const int block_interval[] = {
+		[CIP_SFC_32000]   = 16,
+		[CIP_SFC_44100]   = 16,
+		[CIP_SFC_48000]   = 16,
+		[CIP_SFC_88200]   = 32,
+		[CIP_SFC_96000]   = 32,
+		[CIP_SFC_176400]  = 64,
+		[CIP_SFC_192000]  = 64
+	};
 
 	for (f = 0; f < frames; f += 1) {
 		/* skip PCM data */
@@ -417,15 +433,12 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 
 		/*
 		 * According to MMA/AMEI RP-027, one channels of AM824 can
-		 * handle 8 MIDI streams. This module can transfer 1 byte for
-		 * MIDI message because can't support "negotiation procedure"
-		 * in MMA/AMEI RP-027.
+		 * handle 8 MIDI streams.
 		 */
 		m = (s->data_block_counter + f) % 8;
-
-		for (p = 0; p < s->midi_ports; p += 1) {
+		for (c = 0; c < DIV_ROUND_UP(s->midi_ports, 8); c += 1) {
 			/* MIDI stream number */
-			port = p * 8 + m;
+			port = c * 8 + m;
 
 			b[0] = 0x80;
 			b[1] = 0x00;
@@ -433,7 +446,9 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 			b[3] = 0x00;
 			len = 0;
 
-			if ((s->midi[port] != NULL) ||
+			if ((m == (s->data_block_counter + f) %
+						block_interval[s->sfc]) &&
+			    (s->midi[port] != NULL) &&
 			    test_bit(port, &s->midi_triggered)) {
 				len = snd_rawmidi_transmit(s->midi[port],
 								b + 1, 1);
@@ -443,9 +458,9 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 					b[0] = 0x81;
 			}
 
-			buffer[p] = (b[0] << 24) | (b[1] << 16) |
+			buffer[c] = (b[0] << 24) | (b[1] << 16) |
 							(b[2] << 8) | b[3];
-			buffer[p] = be32_to_cpu(buffer[p]);
+			buffer[c] = be32_to_cpu(buffer[c]);
 		}
 		buffer += s->data_block_quadlets - s->pcm_channels;
 	}
