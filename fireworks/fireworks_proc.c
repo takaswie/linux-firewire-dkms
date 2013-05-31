@@ -24,7 +24,7 @@ proc_read_hwinfo(struct snd_info_entry *entry, struct snd_info_buffer *buffer)
 {
 	struct snd_efw *efw = entry->private_data;
 	unsigned short i;
-	struct efc_hwinfo hwinfo;
+	struct snd_efw_hwinfo hwinfo;
 
 	if(snd_efw_command_get_hwinfo(efw, &hwinfo) < 0)
 		goto end;
@@ -49,15 +49,15 @@ proc_read_hwinfo(struct snd_info_entry *entry, struct snd_info_buffer *buffer)
 	snd_iprintf(buffer, "nb_phys_audio_out: 0x%X\n", hwinfo.nb_phys_audio_out);
 	snd_iprintf(buffer, "nb_phys_audio_in: 0x%X\n", hwinfo.nb_phys_audio_in);
 
-	snd_iprintf(buffer, "nb_out_groups: 0x%X\n", hwinfo.nb_out_groups);
-	for (i = 0; i < HWINFO_MAX_CAPS_GROUPS; i += 1) {
-		snd_iprintf(buffer, "out_group[0x%d]: type 0x%d, count 0x%d\n",
+	snd_iprintf(buffer, "nb_in_groups: 0x%X\n", hwinfo.nb_in_groups);
+	for (i = 0; i < hwinfo.nb_in_groups; i += 1) {
+		snd_iprintf(buffer, "in_group[0x%d]: type 0x%d, count 0x%d\n",
 			i, hwinfo.out_groups[i].type, hwinfo.out_groups[i].count);
 	}
 
-	snd_iprintf(buffer, "nb_in_groups: 0x%X\n", hwinfo.nb_in_groups);
-	for (i = 0; i < HWINFO_MAX_CAPS_GROUPS; i += 1) {
-		snd_iprintf(buffer, "in_group[0x%d]: type 0x%d, count 0x%d\n",
+	snd_iprintf(buffer, "nb_out_groups: 0x%X\n", hwinfo.nb_out_groups);
+	for (i = 0; i < hwinfo.nb_out_groups; i += 1) {
+		snd_iprintf(buffer, "out_group[0x%d]: type 0x%d, count 0x%d\n",
 			i, hwinfo.out_groups[i].type, hwinfo.out_groups[i].count);
 	}
 
@@ -102,40 +102,26 @@ static void
 proc_read_phys_meters(struct snd_info_entry *entry,
 		      struct snd_info_buffer *buffer)
 {
-	u32 *meters = NULL;
+	struct snd_efw *efw = entry->private_data;
 
 	char const *descs[] = {"Analog", "S/PDIF", "ADAT", "S/PDIF or ADAT",
-				"Analog Mirroring", "Headphones", "I2S"};
+			       "Analog Mirroring", "Headphones", "I2S"};
 
-	struct snd_efw *efw = entry->private_data;
+	struct snd_efw_phys_meters *meters;
 	int i, g, c;
+	int base = sizeof(struct snd_efw_phys_meters);
 	int count = efw->input_meter_counts + efw->output_meter_counts;
+	int err;
 
-	meters = kzalloc(count * sizeof(u32), GFP_KERNEL);
+	meters = kzalloc(base + count * 4, GFP_KERNEL);
 	if (meters == NULL)
-		goto end;
+		return;
 
-	if (snd_efw_command_get_phys_meters(efw, count, meters) < 0) {
-		kfree(meters);
+	err = snd_efw_command_get_phys_meters(efw, meters, base + count * 4);
+	if (err < 0)
 		goto end;
-	}
-
-	/* TODO*/
 
 	snd_iprintf(buffer, "Physical Meters:\n");
-
-	snd_iprintf(buffer, " %d Outputs:\n", efw->mixer_output_channels);
-	g = 0;
-	c = 0;
-	for (i = 0; i < efw->mixer_output_channels; i += 1) {
-		if (c == efw->output_groups[g].count) {
-			g += 1;
-			c = 0;
-		}
-		snd_iprintf(buffer, "  %s [%d]:  %d\n",
-			descs[efw->output_groups[g].type], c, meters[i]);
-		c += 1;
-	}
 
 	snd_iprintf(buffer, " %d Inputs:\n", efw->mixer_input_channels);
 	g = 0;
@@ -145,14 +131,28 @@ proc_read_phys_meters(struct snd_info_entry *entry,
 			g += 1;
 			c = 0;
 		}
-		snd_iprintf(buffer, "  %s [%d]: %d\n",
-			descs[efw->input_groups[g].type], c, meters[efw->mixer_output_channels + i]);
+		snd_iprintf(buffer, "\t%s [%d]: %d\n",
+			descs[efw->input_groups[g].type], c,
+			meters->values[efw->mixer_output_channels + i]);
+		c += 1;
+	}
+
+	snd_iprintf(buffer, " %d Outputs:\n", efw->mixer_output_channels);
+	g = 0;
+	c = 0;
+	for (i = 0; i < efw->mixer_output_channels; i += 1) {
+		if (c == efw->output_groups[g].count) {
+			g += 1;
+			c = 0;
+		}
+		snd_iprintf(buffer, "\t%s [%d]: %d\n",
+			descs[efw->output_groups[g].type], c,
+			meters->values[i]);
 		c += 1;
 	}
 
 end:
-	if (meters != NULL)
-		kfree(meters);
+	kfree(meters);
 	return;
 }
 

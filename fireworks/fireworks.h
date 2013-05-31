@@ -92,24 +92,24 @@ struct snd_efw {
 	unsigned int dynaddr_support;
 
 	/* physical metering */
-	unsigned int output_group_counts;
-	struct snd_efw_phys_group *output_groups;
-	unsigned int output_meter_counts;
 	unsigned int input_group_counts;
 	struct snd_efw_phys_group *input_groups;
 	unsigned int input_meter_counts;
+	unsigned int output_group_counts;
+	struct snd_efw_phys_group *output_groups;
+	unsigned int output_meter_counts;
 
 	/* mixer parameters */
-	unsigned int mixer_output_channels;
 	unsigned int mixer_input_channels;
+	unsigned int mixer_output_channels;
 
 	/* MIDI parameters */
-	unsigned int midi_output_ports;
 	unsigned int midi_input_ports;
+	unsigned int midi_output_ports;
 
 	/* PCM parameters */
-	unsigned int pcm_playback_channels_sets[SND_EFW_MUITIPLIER_MODES];
 	unsigned int pcm_capture_channels_sets[SND_EFW_MUITIPLIER_MODES];
+	unsigned int pcm_playback_channels_sets[SND_EFW_MUITIPLIER_MODES];
 
 	/* notification to control components */
 	struct snd_ctl_elem_id *control_id_sampling_rate;
@@ -123,7 +123,7 @@ struct snd_efw {
 	struct cmp_connection input_connection;
 };
 
-struct efc_hwinfo {
+struct snd_efw_hwinfo {
 	u32 flags;
 	u32 guid_hi;
 	u32 guid_lo;
@@ -167,6 +167,20 @@ struct efc_isoc_map {
 	__be32 recmap[32];
 } __attribute__((packed));
 
+/* for hardware metering */
+struct snd_efw_phys_meters {
+	u32 status;
+	u32 detect_spdif;
+	u32 detect_adat;
+	u32 reserved0;
+	u32 reserved1;
+	u32 nb_output_meters;
+	u32 nb_input_meters;
+	u32 reserved2;
+	u32 reserved3;
+	u32 values[0];
+} __attribute__((packed));
+
 /* clock source parameters */
 enum snd_efw_clock_source {
 	SND_EFW_CLOCK_SOURCE_INTERNAL	= 0,
@@ -176,8 +190,6 @@ enum snd_efw_clock_source {
 	SND_EFW_CLOCK_SOURCE_ADAT_1	= 4,
 	SND_EFW_CLOCK_SOURCE_ADAT_2	= 5,
 };
-
-/* SNDRV_PCM_RATE_XXX should be used to indicate sampling rate */
 
 /* digital mode parameters */
 enum snd_efw_digital_mode {
@@ -209,11 +221,10 @@ enum snd_efw_mixer_cmd {
 };
 int snd_efw_command_identify(struct snd_efw *efw);
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
-			       struct efc_hwinfo *hwinfo);
-int snd_efw_command_get_phys_meters_count(struct snd_efw *efw,
-					  int *inputs, int *outputs);
+			       struct snd_efw_hwinfo *hwinfo);
 int snd_efw_command_get_phys_meters(struct snd_efw *efw,
-				    int count, u32 *polled_meters);
+				    struct snd_efw_phys_meters *meters,
+				    int len);
 int snd_efw_command_get_mixer_usable(struct snd_efw *efw, int *usable);
 int snd_efw_command_set_mixer_usable(struct snd_efw *efw, int usable);
 int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
@@ -261,8 +272,7 @@ int snd_efw_create_midi_devices(struct snd_efw *ef);
 /* for pcm component */
 int snd_efw_create_pcm_devices(struct snd_efw *efw);
 void snd_efw_destroy_pcm_devices(struct snd_efw *efw);
+int snd_efw_get_multiplier_mode(int sampling_rate);
 
-int get_sampling_rate_index(int sampling_rate);
-int get_multiplier_mode(int index);
 
 #endif

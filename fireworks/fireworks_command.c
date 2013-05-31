@@ -166,26 +166,6 @@ struct efc_clock {
 	u32 index;
 };
 
-/* for hardware metering s*/
-struct efc_polled_values {
-	u32 status;
-	u32 detect_spdif;
-	u32 detect_adat;
-	u32 reserved3;
-	u32 reserved4;
-	u32 nb_output_meters;
-	u32 nb_input_meters;
-	u32 reserved5;
-	u32 reserved6;
-};
-
-/* channel types */
-/* MIDI */
-/* Guitar */
-/* Piezo pickup */
-/* Guitar string */
-/* hardware control flags */
-
 /* return values in response */
 enum efc_retval {
 	EFC_RETVAL_OK			= 0,
@@ -343,7 +323,7 @@ int snd_efw_command_identify(struct snd_efw *efw)
 }
 
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
-			       struct efc_hwinfo *hwinfo)
+			       struct snd_efw_hwinfo *hwinfo)
 {
 	u32 *tmp;
 	int i;
@@ -380,71 +360,18 @@ end:
 	return err;
 }
 
-int snd_efw_command_get_polled(struct snd_efw *efw,
-			       u32 *value, int count)
+int snd_efw_command_get_phys_meters(struct snd_efw *efw,
+				    struct snd_efw_phys_meters *meters,
+				    int len)
 {
 	return efc_over_avc(efw, 0,
 			EFC_CAT_HWINFO, EFC_CMD_HWINFO_GET_POLLED,
-			NULL, 0, value, count);
-}
-
-int snd_efw_command_get_phys_meters_count(struct snd_efw *efw,
-					  int *inputs, int *outputs)
-{
-	int err;
-
-	struct efc_polled_values polled_values = {0};
-
-	err = efc_over_avc(efw, 0,
-			EFC_CAT_HWINFO, EFC_CMD_HWINFO_GET_POLLED,
 			NULL, 0,
-			&polled_values, sizeof(struct efc_polled_values) / 4);
-	if (err < 0)
-		goto end;
-
-	*outputs = polled_values.nb_output_meters;
-	*inputs = polled_values.nb_input_meters;
-	if ((*inputs < 0) || (*outputs < 0) ||
-	    (*inputs + *outputs > POLLED_MAX_NB_METERS)) {
-		snd_printk("Invalid polled meters count\n");
-		err = -ENXIO;
-	}
-
-	err = 0;
-end:
-	return err;
-}
-
-int snd_efw_command_get_phys_meters(struct snd_efw *efw,
-				    int count, u32 *polled_meters)
-{
-	int err;
-
-	int base_count = sizeof(struct efc_polled_values) / 4;
-	u32 *polled_values = NULL;
-
-	/* keep enough buffer */
-	polled_values = kzalloc((base_count + count) * 4, GFP_KERNEL);
-	if (polled_values == NULL)
-		return -ENOMEM;
-
-	err = efc_over_avc(efw, 0,
-			EFC_CAT_HWINFO, EFC_CMD_HWINFO_GET_POLLED,
-			NULL, 0,
-			polled_values, base_count + count);
-	if (err < 0)
-		goto end;
-
-	memcpy(polled_meters, polled_values + base_count, count * 4);
-
-	err = 0;
-end:
-	kfree(polled_values);
-	return err;
+			meters, len / 4);
 }
 
 static int
-snd_efw_command_get_clock(struct snd_efw *efw, struct efc_clock *clock)
+command_get_clock(struct snd_efw *efw, struct efc_clock *clock)
 {
 	return efc_over_avc(efw, 0,
 			EFC_CAT_HWCTL, EFC_CMD_HWCTL_GET_CLOCK,
@@ -452,7 +379,7 @@ snd_efw_command_get_clock(struct snd_efw *efw, struct efc_clock *clock)
 }
 
 static int
-snd_efw_command_set_clock(struct snd_efw *efw,
+command_set_clock(struct snd_efw *efw,
 			  int source, int sampling_rate)
 {
 	int err;
@@ -466,7 +393,7 @@ snd_efw_command_set_clock(struct snd_efw *efw,
 	}
 
 	/* get current status */
-	err = snd_efw_command_get_clock(efw, &clock);
+	err = command_get_clock(efw, &clock);
 	if (err < 0)
 		goto end;
 
@@ -497,7 +424,7 @@ int snd_efw_command_get_clock_source(struct snd_efw *efw,
 	int err;
 	struct efc_clock clock = {0};
 
-	err = snd_efw_command_get_clock(efw, &clock);
+	err = command_get_clock(efw, &clock);
 	if (err >= 0)
 		*source = clock.source;
 
@@ -507,7 +434,7 @@ int snd_efw_command_get_clock_source(struct snd_efw *efw,
 int snd_efw_command_set_clock_source(struct snd_efw *efw,
 				     enum snd_efw_clock_source source)
 {
-	return snd_efw_command_set_clock(efw, source, -1);
+	return command_set_clock(efw, source, -1);
 }
 
 int snd_efw_command_get_sampling_rate(struct snd_efw *efw,
@@ -516,7 +443,7 @@ int snd_efw_command_get_sampling_rate(struct snd_efw *efw,
 	int err;
 	struct efc_clock clock = {0};
 
-	err = snd_efw_command_get_clock(efw, &clock);
+	err = command_get_clock(efw, &clock);
 	if (err >= 0)
 		*sampling_rate = clock.sampling_rate;
 
@@ -526,7 +453,7 @@ int snd_efw_command_get_sampling_rate(struct snd_efw *efw,
 int
 snd_efw_command_set_sampling_rate(struct snd_efw *efw, int sampling_rate)
 {
-	return snd_efw_command_set_clock(efw, -1, sampling_rate);
+	return command_set_clock(efw, -1, sampling_rate);
 }
 
 int snd_efw_command_get_mixer_usable(struct snd_efw *efw, int *usable)

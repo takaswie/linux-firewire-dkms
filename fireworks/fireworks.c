@@ -37,7 +37,6 @@ MODULE_PARM_DESC(enable, "enable Fireworks sound card");
 static DEFINE_MUTEX(devices_mutex);
 static unsigned int devices_used;
 
-/* other flags are unknown... */
 #define FLAG_DYNADDR_SUPPORTED			0
 #define FLAG_MIRRORING_SUPPORTED		1
 #define FLAG_SPDIF_COAX_SUPPORTED		2
@@ -45,18 +44,19 @@ static unsigned int devices_used;
 #define FLAG_HAS_DSP_MIXER			4
 #define FLAG_HAS_FPGA				5
 #define FLAG_HAS_PHANTOM			6
+/* other flags are unknown... */
 
 static int
-snd_efw_get_hardware_info(struct snd_efw *efw)
+get_hardware_info(struct snd_efw *efw)
 {
 	int err;
 
-	struct efc_hwinfo *hwinfo;
+	struct snd_efw_hwinfo *hwinfo;
 	char version[12];
 	int size;
 	int i;
 
-	hwinfo = kzalloc(sizeof(struct efc_hwinfo), GFP_KERNEL);
+	hwinfo = kzalloc(sizeof(struct snd_efw_hwinfo), GFP_KERNEL);
 	if (hwinfo == NULL)
 		return -ENOMEM;
 
@@ -79,7 +79,7 @@ snd_efw_get_hardware_info(struct snd_efw *efw)
 		efw->has_phantom = 1;
 	if (hwinfo->flags & (1 << FLAG_SPDIF_COAX_SUPPORTED)) {
 		efw->supported_digital_mode = BIT(2) | BIT(3);
-		/* find better way... */
+		/* TODO: find better way... */
 		if (strcmp(hwinfo->model_name, "AudioFire8a")
 		 || strcmp(hwinfo->model_name, "AudioFirePre8"))
 			efw->supported_digital_mode |= BIT(0);
@@ -89,8 +89,10 @@ snd_efw_get_hardware_info(struct snd_efw *efw)
 	if (hwinfo->nb_out_groups > 0) {
 		size = sizeof(struct snd_efw_phys_group) * hwinfo->nb_out_groups;
 		efw->output_groups = kzalloc(size, GFP_KERNEL);
-		if (efw->output_groups == NULL)
-			goto end;
+		if (efw->output_groups == NULL) {
+			err = -ENOMEM;
+			goto error;
+		}
 
 		efw->output_group_counts = hwinfo->nb_out_groups;
 		for (i = 0; i < efw->output_group_counts; i += 1) {
@@ -104,9 +106,8 @@ snd_efw_get_hardware_info(struct snd_efw *efw)
 		size = sizeof(struct snd_efw_phys_group) * hwinfo->nb_in_groups;
 		efw->input_groups = kzalloc(size, GFP_KERNEL);
 		if (efw->input_groups == NULL) {
-			if (efw->output_group_counts > 0)
-				kfree(efw->output_groups);
-			goto end;
+			err = -ENOMEM;
+			goto error;
 		}
 
 		efw->input_group_counts = hwinfo->nb_out_groups;
@@ -120,15 +121,13 @@ snd_efw_get_hardware_info(struct snd_efw *efw)
 	efw->mixer_output_channels = hwinfo->mixer_playback_channels;
 	efw->mixer_input_channels = hwinfo->mixer_capture_channels;
 
-	/* TODO: */
+	/* fill channels sets */
 	efw->pcm_capture_channels_sets[0] = hwinfo->nb_1394_capture_channels;
 	efw->pcm_capture_channels_sets[1] = hwinfo->nb_1394_capture_channels_2x;
 	efw->pcm_capture_channels_sets[2] = hwinfo->nb_1394_capture_channels_4x;
 	efw->pcm_playback_channels_sets[0] = hwinfo->nb_1394_playback_channels;
 	efw->pcm_playback_channels_sets[1] = hwinfo->nb_1394_playback_channels_2x;
 	efw->pcm_playback_channels_sets[2] = hwinfo->nb_1394_playback_channels_4x;
-
-	/* TODO: check channels */
 
 	/* chip version for firmware */
 	err = sprintf(version, "%u.%u",
@@ -181,16 +180,40 @@ snd_efw_get_hardware_info(struct snd_efw *efw)
 	efw->midi_input_ports = hwinfo->nb_midi_in;
 
 	err = 0;
+	goto end;
+
+error:
+	if (efw->input_group_counts > 0)
+		kfree(efw->input_groups);
+	if (efw->output_group_counts > 0)
+		kfree(efw->output_groups);
 end:
 	kfree(hwinfo);
 	return err;
 }
 
 static int
-snd_efw_get_hardware_meters_count(struct snd_efw *efw)
+get_hardware_meters_count(struct snd_efw *efw)
 {
-	return snd_efw_command_get_phys_meters_count(efw,
-			&efw->input_meter_counts, &efw->output_meter_counts);
+	int err;
+	struct snd_efw_phys_meters *meters;
+
+	meters = kzalloc(sizeof(struct snd_efw_phys_meters), GFP_KERNEL);
+	if (meters == NULL)
+		return -ENOMEM;
+
+	err = snd_efw_command_get_phys_meters(efw, meters,
+				sizeof(struct snd_efw_phys_meters));
+	if (err < 0)
+		goto end;
+
+	efw->input_meter_counts = meters->nb_input_meters;
+	efw->output_meter_counts = meters->nb_output_meters;
+
+	err = 0;
+end:
+	kfree(meters);
+	return err;
 }
 
 static void
@@ -321,15 +344,14 @@ snd_efw_probe(struct device *dev)
 		goto error;
 
 	/* get hardware information */
-	err = snd_efw_get_hardware_info(efw);
+	err = get_hardware_info(efw);
 	if (err < 0)
 		goto error;
 
-	/* get the number of hardware meters
-	err = snd_efw_get_hardware_meters_count(efw);
+	/* get the number of hardware meters */
+	err = get_hardware_meters_count(efw);
 	if (err < 0)
 		goto error;
-	*/
 
 	/* create procfs interface */
 	snd_efw_proc_init(efw);

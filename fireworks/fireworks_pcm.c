@@ -35,6 +35,8 @@
  *  - ADAT optical with 32.0-48.0 kHz	: use inputs 1-8
  *  - ADAT coaxial with 88.2-96.0 kHz	: use inputs 1-4
  *  - S/PDIF coaxial and optical	: use inputs 1-2
+ * If these restriction is applied, the number of channels in stream is with the
+ * same rules realated to above modes.
  *
  * Currently this module doesn't have rules for the latter.
  */
@@ -51,20 +53,20 @@ static unsigned int freq_table[] = {
 	[6] = 192000,
 };
 
-int get_sampling_rate_index(int sampling_rate)
+static inline int
+get_multiplier_mode_with_index(int index)
+{
+	return ((int)index - 1) / 2;
+}
+
+int snd_efw_get_multiplier_mode(int sampling_rate)
 {
 	int i;
 	for (i = 0; i < sizeof(freq_table); i += 1)
 		if (freq_table[i] == sampling_rate)
-			return i;
+			return get_multiplier_mode_with_index(i);
 
 	return -1;
-}
-
-int
-get_multiplier_mode(int index)
-{
-	return ((int)index - 1) / 2;
 }
 
 static int
@@ -87,7 +89,7 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 		if (!(efw->supported_sampling_rate & rate_bit))
 			continue;
 
-		mode = get_multiplier_mode(i);
+		mode = get_multiplier_mode_with_index(i);
 		if (!snd_interval_test(c, channels_sets[mode]))
 			continue;
 
@@ -120,7 +122,7 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 		if (!(efw->supported_sampling_rate & rate_bit))
 			continue;
 
-		mode = get_multiplier_mode(i);
+		mode = get_multiplier_mode_with_index(i);
 		if (!snd_interval_test(r, freq_table[i]))
 			continue;
 
@@ -239,7 +241,7 @@ pcm_init_hw_params(struct snd_efw *efw,
 		if (!(efw->supported_sampling_rate & rate_bit))
 			continue;
 
-		mode = get_multiplier_mode(i);
+		mode = get_multiplier_mode_with_index(i);
 		if (pcm_channels_sets[mode] == 0)
 			continue;
 		substream->runtime->hw.channels_min =
@@ -324,7 +326,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	struct amdtp_stream *stream;
 	struct amdtp_stream *opposite;
 	unsigned int *pcm_channels_sets;
-	int index, mode;
+	int mode;
 	int err;
 
 	/* keep PCM ring buffer */
@@ -370,8 +372,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	/* need to start if opposite stream has MIDI stream */
 	if (!opposite->pcm && amdtp_stream_midi_running(opposite)) {
 		amdtp_stream_set_rate(opposite, params_rate(hw_params));
-		index = get_sampling_rate_index(params_rate(hw_params));
-		mode = get_multiplier_mode(index);
+		mode = snd_efw_get_multiplier_mode(params_rate(hw_params));
 		amdtp_stream_set_pcm(opposite, pcm_channels_sets[mode]);
 		err = snd_efw_stream_start(efw, opposite);
 	}

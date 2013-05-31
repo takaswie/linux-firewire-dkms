@@ -81,9 +81,8 @@ midi_open(struct snd_rawmidi_substream *substream)
 		err = snd_efw_command_set_sampling_rate(efw, sampling_rate);
 	if (err < 0)
 		goto end;
+	mode = snd_efw_get_multiplier_mode(sampling_rate);
 	amdtp_stream_set_rate(stream, sampling_rate);
-
-	mode = get_multiplier_mode(get_sampling_rate_index(sampling_rate));
 	amdtp_stream_set_pcm(stream, pcm_channels_sets[mode]);
 
 	/* start stream just for MIDI */

@@ -38,10 +38,31 @@ static int
 physical_metering_get(struct snd_kcontrol *ctl,
 		      struct snd_ctl_elem_value *value)
 {
-	int err ;
 	struct snd_efw *efw = ctl->private_data;
-	/* TODO */
+	struct snd_efw_phys_meters *meters;
+	int base = sizeof(struct snd_efw_phys_meters);
+	int count = efw->input_meter_counts + efw->output_meter_counts;
+
+	int err;
+
+	meters = kzalloc(base + count * 4, GFP_KERNEL);
+	if (meters == NULL)
+		return -ENOMEM;
+
+	err = snd_efw_command_get_phys_meters(efw, meters, base + count * 4);
+	if (err < 0)
+		goto end;
+
+	value->value.bytes.data[1] = efw->input_group_counts;
+	value->value.bytes.data[0] = efw->output_meter_counts;
+
+	memcpy(value->value.bytes.data + 2 + efw->output_meter_counts * 4,
+	       meters->values + 2, efw->input_meter_counts * 4);
+	memcpy(value->value.bytes.data + 2,
+	       meters->values + 2, efw->output_meter_counts * 4);
+
 	err = 0;
+end:
 	return err;
 }
 static const
