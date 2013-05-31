@@ -20,19 +20,21 @@
  *
  */
 
+#include "./fireworks.h"
+
 /*
- * According to AV/C command specification, vendors can define their own command.
+ * According to AV/C command specification, vendors can define own command.
  *
- * 1394 Trade Association's AV/C Digital Interface Command Set General Specification 4.2
- * (September 1, 2004)
+ * 1394 Trade Association's AV/C Digital Interface Command Set General
+ * Specification 4.2 (September 1, 2004)
  *  9.6 VENDOR-DEPENDENT commands
  *  (to page 55)
  *   opcode:		0x00
  *   operand[0-2]:	company ID
  *   operand[3-]:	vendor dependent data
  *
- * Echo's Fireworks (trademark? I have no idea...) utilize this specification.
- * We call it as 'Echo Fireworks Commands' (a.k.a EFC).
+ * Echo's Fireworks(TM) utilize this specification.
+ * This module calls it as 'Echo Fireworks Commands' (a.k.a EFC).
  *
  * In EFC,
  *  Company ID is always 0x00.
@@ -45,23 +47,21 @@
  *   operand[3]:	0x00
  *   operand[4]:	0x00
  *
- *  Following to the two operands, EFC substance exists.
+ *  Following these operands, EFC substance exists.
  *   At first, 6 data exist. we call these data as 'EFC fields'.
  *   Following to the 6 data, parameters for each commands exists.
- *   Almost of parameters are 32 bit. But exception exists according to command.
- *    data[0]:	length of EFC substance.
+ *   Most of parameters are 32 bit. But exception exists according to command.
+ *    data[0]:	Length of EFC substance.
  *    data[1]:	EFC version
- *    data[2]:	sequence number. this is incremented in return value
+ *    data[2]:	Sequence number. This is incremented at return value
  *    data[3]:	EFC category. If greater than 1,
- *			 EFC_CAT_HWINFO return extended fields.
+ *				EFC_CAT_HWINFO return extended fields.
  *    data[4]:	EFC command
- *    data[5]:	EFC return value against EFC request
+ *    data[5]:	EFC return value in EFC response.
  *    data[6-]:	parameters
  *
  * As a result, Echo's Fireworks doesn't need generic command sets.
  */
-
-#include "./fireworks.h"
 
 #define POLLED_MAX_NB_METERS 100
 
@@ -75,7 +75,7 @@
 #define AVC_OPCODE		0x00
 #define AVC_COMPANY_ID		0x00
 
-struct avc_fields_t {
+struct avc_fields {
 	unsigned short cts:4;
 	unsigned short ctype:4;
 	unsigned short subunit_type:5;
@@ -86,9 +86,9 @@ struct avc_fields_t {
 
 /*
  * EFC command
- * quadlet parameters following to this fields.
+ * quadlet parameters following to these fields.
  */
-struct efc_fields_t {
+struct efc_fields {
 	u32 length;
 	u32 version;
 	u32 seqnum;
@@ -98,9 +98,10 @@ struct efc_fields_t {
 };
 
 /* command categories */
-enum efc_category_t {
+enum efc_category {
 	EFC_CAT_HWINFO			= 0,
 	EFC_CAT_FLASH			= 1,
+	EFC_CAT_TRANSPORT		= 2,
 	EFC_CAT_HWCTL			= 3,
 	EFC_CAT_MIXER_PHYS_OUT		= 4,
 	EFC_CAT_MIXER_PHYS_IN		= 5,
@@ -108,12 +109,10 @@ enum efc_category_t {
 	EFC_CAT_MIXER_CAPTURE		= 7,
 	EFC_CAT_MIXER_MONITOR		= 8,
 	EFC_CAT_IOCONF			= 9,
-	/* unused */
-	EFC_CAT_TRANSPORT		= 2,
 };
 
 /* hardware info category commands */
-enum efc_cmd_hwinfo_t {
+enum efc_cmd_hwinfo {
 	EFC_CMD_HWINFO_GET_CAPS			= 0,
 	EFC_CMD_HWINFO_GET_POLLED		= 1,
 	EFC_CMD_HWINFO_SET_EFR_ADDRESS		= 2,
@@ -123,7 +122,7 @@ enum efc_cmd_hwinfo_t {
 };
 
 /* flash category commands */
-enum efc_cmd_flash_t {
+enum efc_cmd_flash {
 	EFC_CMD_FLASH_ERASE		= 0,
 	EFC_CMD_FLASH_READ		= 1,
 	EFC_CMD_FLASH_WRITE		= 2,
@@ -133,7 +132,7 @@ enum efc_cmd_flash_t {
 };
 
 /* hardware control category commands */
-enum efc_cmd_hwctl_t {
+enum efc_cmd_hwctl {
 	EFC_CMD_HWCTL_SET_CLOCK		= 0,
 	EFC_CMD_HWCTL_GET_CLOCK		= 1,
 	EFC_CMD_HWCTL_BSX_HANDSHAKE	= 2,
@@ -149,7 +148,7 @@ enum efc_cmd_hwctl_t {
 #define EFC_HWCTL_FLAG_DIGITAL_RAW	0x04
 
 /* I/O config category commands */
-enum efc_cmd_ioconf_t {
+enum efc_cmd_ioconf {
 	EFC_CMD_IOCONF_SET_MIRROR	= 0,
 	EFC_CMD_IOCONF_GET_MIRROR	= 1,
 	EFC_CMD_IOCONF_SET_DIGITAL_MODE	= 2,
@@ -161,14 +160,14 @@ enum efc_cmd_ioconf_t {
 };
 
 /* for clock source and sampling rate */
-struct efc_clock_t {
+struct efc_clock {
 	u32 source;
 	u32 sampling_rate;
 	u32 index;
 };
 
 /* for hardware metering s*/
-struct efc_polled_values_t {
+struct efc_polled_values {
 	u32 status;
 	u32 detect_spdif;
 	u32 detect_adat;
@@ -187,8 +186,8 @@ struct efc_polled_values_t {
 /* Guitar string */
 /* hardware control flags */
 
-/* return values */
-enum efc_retval_t {
+/* return values in response */
+enum efc_retval {
 	EFC_RETVAL_OK			= 0,
 	EFC_RETVAL_BAD			= 1,
 	EFC_RETVAL_BAD_COMMAND		= 2,
@@ -209,7 +208,7 @@ enum efc_retval_t {
 };
 
 static int
-efc_over_avc(struct snd_efw_t *efw, unsigned int version,
+efc_over_avc(struct snd_efw *efw, unsigned int version,
 		unsigned int category, unsigned int command,
 		const u32 *params, unsigned int param_count,
 		void *response, unsigned int response_quadlets)
@@ -218,12 +217,12 @@ efc_over_avc(struct snd_efw_t *efw, unsigned int version,
 
 	unsigned int cmdbuf_bytes;
 	__be32 *cmdbuf;
-	struct efc_fields_t *efc_fields;
+	struct efc_fields *efc_fields;
 	u32 sequence_number;
 	unsigned int i;
 
 	/* AV/C fields */
-	struct avc_fields_t avc_fields = {
+	struct avc_fields avc_fields = {
 		.cts		= AVC_CTS,
 		.ctype		= AVC_CTYPE,
 		.subunit_type	= AVC_SUBUNIT_TYPE,
@@ -239,22 +238,25 @@ efc_over_avc(struct snd_efw_t *efw, unsigned int version,
 		cmdbuf_bytes = 32 + response_quadlets * 4;
 
 	/* keep buffer */
-	cmdbuf = kmalloc(cmdbuf_bytes, GFP_KERNEL);
-	if (cmdbuf == NULL) {
-		err = -ENOMEM;
-		goto end;
-	}
+	cmdbuf = kzalloc(cmdbuf_bytes, GFP_KERNEL);
+	if (cmdbuf == NULL)
+		return -ENOMEM;
 
 	/* fill AV/C fields */
-	cmdbuf[0] = (avc_fields.cts << 28) | (avc_fields.ctype << 24) |
-			(avc_fields.subunit_type << 19) | (avc_fields.subunit_id << 16) |
-			(avc_fields.opcode << 8) | (avc_fields.company_id >> 16 & 0xFF);
-	cmdbuf[1] = ((avc_fields.company_id >> 8 & 0xFF) << 24) |
-			((avc_fields.company_id & 0xFF) << 16) | (0x00 << 8) | 0x00;
+	cmdbuf[0] =	(avc_fields.cts << 28) |
+		    	(avc_fields.ctype << 24) |
+			(avc_fields.subunit_type << 19) |
+			(avc_fields.subunit_id << 16) |
+			(avc_fields.opcode << 8) |
+			(avc_fields.company_id >> 16 & 0xFF);
+	cmdbuf[1] =	((avc_fields.company_id >> 8 & 0xFF) << 24) |
+			((avc_fields.company_id & 0xFF) << 16) |
+			(0x00 << 8) |
+			0x00;
 
 	/* fill EFC fields */
-	efc_fields = (struct efc_fields_t *)(cmdbuf + 2);
-	efc_fields->length	= sizeof(struct efc_fields_t) / 4 + param_count;
+	efc_fields		= (struct efc_fields *)(cmdbuf + 2);
+	efc_fields->length	= sizeof(struct efc_fields) / 4 + param_count;
 	efc_fields->version	= version;
 	efc_fields->category	= category;
 	efc_fields->command	= command;
@@ -275,8 +277,9 @@ efc_over_avc(struct snd_efw_t *efw, unsigned int version,
 		cmdbuf[i] = cpu_to_be32(cmdbuf[i]);
 
 	/* if return value is positive, it means return bytes */
-	err = fcp_avc_transaction(efw->unit, cmdbuf, cmdbuf_bytes,
-				cmdbuf, cmdbuf_bytes, 0x00);
+	err = fcp_avc_transaction(efw->unit,
+				  cmdbuf, cmdbuf_bytes,
+				  cmdbuf, cmdbuf_bytes, 0x00);
 	if (err < 0)
 		goto end;
 
@@ -285,17 +288,18 @@ efc_over_avc(struct snd_efw_t *efw, unsigned int version,
 		cmdbuf[i] = cpu_to_be32(cmdbuf[i]);
 
 	/* parse AV/C fields */
-	avc_fields.cts = cmdbuf[0] >> 28;
-	avc_fields.ctype = cmdbuf[0] >> 24 & 0x0F;
-	avc_fields.subunit_type = cmdbuf[0] >> 19 & 0x1F;
-	avc_fields.subunit_id = cmdbuf[0] >> 16 & 0x07;
-	avc_fields.opcode = cmdbuf[0] >> 8 & 0xFF;
-	avc_fields.company_id = ((cmdbuf[0] & 0xFF) << 16) |
-			((cmdbuf[1] >> 24 & 0xFF) << 8) | (cmdbuf[1] >> 16 & 0xFF);
+	avc_fields.cts		= cmdbuf[0] >> 28;
+	avc_fields.ctype	= cmdbuf[0] >> 24 & 0x0F;
+	avc_fields.subunit_type	= cmdbuf[0] >> 19 & 0x1F;
+	avc_fields.subunit_id	= cmdbuf[0] >> 16 & 0x07;
+	avc_fields.opcode	= cmdbuf[0] >> 8 & 0xFF;
+	avc_fields.company_id	= ((cmdbuf[0] & 0xFF) << 16) |
+				  ((cmdbuf[1] >> 24 & 0xFF) << 8) |
+				  (cmdbuf[1] >> 16 & 0xFF);
 
 	/* check AV/C fields */
 	if ((avc_fields.cts != AVC_CTS) ||
-	    (avc_fields.ctype != 0x09) ||	/* just ACCEPTED */
+	    (avc_fields.ctype != 0x09) ||	/* ACCEPTED */
 	    (avc_fields.subunit_type != AVC_SUBUNIT_TYPE) ||
 	    (avc_fields.subunit_id != AVC_SUBUNIT_ID) ||
 	    (avc_fields.opcode != AVC_OPCODE) ||
@@ -308,7 +312,7 @@ efc_over_avc(struct snd_efw_t *efw, unsigned int version,
 	}
 
 	/* check EFC response fields */
-	efc_fields = (struct efc_fields_t *)(cmdbuf + 2);
+	efc_fields = (struct efc_fields *)(cmdbuf + 2);
 	if ((efc_fields->seqnum != sequence_number) |
 	    (efc_fields->category != category) |
 	    (efc_fields->command != command) |
@@ -317,8 +321,6 @@ efc_over_avc(struct snd_efw_t *efw, unsigned int version,
 			efc_fields->category, efc_fields->command, efc_fields->retval);
 		err = -EIO;
 		goto end;
-	} else {
-		err = 0;
 	}
 
 	/* fill response buffer */
@@ -327,23 +329,21 @@ efc_over_avc(struct snd_efw_t *efw, unsigned int version,
 		response_quadlets = efc_fields->length;
 	memcpy(response, cmdbuf + 8, response_quadlets * 4);
 
+	err = 0;
 end:
-	if (cmdbuf != NULL)
-		kfree(cmdbuf);
+	kfree(cmdbuf);
 	return err;
 }
 
-int
-snd_efw_command_identify(struct snd_efw_t *efw)
+int snd_efw_command_identify(struct snd_efw *efw)
 {
 	return efc_over_avc(efw, 0,
 			EFC_CAT_HWCTL, EFC_CMD_HWCTL_IDENTIFY,
 			NULL, 0, NULL, 0);
 }
 
-int
-snd_efw_command_get_hwinfo(struct snd_efw_t *efw,
-			struct efc_hwinfo_t *hwinfo)
+int snd_efw_command_get_hwinfo(struct snd_efw *efw,
+			       struct efc_hwinfo *hwinfo)
 {
 	u32 *tmp;
 	int i;
@@ -354,7 +354,7 @@ snd_efw_command_get_hwinfo(struct snd_efw_t *efw,
 	if (err < 0)
 		goto end;
 
-	/* arrangement for 8bit width data */
+	/* arrangement for endianness */
 	count = HWINFO_NAME_SIZE_BYTES / 4;
 	tmp = (u32 *)&hwinfo->vendor_name;
 	for (i = 0; i < count; i += 1)
@@ -363,8 +363,7 @@ snd_efw_command_get_hwinfo(struct snd_efw_t *efw,
 	for (i = 0; i < count; i += 1)
 		tmp[i] = cpu_to_be32(tmp[i]);
 
-	/* arrangement for 8bit width data */
-	count = sizeof(struct snd_efw_phys_group_t) * HWINFO_MAX_CAPS_GROUPS / 4;
+	count = sizeof(struct snd_efw_phys_group) * HWINFO_MAX_CAPS_GROUPS / 4;
 	tmp = (u32 *)&hwinfo->out_groups;
 	for (i = 0; i < count; i += 1)
 		tmp[i] = cpu_to_be32(tmp[i]);
@@ -376,28 +375,30 @@ snd_efw_command_get_hwinfo(struct snd_efw_t *efw,
 	hwinfo->vendor_name[HWINFO_NAME_SIZE_BYTES - 1] = '\0';
 	hwinfo->model_name[HWINFO_NAME_SIZE_BYTES  - 1] = '\0';
 
+	err = 0;
 end:
 	return err;
 }
 
-int
-snd_efw_command_get_polled(struct snd_efw_t *efw, u32 *value, int count)
+int snd_efw_command_get_polled(struct snd_efw *efw,
+			       u32 *value, int count)
 {
 	return efc_over_avc(efw, 0,
 			EFC_CAT_HWINFO, EFC_CMD_HWINFO_GET_POLLED,
 			NULL, 0, value, count);
 }
 
-int
-snd_efw_command_get_phys_meters_count(struct snd_efw_t *efw, int *inputs, int *outputs)
+int snd_efw_command_get_phys_meters_count(struct snd_efw *efw,
+					  int *inputs, int *outputs)
 {
 	int err;
 
-	struct efc_polled_values_t polled_values = {0};
+	struct efc_polled_values polled_values = {0};
 
 	err = efc_over_avc(efw, 0,
 			EFC_CAT_HWINFO, EFC_CMD_HWINFO_GET_POLLED,
-			NULL, 0, &polled_values, sizeof(struct efc_polled_values_t) / 4);
+			NULL, 0,
+			&polled_values, sizeof(struct efc_polled_values) / 4);
 	if (err < 0)
 		goto end;
 
@@ -409,24 +410,23 @@ snd_efw_command_get_phys_meters_count(struct snd_efw_t *efw, int *inputs, int *o
 		err = -ENXIO;
 	}
 
+	err = 0;
 end:
 	return err;
 }
 
-int snd_efw_command_get_phys_meters(struct snd_efw_t *efw,
-					int count, u32 *polled_meters)
+int snd_efw_command_get_phys_meters(struct snd_efw *efw,
+				    int count, u32 *polled_meters)
 {
 	int err;
 
-	int base_count = sizeof(struct efc_polled_values_t) / 4;
+	int base_count = sizeof(struct efc_polled_values) / 4;
 	u32 *polled_values = NULL;
 
 	/* keep enough buffer */
-	polled_values = kmalloc((base_count + count) * 4, GFP_KERNEL);
-	if (polled_values == NULL) {
-		err = -ENOMEM;
-		goto end;
-	}
+	polled_values = kzalloc((base_count + count) * 4, GFP_KERNEL);
+	if (polled_values == NULL)
+		return -ENOMEM;
 
 	err = efc_over_avc(efw, 0,
 			EFC_CAT_HWINFO, EFC_CMD_HWINFO_GET_POLLED,
@@ -437,27 +437,27 @@ int snd_efw_command_get_phys_meters(struct snd_efw_t *efw,
 
 	memcpy(polled_meters, polled_values + base_count, count * 4);
 
+	err = 0;
 end:
-	if (polled_values != NULL)
-		kfree(polled_values);
+	kfree(polled_values);
 	return err;
 }
 
 static int
-snd_efw_command_get_clock(struct snd_efw_t *efw, struct efc_clock_t *clock)
+snd_efw_command_get_clock(struct snd_efw *efw, struct efc_clock *clock)
 {
 	return efc_over_avc(efw, 0,
 			EFC_CAT_HWCTL, EFC_CMD_HWCTL_GET_CLOCK,
-			NULL, 0, clock, sizeof(struct efc_clock_t) / 4);
+			NULL, 0, clock, sizeof(struct efc_clock) / 4);
 }
 
 static int
-snd_efw_command_set_clock(struct snd_efw_t *efw,
-			int source, int sampling_rate)
+snd_efw_command_set_clock(struct snd_efw *efw,
+			  int source, int sampling_rate)
 {
-	int err = 0;
+	int err;
 
-	struct efc_clock_t clock = {0};
+	struct efc_clock clock = {0};
 
 	/* check arguments */
 	if ((source < 0) && (sampling_rate < 0)) {
@@ -483,19 +483,19 @@ snd_efw_command_set_clock(struct snd_efw_t *efw,
 	clock.index = 0;
 
 	err = efc_over_avc(efw, 0,
-		EFC_CAT_HWCTL, EFC_CMD_HWCTL_SET_CLOCK,
-		(u32 *)&clock, 3, NULL, 0);
+			EFC_CAT_HWCTL, EFC_CMD_HWCTL_SET_CLOCK,
+			(u32 *)&clock, 3, NULL, 0);
 
+	err = 0;
 end:
 	return err;
 }
 
-int
-snd_efw_command_get_clock_source(struct snd_efw_t *efw,
-					enum snd_efw_clock_source_t *source)
+int snd_efw_command_get_clock_source(struct snd_efw *efw,
+				     enum snd_efw_clock_source *source)
 {
-	int err = 0;
-	struct efc_clock_t clock = {0};
+	int err;
+	struct efc_clock clock = {0};
 
 	err = snd_efw_command_get_clock(efw, &clock);
 	if (err >= 0)
@@ -504,18 +504,17 @@ snd_efw_command_get_clock_source(struct snd_efw_t *efw,
 	return err;
 }
 
-int
-snd_efw_command_set_clock_source(struct snd_efw_t *efw,
-					enum snd_efw_clock_source_t source)
+int snd_efw_command_set_clock_source(struct snd_efw *efw,
+				     enum snd_efw_clock_source source)
 {
 	return snd_efw_command_set_clock(efw, source, -1);
 }
 
-int
-snd_efw_command_get_sampling_rate(struct snd_efw_t *efw, int *sampling_rate)
+int snd_efw_command_get_sampling_rate(struct snd_efw *efw,
+				      int *sampling_rate)
 {
-	int err = 0;
-	struct efc_clock_t clock = {0};
+	int err;
+	struct efc_clock clock = {0};
 
 	err = snd_efw_command_get_clock(efw, &clock);
 	if (err >= 0)
@@ -525,40 +524,19 @@ snd_efw_command_get_sampling_rate(struct snd_efw_t *efw, int *sampling_rate)
 }
 
 int
-snd_efw_command_set_sampling_rate(struct snd_efw_t *efw, int sampling_rate)
+snd_efw_command_set_sampling_rate(struct snd_efw *efw, int sampling_rate)
 {
-	int err;
-
-	int multiplier;
-
-	err = snd_efw_command_set_clock(efw, -1, sampling_rate);
-	if (err < 0)
-		goto end;
-
-	/* set channels */
-	if ((176400 <= sampling_rate) && (sampling_rate <= 192000))
-		multiplier = 2;
-	else if ((88200 <= sampling_rate) && (sampling_rate <= 96000))
-		multiplier = 1;
-	else
-		multiplier = 0;
-
-	efw->pcm_playback_channels = efw->pcm_playback_channels_sets[multiplier];
-	efw->pcm_capture_channels = efw->pcm_capture_channels_sets[multiplier];
-
-end:
-	return err;
+	return snd_efw_command_set_clock(efw, -1, sampling_rate);
 }
 
-int snd_efw_command_get_mixer_usable(struct snd_efw_t *efw, int *usable)
+int snd_efw_command_get_mixer_usable(struct snd_efw *efw, int *usable)
 {
-	int err = 0;
-
+	int err;
 	u32 flag = {0};
 
 	err = efc_over_avc(efw, 0,
-		EFC_CAT_HWCTL, EFC_CMD_HWCTL_GET_FLAGS,
-		NULL, 0, &flag, 1);
+			EFC_CAT_HWCTL, EFC_CMD_HWCTL_GET_FLAGS,
+			NULL, 0, &flag, 1);
 	if (err >= 0) {
 		if (flag & EFC_HWCTL_FLAG_MIXER_USABLE)
 			*usable = 1;
@@ -569,7 +547,7 @@ int snd_efw_command_get_mixer_usable(struct snd_efw_t *efw, int *usable)
 	return err;
 }
 
-int snd_efw_command_set_mixer_usable(struct snd_efw_t *efw, int usable)
+int snd_efw_command_set_mixer_usable(struct snd_efw *efw, int usable)
 {
 	/*
 	 * mask[0]: for set
@@ -583,15 +561,14 @@ int snd_efw_command_set_mixer_usable(struct snd_efw_t *efw, int usable)
 		mask[1] = EFC_HWCTL_FLAG_MIXER_UNUSABLE;
 
 	return efc_over_avc(efw, 0,
-		EFC_CAT_HWCTL, EFC_CMD_HWCTL_CHANGE_FLAGS,
-		(u32 *)mask, 2, NULL, 0);
+			EFC_CAT_HWCTL, EFC_CMD_HWCTL_CHANGE_FLAGS,
+			(u32 *)mask, 2, NULL, 0);
 }
 
-int snd_efw_command_get_iec60958_format(struct snd_efw_t *efw,
-				enum snd_efw_iec60958_format_t *format)
+int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
+					enum snd_efw_iec60958_format *format)
 {
-	int err = 0;
-
+	int err;
 	u32 flag = {0};
 
 	err = efc_over_avc(efw, 0,
@@ -607,8 +584,8 @@ int snd_efw_command_get_iec60958_format(struct snd_efw_t *efw,
 	return err;
 }
 
-int snd_efw_command_set_iec60958_format(struct snd_efw_t *efw,
-				enum snd_efw_iec60958_format_t format)
+int snd_efw_command_set_iec60958_format(struct snd_efw *efw,
+					enum snd_efw_iec60958_format format)
 {
 	/*
 	 * mask[0]: for set
@@ -622,20 +599,19 @@ int snd_efw_command_set_iec60958_format(struct snd_efw_t *efw,
 		mask[1] = EFC_HWCTL_FLAG_DIGITAL_PRO;
 
 	return efc_over_avc(efw, 0,
-		EFC_CAT_HWCTL, EFC_CMD_HWCTL_CHANGE_FLAGS,
-		(u32 *)mask, 2, NULL, 0);
+			EFC_CAT_HWCTL, EFC_CMD_HWCTL_CHANGE_FLAGS,
+			(u32 *)mask, 2, NULL, 0);
 }
 
-int snd_efw_command_get_digital_mode(struct snd_efw_t *efw,
-				enum snd_efw_digital_mode_t *mode)
+int snd_efw_command_get_digital_mode(struct snd_efw *efw,
+				     enum snd_efw_digital_mode *mode)
 {
-	int err = 0;
-
+	int err;
 	u32 value = 0;
 
 	err = efc_over_avc(efw, 0,
-		EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_DIGITAL_MODE,
-		NULL, 0, &value, 1);
+			EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_DIGITAL_MODE,
+			NULL, 0, &value, 1);
 
 	if (err >= 0)
 		*mode = value;
@@ -643,8 +619,8 @@ int snd_efw_command_get_digital_mode(struct snd_efw_t *efw,
 	return err;
 }
 
-int snd_efw_command_set_digital_mode(struct snd_efw_t *efw,
-				enum snd_efw_digital_mode_t mode)
+int snd_efw_command_set_digital_mode(struct snd_efw *efw,
+				     enum snd_efw_digital_mode mode)
 {
 	u32 value = mode;
 
@@ -654,21 +630,21 @@ int snd_efw_command_set_digital_mode(struct snd_efw_t *efw,
 }
 
 
-int snd_efw_command_get_phantom_state(struct snd_efw_t *efw, int *state)
+int snd_efw_command_get_phantom_state(struct snd_efw *efw, int *state)
 {
-	int err = 0;
+	int err;
 	u32 response;
 
 	err = efc_over_avc(efw, 0,
-		EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
-		NULL, 0, &response, 1);
+			EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
+			NULL, 0, &response, 1);
 	if (err >= 0)
 		*state = response;
 
 	return err;
 }
 
-int snd_efw_command_set_phantom_state(struct snd_efw_t *efw, int state)
+int snd_efw_command_set_phantom_state(struct snd_efw *efw, int state)
 {
 	u32 request;
 	u32 response;
@@ -679,15 +655,15 @@ int snd_efw_command_set_phantom_state(struct snd_efw_t *efw, int state)
 		request = 0;
 
 	return efc_over_avc(efw, 0,
-		EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
-		&request, 1, &response, 1);
+			EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
+			&request, 1, &response, 1);
 }
 
 static int
-snd_efw_command_get_monitor(struct snd_efw_t *efw, int category, int command,
-						int input, int output, int *value)
+snd_efw_command_get_monitor(struct snd_efw *efw, int category,
+			    int command, int input, int output, int *value)
 {
-	int err = 0;
+	int err;
 
 	u32 request[2] = {0};
 	u32 response[3] = {0};
@@ -703,8 +679,8 @@ snd_efw_command_get_monitor(struct snd_efw_t *efw, int category, int command,
 }
 
 static int
-snd_efw_command_set_monitor(struct snd_efw_t *efw, int category, int command,
-						int input, int output, int *value)
+snd_efw_command_set_monitor(struct snd_efw *efw, int category,
+			    int command, int input, int output, int *value)
 {
 	u32 request[3] = {0};
 	request[0] = input;
@@ -714,8 +690,9 @@ snd_efw_command_set_monitor(struct snd_efw_t *efw, int category, int command,
 	return efc_over_avc(efw, 0, category, command, request, 3, NULL, 0);
 }
 
-int snd_efw_command_monitor(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
-						int input, int output, int *value)
+int snd_efw_command_monitor(struct snd_efw *efw,
+			    enum snd_efw_mixer_cmd cmd,
+			    int input, int output, int *value)
 {
 	switch (cmd) {
 	case SND_EFW_MIXER_SET_GAIN:
@@ -723,15 +700,15 @@ int snd_efw_command_monitor(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
 	case SND_EFW_MIXER_SET_SOLO:
 	case SND_EFW_MIXER_SET_PAN:
 	case SND_EFW_MIXER_SET_NOMINAL:
-		return snd_efw_command_set_monitor(efw, EFC_CAT_MIXER_MONITOR, cmd,
-								input, output, value);
+		return snd_efw_command_set_monitor(efw, EFC_CAT_MIXER_MONITOR,
+						cmd, input, output, value);
 
 	case SND_EFW_MIXER_GET_GAIN:
 	case SND_EFW_MIXER_GET_MUTE:
 	case SND_EFW_MIXER_GET_SOLO:
 	case SND_EFW_MIXER_GET_PAN:
-		return snd_efw_command_get_monitor(efw, EFC_CAT_MIXER_MONITOR, cmd,
-								input, output, value);
+		return snd_efw_command_get_monitor(efw, EFC_CAT_MIXER_MONITOR,
+						cmd, input, output, value);
 
 	case SND_EFW_MIXER_GET_NOMINAL:
 	default:
@@ -740,17 +717,16 @@ int snd_efw_command_monitor(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
 }
 
 static int
-snd_efw_command_get_mixer(struct snd_efw_t *efw, int category, int command,
-						int channel, int *value)
+snd_efw_command_get_mixer(struct snd_efw *efw, int category,
+			  int command, int channel, int *value)
 {
-	int err = 0;
+	int err;
 
-	u32 request;
+	u32 request = channel;
 	u32 response[2] = {0};
 
-	request = channel;
-
-	err = efc_over_avc(efw, 0, category, command, &request, 1, response, 2);
+	err = efc_over_avc(efw, 0, category, command,
+				&request, 1, response, 2);
 	if ((err >= 0) && (response[0] == channel))
 		*value = response[1];
 
@@ -758,7 +734,7 @@ snd_efw_command_get_mixer(struct snd_efw_t *efw, int category, int command,
 }
 
 static int
-snd_efw_command_set_mixer(struct snd_efw_t *efw, int category, int command,
+snd_efw_command_set_mixer(struct snd_efw *efw, int category, int command,
 						int channel, int *value)
 {
 	u32 request[2] = {0};
@@ -768,21 +744,22 @@ snd_efw_command_set_mixer(struct snd_efw_t *efw, int category, int command,
 	return efc_over_avc(efw, 0, category, command, request, 2, NULL, 0);
 }
 
-int snd_efw_command_playback(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
-						int channel, int *value)
+int snd_efw_command_playback(struct snd_efw *efw,
+			     enum snd_efw_mixer_cmd cmd,
+			     int channel, int *value)
 {
 	switch (cmd) {
 	case SND_EFW_MIXER_SET_GAIN:
 	case SND_EFW_MIXER_SET_MUTE:
 	case SND_EFW_MIXER_SET_SOLO:
-		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_PLAYBACK, cmd,
-								channel, value);
+		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_PLAYBACK,
+							cmd, channel, value);
 
 	case SND_EFW_MIXER_GET_GAIN:
 	case SND_EFW_MIXER_GET_MUTE:
 	case SND_EFW_MIXER_GET_SOLO:
-		return snd_efw_command_get_mixer(efw, EFC_CAT_MIXER_PLAYBACK, cmd,
-								channel, value);
+		return snd_efw_command_get_mixer(efw, EFC_CAT_MIXER_PLAYBACK,
+							cmd, channel, value);
 
 	case SND_EFW_MIXER_SET_PAN:
 	case SND_EFW_MIXER_SET_NOMINAL:
@@ -793,21 +770,22 @@ int snd_efw_command_playback(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd
 	}
 }
 
-int snd_efw_command_phys_out(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
-						int channel, int *value)
+int snd_efw_command_phys_out(struct snd_efw *efw,
+			     enum snd_efw_mixer_cmd cmd,
+			     int channel, int *value)
 {
 	switch (cmd) {
 	case SND_EFW_MIXER_SET_GAIN:
 	case SND_EFW_MIXER_SET_MUTE:
 	case SND_EFW_MIXER_SET_NOMINAL:
-		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_PHYS_OUT, cmd,
-								channel, value);
+		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_PHYS_OUT,
+							cmd, channel, value);
 
 	case SND_EFW_MIXER_GET_GAIN:
 	case SND_EFW_MIXER_GET_MUTE:
 	case SND_EFW_MIXER_GET_NOMINAL:
-		return snd_efw_command_get_mixer(efw, EFC_CAT_MIXER_PHYS_OUT, cmd,
-								channel, value);
+		return snd_efw_command_get_mixer(efw, EFC_CAT_MIXER_PHYS_OUT,
+							cmd, channel, value);
 
 	case SND_EFW_MIXER_SET_SOLO:
 	case SND_EFW_MIXER_SET_PAN:
@@ -818,8 +796,9 @@ int snd_efw_command_phys_out(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd
 	}
 }
 
-int snd_efw_command_capture(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
-						int channel, int *value)
+int snd_efw_command_capture(struct snd_efw *efw,
+			    enum snd_efw_mixer_cmd cmd,
+			    int channel, int *value)
 {
 	switch (cmd) {
 	case SND_EFW_MIXER_SET_GAIN:
@@ -827,8 +806,8 @@ int snd_efw_command_capture(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
 	case SND_EFW_MIXER_SET_SOLO:
 	case SND_EFW_MIXER_SET_PAN:
 	case SND_EFW_MIXER_SET_NOMINAL:
-		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_CAPTURE, cmd,
-								channel, value);
+		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_CAPTURE,
+							cmd, channel, value);
 
 	/* get nothing */
 	case SND_EFW_MIXER_GET_GAIN:
@@ -841,13 +820,14 @@ int snd_efw_command_capture(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
 	}
 }
 
-int snd_efw_command_phys_in(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd,
-						int channel, int *value)
+int snd_efw_command_phys_in(struct snd_efw *efw,
+			    enum snd_efw_mixer_cmd cmd,
+			    int channel, int *value)
 {
 	switch (cmd) {
 	case SND_EFW_MIXER_SET_NOMINAL:
-		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_PHYS_IN, cmd,
-								channel, value);
+		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_PHYS_IN,
+							cmd, channel, value);
 
 	/* set nothing except nominal */
 	case SND_EFW_MIXER_SET_GAIN:

@@ -45,20 +45,20 @@ static unsigned int devices_used;
 #define FLAG_HAS_DSP_MIXER			4
 #define FLAG_HAS_FPGA				5
 #define FLAG_HAS_PHANTOM			6
-static int snd_efw_get_hardware_info(struct snd_efw_t *efw)
-{
-	int err = 0;
 
-	struct efc_hwinfo_t *hwinfo = NULL;
+static int
+snd_efw_get_hardware_info(struct snd_efw *efw)
+{
+	int err;
+
+	struct efc_hwinfo *hwinfo;
 	char version[12];
 	int size;
 	int i;
 
-	hwinfo = kmalloc(sizeof(struct efc_hwinfo_t), GFP_KERNEL);
-	if (hwinfo == NULL) {
-		err = -ENOMEM;
-		goto end;
-	}
+	hwinfo = kzalloc(sizeof(struct efc_hwinfo), GFP_KERNEL);
+	if (hwinfo == NULL)
+		return -ENOMEM;
 
 	err = snd_efw_command_get_hwinfo(efw, hwinfo);
 	if (err < 0)
@@ -87,22 +87,22 @@ static int snd_efw_get_hardware_info(struct snd_efw_t *efw)
 
 	/* for input physical metering */
 	if (hwinfo->nb_out_groups > 0) {
-		size = sizeof(struct snd_efw_phys_group_t) * hwinfo->nb_out_groups;
-		efw->output_groups = kmalloc(size, GFP_KERNEL);
+		size = sizeof(struct snd_efw_phys_group) * hwinfo->nb_out_groups;
+		efw->output_groups = kzalloc(size, GFP_KERNEL);
 		if (efw->output_groups == NULL)
 			goto end;
 
 		efw->output_group_counts = hwinfo->nb_out_groups;
 		for (i = 0; i < efw->output_group_counts; i += 1) {
-			efw->output_groups[i].type = hwinfo->out_groups[i].type;
+			efw->output_groups[i].type  = hwinfo->out_groups[i].type;
 			efw->output_groups[i].count = hwinfo->out_groups[i].count;
 		}
 	}
 
 	/* for output physical metering */
 	if (hwinfo->nb_in_groups > 0) {
-		size = sizeof(struct snd_efw_phys_group_t) * hwinfo->nb_in_groups;
-		efw->input_groups = kmalloc(size, GFP_KERNEL);
+		size = sizeof(struct snd_efw_phys_group) * hwinfo->nb_in_groups;
+		efw->input_groups = kzalloc(size, GFP_KERNEL);
 		if (efw->input_groups == NULL) {
 			if (efw->output_group_counts > 0)
 				kfree(efw->output_groups);
@@ -111,7 +111,7 @@ static int snd_efw_get_hardware_info(struct snd_efw_t *efw)
 
 		efw->input_group_counts = hwinfo->nb_out_groups;
 		for (i = 0; i < efw->input_group_counts; i += 1) {
-			efw->input_groups[i].type = hwinfo->in_groups[i].type;
+			efw->input_groups[i].type  = hwinfo->in_groups[i].type;
 			efw->input_groups[i].count = hwinfo->in_groups[i].count;
 		}
 	}
@@ -176,26 +176,28 @@ static int snd_efw_get_hardware_info(struct snd_efw_t *efw)
 	 && (192000 <= hwinfo->max_sample_rate))
 		efw->supported_sampling_rate |= SNDRV_PCM_RATE_192000;
 
-	/* MIDI/PCM inputs and outputs */
+	/* MIDI inputs and outputs */
 	efw->midi_output_ports = hwinfo->nb_midi_out;
 	efw->midi_input_ports = hwinfo->nb_midi_in;
 
+	err = 0;
 end:
-	if (hwinfo != NULL)
-		kfree(hwinfo);
+	kfree(hwinfo);
 	return err;
 }
 
-static int snd_efw_get_hardware_meters_count(struct snd_efw_t *efw)
+static int
+snd_efw_get_hardware_meters_count(struct snd_efw *efw)
 {
-	return snd_efw_command_get_phys_meters_count(efw, &efw->input_meter_counts, &efw->output_meter_counts);
+	return snd_efw_command_get_phys_meters_count(efw,
+			&efw->input_meter_counts, &efw->output_meter_counts);
 }
 
 static void
 snd_efw_update(struct fw_unit *unit)
 {
 	struct snd_card *card = dev_get_drvdata(&unit->device);
-	struct snd_efw_t *efw = card->private_data;
+	struct snd_efw *efw = card->private_data;
 
 	fcp_bus_reset(efw->unit);
 
@@ -251,9 +253,10 @@ static bool match_fireworks_device_name(struct fw_unit *unit)
 	return false;
 }
 
-static void snd_efw_card_free(struct snd_card *card)
+static void
+snd_efw_card_free(struct snd_card *card)
 {
-	struct snd_efw_t *efw = card->private_data;
+	struct snd_efw *efw = card->private_data;
 
 	if (efw->card_index >= 0) {
 		mutex_lock(&devices_mutex);
@@ -271,13 +274,16 @@ static void snd_efw_card_free(struct snd_card *card)
 	return;
 }
 
-static int snd_efw_probe(struct device *dev)
+static int
+snd_efw_probe(struct device *dev)
 {
 	struct fw_unit *unit = fw_unit(dev);
 	int card_index;
 	struct snd_card *card;
-	struct snd_efw_t *efw;
+	struct snd_efw *efw;
 	int err;
+
+	mutex_lock(&devices_mutex);
 
 	/* check device name */
 	if (!match_fireworks_device_name(unit)) {
@@ -285,8 +291,7 @@ static int snd_efw_probe(struct device *dev)
 		goto end;
 	}
 
-	/* check registered card */
-	mutex_lock(&devices_mutex);
+	/* check registered cards */
 	for (card_index = 0; card_index < SNDRV_CARDS; ++card_index)
 		if (!(devices_used & (1 << card_index)) && enable[card_index])
 			break;
@@ -297,7 +302,7 @@ static int snd_efw_probe(struct device *dev)
 
 	/* create card */
 	err = snd_card_create(index[card_index], id[card_index],
-			THIS_MODULE, sizeof(struct snd_efw_t), &card);
+				THIS_MODULE, sizeof(struct snd_efw), &card);
 	if (err < 0)
 		goto end;
 	card->private_free = snd_efw_card_free;
@@ -320,15 +325,16 @@ static int snd_efw_probe(struct device *dev)
 	if (err < 0)
 		goto error;
 
-	/* get the number of hardware meters */
+	/* get the number of hardware meters
 	err = snd_efw_get_hardware_meters_count(efw);
 	if (err < 0)
 		goto error;
+	*/
 
-	/* create proc interface */
+	/* create procfs interface */
 	snd_efw_proc_init(efw);
 
-	/* create hardware control */
+	/* create control interface */
 	err = snd_efw_create_control_devices(efw);
 	if (err < 0)
 		goto error;
@@ -366,10 +372,11 @@ end:
 	return err;
 }
 
-static int snd_efw_remove(struct device *dev)
+static int
+snd_efw_remove(struct device *dev)
 {
 	struct snd_card *card = dev_get_drvdata(dev);
-	struct snd_efw_t *efw = card->private_data;
+	struct snd_efw *efw = card->private_data;
 
 	snd_efw_destroy_pcm_devices(efw);
 

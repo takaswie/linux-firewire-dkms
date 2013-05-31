@@ -17,7 +17,7 @@
  */
 #include "./fireworks.h"
 
-int snd_efw_stream_init(struct snd_efw_t *efw, struct amdtp_stream *stream)
+int snd_efw_stream_init(struct snd_efw *efw, struct amdtp_stream *stream)
 {
 	struct cmp_connection *connection;
 	enum cmp_direction c_dir;
@@ -48,7 +48,7 @@ end:
 	return err;
 }
 
-int snd_efw_stream_start(struct snd_efw_t *efw, struct amdtp_stream *stream)
+int snd_efw_stream_start(struct snd_efw *efw, struct amdtp_stream *stream)
 {
 	struct cmp_connection *connection;
 	int err = 0;
@@ -79,7 +79,7 @@ end:
 	return err;
 }
 
-void snd_efw_stream_stop(struct snd_efw_t *efw, struct amdtp_stream *stream)
+void snd_efw_stream_stop(struct snd_efw *efw, struct amdtp_stream *stream)
 {
 	if (!!IS_ERR(stream->context))
 		goto end;
@@ -94,7 +94,7 @@ end:
 	return;
 }
 
-void snd_efw_stream_destroy(struct snd_efw_t *efw, struct amdtp_stream *stream)
+void snd_efw_stream_destroy(struct snd_efw *efw, struct amdtp_stream *stream)
 {
 	snd_efw_stream_stop(efw, stream);
 

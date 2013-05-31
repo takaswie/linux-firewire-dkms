@@ -54,7 +54,7 @@
 #define HWINFO_MAX_CAPS_GROUPS 8
 
 /* for physical metering */
-enum snd_efw_channel_type_t {
+enum snd_efw_channel_type {
 	SND_EFW_CHANNEL_TYPE_ANALOG		= 0,
 	SND_EFW_CHANNEL_TYPE_SPDIF		= 1,
 	SND_EFW_CHANNEL_TYPE_ADAT		= 2,
@@ -63,12 +63,12 @@ enum snd_efw_channel_type_t {
 	SND_EFW_CHANNEL_TYPE_HEADPHONES		= 5,
 	SND_EFW_CHANNEL_TYPE_I2S		= 6
 };
-struct snd_efw_phys_group_t {
-	u8 type;	/* enum snd_efw_channel_type_t */
+struct snd_efw_phys_group {
+	u8 type;	/* enum snd_efw_channel_type */
 	u8 count;
 } __attribute__((packed));
 
-struct snd_efw_t {
+struct snd_efw {
 	struct snd_card *card;
 	struct fw_device *device;
 	struct fw_unit *unit;
@@ -93,10 +93,10 @@ struct snd_efw_t {
 
 	/* physical metering */
 	unsigned int output_group_counts;
-	struct snd_efw_phys_group_t *output_groups;
+	struct snd_efw_phys_group *output_groups;
 	unsigned int output_meter_counts;
 	unsigned int input_group_counts;
-	struct snd_efw_phys_group_t *input_groups;
+	struct snd_efw_phys_group *input_groups;
 	unsigned int input_meter_counts;
 
 	/* mixer parameters */
@@ -108,9 +108,7 @@ struct snd_efw_t {
 	unsigned int midi_input_ports;
 
 	/* PCM parameters */
-	unsigned int pcm_playback_channels;
 	unsigned int pcm_playback_channels_sets[SND_EFW_MUITIPLIER_MODES];
-	unsigned int pcm_capture_channels;
 	unsigned int pcm_capture_channels_sets[SND_EFW_MUITIPLIER_MODES];
 
 	/* notification to control components */
@@ -125,7 +123,7 @@ struct snd_efw_t {
 	struct cmp_connection input_connection;
 };
 
-struct efc_hwinfo_t {
+struct efc_hwinfo {
 	u32 flags;
 	u32 guid_hi;
 	u32 guid_lo;
@@ -139,9 +137,9 @@ struct efc_hwinfo_t {
 	u32 nb_phys_audio_out;
 	u32 nb_phys_audio_in;
 	u32 nb_out_groups;
-	struct snd_efw_phys_group_t out_groups[HWINFO_MAX_CAPS_GROUPS];
+	struct snd_efw_phys_group out_groups[HWINFO_MAX_CAPS_GROUPS];
 	u32 nb_in_groups;
-	struct snd_efw_phys_group_t in_groups[HWINFO_MAX_CAPS_GROUPS];
+	struct snd_efw_phys_group in_groups[HWINFO_MAX_CAPS_GROUPS];
 	u32 nb_midi_out;
 	u32 nb_midi_in;
 	u32 max_sample_rate;
@@ -150,7 +148,6 @@ struct efc_hwinfo_t {
 	u32 arm_version;
 	u32 mixer_playback_channels;
 	u32 mixer_capture_channels;
-	/* only with version 1: */
 	u32 fpga_version;
 	u32 nb_1394_playback_channels_2x;
 	u32 nb_1394_capture_channels_2x;
@@ -171,7 +168,7 @@ struct efc_isoc_map {
 } __attribute__((packed));
 
 /* clock source parameters */
-enum snd_efw_clock_source_t {
+enum snd_efw_clock_source {
 	SND_EFW_CLOCK_SOURCE_INTERNAL	= 0,
 	SND_EFW_CLOCK_SOURCE_SYTMATCH	= 1,
 	SND_EFW_CLOCK_SOURCE_WORDCLOCK	= 2,
@@ -183,7 +180,7 @@ enum snd_efw_clock_source_t {
 /* SNDRV_PCM_RATE_XXX should be used to indicate sampling rate */
 
 /* digital mode parameters */
-enum snd_efw_digital_mode_t {
+enum snd_efw_digital_mode {
 	SND_EFW_DIGITAL_MODE_SPDIF_COAXIAL	= 0,
 	SND_EFW_DIGITAL_MODE_ADAT_COAXIAL	= 1,
 	SND_EFW_DIGITAL_MODE_SPDIF_OPTICAL	= 2,
@@ -191,14 +188,14 @@ enum snd_efw_digital_mode_t {
 };
 
 /* S/PDIF format parameters */
-enum snd_efw_iec60958_format_t {
+enum snd_efw_iec60958_format {
 	SND_EFW_IEC60958_FORMAT_CONSUMER	= 0,
 	SND_EFW_IEC60958_FORMAT_PROFESSIONAL	= 1
 };
 
 /* Echo Fireworks Command functions */
 /* for phys_in/phys_out/playback/capture/monitor category commands */
-enum snd_efw_mixer_cmd_t {
+enum snd_efw_mixer_cmd {
 	SND_EFW_MIXER_SET_GAIN		= 0,
 	SND_EFW_MIXER_GET_GAIN		= 1,
 	SND_EFW_MIXER_SET_MUTE		= 2,
@@ -210,46 +207,60 @@ enum snd_efw_mixer_cmd_t {
 	SND_EFW_MIXER_SET_NOMINAL	= 8,
 	SND_EFW_MIXER_GET_NOMINAL	= 9
 };
-int snd_efw_command_identify(struct snd_efw_t *efw);
-int snd_efw_command_get_hwinfo(struct snd_efw_t *efw, struct efc_hwinfo_t *hwinfo);
-int snd_efw_command_get_phys_meters_count(struct snd_efw_t *efw, int *inputs, int *outputs);
-int snd_efw_command_get_phys_meters(struct snd_efw_t *efw, int count, u32 *polled_meters);
-int snd_efw_command_get_mixer_usable(struct snd_efw_t *efw, int *usable);
-int snd_efw_command_set_mixer_usable(struct snd_efw_t *efw, int usable);
-int snd_efw_command_get_iec60958_format(struct snd_efw_t *efw, enum snd_efw_iec60958_format_t *format);
-int snd_efw_command_set_iec60958_format(struct snd_efw_t *efw, enum snd_efw_iec60958_format_t format);
-int snd_efw_command_get_clock_source(struct snd_efw_t *efw, enum snd_efw_clock_source_t *source);
-int snd_efw_command_set_clock_source(struct snd_efw_t *efw, enum snd_efw_clock_source_t source);
-int snd_efw_command_get_sampling_rate(struct snd_efw_t *efw, int *sampling_rate);
-int snd_efw_command_set_sampling_rate(struct snd_efw_t *efw, int sampling_rate);
-int snd_efw_command_get_digital_mode(struct snd_efw_t *efw, enum snd_efw_digital_mode_t *mode);
-int snd_efw_command_set_digital_mode(struct snd_efw_t *efw, enum snd_efw_digital_mode_t mode);
-int snd_efw_command_get_phantom_state(struct snd_efw_t *efw, int *state);
-int snd_efw_command_set_phantom_state(struct snd_efw_t *efw, int state);
-int snd_efw_command_monitor(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int input, int output, int *value);
-int snd_efw_command_playback(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
-int snd_efw_command_phys_out(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
-int snd_efw_command_capture(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
-int snd_efw_command_phys_in(struct snd_efw_t *efw, enum snd_efw_mixer_cmd_t cmd, int channel, int *value);
+int snd_efw_command_identify(struct snd_efw *efw);
+int snd_efw_command_get_hwinfo(struct snd_efw *efw,
+			       struct efc_hwinfo *hwinfo);
+int snd_efw_command_get_phys_meters_count(struct snd_efw *efw,
+					  int *inputs, int *outputs);
+int snd_efw_command_get_phys_meters(struct snd_efw *efw,
+				    int count, u32 *polled_meters);
+int snd_efw_command_get_mixer_usable(struct snd_efw *efw, int *usable);
+int snd_efw_command_set_mixer_usable(struct snd_efw *efw, int usable);
+int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
+					enum snd_efw_iec60958_format *format);
+int snd_efw_command_set_iec60958_format(struct snd_efw *efw,
+					enum snd_efw_iec60958_format format);
+int snd_efw_command_get_clock_source(struct snd_efw *efw,
+				     enum snd_efw_clock_source *source);
+int snd_efw_command_set_clock_source(struct snd_efw *efw,
+				     enum snd_efw_clock_source source);
+int snd_efw_command_get_sampling_rate(struct snd_efw *efw, int *sampling_rate);
+int snd_efw_command_set_sampling_rate(struct snd_efw *efw, int sampling_rate);
+int snd_efw_command_get_digital_mode(struct snd_efw *efw,
+				     enum snd_efw_digital_mode *mode);
+int snd_efw_command_set_digital_mode(struct snd_efw *efw,
+				     enum snd_efw_digital_mode mode);
+int snd_efw_command_get_phantom_state(struct snd_efw *efw, int *state);
+int snd_efw_command_set_phantom_state(struct snd_efw *efw, int state);
+int snd_efw_command_monitor(struct snd_efw *efw, enum snd_efw_mixer_cmd cmd,
+			    int input, int output, int *value);
+int snd_efw_command_playback(struct snd_efw *efw, enum snd_efw_mixer_cmd cmd,
+			     int channel, int *value);
+int snd_efw_command_phys_out(struct snd_efw *efw, enum snd_efw_mixer_cmd cmd,
+			     int channel, int *value);
+int snd_efw_command_capture(struct snd_efw *efw, enum snd_efw_mixer_cmd cmd,
+			    int channel, int *value);
+int snd_efw_command_phys_in(struct snd_efw *efw, enum snd_efw_mixer_cmd cmd,
+			    int channel, int *value);
 
 /* for AMDTP stream and CMP */
-int snd_efw_stream_init(struct snd_efw_t *efw, struct amdtp_stream *stream);
-int snd_efw_stream_start(struct snd_efw_t *efw, struct amdtp_stream *stream);
-void snd_efw_stream_stop(struct snd_efw_t *efw, struct amdtp_stream *stream);
-void snd_efw_stream_destroy(struct snd_efw_t *efw, struct amdtp_stream *stream);
+int snd_efw_stream_init(struct snd_efw *efw, struct amdtp_stream *stream);
+int snd_efw_stream_start(struct snd_efw *efw, struct amdtp_stream *stream);
+void snd_efw_stream_stop(struct snd_efw *efw, struct amdtp_stream *stream);
+void snd_efw_stream_destroy(struct snd_efw *efw, struct amdtp_stream *stream);
 
 /* for procfs subsystem */
-void snd_efw_proc_init(struct snd_efw_t *efw);
+void snd_efw_proc_init(struct snd_efw *efw);
 
 /* for control component */
-int snd_efw_create_control_devices(struct snd_efw_t *efw);
+int snd_efw_create_control_devices(struct snd_efw *efw);
 
 /* for midi component */
-int snd_efw_create_midi_devices(struct snd_efw_t *ef);
+int snd_efw_create_midi_devices(struct snd_efw *ef);
 
 /* for pcm component */
-int snd_efw_create_pcm_devices(struct snd_efw_t *efw);
-void snd_efw_destroy_pcm_devices(struct snd_efw_t *efw);
+int snd_efw_create_pcm_devices(struct snd_efw *efw);
+void snd_efw_destroy_pcm_devices(struct snd_efw *efw);
 
 int get_sampling_rate_index(int sampling_rate);
 int get_multiplier_mode(int index);

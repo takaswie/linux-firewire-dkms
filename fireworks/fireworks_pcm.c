@@ -69,12 +69,12 @@ get_multiplier_mode(int index)
 
 static int
 hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
-			struct snd_efw_t *efw, unsigned int *channels_sets)
+			struct snd_efw *efw, unsigned int *channels_sets)
 {
 	struct snd_interval *r =
-			hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	const struct snd_interval *c =
-			hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+		hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	struct snd_interval t = {
 		.min = UINT_MAX, .max = 0, .integer = 1
 	};
@@ -101,7 +101,7 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 
 static int
 hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
-			struct snd_efw_t *efw, unsigned int *channels_sets)
+			struct snd_efw *efw, unsigned int *channels_sets)
 {
 	struct snd_interval *c =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
@@ -136,7 +136,7 @@ static inline int
 hw_rule_capture_rate(struct snd_pcm_hw_params *params,
 				struct snd_pcm_hw_rule *rule)
 {
-	struct snd_efw_t *efw = rule->private;
+	struct snd_efw *efw = rule->private;
 	return hw_rule_rate(params, rule, efw,
 				efw->pcm_capture_channels_sets);
 }
@@ -145,7 +145,7 @@ static inline int
 hw_rule_playback_rate(struct snd_pcm_hw_params *params,
 				struct snd_pcm_hw_rule *rule)
 {
-	struct snd_efw_t *efw = rule->private;
+	struct snd_efw *efw = rule->private;
 	return hw_rule_rate(params, rule, efw,
 				efw->pcm_playback_channels_sets);
 }
@@ -154,7 +154,7 @@ static inline int
 hw_rule_capture_channels(struct snd_pcm_hw_params *params,
 				struct snd_pcm_hw_rule *rule)
 {
-	struct snd_efw_t *efw = rule->private;
+	struct snd_efw *efw = rule->private;
 	return hw_rule_channels(params, rule, efw,
 				efw->pcm_capture_channels_sets);
 }
@@ -163,13 +163,13 @@ static inline int
 hw_rule_playback_channels(struct snd_pcm_hw_params *params,
 				struct snd_pcm_hw_rule *rule)
 {
-	struct snd_efw_t *efw = rule->private;
+	struct snd_efw *efw = rule->private;
 	return hw_rule_channels(params, rule, efw,
 				efw->pcm_playback_channels_sets);
 }
 
 static int
-pcm_init_hw_params(struct snd_efw_t *efw,
+pcm_init_hw_params(struct snd_efw *efw,
 			struct snd_pcm_substream *substream)
 {
 	unsigned int *pcm_channels_sets;
@@ -207,19 +207,23 @@ pcm_init_hw_params(struct snd_efw_t *efw,
 	/* add rule between channels and sampling rate */
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
-		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+		snd_pcm_hw_rule_add(substream->runtime, 0,
+				SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_capture_channels, efw,
 				SNDRV_PCM_HW_PARAM_RATE, -1);
-		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+		snd_pcm_hw_rule_add(substream->runtime, 0,
+				SNDRV_PCM_HW_PARAM_RATE,
 				hw_rule_capture_rate, efw,
 				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 		pcm_channels_sets = efw->pcm_capture_channels_sets;
 	} else {
 		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
-		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+		snd_pcm_hw_rule_add(substream->runtime, 0,
+				SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_playback_channels, efw,
 				SNDRV_PCM_HW_PARAM_RATE, -1);
-		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+		snd_pcm_hw_rule_add(substream->runtime, 0,
+				SNDRV_PCM_HW_PARAM_RATE,
 				hw_rule_playback_rate, efw,
 				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 		pcm_channels_sets = efw->pcm_playback_channels_sets;
@@ -277,7 +281,7 @@ end:
 static int
 pcm_open(struct snd_pcm_substream *substream)
 {
-	struct snd_efw_t *efw = substream->private_data;
+	struct snd_efw *efw = substream->private_data;
 	int sampling_rate;
 	int err;
 
@@ -316,7 +320,7 @@ static int
 pcm_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *hw_params)
 {
-	struct snd_efw_t *efw = substream->private_data;
+	struct snd_efw *efw = substream->private_data;
 	struct amdtp_stream *stream;
 	struct amdtp_stream *opposite;
 	unsigned int *pcm_channels_sets;
@@ -339,7 +343,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 		pcm_channels_sets = efw->pcm_capture_channels_sets;
 	}
 
-	/* stop stream if it's just for MIDI */
+	/* stop stream if it's just for MIDI streams */
 	if (!IS_ERR(stream->context) && !stream->pcm &&
 	    amdtp_stream_midi_running(stream))
 		snd_efw_stream_stop(efw, stream);
@@ -348,8 +352,8 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 		snd_efw_stream_stop(efw, opposite);
 	}
 
-	/* set sampling rate if fw isochronous stream is not running */
-	if (!!IS_ERR(stream->context) || !!IS_ERR(stream->context)) {
+	/* set sampling rate if both streams are not running */
+	if (!!IS_ERR(stream->context) || !!IS_ERR(opposite->context)) {
 		err = snd_efw_command_set_sampling_rate(efw,
 					params_rate(hw_params));
 		if (err < 0)
@@ -379,7 +383,7 @@ end:
 static int
 pcm_hw_free(struct snd_pcm_substream *substream)
 {
-	struct snd_efw_t *efw = substream->private_data;
+	struct snd_efw *efw = substream->private_data;
 	struct amdtp_stream *stream;
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
@@ -397,7 +401,7 @@ pcm_hw_free(struct snd_pcm_substream *substream)
 static int
 pcm_prepare(struct snd_pcm_substream *substream)
 {
-	struct snd_efw_t *efw = substream->private_data;
+	struct snd_efw *efw = substream->private_data;
 	struct amdtp_stream *stream;
 	int err = 0;
 
@@ -421,7 +425,7 @@ end:
 static int
 pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 {
-	struct snd_efw_t *efw = substream->private_data;
+	struct snd_efw *efw = substream->private_data;
 	struct snd_pcm_substream *pcm;
 
 	switch (cmd) {
@@ -443,9 +447,10 @@ pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	return 0;
 }
 
-static snd_pcm_uframes_t pcm_pointer(struct snd_pcm_substream *substream)
+static snd_pcm_uframes_t
+pcm_pointer(struct snd_pcm_substream *substream)
 {
-	struct snd_efw_t *efw = substream->private_data;
+	struct snd_efw *efw = substream->private_data;
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		return amdtp_stream_pcm_pointer(&efw->receive_stream);
@@ -478,7 +483,7 @@ static struct snd_pcm_ops pcm_capture_ops = {
 	.page		= snd_pcm_lib_get_vmalloc_page,
 };
 
-int snd_efw_create_pcm_devices(struct snd_efw_t *efw)
+int snd_efw_create_pcm_devices(struct snd_efw *efw)
 {
 	struct snd_pcm *pcm;
 	int err;
@@ -497,7 +502,7 @@ int snd_efw_create_pcm_devices(struct snd_efw_t *efw)
 	if (err < 0)
 		goto end;
 
-	/* for host receive and target output */
+	/* for target output and host receive */
 	err = snd_efw_stream_init(efw, &efw->receive_stream);
 	if (err < 0) {
 		snd_efw_stream_destroy(efw, &efw->transmit_stream);
@@ -508,7 +513,7 @@ end:
 	return err;
 }
 
-void snd_efw_destroy_pcm_devices(struct snd_efw_t *efw)
+void snd_efw_destroy_pcm_devices(struct snd_efw *efw)
 {
 	amdtp_stream_pcm_abort(&efw->receive_stream);
 	amdtp_stream_stop(&efw->receive_stream);

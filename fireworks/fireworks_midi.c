@@ -20,7 +20,7 @@
 
 /*
  * According to MMA/AMEI-027, MIDI stream is multiplexed with PCM stream in an
- * Firewire isochronous stream. And fireworks need to handle input and output
+ * Firewire isochronous stream. And Fireworks need to handle input and output
  * stream with the same sampling rate. Then this module use the rules below:
  *
  * [MIDI stream side]
@@ -40,7 +40,7 @@
 static int
 midi_open(struct snd_rawmidi_substream *substream)
 {
-	struct snd_efw_t *efw = substream->rmidi->private_data;
+	struct snd_efw *efw = substream->rmidi->private_data;
 	struct amdtp_stream *stream;
 	struct amdtp_stream *opposite;
 	int *pcm_channels_sets;
@@ -63,12 +63,12 @@ midi_open(struct snd_rawmidi_substream *substream)
 	/* register pointer */
 	amdtp_stream_midi_register(stream, substream);
 
-	/* the other streams running */
+	/* the other MIDI streams running */
 	if (run > 0) {
 		err = 0;
 		goto end;
 	}
-	/* PCM stream seems to start the stream */
+	/* PCM stream starts the stream */
 	else if (!IS_ERR(stream->context)) {
 		err = 0;
 		goto end;
@@ -98,7 +98,7 @@ end:
 static int
 midi_close(struct snd_rawmidi_substream *substream)
 {
-	struct snd_efw_t *efw = substream->rmidi->private_data;
+	struct snd_efw *efw = substream->rmidi->private_data;
 	struct amdtp_stream *stream;
 
 	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
@@ -127,7 +127,7 @@ end:
 static void
 midi_trigger(struct snd_rawmidi_substream *substream, int up)
 {
-	struct snd_efw_t *efw = substream->rmidi->private_data;
+	struct snd_efw *efw = substream->rmidi->private_data;
 	unsigned long *midi_triggered;
 	unsigned long flags;
 
@@ -162,7 +162,7 @@ static struct snd_rawmidi_ops midi_input_ops = {
 };
 
 static void
-set_midi_substream_names(struct snd_efw_t *efw,
+set_midi_substream_names(struct snd_efw *efw,
 				     struct snd_rawmidi_str *str)
 {
 	struct snd_rawmidi_substream *subs;
@@ -176,7 +176,7 @@ set_midi_substream_names(struct snd_efw_t *efw,
 }
 
 int
-snd_efw_create_midi_devices(struct snd_efw_t *efw)
+snd_efw_create_midi_devices(struct snd_efw *efw)
 {
 	struct snd_rawmidi *rmidi;
 	struct snd_rawmidi_str *str;

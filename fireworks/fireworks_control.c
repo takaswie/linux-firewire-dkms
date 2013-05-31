@@ -22,50 +22,41 @@
  * Physical metering:
  *  available channels differ depending on current sampling rate
  */
-static int snd_efw_physical_metering_info(struct snd_kcontrol *ctl, struct snd_ctl_elem_info *info)
+static int
+physical_metering_info(struct snd_kcontrol *ctl,
+		       struct snd_ctl_elem_info *info)
 {
-	struct snd_efw_t *efw = ctl->private_data;
+	struct snd_efw *efw = ctl->private_data;
 
 	info->type = SNDRV_CTL_ELEM_TYPE_BYTES;
-	info->count = 2 + (efw->input_meter_counts + efw->output_meter_counts) * 4;
+	info->count = (efw->input_meter_counts + efw->output_meter_counts)
+			 * 4 + 2;
 
 	return 0;
 }
-static int snd_efw_physical_metering_get(struct snd_kcontrol *ctl, struct snd_ctl_elem_value *value)
+static int
+physical_metering_get(struct snd_kcontrol *ctl,
+		      struct snd_ctl_elem_value *value)
 {
-	int err;
-
-	struct snd_efw_t *efw = ctl->private_data;
-
-	value->value.bytes.data[0] = efw->pcm_playback_channels;
-	value->value.bytes.data[1] = efw->pcm_capture_channels;
-
-	err = snd_efw_command_get_phys_meters(efw,
-		efw->input_meter_counts + efw->output_meter_counts, (u32 *)(value->value.bytes.data + 2));
-	if (err < 0)
-		goto end;
-
-	memmove(value->value.bytes.data + 2 + efw->pcm_playback_channels * 4,
-		value->value.bytes.data + 2 + efw->output_meter_counts * 4,
-		efw->pcm_capture_channels * 4);
-	memset(value->value.bytes.data + 2 + efw->pcm_playback_channels * 4 + efw->pcm_capture_channels * 4,
-		0, 2 + (efw->output_meter_counts - efw->pcm_playback_channels) * 4 +
-			(efw->input_meter_counts - efw->pcm_capture_channels) * 4);
-
-end:
+	int err ;
+	struct snd_efw *efw = ctl->private_data;
+	/* TODO */
+	err = 0;
 	return err;
 }
-static const struct snd_kcontrol_new snd_efw_physical_metering = {
+static const
+struct snd_kcontrol_new physical_metering = {
 	.iface	= SNDRV_CTL_ELEM_IFACE_CARD,
 	.name	= "Physical Metering",
 	.access	= SNDRV_CTL_ELEM_ACCESS_READ | SNDRV_CTL_ELEM_ACCESS_VOLATILE,
-	.info	= snd_efw_physical_metering_info,
-	.get	= snd_efw_physical_metering_get
+	.info	= physical_metering_info,
+	.get	= physical_metering_get
 };
 
 /* Playback Control: PCM Playback Gain: */
-static const DECLARE_TLV_DB_SCALE(snd_efw_playback_db_scale, -6000, 100, 0);
-static int snd_efw_playback_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static const DECLARE_TLV_DB_SCALE(playback_db_scale, -6000, 100, 0);
+static int
+playback_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -76,19 +67,22 @@ static int snd_efw_playback_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_
 
 	return err;
 }
-static int snd_efw_playback_gain_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+playback_gain_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_playback_gain_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+playback_gain_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
 
 /* Playback Control: playback solo of each channels */
-static int snd_efw_playback_solo_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static int
+playback_solo_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -99,19 +93,22 @@ static int snd_efw_playback_solo_info(struct snd_kcontrol *kctl, struct snd_ctl_
 
 	return err;
 }
-static int snd_efw_playback_solo_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+playback_solo_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_playback_solo_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+playback_solo_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
 
 /* Playback Control: playback mute of each channels */
-static int snd_efw_playback_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static int
+playback_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -122,49 +119,52 @@ static int snd_efw_playback_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_
 
 	return err;
 }
-static int snd_efw_playback_mute_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+playback_mute_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_playback_mute_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+playback_mute_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
 
-static struct snd_kcontrol_new snd_efw_playback_controls[] = {
+static struct snd_kcontrol_new playback_controls[] = {
 	{
 		.name	= "PCM Playback Gain",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE |
 		          SNDRV_CTL_ELEM_ACCESS_TLV_READWRITE,
-		.info	= snd_efw_playback_gain_info,
-		.get	= snd_efw_playback_gain_get,
-		.put	= snd_efw_playback_gain_put,
-		.tlv = { .p =  snd_efw_playback_db_scale }
+		.info	= playback_gain_info,
+		.get	= playback_gain_get,
+		.put	= playback_gain_put,
+		.tlv = { .p =  playback_db_scale }
 	},
 	{
 		.name	= "PCM Playback Solo",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-		.info	= snd_efw_playback_solo_info,
-		.get	= snd_efw_playback_solo_get,
-		.put	= snd_efw_playback_solo_put,
+		.info	= playback_solo_info,
+		.get	= playback_solo_get,
+		.put	= playback_solo_put,
 	},
 	{
 		.name	= "PCM Playback Mute",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-		.info	= snd_efw_playback_mute_info,
-		.get	= snd_efw_playback_mute_get,
-		.put	= snd_efw_playback_mute_put,
+		.info	= playback_mute_info,
+		.get	= playback_mute_get,
+		.put	= playback_mute_put,
 	},
 };
 
 /* Capture Control: capture gain of each channels */
-static const DECLARE_TLV_DB_SCALE(snd_efw_capture_db_scale, -6000, 100, 0);
-static int snd_efw_capture_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static const DECLARE_TLV_DB_SCALE(capture_db_scale, -6000, 100, 0);
+static int
+capture_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -175,19 +175,22 @@ static int snd_efw_capture_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_e
 
 	return err;
 }
-static int snd_efw_capture_gain_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+capture_gain_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_capture_gain_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+capture_gain_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
 
 /* Capture Control: capture mute of each channels */
-static int snd_efw_capture_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static int
+capture_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -198,19 +201,22 @@ static int snd_efw_capture_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_e
 
 	return err;
 }
-static int snd_efw_capture_mute_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+capture_mute_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_capture_mute_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+capture_mute_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
 
 /* Capture Control: capture solo of each channels */
-static int snd_efw_capture_solo_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static int
+capture_solo_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -221,12 +227,14 @@ static int snd_efw_capture_solo_info(struct snd_kcontrol *kctl, struct snd_ctl_e
 
 	return err;
 }
-static int snd_efw_capture_solo_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+capture_solo_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_capture_solo_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+capture_solo_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
@@ -235,7 +243,8 @@ static int snd_efw_capture_solo_put(struct snd_kcontrol *kctl, struct snd_ctl_el
 /* Capture Control: capture solo of each channels */
 static int capture_nominal_tmp = 0;
 static char *capture_nominal_descs[] = {"-10dBV", "+4dBu"};
-static int snd_efw_capture_nominal_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static int
+capture_nominal_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -246,11 +255,13 @@ static int snd_efw_capture_nominal_info(struct snd_kcontrol *kctl, struct snd_ct
 	if (einf->value.enumerated.item >= einf->value.enumerated.items)
 		einf->value.enumerated.item = einf->value.enumerated.items - 1;
 
-	strcpy(einf->value.enumerated.name, capture_nominal_descs[einf->value.enumerated.item]);
+	strcpy(einf->value.enumerated.name,
+		capture_nominal_descs[einf->value.enumerated.item]);
 
 	return err;
 }
-static int snd_efw_capture_nominal_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
+static int
+capture_nominal_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
 {
 	int err = 0;
 
@@ -258,7 +269,8 @@ static int snd_efw_capture_nominal_get(struct snd_kcontrol *kctl, struct snd_ctl
 
 	return err;
 }
-static int snd_efw_capture_nominal_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
+static int
+capture_nominal_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
 {
 	int changed = 0;
 	int value = uval->value.enumerated.item[0];
@@ -272,7 +284,8 @@ static int snd_efw_capture_nominal_put(struct snd_kcontrol *kctl, struct snd_ctl
 }
 
 /* Capture Control: capture solo of each channels */
-static int snd_efw_capture_pan_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static int
+capture_pan_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -283,65 +296,68 @@ static int snd_efw_capture_pan_info(struct snd_kcontrol *kctl, struct snd_ctl_el
 
 	return err;
 }
-static int snd_efw_capture_pan_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
+static int
+capture_pan_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_capture_pan_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
+static int
+capture_pan_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uval)
 {
 	int err = 0;
 	return err;
 }
 
-static struct snd_kcontrol_new snd_efw_capture_controls[] = {
+static struct snd_kcontrol_new capture_controls[] = {
 	{
 		.name	= "PCM Capture Gain",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE |
 		          SNDRV_CTL_ELEM_ACCESS_TLV_READWRITE,
-		.info	= snd_efw_capture_gain_info,
-		.get	= snd_efw_capture_gain_get,
-		.put	= snd_efw_capture_gain_put,
-		.tlv = { .p =  snd_efw_capture_db_scale }
+		.info	= capture_gain_info,
+		.get	= capture_gain_get,
+		.put	= capture_gain_put,
+		.tlv = { .p =  capture_db_scale }
 	},
 	{
 		.name	= "PCM Capture Mute",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-		.info	= snd_efw_capture_mute_info,
-		.get	= snd_efw_capture_mute_get,
-		.put	= snd_efw_capture_mute_put,
+		.info	= capture_mute_info,
+		.get	= capture_mute_get,
+		.put	= capture_mute_put,
 	},
 	{
 		.name	= "PCM Capture Solo",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-		.info	= snd_efw_capture_solo_info,
-		.get	= snd_efw_capture_solo_get,
-		.put	= snd_efw_capture_solo_put,
+		.info	= capture_solo_info,
+		.get	= capture_solo_get,
+		.put	= capture_solo_put,
 	},
 	{
 		.name	= "PCM Capture Nominal",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-		.info	= snd_efw_capture_nominal_info,
-		.get	= snd_efw_capture_nominal_get,
-		.put	= snd_efw_capture_nominal_put,
+		.info	= capture_nominal_info,
+		.get	= capture_nominal_get,
+		.put	= capture_nominal_put,
 	},
 	{
 		.name	= "PCM Capture Pan",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-		.info	= snd_efw_capture_pan_info,
-		.get	= snd_efw_capture_pan_get,
-		.put	= snd_efw_capture_pan_put,
+		.info	= capture_pan_info,
+		.get	= capture_pan_get,
+		.put	= capture_pan_put,
 	}
 };
 
 /* Output Control: Master Output Gain */
-static const DECLARE_TLV_DB_SCALE(snd_efw_output_db_scale, -6000, 100, 0);
-static int snd_efw_output_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static const DECLARE_TLV_DB_SCALE(output_db_scale, -6000, 100, 0);
+static int
+output_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -352,19 +368,22 @@ static int snd_efw_output_gain_info(struct snd_kcontrol *kctl, struct snd_ctl_el
 
 	return err;
 }
-static int snd_efw_output_gain_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+output_gain_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_output_gain_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+output_gain_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
 
 /* Output Control: Master Output Mute */
-static int snd_efw_output_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static int
+output_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -375,19 +394,22 @@ static int snd_efw_output_mute_info(struct snd_kcontrol *kctl, struct snd_ctl_el
 
 	return err;
 }
-static int snd_efw_output_mute_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+output_mute_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_output_mute_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+output_mute_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
 
 /* Output Control: Master Output Solo */
-static int snd_efw_output_solo_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
+static int
+output_solo_info(struct snd_kcontrol *kctl, struct snd_ctl_elem_info *einf)
 {
 	int err = 0;
 
@@ -398,43 +420,45 @@ static int snd_efw_output_solo_info(struct snd_kcontrol *kctl, struct snd_ctl_el
 
 	return err;
 }
-static int snd_efw_output_solo_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+output_solo_get(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
-static int snd_efw_output_solo_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
+static int
+output_solo_put(struct snd_kcontrol *kctl, struct snd_ctl_elem_value *uctl)
 {
 	int err = 0;
 	return err;
 }
 
-static struct snd_kcontrol_new snd_efw_output_controls[] = {
+static struct snd_kcontrol_new output_controls[] = {
 	{
 		.name	= "Master Output Gain",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE |
 		          SNDRV_CTL_ELEM_ACCESS_TLV_READWRITE,
-		.info	= snd_efw_output_gain_info,
-		.get	= snd_efw_output_gain_get,
-		.put	= snd_efw_output_gain_put,
-		.tlv = { .p =  snd_efw_output_db_scale }
+		.info	= output_gain_info,
+		.get	= output_gain_get,
+		.put	= output_gain_put,
+		.tlv = { .p =  output_db_scale }
 	},
 	{
 		.name	= "Master Output Mute",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-		.info	= snd_efw_output_mute_info,
-		.get	= snd_efw_output_mute_get,
-		.put	= snd_efw_output_mute_put
+		.info	= output_mute_info,
+		.get	= output_mute_get,
+		.put	= output_mute_put
 	},
 	{
 		.name	= "Master Output Solo",
 		.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 		.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-		.info	= snd_efw_output_solo_info,
-		.get	= snd_efw_output_solo_get,
-		.put	= snd_efw_output_solo_put
+		.info	= output_solo_info,
+		.get	= output_solo_get,
+		.put	= output_solo_put
 	},
 };
 
@@ -442,14 +466,15 @@ static struct snd_kcontrol_new snd_efw_output_controls[] = {
  * Global Control:  Digital capture and playback mode
  *
  * S/PDIF or ADAT, Coaxial or Optical
- * struct efc_hwinfo_t.flags include a flag for this control
+ * struct efc_hwinfo.flags include a flag for this control
  */
 static char *digital_mode_descs[] = {"S/PDIF Coaxial", "ADAT Coaxial",
-						"S/PDIF Optical", "ADAT Optical"};
-static int snd_efw_control_digital_mode_info(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_info *einf)
+				     "S/PDIF Optical", "ADAT Optical"};
+static int
+control_digital_mode_info(struct snd_kcontrol *kctl,
+			  struct snd_ctl_elem_info *einf)
 {
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int value, i;
 
 	einf->value.enumerated.items = 0;
@@ -479,13 +504,14 @@ static int snd_efw_control_digital_mode_info(struct snd_kcontrol *kctl,
 
 	return 0;
 }
-static int snd_efw_control_digital_mode_get(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_value *uval)
+static int
+control_digital_mode_get(struct snd_kcontrol *kctl,
+			 struct snd_ctl_elem_value *uval)
 {
 	int err = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
-	enum snd_efw_digital_mode_t digital_mode;
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
+	enum snd_efw_digital_mode digital_mode;
 	int i;
 
 	/* get current index */
@@ -494,7 +520,8 @@ static int snd_efw_control_digital_mode_get(struct snd_kcontrol *kctl,
 		goto end;
 
 	/* check clock source */
-	if ((digital_mode < 0) && (ARRAY_SIZE(digital_mode_descs) < digital_mode))
+	if ((digital_mode < 0) &&
+	    (ARRAY_SIZE(digital_mode_descs) < digital_mode))
 		goto end;
 
 	/* generate user value */
@@ -507,12 +534,13 @@ static int snd_efw_control_digital_mode_get(struct snd_kcontrol *kctl,
 end:
 	return err;
 }
-static int snd_efw_control_digital_mode_put(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_value *uval)
+static int
+control_digital_mode_put(struct snd_kcontrol *kctl,
+			 struct snd_ctl_elem_value *uval)
 {
 	int changed = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int index, value;
 
 	/* get index from user value */
@@ -539,14 +567,17 @@ end:
 
 /*
  * Global Control: S/PDIF format are selectable from "Professional/Consumer".
- *  Consumer:		IEC-60958 Digital audio interface – Part 3: Consumer applications
- *  Professional:	IEC-60958 Digital audio interface – Part 4: Professional applications
+ *  Consumer:		IEC-60958 Digital audio interface
+ *			 – Part 3:Consumer applications
+ *  Professional:	IEC-60958 Digital audio interface
+ *			 – Part 4: Professional applications
  *
- * struct efc_hwinfo_t.flags include a flag for this control
+ * struct efc_hwinfo.flags include a flag for this control
  */
 static char *spdif_format_descs[] = {"Consumer", "Professional"};
-static int snd_efw_control_spdif_format_info(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_info *einf)
+static int
+control_spdif_format_info(struct snd_kcontrol *kctl,
+			  struct snd_ctl_elem_info *einf)
 {
 	/* TODO: this control should be unavailable when ADAT is selected */
 
@@ -557,17 +588,19 @@ static int snd_efw_control_spdif_format_info(struct snd_kcontrol *kctl,
 	if (einf->value.enumerated.item >= einf->value.enumerated.items)
 		einf->value.enumerated.item = einf->value.enumerated.items - 1;
 
-	strcpy(einf->value.enumerated.name, spdif_format_descs[einf->value.enumerated.item]);
+	strcpy(einf->value.enumerated.name,
+		spdif_format_descs[einf->value.enumerated.item]);
 
         return 0;
 }
-static int snd_efw_control_spdif_format_get(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_value *uvalue)
+static int
+control_spdif_format_get(struct snd_kcontrol *kctl,
+			 struct snd_ctl_elem_value *uvalue)
 {
 	int err = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
-	enum snd_efw_iec60958_format_t format;
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
+	enum snd_efw_iec60958_format format;
 
 	err = snd_efw_command_get_iec60958_format(efw, &format);
 	if (err >= 0)
@@ -575,12 +608,13 @@ static int snd_efw_control_spdif_format_get(struct snd_kcontrol *kctl,
 
 	return 0;
 }
-static int snd_efw_control_spdif_format_put(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_value *uval)
+static int
+control_spdif_format_put(struct snd_kcontrol *kctl,
+			 struct snd_ctl_elem_value *uval)
 {
 	int changed = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int value = uval->value.enumerated.item[0];
 
 	if (value < ARRAY_SIZE(spdif_format_descs)) {
@@ -596,20 +630,21 @@ end:
 /*
  * Global Control: Sampling Rate Control
  *
- * struct efc_hwinfo_t.min_sample_rate and struct efc_hwinfo_t.max_sample_rate
+ * struct efc_hwinfo.min_sample_rate and struct efc_hwinfo.max_sample_rate
  * is a minimum and maximum sampling rate
  */
-static char *sampling_rate_descs[] = {"5512Hz", "8000Hz", "11025Hz", "16000Hz",
-	"22050Hz", "32000Hz", "44100Hz", "48000Hz", "64000Hz",
-	"88200Hz", "96000Hz", "176400Hz", "192000Hz"};
-static int sampling_rates[] = {5512, 8000, 11025, 16000,
-	22500, 32000, 44100, 48000, 64000,
-	88200, 96000, 176400, 192000};
+static char *sampling_rate_descs[] = {"5512Hz", "8000Hz", "11025Hz",
+				      "16000Hz","22050Hz", "32000Hz",
+				      "44100Hz", "48000Hz", "64000Hz",
+				      "88200Hz", "96000Hz", "176400Hz",
+				      "192000Hz"};
+static int sampling_rates[] = {5512, 8000, 11025, 16000, 22500, 32000, 44100,
+			       48000, 64000, 88200, 96000, 176400, 192000};
 static int
-snd_efw_control_sampling_rate_info(struct snd_kcontrol *kctl,
-					struct snd_ctl_elem_info *einf)
+control_sampling_rate_info(struct snd_kcontrol *kctl,
+			   struct snd_ctl_elem_info *einf)
 {
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int value, i;
 
 	/* TODO: this control is unavailable when isochronous stream runs
@@ -646,12 +681,12 @@ snd_efw_control_sampling_rate_info(struct snd_kcontrol *kctl,
         return 0;
 }
 static int
-snd_efw_control_sampling_rate_get(struct snd_kcontrol *kctl,
-					struct snd_ctl_elem_value *uval)
+control_sampling_rate_get(struct snd_kcontrol *kctl,
+			  struct snd_ctl_elem_value *uval)
 {
 	int err = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int sampling_rate;
 	int index, i;
 
@@ -677,12 +712,12 @@ end:
 	return err;
 }
 static int
-snd_efw_control_sampling_rate_put(struct snd_kcontrol *kctl,
-					struct snd_ctl_elem_value *uval)
+control_sampling_rate_put(struct snd_kcontrol *kctl,
+			  struct snd_ctl_elem_value *uval)
 {
 	int changed = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int index, value;
 
 	/* get index from user value */
@@ -710,14 +745,15 @@ end:
 /*
  * Global Control: Clock Source Control
  *
- * struct efw_hwinfo_t.supported_clocks is a flags for this control
+ * struct efw_hwinfo.supported_clocks is a flags for this control
  */
 static char *clock_source_descs[] = {"Internal", "SYT Match", "Word",
-						"S/PDIF", "ADAT1", "ADAT2"};
-static int snd_efw_control_clock_source_info(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_info *einf)
+				     "S/PDIF", "ADAT1", "ADAT2"};
+static int
+control_clock_source_info(struct snd_kcontrol *kctl,
+			  struct snd_ctl_elem_info *einf)
 {
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int value, i;
 
 	/* skip unsupported clock source */
@@ -749,13 +785,13 @@ static int snd_efw_control_clock_source_info(struct snd_kcontrol *kctl,
         return 0;
 }
 static int
-snd_efw_control_clock_source_get(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_value *uval)
+control_clock_source_get(struct snd_kcontrol *kctl,
+			 struct snd_ctl_elem_value *uval)
 {
 	int err = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
-	enum snd_efw_clock_source_t clock_source;
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
+	enum snd_efw_clock_source clock_source;
 	int i;
 
 	/* get current index */
@@ -777,12 +813,13 @@ snd_efw_control_clock_source_get(struct snd_kcontrol *kctl,
 end:
 	return err;
 }
-static int snd_efw_control_clock_source_put(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_value *uval)
+static int
+control_clock_source_put(struct snd_kcontrol *kctl,
+			 struct snd_ctl_elem_value *uval)
 {
 	int changed = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int index, value;
 
 	/* get index from user value */
@@ -810,10 +847,11 @@ end:
 /*
  * Global Control: Phantom Power Control
  *
- * struct efc_hwinfo_t.flags include a flag for this control
+ * struct efc_hwinfo.flags include a flag for this control
  */
-static int snd_efw_control_phantom_state_info(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_info *einf)
+static int
+control_phantom_state_info(struct snd_kcontrol *kctl,
+				   struct snd_ctl_elem_info *einf)
 {
 
 	einf->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
@@ -823,12 +861,13 @@ static int snd_efw_control_phantom_state_info(struct snd_kcontrol *kctl,
 
         return 0;
 }
-static int snd_efw_control_phantom_state_get(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_value *uval)
+static int
+control_phantom_state_get(struct snd_kcontrol *kctl,
+			  struct snd_ctl_elem_value *uval)
 {
 	int err = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int state;
 
 	err = snd_efw_command_get_phantom_state(efw, &state);
@@ -837,12 +876,13 @@ static int snd_efw_control_phantom_state_get(struct snd_kcontrol *kctl,
 
 	return 0;
 }
-static int snd_efw_control_phantom_state_put(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_value *uval)
+static int
+control_phantom_state_put(struct snd_kcontrol *kctl,
+				  struct snd_ctl_elem_value *uval)
 {
 	int changed = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int value = (uval->value.integer.value[0] > 0) ? 1: 0;
 
 	if (snd_efw_command_set_phantom_state(efw, value) > 0)
@@ -857,8 +897,9 @@ static int snd_efw_control_phantom_state_put(struct snd_kcontrol *kctl,
  * If it's On, this driver can change Hardware Matrix Mixer.
  * If it's Off, this driver cannot change Hardware Matrix Mixer and it's fixed.
  */
-static int snd_efw_control_mixer_usable_info(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_info *einf)
+static int
+control_mixer_usable_info(struct snd_kcontrol *kctl,
+			  struct snd_ctl_elem_info *einf)
 {
 
 	einf->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
@@ -868,12 +909,13 @@ static int snd_efw_control_mixer_usable_info(struct snd_kcontrol *kctl,
 
         return 0;
 }
-static int snd_efw_control_mixer_usable_get(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_value *uval)
+static int
+control_mixer_usable_get(struct snd_kcontrol *kctl,
+			 struct snd_ctl_elem_value *uval)
 {
 	int err = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int usable;
 
 	err = snd_efw_command_get_mixer_usable(efw, &usable);
@@ -882,12 +924,13 @@ static int snd_efw_control_mixer_usable_get(struct snd_kcontrol *kctl,
 
 	return 0;
 }
-static int snd_efw_control_mixer_usable_put(struct snd_kcontrol *kctl,
-						struct snd_ctl_elem_value *uval)
+static int
+control_mixer_usable_put(struct snd_kcontrol *kctl,
+			 struct snd_ctl_elem_value *uval)
 {
 	int changed = 0;
 
-	struct snd_efw_t *efw = snd_kcontrol_chip(kctl);
+	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int value = (uval->value.integer.value[0] > 0) ? 1: 0;
 
 	if (snd_efw_command_set_mixer_usable(efw, value) > 0)
@@ -896,94 +939,94 @@ static int snd_efw_control_mixer_usable_put(struct snd_kcontrol *kctl,
 	return changed;
 }
 
-static struct snd_kcontrol_new snd_efw_clock_source_control =
+static struct snd_kcontrol_new global_clock_source_control =
 {
 	.name	= "Clock Source",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-	.info	= snd_efw_control_clock_source_info,
-	.get	= snd_efw_control_clock_source_get,
-	.put	= snd_efw_control_clock_source_put
+	.info	= control_clock_source_info,
+	.get	= control_clock_source_get,
+	.put	= control_clock_source_put
 };
 
-static struct snd_kcontrol_new snd_efw_sampling_rate_control =
+static struct snd_kcontrol_new global_sampling_rate_control =
 {
 	.name	= "Sampling Rate",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-	.info	= snd_efw_control_sampling_rate_info,
-	.get	= snd_efw_control_sampling_rate_get,
-	.put	= snd_efw_control_sampling_rate_put
+	.info	= control_sampling_rate_info,
+	.get	= control_sampling_rate_get,
+	.put	= control_sampling_rate_put
 };
 
-static struct snd_kcontrol_new snd_efw_digital_mode_control =
+static struct snd_kcontrol_new global_digital_mode_control =
 {
 	.name	= "Digital Mode",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-	.info	= snd_efw_control_digital_mode_info,
-	.get	= snd_efw_control_digital_mode_get,
-	.put	= snd_efw_control_digital_mode_put
+	.info	= control_digital_mode_info,
+	.get	= control_digital_mode_get,
+	.put	= control_digital_mode_put
 };
 
-static struct snd_kcontrol_new snd_efw_global_iec60958_format_control =
+static struct snd_kcontrol_new global_iec60958_format_control =
 {
 	.name	= "S/PDIF Format",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-	.info	= snd_efw_control_spdif_format_info,
-	.get	= snd_efw_control_spdif_format_get,
-	.put	= snd_efw_control_spdif_format_put
+	.info	= control_spdif_format_info,
+	.get	= control_spdif_format_get,
+	.put	= control_spdif_format_put
 };
 
-static struct snd_kcontrol_new snd_efw_global_phantom_state_control =
+static struct snd_kcontrol_new global_phantom_state_control =
 {
 	.name	= "Phantom Power",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-	.info	= snd_efw_control_phantom_state_info,
-	.get	= snd_efw_control_phantom_state_get,
-	.put	= snd_efw_control_phantom_state_put
+	.info	= control_phantom_state_info,
+	.get	= control_phantom_state_get,
+	.put	= control_phantom_state_put
 };
 
-static struct snd_kcontrol_new snd_efw_global_mixer_usable_control =
+static struct snd_kcontrol_new global_mixer_usable_control =
 {
 	.name	= "DSP Mixer",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-	.info	= snd_efw_control_mixer_usable_info,
-	.get	= snd_efw_control_mixer_usable_get,
-	.put	= snd_efw_control_mixer_usable_put
+	.info	= control_mixer_usable_info,
+	.get	= control_mixer_usable_get,
+	.put	= control_mixer_usable_put
 };
 
-int snd_efw_create_control_devices(struct snd_efw_t *efw)
+int snd_efw_create_control_devices(struct snd_efw *efw)
 {
 	unsigned int i;
 	int err;
 	struct snd_kcontrol *kctl;
 
-	kctl = snd_ctl_new1(&snd_efw_physical_metering, efw);
+	kctl = snd_ctl_new1(&physical_metering, efw);
 	err = snd_ctl_add(efw->card, kctl);
 	if (err < 0)
 		goto end;
 
-	for (i = 0; i < ARRAY_SIZE(snd_efw_output_controls); ++i) {
-		kctl = snd_ctl_new1(&snd_efw_output_controls[i], efw);
+	for (i = 0; i < ARRAY_SIZE(output_controls); ++i) {
+		kctl = snd_ctl_new1(&output_controls[i], efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(snd_efw_playback_controls); ++i) {
-		kctl = snd_ctl_new1(&snd_efw_playback_controls[i], efw);
+	for (i = 0; i < ARRAY_SIZE(playback_controls); ++i) {
+		kctl = snd_ctl_new1(&playback_controls[i], efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
 	}
 
-	for (i = 0; i < ARRAY_SIZE(snd_efw_capture_controls); i += 1) {
-		snd_efw_capture_controls[i].index = 0;
-		kctl = snd_ctl_new1(&snd_efw_capture_controls[i], efw);
+	for (i = 0; i < ARRAY_SIZE(capture_controls); i += 1) {
+		capture_controls[i].index = 0;
+		kctl = snd_ctl_new1(&capture_controls[i], efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
@@ -991,38 +1034,38 @@ int snd_efw_create_control_devices(struct snd_efw_t *efw)
 
 	/* capabilities */
 	if (efw->supported_clock_source > 0) {
-		kctl = snd_ctl_new1(&snd_efw_clock_source_control, efw);
+		kctl = snd_ctl_new1(&global_clock_source_control, efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
 		efw->control_id_clock_source = &kctl->id;
 	}
 	if (efw->supported_sampling_rate > 0) {
-		kctl = snd_ctl_new1(&snd_efw_sampling_rate_control, efw);
+		kctl = snd_ctl_new1(&global_sampling_rate_control, efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
 		efw->control_id_sampling_rate = &kctl->id;
 	}
 	if (efw->supported_digital_mode > 0) {
-		kctl = snd_ctl_new1(&snd_efw_digital_mode_control, efw);
+		kctl = snd_ctl_new1(&global_digital_mode_control, efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
-		kctl = snd_ctl_new1(&snd_efw_global_iec60958_format_control, efw);
+		kctl = snd_ctl_new1(&global_iec60958_format_control, efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
 	}
 	if (efw->has_phantom > 0) {
-		kctl = snd_ctl_new1(&snd_efw_global_phantom_state_control, efw);
+		kctl = snd_ctl_new1(&global_phantom_state_control, efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
 	}
 
 	if (efw->has_dsp_mixer > 0) {
-		kctl = snd_ctl_new1(&snd_efw_global_mixer_usable_control, efw);
+		kctl = snd_ctl_new1(&global_mixer_usable_control, efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
