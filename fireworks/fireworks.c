@@ -44,7 +44,7 @@ static unsigned int devices_used;
 #define FLAG_HAS_DSP_MIXER			4
 #define FLAG_HAS_FPGA				5
 #define FLAG_HAS_PHANTOM			6
-/* other flags are unknown... */
+/* other flags exist but unknown... */
 
 static int
 get_hardware_info(struct snd_efw *efw)
@@ -78,11 +78,11 @@ get_hardware_info(struct snd_efw *efw)
 	if (hwinfo->flags & (1 << FLAG_HAS_PHANTOM))
 		efw->has_phantom = 1;
 	if (hwinfo->flags & (1 << FLAG_SPDIF_COAX_SUPPORTED)) {
-		efw->supported_digital_mode = BIT(2) | BIT(3);
+		efw->supported_digital_interface = BIT(2) | BIT(3);
 		/* TODO: find better way... */
 		if (strcmp(hwinfo->model_name, "AudioFire8a")
 		 || strcmp(hwinfo->model_name, "AudioFirePre8"))
-			efw->supported_digital_mode |= BIT(0);
+			efw->supported_digital_interface |= BIT(0);
 	}
 
 	/* for input physical metering */

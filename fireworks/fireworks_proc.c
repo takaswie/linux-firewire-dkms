@@ -156,117 +156,6 @@ end:
 	return;
 }
 
-static void
-print_mixer_values(struct snd_efw *efw, struct snd_info_buffer *buffer,
-	int(*func)(struct snd_efw *, enum snd_efw_mixer_cmd, int, int *),
-	int channel)
-{
-	int value;
-
-	if (func(efw, SND_EFW_MIXER_GET_GAIN, channel, &value) < 0)
-		snd_iprintf(buffer, "*\t");
-	else
-		snd_iprintf(buffer, "%d\t", value);
-
-	if (func(efw, SND_EFW_MIXER_GET_MUTE, channel, &value) < 0)
-		snd_iprintf(buffer, "*\t");
-	else
-		snd_iprintf(buffer, "%d\t", value);
-
-	if (func(efw, SND_EFW_MIXER_GET_SOLO, channel, &value) < 0)
-		snd_iprintf(buffer, "*\t");
-	else
-		snd_iprintf(buffer, "%d\t", value);
-
-	if (func(efw, SND_EFW_MIXER_GET_PAN, channel, &value) < 0)
-		snd_iprintf(buffer, "*\t");
-	else
-		snd_iprintf(buffer, "%d\t", value);
-
-	if (func(efw, SND_EFW_MIXER_GET_NOMINAL, channel, &value) < 0)
-		snd_iprintf(buffer, "*\n");
-	else
-		snd_iprintf(buffer, "%d\n", value);
-
-	return;
-}
-
-static void
-proc_read_mixer(struct snd_info_entry *entry,
-		struct snd_info_buffer *buffer)
-{
-	struct snd_efw *efw = entry->private_data;
-	int c;
-
-	snd_iprintf(buffer, "\n\t\tGain\t\tMute\tSolo\tPan\tNominal\n");
-	for (c = 0; c < efw->output_meter_counts; c += 1) {
-		snd_iprintf(buffer, "PCM Play[%d]:\t", c);
-		print_mixer_values(efw, buffer, snd_efw_command_playback, c);
-	}
-
-	snd_iprintf(buffer, "\n\t\tGain\t\tMute\tSolo\tPan\tNominal\n");
-	for (c = 0; c < efw->output_meter_counts; c += 1) {
-		snd_iprintf(buffer, "Phys Out[%d]:\t", c);
-		print_mixer_values(efw, buffer, snd_efw_command_phys_out, c);
-	}
-
-	snd_iprintf(buffer, "\n\t\tGain\t\tMute\tSolo\tPan\tNominal\n");
-	for (c = 0; c < efw->input_meter_counts; c += 1) {
-		snd_iprintf(buffer, "PCM Cap[%d]:\t", c);
-		print_mixer_values(efw, buffer, snd_efw_command_capture, c);
-	}
-
-	snd_iprintf(buffer, "\n\t\tGain\t\tMute\tSolo\tPan\tNominal\n");
-	for (c = 0; c < efw->input_meter_counts; c += 1) {
-		snd_iprintf(buffer, "Phys In[%d]:\t", c);
-		print_mixer_values(efw, buffer, snd_efw_command_phys_in, c);
-	}
-
-	return;
-}
-
-static void
-proc_read_monitor(struct snd_info_entry *entry,
-		  struct snd_info_buffer *buffer)
-{
-	struct snd_efw *efw = entry->private_data;
-	int value;
-	int i, o;
-
-	for (i = 0; i < efw->mixer_input_channels; i += 1 ) {
-		snd_iprintf(buffer, "\n\t\tGain\t\tMute\tSolo\tPan\n");
-		for (o = 0; o < efw->mixer_output_channels; o += 1) {
-			snd_iprintf(buffer, "IN[%d]:OUT[%d]:\t", i, o);
-			if (snd_efw_command_monitor(efw, SND_EFW_MIXER_GET_GAIN,
-							i, o, &value) < 0)
-				snd_iprintf(buffer, "*\t");
-			else
-				snd_iprintf(buffer, "%d\t", value);
-
-			if (snd_efw_command_monitor(efw, SND_EFW_MIXER_GET_MUTE,
-							i, o, &value) < 0)
-				snd_iprintf(buffer, "*\t");
-			else
-				snd_iprintf(buffer, "%d\t", value);
-
-			if (snd_efw_command_monitor(efw, SND_EFW_MIXER_GET_SOLO,
-							i, o, &value) < 0)
-				snd_iprintf(buffer, "*\t");
-			else
-				snd_iprintf(buffer, "%d\t", value);
-
-			if (snd_efw_command_monitor(efw, SND_EFW_MIXER_GET_PAN,
-							i, o, &value) < 0)
-				snd_iprintf(buffer, "*\n");
-			else
-				snd_iprintf(buffer, "%d\n", value);
-
-		}
-	}
-
-	return;
-}
-
 void snd_efw_proc_init(struct snd_efw *efw)
 {
 	struct snd_info_entry *entry;
@@ -277,9 +166,5 @@ void snd_efw_proc_init(struct snd_efw *efw)
 		snd_info_set_text_ops(entry, efw, proc_read_clock);
 	if(!snd_card_proc_new(efw->card, "#meters", &entry))
 		snd_info_set_text_ops(entry, efw, proc_read_phys_meters);
-	if(!snd_card_proc_new(efw->card, "#mixer", &entry))
-		snd_info_set_text_ops(entry, efw, proc_read_mixer);
-	if(!snd_card_proc_new(efw->card, "#monitor", &entry))
-		snd_info_set_text_ops(entry, efw, proc_read_monitor);
 	return;
 }

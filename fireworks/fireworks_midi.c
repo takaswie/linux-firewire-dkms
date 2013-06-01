@@ -77,8 +77,11 @@ midi_open(struct snd_rawmidi_substream *substream)
 	/* opposite stream is running then use the same sampling rate */
 	if (!IS_ERR(opposite->context))
 		err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
-	else
+	else {
 		err = snd_efw_command_set_sampling_rate(efw, sampling_rate);
+		snd_ctl_notify(efw->card, SNDRV_CTL_EVENT_MASK_VALUE,
+				efw->control_id_sampling_rate);
+	}
 	if (err < 0)
 		goto end;
 	mode = snd_efw_get_multiplier_mode(sampling_rate);

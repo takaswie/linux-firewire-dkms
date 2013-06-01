@@ -83,7 +83,7 @@ struct snd_efw {
 	/* capabilities */
 	unsigned int supported_sampling_rate;
 	unsigned int supported_clock_source;
-	unsigned int supported_digital_mode;
+	unsigned int supported_digital_interface;
 	unsigned int has_phantom;
 	unsigned int has_dsp_mixer;
 	unsigned int has_fpga;
@@ -94,9 +94,11 @@ struct snd_efw {
 	/* physical metering */
 	unsigned int input_group_counts;
 	struct snd_efw_phys_group *input_groups;
-	unsigned int input_meter_counts;
 	unsigned int output_group_counts;
 	struct snd_efw_phys_group *output_groups;
+
+	/* meter parameters */
+	unsigned int input_meter_counts;
 	unsigned int output_meter_counts;
 
 	/* mixer parameters */
@@ -113,7 +115,6 @@ struct snd_efw {
 
 	/* notification to control components */
 	struct snd_ctl_elem_id *control_id_sampling_rate;
-	struct snd_ctl_elem_id *control_id_clock_source;
 
 	/* for IEC 61883-1 and -6 streaming */
 	struct amdtp_stream receive_stream;
@@ -156,17 +157,6 @@ struct snd_efw_hwinfo {
 	u32 reserved[16];
 } __attribute__((packed));
 
-struct efc_isoc_map {
-	__be32 sample_rate;
-	__be32 flags;
-	__be32 num_playmap_entries;
-	__be32 num_phys_out;
-	__be32 playmap[32];
-	__be32 num_recmap_entries;
-	__be32 num_phys_in;
-	__be32 recmap[32];
-} __attribute__((packed));
-
 /* for hardware metering */
 struct snd_efw_phys_meters {
 	u32 status;
@@ -191,12 +181,12 @@ enum snd_efw_clock_source {
 	SND_EFW_CLOCK_SOURCE_ADAT_2	= 5,
 };
 
-/* digital mode parameters */
-enum snd_efw_digital_mode {
-	SND_EFW_DIGITAL_MODE_SPDIF_COAXIAL	= 0,
-	SND_EFW_DIGITAL_MODE_ADAT_COAXIAL	= 1,
-	SND_EFW_DIGITAL_MODE_SPDIF_OPTICAL	= 2,
-	SND_EFW_DIGITAL_MODE_ADAT_OPTICAL	= 3
+/* digital interface parameters */
+enum snd_efw_digital_interface {
+	SND_EFW_DIGITAL_INTERFACE_SPDIF_COAXIAL	= 0,
+	SND_EFW_DIGITAL_INTERFACE_ADAT_COAXIAL	= 1,
+	SND_EFW_DIGITAL_INTERFACE_SPDIF_OPTICAL	= 2,
+	SND_EFW_DIGITAL_INTERFACE_ADAT_OPTICAL	= 3
 };
 
 /* S/PDIF format parameters */
@@ -206,53 +196,26 @@ enum snd_efw_iec60958_format {
 };
 
 /* Echo Fireworks Command functions */
-/* for phys_in/phys_out/playback/capture/monitor category commands */
-enum snd_efw_mixer_cmd {
-	SND_EFW_MIXER_SET_GAIN		= 0,
-	SND_EFW_MIXER_GET_GAIN		= 1,
-	SND_EFW_MIXER_SET_MUTE		= 2,
-	SND_EFW_MIXER_GET_MUTE		= 3,
-	SND_EFW_MIXER_SET_SOLO		= 4,
-	SND_EFW_MIXER_GET_SOLO		= 5,
-	SND_EFW_MIXER_SET_PAN		= 6,
-	SND_EFW_MIXER_GET_PAN		= 7,
-	SND_EFW_MIXER_SET_NOMINAL	= 8,
-	SND_EFW_MIXER_GET_NOMINAL	= 9
-};
 int snd_efw_command_identify(struct snd_efw *efw);
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 			       struct snd_efw_hwinfo *hwinfo);
 int snd_efw_command_get_phys_meters(struct snd_efw *efw,
 				    struct snd_efw_phys_meters *meters,
 				    int len);
-int snd_efw_command_get_mixer_usable(struct snd_efw *efw, int *usable);
-int snd_efw_command_set_mixer_usable(struct snd_efw *efw, int usable);
-int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
-					enum snd_efw_iec60958_format *format);
-int snd_efw_command_set_iec60958_format(struct snd_efw *efw,
-					enum snd_efw_iec60958_format format);
 int snd_efw_command_get_clock_source(struct snd_efw *efw,
 				     enum snd_efw_clock_source *source);
 int snd_efw_command_set_clock_source(struct snd_efw *efw,
 				     enum snd_efw_clock_source source);
 int snd_efw_command_get_sampling_rate(struct snd_efw *efw, int *sampling_rate);
 int snd_efw_command_set_sampling_rate(struct snd_efw *efw, int sampling_rate);
-int snd_efw_command_get_digital_mode(struct snd_efw *efw,
-				     enum snd_efw_digital_mode *mode);
-int snd_efw_command_set_digital_mode(struct snd_efw *efw,
-				     enum snd_efw_digital_mode mode);
-int snd_efw_command_get_phantom_state(struct snd_efw *efw, int *state);
-int snd_efw_command_set_phantom_state(struct snd_efw *efw, int state);
-int snd_efw_command_monitor(struct snd_efw *efw, enum snd_efw_mixer_cmd cmd,
-			    int input, int output, int *value);
-int snd_efw_command_playback(struct snd_efw *efw, enum snd_efw_mixer_cmd cmd,
-			     int channel, int *value);
-int snd_efw_command_phys_out(struct snd_efw *efw, enum snd_efw_mixer_cmd cmd,
-			     int channel, int *value);
-int snd_efw_command_capture(struct snd_efw *efw, enum snd_efw_mixer_cmd cmd,
-			    int channel, int *value);
-int snd_efw_command_phys_in(struct snd_efw *efw, enum snd_efw_mixer_cmd cmd,
-			    int channel, int *value);
+int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
+					enum snd_efw_iec60958_format *format);
+int snd_efw_command_set_iec60958_format(struct snd_efw *efw,
+					enum snd_efw_iec60958_format format);
+int snd_efw_command_get_digital_interface(struct snd_efw *efw,
+			enum snd_efw_digital_interface *digital_interface);
+int snd_efw_command_set_digital_interface(struct snd_efw *efw,
+			enum snd_efw_digital_interface digital_interface);
 
 /* for AMDTP stream and CMP */
 int snd_efw_stream_init(struct snd_efw *efw, struct amdtp_stream *stream);

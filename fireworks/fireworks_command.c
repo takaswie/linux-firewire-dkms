@@ -63,8 +63,6 @@
  * As a result, Echo's Fireworks doesn't need generic command sets.
  */
 
-#define POLLED_MAX_NB_METERS 100
-
 /*
  * AV/C parameters for Vendor-Dependent command
  */
@@ -95,6 +93,13 @@ struct efc_fields {
 	u32 category;
 	u32 command;
 	u32 retval;
+};
+
+/* for clock source and sampling rate */
+struct efc_clock {
+	u32 source;
+	u32 sampling_rate;
+	u32 index;
 };
 
 /* command categories */
@@ -159,13 +164,6 @@ enum efc_cmd_ioconf {
 	EFC_CMD_IOCONF_GET_ISOC_MAP	= 7,
 };
 
-/* for clock source and sampling rate */
-struct efc_clock {
-	u32 source;
-	u32 sampling_rate;
-	u32 index;
-};
-
 /* return values in response */
 enum efc_retval {
 	EFC_RETVAL_OK			= 0,
@@ -185,6 +183,20 @@ enum efc_retval {
 	EFC_RETVAL_BAD_LED		= 14,
 	EFC_RETVAL_BAD_PARAMETER	= 15,
 	EFC_RETVAL_INCOMPLETE		= 0x80000000
+};
+
+/* for phys_in/phys_out/playback/capture/monitor category commands */
+enum snd_efw_mixer_cmd {
+	SND_EFW_MIXER_SET_GAIN		= 0,
+	SND_EFW_MIXER_GET_GAIN		= 1,
+	SND_EFW_MIXER_SET_MUTE		= 2,
+	SND_EFW_MIXER_GET_MUTE		= 3,
+	SND_EFW_MIXER_SET_SOLO		= 4,
+	SND_EFW_MIXER_GET_SOLO		= 5,
+	SND_EFW_MIXER_SET_PAN		= 6,
+	SND_EFW_MIXER_GET_PAN		= 7,
+	SND_EFW_MIXER_SET_NOMINAL	= 8,
+	SND_EFW_MIXER_GET_NOMINAL	= 9
 };
 
 static int
@@ -456,42 +468,6 @@ snd_efw_command_set_sampling_rate(struct snd_efw *efw, int sampling_rate)
 	return command_set_clock(efw, -1, sampling_rate);
 }
 
-int snd_efw_command_get_mixer_usable(struct snd_efw *efw, int *usable)
-{
-	int err;
-	u32 flag = {0};
-
-	err = efc_over_avc(efw, 0,
-			EFC_CAT_HWCTL, EFC_CMD_HWCTL_GET_FLAGS,
-			NULL, 0, &flag, 1);
-	if (err >= 0) {
-		if (flag & EFC_HWCTL_FLAG_MIXER_USABLE)
-			*usable = 1;
-		else
-			*usable = 0;
-	}
-
-	return err;
-}
-
-int snd_efw_command_set_mixer_usable(struct snd_efw *efw, int usable)
-{
-	/*
-	 * mask[0]: for set
-	 * mask[1]: for clear
-	 */
-	u32 mask[2] = {0};
-
-	if (usable == 1)
-		mask[0] = EFC_HWCTL_FLAG_MIXER_USABLE;
-	else
-		mask[1] = EFC_HWCTL_FLAG_MIXER_UNUSABLE;
-
-	return efc_over_avc(efw, 0,
-			EFC_CAT_HWCTL, EFC_CMD_HWCTL_CHANGE_FLAGS,
-			(u32 *)mask, 2, NULL, 0);
-}
-
 int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
 					enum snd_efw_iec60958_format *format)
 {
@@ -530,8 +506,8 @@ int snd_efw_command_set_iec60958_format(struct snd_efw *efw,
 			(u32 *)mask, 2, NULL, 0);
 }
 
-int snd_efw_command_get_digital_mode(struct snd_efw *efw,
-				     enum snd_efw_digital_mode *mode)
+int snd_efw_command_get_digital_interface(struct snd_efw *efw,
+			enum snd_efw_digital_interface *digital_interface)
 {
 	int err;
 	u32 value = 0;
@@ -541,233 +517,17 @@ int snd_efw_command_get_digital_mode(struct snd_efw *efw,
 			NULL, 0, &value, 1);
 
 	if (err >= 0)
-		*mode = value;
+		*digital_interface = value;
 
 	return err;
 }
 
-int snd_efw_command_set_digital_mode(struct snd_efw *efw,
-				     enum snd_efw_digital_mode mode)
+int snd_efw_command_set_digital_interface(struct snd_efw *efw,
+			enum snd_efw_digital_interface digital_interface)
 {
-	u32 value = mode;
+	u32 value = digital_interface;
 
 	return efc_over_avc(efw, 0,
 		EFC_CAT_IOCONF, EFC_CMD_IOCONF_SET_DIGITAL_MODE,
 		&value, 1, NULL, 0);
-}
-
-
-int snd_efw_command_get_phantom_state(struct snd_efw *efw, int *state)
-{
-	int err;
-	u32 response;
-
-	err = efc_over_avc(efw, 0,
-			EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
-			NULL, 0, &response, 1);
-	if (err >= 0)
-		*state = response;
-
-	return err;
-}
-
-int snd_efw_command_set_phantom_state(struct snd_efw *efw, int state)
-{
-	u32 request;
-	u32 response;
-
-	if (state > 0)
-		request = 1;
-	else
-		request = 0;
-
-	return efc_over_avc(efw, 0,
-			EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_PHANTOM,
-			&request, 1, &response, 1);
-}
-
-static int
-snd_efw_command_get_monitor(struct snd_efw *efw, int category,
-			    int command, int input, int output, int *value)
-{
-	int err;
-
-	u32 request[2] = {0};
-	u32 response[3] = {0};
-
-	request[0] = input;
-	request[1] = output;
-
-	err = efc_over_avc(efw, 0, category, command, request, 2, response, 3);
-	if (err >= 0)
-		*value = response[2];
-
-	return err;
-}
-
-static int
-snd_efw_command_set_monitor(struct snd_efw *efw, int category,
-			    int command, int input, int output, int *value)
-{
-	u32 request[3] = {0};
-	request[0] = input;
-	request[1] = output;
-	request[2] = *value;
-
-	return efc_over_avc(efw, 0, category, command, request, 3, NULL, 0);
-}
-
-int snd_efw_command_monitor(struct snd_efw *efw,
-			    enum snd_efw_mixer_cmd cmd,
-			    int input, int output, int *value)
-{
-	switch (cmd) {
-	case SND_EFW_MIXER_SET_GAIN:
-	case SND_EFW_MIXER_SET_MUTE:
-	case SND_EFW_MIXER_SET_SOLO:
-	case SND_EFW_MIXER_SET_PAN:
-	case SND_EFW_MIXER_SET_NOMINAL:
-		return snd_efw_command_set_monitor(efw, EFC_CAT_MIXER_MONITOR,
-						cmd, input, output, value);
-
-	case SND_EFW_MIXER_GET_GAIN:
-	case SND_EFW_MIXER_GET_MUTE:
-	case SND_EFW_MIXER_GET_SOLO:
-	case SND_EFW_MIXER_GET_PAN:
-		return snd_efw_command_get_monitor(efw, EFC_CAT_MIXER_MONITOR,
-						cmd, input, output, value);
-
-	case SND_EFW_MIXER_GET_NOMINAL:
-	default:
-		return -EINVAL;
-	}
-}
-
-static int
-snd_efw_command_get_mixer(struct snd_efw *efw, int category,
-			  int command, int channel, int *value)
-{
-	int err;
-
-	u32 request = channel;
-	u32 response[2] = {0};
-
-	err = efc_over_avc(efw, 0, category, command,
-				&request, 1, response, 2);
-	if ((err >= 0) && (response[0] == channel))
-		*value = response[1];
-
-	return err;
-}
-
-static int
-snd_efw_command_set_mixer(struct snd_efw *efw, int category, int command,
-						int channel, int *value)
-{
-	u32 request[2] = {0};
-	request[0] = channel;
-	request[1] = *value;
-
-	return efc_over_avc(efw, 0, category, command, request, 2, NULL, 0);
-}
-
-int snd_efw_command_playback(struct snd_efw *efw,
-			     enum snd_efw_mixer_cmd cmd,
-			     int channel, int *value)
-{
-	switch (cmd) {
-	case SND_EFW_MIXER_SET_GAIN:
-	case SND_EFW_MIXER_SET_MUTE:
-	case SND_EFW_MIXER_SET_SOLO:
-		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_PLAYBACK,
-							cmd, channel, value);
-
-	case SND_EFW_MIXER_GET_GAIN:
-	case SND_EFW_MIXER_GET_MUTE:
-	case SND_EFW_MIXER_GET_SOLO:
-		return snd_efw_command_get_mixer(efw, EFC_CAT_MIXER_PLAYBACK,
-							cmd, channel, value);
-
-	case SND_EFW_MIXER_SET_PAN:
-	case SND_EFW_MIXER_SET_NOMINAL:
-	case SND_EFW_MIXER_GET_PAN:
-	case SND_EFW_MIXER_GET_NOMINAL:
-	default:
-		return -EINVAL;
-	}
-}
-
-int snd_efw_command_phys_out(struct snd_efw *efw,
-			     enum snd_efw_mixer_cmd cmd,
-			     int channel, int *value)
-{
-	switch (cmd) {
-	case SND_EFW_MIXER_SET_GAIN:
-	case SND_EFW_MIXER_SET_MUTE:
-	case SND_EFW_MIXER_SET_NOMINAL:
-		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_PHYS_OUT,
-							cmd, channel, value);
-
-	case SND_EFW_MIXER_GET_GAIN:
-	case SND_EFW_MIXER_GET_MUTE:
-	case SND_EFW_MIXER_GET_NOMINAL:
-		return snd_efw_command_get_mixer(efw, EFC_CAT_MIXER_PHYS_OUT,
-							cmd, channel, value);
-
-	case SND_EFW_MIXER_SET_SOLO:
-	case SND_EFW_MIXER_SET_PAN:
-	case SND_EFW_MIXER_GET_SOLO:
-	case SND_EFW_MIXER_GET_PAN:
-	default:
-		return -EINVAL;
-	}
-}
-
-int snd_efw_command_capture(struct snd_efw *efw,
-			    enum snd_efw_mixer_cmd cmd,
-			    int channel, int *value)
-{
-	switch (cmd) {
-	case SND_EFW_MIXER_SET_GAIN:
-	case SND_EFW_MIXER_SET_MUTE:
-	case SND_EFW_MIXER_SET_SOLO:
-	case SND_EFW_MIXER_SET_PAN:
-	case SND_EFW_MIXER_SET_NOMINAL:
-		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_CAPTURE,
-							cmd, channel, value);
-
-	/* get nothing */
-	case SND_EFW_MIXER_GET_GAIN:
-	case SND_EFW_MIXER_GET_MUTE:
-	case SND_EFW_MIXER_GET_SOLO:
-	case SND_EFW_MIXER_GET_PAN:
-	case SND_EFW_MIXER_GET_NOMINAL:
-	default:
-		return -EINVAL;
-	}
-}
-
-int snd_efw_command_phys_in(struct snd_efw *efw,
-			    enum snd_efw_mixer_cmd cmd,
-			    int channel, int *value)
-{
-	switch (cmd) {
-	case SND_EFW_MIXER_SET_NOMINAL:
-		return snd_efw_command_set_mixer(efw, EFC_CAT_MIXER_PHYS_IN,
-							cmd, channel, value);
-
-	/* set nothing except nominal */
-	case SND_EFW_MIXER_SET_GAIN:
-	case SND_EFW_MIXER_SET_MUTE:
-	case SND_EFW_MIXER_SET_SOLO:
-	case SND_EFW_MIXER_SET_PAN:
-	/* get nothing */
-	case SND_EFW_MIXER_GET_GAIN:
-	case SND_EFW_MIXER_GET_MUTE:
-	case SND_EFW_MIXER_GET_SOLO:
-	case SND_EFW_MIXER_GET_NOMINAL:
-	case SND_EFW_MIXER_GET_PAN:
-	default:
-		return -EINVAL;
-	}
 }
