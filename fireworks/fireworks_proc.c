@@ -123,24 +123,24 @@ proc_read_phys_meters(struct snd_info_entry *entry,
 
 	snd_iprintf(buffer, "Physical Meters:\n");
 
-	snd_iprintf(buffer, " %d Inputs:\n", efw->mixer_input_channels);
+	snd_iprintf(buffer, " %d Inputs:\n", efw->input_meter_counts);
 	g = 0;
 	c = 0;
-	for (i = 0; i < efw->mixer_input_channels; i += 1) {
+	for (i = 0; i < efw->input_meter_counts; i += 1) {
 		if (c == efw->input_groups[g].count) {
 			g += 1;
 			c = 0;
 		}
 		snd_iprintf(buffer, "\t%s [%d]: %d\n",
 			descs[efw->input_groups[g].type], c,
-			meters->values[efw->mixer_output_channels + i]);
+			meters->values[efw->output_meter_counts + i]);
 		c += 1;
 	}
 
-	snd_iprintf(buffer, " %d Outputs:\n", efw->mixer_output_channels);
+	snd_iprintf(buffer, " %d Outputs:\n", efw->output_meter_counts);
 	g = 0;
 	c = 0;
-	for (i = 0; i < efw->mixer_output_channels; i += 1) {
+	for (i = 0; i < efw->output_meter_counts; i += 1) {
 		if (c == efw->output_groups[g].count) {
 			g += 1;
 			c = 0;

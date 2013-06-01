@@ -42,8 +42,8 @@ physical_metering_get(struct snd_kcontrol *ctl,
 	struct snd_efw_phys_meters *meters;
 	int base = sizeof(struct snd_efw_phys_meters);
 	int count = efw->input_meter_counts + efw->output_meter_counts;
-
-	int err;
+	u32 *dst, *src;
+	int i, err;
 
 	meters = kzalloc(base + count * 4, GFP_KERNEL);
 	if (meters == NULL)
@@ -53,16 +53,21 @@ physical_metering_get(struct snd_kcontrol *ctl,
 	if (err < 0)
 		goto end;
 
-	value->value.bytes.data[1] = efw->input_group_counts;
-	value->value.bytes.data[0] = efw->output_meter_counts;
+	value->value.bytes.data[0] = efw->input_meter_counts;
+	value->value.bytes.data[1] = efw->output_meter_counts;
 
-	memcpy(value->value.bytes.data + 2 + efw->output_meter_counts * 4,
-	       meters->values + 2, efw->input_meter_counts * 4);
-	memcpy(value->value.bytes.data + 2,
-	       meters->values + 2, efw->output_meter_counts * 4);
+	dst = (u32 *)(value->value.bytes.data + 2);
+	src = meters->values;
+
+	for (i = 0; i < efw->input_meter_counts; i += 1)
+		dst[i] = src[efw->output_meter_counts + i];
+
+	for (i = 0; i < efw->output_meter_counts; i += 1)
+		dst[i + efw->input_meter_counts] = src[i];
 
 	err = 0;
 end:
+	kfree(meters);
 	return err;
 }
 static const
@@ -1012,7 +1017,7 @@ static struct snd_kcontrol_new global_phantom_state_control =
 
 static struct snd_kcontrol_new global_mixer_usable_control =
 {
-	.name	= "DSP Mixer",
+	.name	= "DSP Mixer Enable",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
 	.info	= control_mixer_usable_info,
