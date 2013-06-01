@@ -31,12 +31,12 @@
  *
  * Additionally, according to AudioFire Owner's Manual Version 2.2,
  * the number of PCM channels for digital input has more restriction
- *  with digital mode.
- *  - ADAT optical with 32.0-48.0 kHz	: use inputs 1-8
- *  - ADAT coaxial with 88.2-96.0 kHz	: use inputs 1-4
- *  - S/PDIF coaxial and optical	: use inputs 1-2
- * If these restriction is applied, the number of channels in stream is with the
- * same rules realated to above modes.
+ *  depending on which digital interface is selected.
+ *  - S/PDIF coaxial and optical	: use input 1-2
+ *  - ADAT optical with 32.0-48.0 kHz	: use input 1-8
+ *  - ADAT optical with 88.2-96.0 kHz	: use input 1-4 (S/MUX format)
+ * If these restriction is applied, the number of channels in stream is decided
+ * according to above modes.
  *
  * Currently this module doesn't have rules for the latter.
  */
