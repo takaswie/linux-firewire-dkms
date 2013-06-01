@@ -129,11 +129,10 @@ get_hardware_info(struct snd_efw *efw)
 	efw->pcm_playback_channels_sets[1] = hwinfo->nb_1394_playback_channels_2x;
 	efw->pcm_playback_channels_sets[2] = hwinfo->nb_1394_playback_channels_4x;
 
-	/* chip version for firmware */
+	/* firmware version */
 	err = sprintf(version, "%u.%u",
-		      (hwinfo->arm_version >> 24) & 0xff, (hwinfo->arm_version >> 8) & 0xff);
-	if (hwinfo->arm_version & 0xff)
-		sprintf(version + err, ".%u", hwinfo->arm_version & 0xff);
+			(hwinfo->arm_version >> 24) & 0xff,
+			(hwinfo->arm_version >> 16) & 0xff);
 
 	/* set names */
 	strcpy(efw->card->driver, "Fireworks");
@@ -309,10 +308,8 @@ snd_efw_probe(struct device *dev)
 	mutex_lock(&devices_mutex);
 
 	/* check device name */
-	if (!match_fireworks_device_name(unit)) {
-		err = -ENODEV;
-		goto end;
-	}
+	if (!match_fireworks_device_name(unit))
+		return -ENODEV;
 
 	/* check registered cards */
 	for (card_index = 0; card_index < SNDRV_CARDS; ++card_index)
@@ -340,7 +337,8 @@ snd_efw_probe(struct device *dev)
 	spin_lock_init(&efw->lock);
 
 	/* identifing */
-	if (snd_efw_command_identify(efw) < 0)
+	err = snd_efw_command_identify(efw);
+	if (err < 0)
 		goto error;
 
 	/* get hardware information */

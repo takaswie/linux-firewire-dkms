@@ -200,8 +200,8 @@ enum snd_efw_mixer_cmd {
 };
 
 static int
-efc_over_avc(struct snd_efw *efw, unsigned int version,
-		unsigned int category, unsigned int command,
+efc_over_avc(struct snd_efw *efw, unsigned int category,
+		unsigned int command,
 		const u32 *params, unsigned int param_count,
 		void *response, unsigned int response_quadlets)
 {
@@ -249,7 +249,7 @@ efc_over_avc(struct snd_efw *efw, unsigned int version,
 	/* fill EFC fields */
 	efc_fields		= (struct efc_fields *)(cmdbuf + 2);
 	efc_fields->length	= sizeof(struct efc_fields) / 4 + param_count;
-	efc_fields->version	= version;
+	efc_fields->version	= 1;
 	efc_fields->category	= category;
 	efc_fields->command	= command;
 	efc_fields->retval	= 0;
@@ -306,11 +306,13 @@ efc_over_avc(struct snd_efw *efw, unsigned int version,
 	/* check EFC response fields */
 	efc_fields = (struct efc_fields *)(cmdbuf + 2);
 	if ((efc_fields->seqnum != sequence_number) |
+	    (efc_fields->version < 1) |
 	    (efc_fields->category != category) |
 	    (efc_fields->command != command) |
 	    (efc_fields->retval != EFC_RETVAL_OK)) {
-		snd_printk(KERN_INFO "EFC Failed [%u/%u]: %X\n",
-			efc_fields->category, efc_fields->command, efc_fields->retval);
+		snd_printk(KERN_INFO "EFC Failed [%u/%u/%u]: %X\n",
+			efc_fields->version, efc_fields->category,
+			efc_fields->command, efc_fields->retval);
 		err = -EIO;
 		goto end;
 	}
@@ -329,9 +331,9 @@ end:
 
 int snd_efw_command_identify(struct snd_efw *efw)
 {
-	return efc_over_avc(efw, 0,
-			EFC_CAT_HWCTL, EFC_CMD_HWCTL_IDENTIFY,
-			NULL, 0, NULL, 0);
+	return efc_over_avc(efw, EFC_CAT_HWCTL,
+				EFC_CMD_HWCTL_IDENTIFY,
+				NULL, 0, NULL, 0);
 }
 
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
@@ -340,9 +342,9 @@ int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 	u32 *tmp;
 	int i;
 	int count;
-	int err = efc_over_avc(efw, 1,
-			EFC_CAT_HWINFO, EFC_CMD_HWINFO_GET_CAPS,
-			NULL, 0, hwinfo, sizeof(*hwinfo) / 4);
+	int err = efc_over_avc(efw, EFC_CAT_HWINFO,
+				EFC_CMD_HWINFO_GET_CAPS,
+				NULL, 0, hwinfo, sizeof(*hwinfo) / 4);
 	if (err < 0)
 		goto end;
 
@@ -376,18 +378,17 @@ int snd_efw_command_get_phys_meters(struct snd_efw *efw,
 				    struct snd_efw_phys_meters *meters,
 				    int len)
 {
-	return efc_over_avc(efw, 0,
-			EFC_CAT_HWINFO, EFC_CMD_HWINFO_GET_POLLED,
-			NULL, 0,
-			meters, len / 4);
+	return efc_over_avc(efw, EFC_CAT_HWINFO,
+				EFC_CMD_HWINFO_GET_POLLED,
+				NULL, 0, meters, len / 4);
 }
 
 static int
 command_get_clock(struct snd_efw *efw, struct efc_clock *clock)
 {
-	return efc_over_avc(efw, 0,
-			EFC_CAT_HWCTL, EFC_CMD_HWCTL_GET_CLOCK,
-			NULL, 0, clock, sizeof(struct efc_clock) / 4);
+	return efc_over_avc(efw, EFC_CAT_HWCTL,
+				EFC_CMD_HWCTL_GET_CLOCK,
+				NULL, 0, clock, sizeof(struct efc_clock) / 4);
 }
 
 static int
@@ -421,9 +422,9 @@ command_set_clock(struct snd_efw *efw,
 		clock.sampling_rate = sampling_rate;
 	clock.index = 0;
 
-	err = efc_over_avc(efw, 0,
-			EFC_CAT_HWCTL, EFC_CMD_HWCTL_SET_CLOCK,
-			(u32 *)&clock, 3, NULL, 0);
+	err = efc_over_avc(efw, EFC_CAT_HWCTL,
+				EFC_CMD_HWCTL_SET_CLOCK,
+				(u32 *)&clock, 3, NULL, 0);
 
 	err = 0;
 end:
@@ -474,9 +475,9 @@ int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
 	int err;
 	u32 flag = {0};
 
-	err = efc_over_avc(efw, 0,
-		EFC_CAT_HWCTL, EFC_CMD_HWCTL_GET_FLAGS,
-		NULL, 0, &flag, 1);
+	err = efc_over_avc(efw, EFC_CAT_HWCTL,
+				EFC_CMD_HWCTL_GET_FLAGS,
+				NULL, 0, &flag, 1);
 	if (err >= 0) {
 		if (flag & EFC_HWCTL_FLAG_DIGITAL_PRO)
 			*format = SND_EFW_IEC60958_FORMAT_PROFESSIONAL;
@@ -501,9 +502,9 @@ int snd_efw_command_set_iec60958_format(struct snd_efw *efw,
 	else
 		mask[1] = EFC_HWCTL_FLAG_DIGITAL_PRO;
 
-	return efc_over_avc(efw, 0,
-			EFC_CAT_HWCTL, EFC_CMD_HWCTL_CHANGE_FLAGS,
-			(u32 *)mask, 2, NULL, 0);
+	return efc_over_avc(efw, EFC_CAT_HWCTL,
+				EFC_CMD_HWCTL_CHANGE_FLAGS,
+				(u32 *)mask, 2, NULL, 0);
 }
 
 int snd_efw_command_get_digital_interface(struct snd_efw *efw,
@@ -512,9 +513,9 @@ int snd_efw_command_get_digital_interface(struct snd_efw *efw,
 	int err;
 	u32 value = 0;
 
-	err = efc_over_avc(efw, 0,
-			EFC_CAT_IOCONF, EFC_CMD_IOCONF_GET_DIGITAL_MODE,
-			NULL, 0, &value, 1);
+	err = efc_over_avc(efw, EFC_CAT_IOCONF,
+				EFC_CMD_IOCONF_GET_DIGITAL_MODE,
+				NULL, 0, &value, 1);
 
 	if (err >= 0)
 		*digital_interface = value;
@@ -527,7 +528,7 @@ int snd_efw_command_set_digital_interface(struct snd_efw *efw,
 {
 	u32 value = digital_interface;
 
-	return efc_over_avc(efw, 0,
-		EFC_CAT_IOCONF, EFC_CMD_IOCONF_SET_DIGITAL_MODE,
-		&value, 1, NULL, 0);
+	return efc_over_avc(efw, EFC_CAT_IOCONF,
+				EFC_CMD_IOCONF_SET_DIGITAL_MODE,
+				&value, 1, NULL, 0);
 }
