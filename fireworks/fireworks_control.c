@@ -91,7 +91,7 @@ struct snd_kcontrol_new physical_metering = {
  * S/PDIF or ADAT, Coaxial or Optical
  * snd_efw_hwinfo.flags include a flag for this control.
  */
-static char *digital_interface_descs[] = {"S/PDIF Coaxial", "ADAT Coaxial",
+static char *digital_iface_descs[] = {"S/PDIF Coaxial", "ADAT Coaxial",
 					  "S/PDIF Optical", "ADAT Optical"};
 static int
 control_digital_interface_info(struct snd_kcontrol *kctl,
@@ -101,10 +101,10 @@ control_digital_interface_info(struct snd_kcontrol *kctl,
 	int value, i;
 
 	einf->value.enumerated.items = 0;
-	for (i = 0; i < ARRAY_SIZE(digital_interface_descs); i += 1) {
+	for (i = 0; i < ARRAY_SIZE(digital_iface_descs); i += 1) {
 		if ((1 << i) & efw->supported_digital_interface)
 			einf->value.enumerated.items += 1;
-        }
+	}
 
 	einf->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	einf->count = 1;
@@ -114,7 +114,7 @@ control_digital_interface_info(struct snd_kcontrol *kctl,
 
 	/* skip unsupported clock source */
 	value = einf->value.enumerated.item;
-	for (i = 0; i < ARRAY_SIZE(digital_interface_descs); i += 1) {
+	for (i = 0; i < ARRAY_SIZE(digital_iface_descs); i += 1) {
 		if (!((1 << i) & efw->supported_digital_interface))
 			continue;
 		else if (value == 0)
@@ -123,7 +123,7 @@ control_digital_interface_info(struct snd_kcontrol *kctl,
 		value -= 1;
 	}
 
-	strcpy(einf->value.enumerated.name, digital_interface_descs[i]);
+	strcpy(einf->value.enumerated.name, digital_iface_descs[i]);
 
 	return 0;
 }
@@ -144,7 +144,7 @@ control_digital_interface_get(struct snd_kcontrol *kctl,
 
 	/* check clock source */
 	if ((digital_interface < 0) &&
-	    (ARRAY_SIZE(digital_interface_descs) < digital_interface))
+	    (ARRAY_SIZE(digital_iface_descs) < digital_interface))
 		goto end;
 
 	/* generate user value */
@@ -168,7 +168,7 @@ control_digital_interface_put(struct snd_kcontrol *kctl,
 
 	/* get index from user value */
 	value = uval->value.enumerated.item[0];
-	for (index = 0; index < ARRAY_SIZE(digital_interface_descs); index += 1) {
+	for (index = 0; index < ARRAY_SIZE(digital_iface_descs); index++) {
 		/* not supported */
 		if (!((1 << index) & efw->supported_digital_interface))
 			continue;
@@ -191,9 +191,9 @@ end:
 /*
  * Global Control: S/PDIF format are selectable from "Professional/Consumer".
  *  Consumer:		IEC-60958 Digital audio interface
- *			 – Part 3:Consumer applications
+ *				Part 3:Consumer applications
  *  Professional:	IEC-60958 Digital audio interface
- *			 – Part 4: Professional applications
+ *				Part 4: Professional applications
  *
  * snd_efw_hwinfo.flags include a flag for this control
  */
@@ -212,7 +212,7 @@ control_spdif_format_info(struct snd_kcontrol *kctl,
 	strcpy(einf->value.enumerated.name,
 		spdif_format_descs[einf->value.enumerated.item]);
 
-        return 0;
+	return 0;
 }
 static int
 control_spdif_format_get(struct snd_kcontrol *kctl,
@@ -255,7 +255,7 @@ end:
  * is a minimum and maximum sampling rate
  */
 static char *sampling_rate_descs[] = {"5512Hz", "8000Hz", "11025Hz",
-				      "16000Hz","22050Hz", "32000Hz",
+				      "16000Hz", "22050Hz", "32000Hz",
 				      "44100Hz", "48000Hz", "64000Hz",
 				      "88200Hz", "96000Hz", "176400Hz",
 				      "192000Hz"};
@@ -294,7 +294,7 @@ control_sampling_rate_info(struct snd_kcontrol *kctl,
 
 	strcpy(einf->value.enumerated.name, sampling_rate_descs[i]);
 
-        return 0;
+	return 0;
 }
 static int
 control_sampling_rate_get(struct snd_kcontrol *kctl,
@@ -363,7 +363,7 @@ end:
  *
  * snd_efw_hwinfo.supported_clocks is a flags for this control
  */
-static char *clock_source_descs[] = {"Internal", "SYT Match", "Word",
+static char *clock_src_descs[] = {"Internal", "SYT Match", "Word",
 				     "S/PDIF", "ADAT1", "ADAT2"};
 static int
 control_clock_source_info(struct snd_kcontrol *kctl,
@@ -374,7 +374,7 @@ control_clock_source_info(struct snd_kcontrol *kctl,
 
 	/* skip unsupported clock source */
 	einf->value.enumerated.items = 0;
-	for (i = 0; i < ARRAY_SIZE(clock_source_descs); i += 1) {
+	for (i = 0; i < ARRAY_SIZE(clock_src_descs); i += 1) {
 		if ((1 << i) & efw->supported_clock_source)
 			einf->value.enumerated.items += 1;
 	}
@@ -387,7 +387,7 @@ control_clock_source_info(struct snd_kcontrol *kctl,
 
 	/* skip unsupported clock source */
 	value = einf->value.enumerated.item;
-	for (i = 0; i < ARRAY_SIZE(clock_source_descs); i += 1) {
+	for (i = 0; i < ARRAY_SIZE(clock_src_descs); i += 1) {
 		if (!((1 << i) & efw->supported_clock_source))
 			continue;
 		else if (value == 0)
@@ -396,9 +396,9 @@ control_clock_source_info(struct snd_kcontrol *kctl,
 			value -= 1;
 	}
 
-	strcpy(einf->value.enumerated.name, clock_source_descs[i]);
+	strcpy(einf->value.enumerated.name, clock_src_descs[i]);
 
-        return 0;
+	return 0;
 }
 static int
 control_clock_source_get(struct snd_kcontrol *kctl,
@@ -416,7 +416,7 @@ control_clock_source_get(struct snd_kcontrol *kctl,
 		goto end;
 
 	/* check clock source */
-	if ((clock_source < 0) && (ARRAY_SIZE(clock_source_descs) < clock_source))
+	if ((clock_source < 0) && (ARRAY_SIZE(clock_src_descs) < clock_source))
 		goto end;
 
 	/* generate user value */
@@ -440,7 +440,7 @@ control_clock_source_put(struct snd_kcontrol *kctl,
 
 	/* get index from user value */
 	value = uval->value.enumerated.item[0];
-	for (index = 0; index < ARRAY_SIZE(clock_source_descs); index += 1) {
+	for (index = 0; index < ARRAY_SIZE(clock_src_descs); index += 1) {
 		/* not supported */
 		if (!((1 << index) & efw->supported_clock_source))
 			continue;
@@ -460,8 +460,7 @@ end:
 	return changed;
 }
 
-static struct snd_kcontrol_new global_clock_source_control =
-{
+static struct snd_kcontrol_new global_clock_source_control = {
 	.name	= "Clock Source",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
@@ -470,8 +469,7 @@ static struct snd_kcontrol_new global_clock_source_control =
 	.put	= control_clock_source_put
 };
 
-static struct snd_kcontrol_new global_sampling_rate_control =
-{
+static struct snd_kcontrol_new global_sampling_rate_control = {
 	.name	= "Sampling Rate",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
@@ -480,8 +478,7 @@ static struct snd_kcontrol_new global_sampling_rate_control =
 	.put	= control_sampling_rate_put
 };
 
-static struct snd_kcontrol_new global_digital_interface_control =
-{
+static struct snd_kcontrol_new global_digital_interface_control = {
 	.name	= "Digital Mode",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
@@ -490,8 +487,7 @@ static struct snd_kcontrol_new global_digital_interface_control =
 	.put	= control_digital_interface_put
 };
 
-static struct snd_kcontrol_new global_iec60958_format_control =
-{
+static struct snd_kcontrol_new global_iec60958_format_control = {
 	.name	= "S/PDIF Format",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
 	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,

@@ -66,7 +66,7 @@ enum snd_efw_channel_type {
 struct snd_efw_phys_group {
 	u8 type;	/* enum snd_efw_channel_type */
 	u8 count;
-} __attribute__((packed));
+} __packed;
 
 struct snd_efw {
 	struct snd_card *card;
@@ -155,7 +155,7 @@ struct snd_efw_hwinfo {
 	u32 nb_1394_playback_channels_4x;
 	u32 nb_1394_capture_channels_4x;
 	u32 reserved[16];
-} __attribute__((packed));
+} __packed;
 
 /* for hardware metering */
 struct snd_efw_phys_meters {
@@ -169,7 +169,7 @@ struct snd_efw_phys_meters {
 	u32 reserved2;
 	u32 reserved3;
 	u32 values[0];
-} __attribute__((packed));
+} __packed;
 
 /* clock source parameters */
 enum snd_efw_clock_source {

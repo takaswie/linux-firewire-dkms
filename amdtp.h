@@ -35,9 +35,9 @@ enum cip_sfc {
 /*
  * This module support maximum 8 MIDI streams
  * This is not in MMA/AMEI RP-027 but for our convinience.
- * Then AMDTP packets include maximum 1 quadlets in each data blocks.
+ * Then AMDTP packets include maximum 2 quadlets in each data blocks.
  */
-#define AMDTP_MAX_MIDI_STREAMS 8
+#define AMDTP_MAX_MIDI_STREAMS 16
 
 struct fw_unit;
 struct fw_iso_context;
@@ -103,10 +103,10 @@ void amdtp_stream_pcm_prepare(struct amdtp_stream *s);
 unsigned long amdtp_stream_pcm_pointer(struct amdtp_stream *s);
 void amdtp_stream_pcm_abort(struct amdtp_stream *s);
 
-void amdtp_stream_midi_register(struct amdtp_stream *s,
-				struct snd_rawmidi_substream *substream);
-void amdtp_stream_midi_unregister(struct amdtp_stream *s,
-				  struct snd_rawmidi_substream *substream);
+void amdtp_stream_midi_insert(struct amdtp_stream *s,
+			      struct snd_rawmidi_substream *substream);
+void amdtp_stream_midi_extract(struct amdtp_stream *s,
+			       struct snd_rawmidi_substream *substream);
 bool amdtp_stream_midi_running(struct amdtp_stream *s);
 
 /**
@@ -144,7 +144,7 @@ static inline void amdtp_stream_set_midi(struct amdtp_stream *s,
  */
 static inline bool amdtp_stream_running(struct amdtp_stream *s)
 {
-        return !IS_ERR(s->context);
+	return !IS_ERR(s->context);
 }
 
 /**
@@ -161,7 +161,7 @@ static inline bool amdtp_streaming_error(struct amdtp_stream *s)
 
 /**
  * amdtp_stream_pcm_running - check PCM stream is running or not
- * @s: the AMDTP
+ * @s: the AMDTP stream
  *
  * If this function returns true, PCM stream in the stream is running.
  */

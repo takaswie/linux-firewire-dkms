@@ -1,7 +1,7 @@
 /*
  * Audio and Music Data Transmission Protocol (IEC 61883-6) streams
  * with Common Isochronous Packet (IEC 61883-1) headers and MIDI comformant
- * data (MMA/AMEI RP-027).
+ * data according to MMA/AMEI RP-027.
  *
  * Copyright (c) Clemens Ladisch <clemens@ladisch.de>
  * Licensed under the terms of the GNU General Public License, version 2.
@@ -160,7 +160,6 @@ static void amdtp_write_s16(struct amdtp_stream *s,
 static void amdtp_write_s32(struct amdtp_stream *s,
 			    struct snd_pcm_substream *pcm,
 			    __be32 *buffer, unsigned int frames);
-
 static void amdtp_read_s16(struct amdtp_stream *s,
 			   struct snd_pcm_substream *pcm,
 			   __be32 *buffer, unsigned int frames);
@@ -419,8 +418,8 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 	/*
 	 * This module can't support "negotiation procedure" in
 	 * MMA/AMEI RP-027. Then a maximum data rate is 3,125 bytes per second
-	 * with 1 byte label. This table is for the restriction. With this
-	 * table, the maximum data rate is between 2,756 to 3,000 bytes per
+	 * without 1 byte label. This table is for the restriction. With this
+	 * table, the maximum data rate is between 2,000 to 3,000 bytes per
 	 * second.
 	 */
 	static const int block_interval[] = {
@@ -628,12 +627,10 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 		 * block quadlets but the actual value differs depending on
 		 * current sampling rate. This is a workaround for Fireworks.
 		 */
-		if ((data_quadlets - 2) % data_block_quadlets > 0) {
-			s->data_block_quadlets = s->pcm_channels;
-			if (s->midi_ports)
-				s->data_block_quadlets +=
+		if ((data_quadlets - 2) % data_block_quadlets > 0)
+			s->data_block_quadlets = s->pcm_channels +
 					DIV_ROUND_UP(s->midi_ports, 8);
-		} else
+		else
 			s->data_block_quadlets = data_block_quadlets;
 
 		/* finish to check CIP header */
@@ -965,24 +962,44 @@ void amdtp_stream_pcm_abort(struct amdtp_stream *s)
 }
 EXPORT_SYMBOL(amdtp_stream_pcm_abort);
 
-void
-amdtp_stream_midi_register(struct amdtp_stream *s,
-			   struct snd_rawmidi_substream *substream)
+/**
+ * amdtp_stream_midi_insert - add MIDI stream
+ * @s: the AMDTP stream
+ * @substream: the MIDI stream to be added
+ *
+ * This function don't check the number of midi substream but it should be
+ * within AMDTP_MAX_MIDI_STREAMS.
+ */
+void amdtp_stream_midi_insert(struct amdtp_stream *s,
+			      struct snd_rawmidi_substream *substream)
 {
 	ACCESS_ONCE(s->midi[substream->number]) = substream;
 }
-EXPORT_SYMBOL(amdtp_stream_midi_register);
+EXPORT_SYMBOL(amdtp_stream_midi_insert);
 
-void
-amdtp_stream_midi_unregister(struct amdtp_stream *s,
-			     struct snd_rawmidi_substream *substream)
+/**
+ * amdtp_stream_midi_extract - remove MIDI stream
+ * @s: the AMDTP stream
+ * @substream: the MIDI stream to be removed
+ *
+ * This function should not be automatically called by amdtp_stream_stop
+ * because the AMDTP stream only with MIDI stream need to be restarted by
+ * PCM streams at requested sampling rate.
+ */
+void amdtp_stream_midi_extract(struct amdtp_stream *s,
+			       struct snd_rawmidi_substream *substream)
 {
 	ACCESS_ONCE(s->midi[substream->number]) = NULL;
 }
-EXPORT_SYMBOL(amdtp_stream_midi_unregister);
+EXPORT_SYMBOL(amdtp_stream_midi_extract);
 
-bool
-amdtp_stream_midi_running(struct amdtp_stream *s)
+/**
+ * amdtp_stream_midi_running - check any MIDI streams are running or not
+ * @s: the AMDTP stream
+ *
+ * If this function returns true, any MIDI streams are running.
+ */
+bool amdtp_stream_midi_running(struct amdtp_stream *s)
 {
 	int i;
 	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1) {

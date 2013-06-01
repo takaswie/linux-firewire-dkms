@@ -87,7 +87,8 @@ get_hardware_info(struct snd_efw *efw)
 
 	/* for input physical metering */
 	if (hwinfo->nb_out_groups > 0) {
-		size = sizeof(struct snd_efw_phys_group) * hwinfo->nb_out_groups;
+		size = sizeof(struct snd_efw_phys_group) *
+						hwinfo->nb_out_groups;
 		efw->output_groups = kzalloc(size, GFP_KERNEL);
 		if (efw->output_groups == NULL) {
 			err = -ENOMEM;
@@ -96,14 +97,17 @@ get_hardware_info(struct snd_efw *efw)
 
 		efw->output_group_counts = hwinfo->nb_out_groups;
 		for (i = 0; i < efw->output_group_counts; i += 1) {
-			efw->output_groups[i].type  = hwinfo->out_groups[i].type;
-			efw->output_groups[i].count = hwinfo->out_groups[i].count;
+			efw->output_groups[i].type  =
+						hwinfo->out_groups[i].type;
+			efw->output_groups[i].count =
+						hwinfo->out_groups[i].count;
 		}
 	}
 
 	/* for output physical metering */
 	if (hwinfo->nb_in_groups > 0) {
-		size = sizeof(struct snd_efw_phys_group) * hwinfo->nb_in_groups;
+		size = sizeof(struct snd_efw_phys_group) *
+						hwinfo->nb_in_groups;
 		efw->input_groups = kzalloc(size, GFP_KERNEL);
 		if (efw->input_groups == NULL) {
 			err = -ENOMEM;
@@ -112,8 +116,10 @@ get_hardware_info(struct snd_efw *efw)
 
 		efw->input_group_counts = hwinfo->nb_out_groups;
 		for (i = 0; i < efw->input_group_counts; i += 1) {
-			efw->input_groups[i].type  = hwinfo->in_groups[i].type;
-			efw->input_groups[i].count = hwinfo->in_groups[i].count;
+			efw->input_groups[i].type =
+						hwinfo->in_groups[i].type;
+			efw->input_groups[i].count =
+						hwinfo->in_groups[i].count;
 		}
 	}
 

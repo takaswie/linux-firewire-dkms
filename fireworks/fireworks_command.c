@@ -236,7 +236,7 @@ efc_over_avc(struct snd_efw *efw, unsigned int category,
 
 	/* fill AV/C fields */
 	cmdbuf[0] =	(avc_fields.cts << 28) |
-		    	(avc_fields.ctype << 24) |
+			(avc_fields.ctype << 24) |
 			(avc_fields.subunit_type << 19) |
 			(avc_fields.subunit_id << 16) |
 			(avc_fields.opcode << 8) |
@@ -297,8 +297,9 @@ efc_over_avc(struct snd_efw *efw, unsigned int category,
 	    (avc_fields.opcode != AVC_OPCODE) ||
 	    (avc_fields.company_id != AVC_COMPANY_ID)) {
 		snd_printk(KERN_INFO "AV/C Failed: 0x%X 0x%X 0x%X 0x%X 0x%X, 0x%X\n",
-			avc_fields.cts, avc_fields.ctype, avc_fields.subunit_type,
-			avc_fields.subunit_id, avc_fields.opcode, avc_fields.company_id);
+			avc_fields.cts, avc_fields.ctype,
+			avc_fields.subunit_type, avc_fields.subunit_id,
+			avc_fields.opcode, avc_fields.company_id);
 		err = -EIO;
 		goto end;
 	}

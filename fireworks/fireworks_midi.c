@@ -61,7 +61,7 @@ midi_open(struct snd_rawmidi_substream *substream)
 	run = stream->midi_triggered;
 
 	/* register pointer */
-	amdtp_stream_midi_register(stream, substream);
+	amdtp_stream_midi_insert(stream, substream);
 
 	/* the other MIDI streams running */
 	if (run > 0) {
@@ -109,7 +109,7 @@ midi_close(struct snd_rawmidi_substream *substream)
 		stream = &efw->transmit_stream;
 
 	/* unregister pointer */
-	amdtp_stream_midi_unregister(stream, substream);
+	amdtp_stream_midi_extract(stream, substream);
 
 	/* the other streams is running */
 	if (amdtp_stream_midi_running(stream) > 0)
@@ -209,7 +209,8 @@ int snd_efw_create_midi_devices(struct snd_efw *efw)
 		str = &rmidi->streams[SNDRV_RAWMIDI_STREAM_INPUT];
 
 		set_midi_substream_names(efw, str);
-		amdtp_stream_set_midi(&efw->receive_stream, efw->midi_input_ports);
+		amdtp_stream_set_midi(&efw->receive_stream,
+				      efw->midi_input_ports);
 	}
 
 	if (efw->midi_output_ports > 0) {
@@ -224,7 +225,8 @@ int snd_efw_create_midi_devices(struct snd_efw *efw)
 			efw->transmit_stream.midi[subs->number] = subs;
 
 		set_midi_substream_names(efw, str);
-		amdtp_stream_set_midi(&efw->transmit_stream, efw->midi_output_ports);
+		amdtp_stream_set_midi(&efw->transmit_stream,
+				      efw->midi_output_ports);
 	}
 
 	if ((efw->midi_output_ports > 0) && (efw->midi_input_ports > 0))

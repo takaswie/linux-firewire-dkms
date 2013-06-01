@@ -26,7 +26,7 @@ proc_read_hwinfo(struct snd_info_entry *entry, struct snd_info_buffer *buffer)
 	unsigned short i;
 	struct snd_efw_hwinfo hwinfo;
 
-	if(snd_efw_command_get_hwinfo(efw, &hwinfo) < 0)
+	if (snd_efw_command_get_hwinfo(efw, &hwinfo) < 0)
 		goto end;
 
 	snd_iprintf(buffer, "guid_hi: 0x%X\n", hwinfo.guid_hi);
@@ -44,35 +44,48 @@ proc_read_hwinfo(struct snd_info_entry *entry, struct snd_info_buffer *buffer)
 
 	snd_iprintf(buffer, "max_sample_rate: 0x%X\n", hwinfo.max_sample_rate);
 	snd_iprintf(buffer, "min_sample_rate: 0x%X\n", hwinfo.min_sample_rate);
-	snd_iprintf(buffer, "supported_clock: 0x%X\n", hwinfo.supported_clocks);
+	snd_iprintf(buffer, "supported_clock: 0x%X\n",
+		    hwinfo.supported_clocks);
 
-	snd_iprintf(buffer, "nb_phys_audio_out: 0x%X\n", hwinfo.nb_phys_audio_out);
-	snd_iprintf(buffer, "nb_phys_audio_in: 0x%X\n", hwinfo.nb_phys_audio_in);
+	snd_iprintf(buffer, "nb_phys_audio_out: 0x%X\n",
+		    hwinfo.nb_phys_audio_out);
+	snd_iprintf(buffer, "nb_phys_audio_in: 0x%X\n",
+		    hwinfo.nb_phys_audio_in);
 
 	snd_iprintf(buffer, "nb_in_groups: 0x%X\n", hwinfo.nb_in_groups);
 	for (i = 0; i < hwinfo.nb_in_groups; i += 1) {
 		snd_iprintf(buffer, "in_group[0x%d]: type 0x%d, count 0x%d\n",
-			i, hwinfo.out_groups[i].type, hwinfo.out_groups[i].count);
+			    i, hwinfo.out_groups[i].type,
+			    hwinfo.out_groups[i].count);
 	}
 
 	snd_iprintf(buffer, "nb_out_groups: 0x%X\n", hwinfo.nb_out_groups);
 	for (i = 0; i < hwinfo.nb_out_groups; i += 1) {
 		snd_iprintf(buffer, "out_group[0x%d]: type 0x%d, count 0x%d\n",
-			i, hwinfo.out_groups[i].type, hwinfo.out_groups[i].count);
+			    i, hwinfo.out_groups[i].type,
+			    hwinfo.out_groups[i].count);
 	}
 
-	snd_iprintf(buffer, "nb_1394_playback_channels: 0x%X\n", hwinfo.nb_1394_playback_channels);
-	snd_iprintf(buffer, "nb_1394_capture_channels: 0x%X\n", hwinfo.nb_1394_capture_channels);
-	snd_iprintf(buffer, "nb_1394_playback_channels_2x: 0x%X\n", hwinfo.nb_1394_playback_channels_2x);
-	snd_iprintf(buffer, "nb_1394_capture_channels_2x: 0x%X\n", hwinfo.nb_1394_capture_channels_2x);
-	snd_iprintf(buffer, "nb_1394_playback_channels_4x: 0x%X\n", hwinfo.nb_1394_playback_channels_4x);
-	snd_iprintf(buffer, "nb_1394_capture_channels_4x: 0x%X\n", hwinfo.nb_1394_capture_channels_4x);
+	snd_iprintf(buffer, "nb_1394_playback_channels: 0x%X\n",
+		    hwinfo.nb_1394_playback_channels);
+	snd_iprintf(buffer, "nb_1394_capture_channels: 0x%X\n",
+		    hwinfo.nb_1394_capture_channels);
+	snd_iprintf(buffer, "nb_1394_playback_channels_2x: 0x%X\n",
+		    hwinfo.nb_1394_playback_channels_2x);
+	snd_iprintf(buffer, "nb_1394_capture_channels_2x: 0x%X\n",
+		    hwinfo.nb_1394_capture_channels_2x);
+	snd_iprintf(buffer, "nb_1394_playback_channels_4x: 0x%X\n",
+		    hwinfo.nb_1394_playback_channels_4x);
+	snd_iprintf(buffer, "nb_1394_capture_channels_4x: 0x%X\n",
+		    hwinfo.nb_1394_capture_channels_4x);
 
 	snd_iprintf(buffer, "nb_midi_out: 0x%X\n", hwinfo.nb_midi_out);
 	snd_iprintf(buffer, "nb_midi_in: 0x%X\n", hwinfo.nb_midi_in);
 
-	snd_iprintf(buffer, "mixer_playback_channels: 0x%X\n", hwinfo.mixer_playback_channels);
-	snd_iprintf(buffer, "mixer_capture_channels: 0x%X\n", hwinfo.mixer_capture_channels);
+	snd_iprintf(buffer, "mixer_playback_channels: 0x%X\n",
+		    hwinfo.mixer_playback_channels);
+	snd_iprintf(buffer, "mixer_capture_channels: 0x%X\n",
+		    hwinfo.mixer_capture_channels);
 
 end:
 	return;
@@ -160,11 +173,11 @@ void snd_efw_proc_init(struct snd_efw *efw)
 {
 	struct snd_info_entry *entry;
 
-	if(!snd_card_proc_new(efw->card, "#hardware", &entry))
+	if (!snd_card_proc_new(efw->card, "#hardware", &entry))
 		snd_info_set_text_ops(entry, efw, proc_read_hwinfo);
-	if(!snd_card_proc_new(efw->card, "#clock", &entry))
+	if (!snd_card_proc_new(efw->card, "#clock", &entry))
 		snd_info_set_text_ops(entry, efw, proc_read_clock);
-	if(!snd_card_proc_new(efw->card, "#meters", &entry))
+	if (!snd_card_proc_new(efw->card, "#meters", &entry))
 		snd_info_set_text_ops(entry, efw, proc_read_phys_meters);
 	return;
 }
