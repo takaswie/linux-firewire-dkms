@@ -137,6 +137,17 @@ static inline void amdtp_stream_set_midi(struct amdtp_stream *s,
 }
 
 /**
+ * amdtp_stream_running - check stream is running or not
+ * @s: the AMDTP stream
+ *
+ * If this function returns true, the stream is running.
+ */
+static inline bool amdtp_stream_running(struct amdtp_stream *s)
+{
+        return !IS_ERR(s->context);
+}
+
+/**
  * amdtp_streaming_error - check for streaming error
  * @s: the AMDTP stream
  *
@@ -146,6 +157,17 @@ static inline void amdtp_stream_set_midi(struct amdtp_stream *s,
 static inline bool amdtp_streaming_error(struct amdtp_stream *s)
 {
 	return s->packet_index < 0;
+}
+
+/**
+ * amdtp_stream_pcm_running - check PCM stream is running or not
+ * @s: the AMDTP
+ *
+ * If this function returns true, PCM stream in the stream is running.
+ */
+static inline bool amdtp_stream_pcm_running(struct amdtp_stream *s)
+{
+	return !IS_ERR_OR_NULL(s->pcm);
 }
 
 /**

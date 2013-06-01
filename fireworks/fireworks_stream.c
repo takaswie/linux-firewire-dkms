@@ -54,7 +54,7 @@ int snd_efw_stream_start(struct snd_efw *efw, struct amdtp_stream *stream)
 	int err = 0;
 
 	/* already running */
-	if (!IS_ERR(stream->context))
+	if (amdtp_stream_running(stream))
 		goto end;
 
 	if (stream == &efw->receive_stream)
@@ -81,7 +81,7 @@ end:
 
 void snd_efw_stream_stop(struct snd_efw *efw, struct amdtp_stream *stream)
 {
-	if (!!IS_ERR(stream->context))
+	if (!amdtp_stream_running(stream))
 		goto end;
 
 	amdtp_stream_stop(stream);

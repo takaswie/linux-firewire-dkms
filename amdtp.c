@@ -54,6 +54,8 @@ static void pcm_period_tasklet(unsigned long data);
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 		enum amdtp_stream_direction direction, enum cip_flags flags)
 {
+	int i;
+
 	if (flags != CIP_NONBLOCKING)
 		return -EINVAL;
 
@@ -65,6 +67,10 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	tasklet_init(&s->period_tasklet, pcm_period_tasklet, (unsigned long)s);
 	s->packet_index = 0;
 
+	s->pcm = NULL;
+	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1)
+		s->midi[i] = NULL;
+
 	return 0;
 }
 EXPORT_SYMBOL(amdtp_stream_init);
@@ -75,7 +81,7 @@ EXPORT_SYMBOL(amdtp_stream_init);
  */
 void amdtp_stream_destroy(struct amdtp_stream *s)
 {
-	WARN_ON(!IS_ERR(s->context));
+	WARN_ON(amdtp_stream_running(s));
 	mutex_destroy(&s->mutex);
 	fw_unit_put(s->unit);
 }
@@ -105,7 +111,7 @@ void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate)
 	};
 	unsigned int sfc;
 
-	if (WARN_ON(!IS_ERR(s->context)))
+	if (WARN_ON(amdtp_stream_running(s)))
 		return;
 
 	for (sfc = 0; sfc < ARRAY_SIZE(rate_info); ++sfc)
@@ -173,7 +179,7 @@ static void amdtp_read_s32(struct amdtp_stream *s,
 void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
 				 snd_pcm_format_t format)
 {
-	if (WARN_ON(!IS_ERR(s->context)))
+	if (WARN_ON(amdtp_stream_running(s)))
 		return;
 
 	switch (format) {
@@ -806,7 +812,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 
 	mutex_lock(&s->mutex);
 
-	if (WARN_ON(!IS_ERR(s->context) ||
+	if (WARN_ON(amdtp_stream_running(s) ||
 		    (!s->pcm_channels && !s->midi_ports))) {
 		err = -EBADFD;
 		goto err_unlock;
@@ -841,7 +847,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 					FW_ISO_CONTEXT_TRANSMIT,
 					channel, speed, 4,
 					out_packet_callback, s);
-	if (IS_ERR(s->context)) {
+	if (!amdtp_stream_running(s)) {
 		err = PTR_ERR(s->context);
 		if (err == -EBUSY)
 			dev_err(&s->unit->device,
@@ -923,7 +929,7 @@ void amdtp_stream_stop(struct amdtp_stream *s)
 {
 	mutex_lock(&s->mutex);
 
-	if (IS_ERR(s->context)) {
+	if (!amdtp_stream_running(s)) {
 		mutex_unlock(&s->mutex);
 		return;
 	}
@@ -980,7 +986,7 @@ amdtp_stream_midi_running(struct amdtp_stream *s)
 {
 	int i;
 	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1) {
-		if (s->midi[i] != NULL)
+		if (!IS_ERR_OR_NULL(s->midi[i]))
 			return true;
 	}
 

@@ -295,10 +295,10 @@ pcm_open(struct snd_pcm_substream *substream)
 	 * The same sampling rate must be used for transmit and receive stream
 	 * as long as the streams include PCM samples
 	 */
-	if ((!IS_ERR(efw->receive_stream.context) &&
-				efw->receive_stream.pcm) ||
-	    (!IS_ERR(efw->transmit_stream.context) &&
-				efw->transmit_stream.pcm)) {
+	if ((amdtp_stream_running(&efw->receive_stream) &&
+	     amdtp_stream_pcm_running(&efw->receive_stream)) ||
+	    (amdtp_stream_running(&efw->transmit_stream) &&
+	     amdtp_stream_pcm_running(&efw->transmit_stream))) {
 		err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
 		if (err < 0)
 			goto end;
@@ -346,16 +346,18 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	/* stop stream if it's just for MIDI streams */
-	if (!IS_ERR(stream->context) && !stream->pcm &&
+	if (amdtp_stream_running(stream) &&
+	    !amdtp_stream_pcm_running(stream) &&
 	    amdtp_stream_midi_running(stream))
 		snd_efw_stream_stop(efw, stream);
-	if (!IS_ERR(opposite->context) && !opposite->pcm &&
-	    amdtp_stream_midi_running(opposite)) {
+	if (amdtp_stream_running(opposite) &&
+	    !amdtp_stream_pcm_running(opposite) &&
+	    amdtp_stream_midi_running(opposite))
 		snd_efw_stream_stop(efw, opposite);
-	}
 
 	/* set sampling rate if both streams are not running */
-	if (!!IS_ERR(stream->context) || !!IS_ERR(opposite->context)) {
+	if (!amdtp_stream_running(stream) ||
+	    !amdtp_stream_running(opposite)) {
 		err = snd_efw_command_set_sampling_rate(efw,
 					params_rate(hw_params));
 		if (err < 0)

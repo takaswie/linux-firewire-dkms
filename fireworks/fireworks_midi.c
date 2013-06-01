@@ -69,13 +69,13 @@ midi_open(struct snd_rawmidi_substream *substream)
 		goto end;
 	}
 	/* PCM stream starts the stream */
-	else if (!IS_ERR(stream->context)) {
+	else if (amdtp_stream_running(stream)) {
 		err = 0;
 		goto end;
 	}
 
 	/* opposite stream is running then use the same sampling rate */
-	if (!IS_ERR(opposite->context))
+	if (amdtp_stream_running(opposite))
 		err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
 	else {
 		err = snd_efw_command_set_sampling_rate(efw, sampling_rate);
@@ -177,8 +177,7 @@ set_midi_substream_names(struct snd_efw *efw,
 			"%s MIDI %d", efw->card->shortname, subs->number + 1);
 }
 
-int
-snd_efw_create_midi_devices(struct snd_efw *efw)
+int snd_efw_create_midi_devices(struct snd_efw *efw)
 {
 	struct snd_rawmidi *rmidi;
 	struct snd_rawmidi_str *str;
