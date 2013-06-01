@@ -110,8 +110,8 @@ struct snd_efw {
 	unsigned int midi_output_ports;
 
 	/* PCM parameters */
-	unsigned int pcm_capture_channels_sets[SND_EFW_MUITIPLIER_MODES];
-	unsigned int pcm_playback_channels_sets[SND_EFW_MUITIPLIER_MODES];
+	unsigned int pcm_capture_channels[SND_EFW_MUITIPLIER_MODES];
+	unsigned int pcm_playback_channels[SND_EFW_MUITIPLIER_MODES];
 
 	/* notification to control components */
 	struct snd_ctl_elem_id *control_id_sampling_rate;

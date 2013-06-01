@@ -43,17 +43,17 @@ midi_open(struct snd_rawmidi_substream *substream)
 	struct snd_efw *efw = substream->rmidi->private_data;
 	struct amdtp_stream *stream;
 	struct amdtp_stream *opposite;
-	int *pcm_channels_sets;
+	int *pcm_channels;
 	int run, mode, sampling_rate = 48000;
 	int err;
 
 	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT) {
 		stream = &efw->receive_stream;
-		pcm_channels_sets = efw->pcm_capture_channels_sets;
+		pcm_channels = efw->pcm_capture_channels;
 		opposite = &efw->transmit_stream;
 	} else {
 		stream = &efw->transmit_stream;
-		pcm_channels_sets = efw->pcm_playback_channels_sets;
+		pcm_channels = efw->pcm_playback_channels;
 		opposite = &efw->receive_stream;
 	}
 
@@ -86,7 +86,7 @@ midi_open(struct snd_rawmidi_substream *substream)
 		goto end;
 	mode = snd_efw_get_multiplier_mode(sampling_rate);
 	amdtp_stream_set_rate(stream, sampling_rate);
-	amdtp_stream_set_pcm(stream, pcm_channels_sets[mode]);
+	amdtp_stream_set_pcm(stream, pcm_channels[mode]);
 
 	/* start stream just for MIDI */
 	err = snd_efw_stream_start(efw, stream);

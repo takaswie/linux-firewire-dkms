@@ -122,12 +122,12 @@ get_hardware_info(struct snd_efw *efw)
 	efw->mixer_input_channels = hwinfo->mixer_capture_channels;
 
 	/* fill channels sets */
-	efw->pcm_capture_channels_sets[0] = hwinfo->nb_1394_capture_channels;
-	efw->pcm_capture_channels_sets[1] = hwinfo->nb_1394_capture_channels_2x;
-	efw->pcm_capture_channels_sets[2] = hwinfo->nb_1394_capture_channels_4x;
-	efw->pcm_playback_channels_sets[0] = hwinfo->nb_1394_playback_channels;
-	efw->pcm_playback_channels_sets[1] = hwinfo->nb_1394_playback_channels_2x;
-	efw->pcm_playback_channels_sets[2] = hwinfo->nb_1394_playback_channels_4x;
+	efw->pcm_capture_channels[0] = hwinfo->nb_1394_capture_channels;
+	efw->pcm_capture_channels[1] = hwinfo->nb_1394_capture_channels_2x;
+	efw->pcm_capture_channels[2] = hwinfo->nb_1394_capture_channels_4x;
+	efw->pcm_playback_channels[0] = hwinfo->nb_1394_playback_channels;
+	efw->pcm_playback_channels[1] = hwinfo->nb_1394_playback_channels_2x;
+	efw->pcm_playback_channels[2] = hwinfo->nb_1394_playback_channels_4x;
 
 	/* firmware version */
 	err = sprintf(version, "%u.%u",

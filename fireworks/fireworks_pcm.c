@@ -22,9 +22,9 @@
  * NOTE:
  * Fireworks changes its PCM channels according to its sampling rate.
  * There are three modes. Here "capture" or "playback" is appplied to XXX.
- *  0:  32.0- 48.0 kHz then nb_1394_XXX_channels    applied
- *  1:  88.2- 96.0 kHz then nb_1394_XXX_channels_2x applied
- *  2: 176.4-192.0 kHz then nb_1394_XXX_channels_4x applied
+ *  0:  32.0- 48.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels    applied
+ *  1:  88.2- 96.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels_2x applied
+ *  2: 176.4-192.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels_4x applied
  *
  * Then the number of PCM channels for analog input and output are always fixed
  * but the number of PCM channels for digital input and output are differed.
@@ -71,7 +71,7 @@ int snd_efw_get_multiplier_mode(int sampling_rate)
 
 static int
 hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
-			struct snd_efw *efw, unsigned int *channels_sets)
+			struct snd_efw *efw, unsigned int *channels)
 {
 	struct snd_interval *r =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
@@ -90,7 +90,7 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 			continue;
 
 		mode = get_multiplier_mode_with_index(i);
-		if (!snd_interval_test(c, channels_sets[mode]))
+		if (!snd_interval_test(c, channels[mode]))
 			continue;
 
 		t.min = min(t.min, freq_table[i]);
@@ -103,7 +103,7 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 
 static int
 hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
-			struct snd_efw *efw, unsigned int *channels_sets)
+			struct snd_efw *efw, unsigned int *channels)
 {
 	struct snd_interval *c =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
@@ -126,8 +126,8 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 		if (!snd_interval_test(r, freq_table[i]))
 			continue;
 
-		t.min = min(t.min, channels_sets[mode]);
-		t.max = max(t.max, channels_sets[mode]);
+		t.min = min(t.min, channels[mode]);
+		t.max = max(t.max, channels[mode]);
 
 	}
 
@@ -140,7 +140,7 @@ hw_rule_capture_rate(struct snd_pcm_hw_params *params,
 {
 	struct snd_efw *efw = rule->private;
 	return hw_rule_rate(params, rule, efw,
-				efw->pcm_capture_channels_sets);
+				efw->pcm_capture_channels);
 }
 
 static inline int
@@ -149,7 +149,7 @@ hw_rule_playback_rate(struct snd_pcm_hw_params *params,
 {
 	struct snd_efw *efw = rule->private;
 	return hw_rule_rate(params, rule, efw,
-				efw->pcm_playback_channels_sets);
+				efw->pcm_playback_channels);
 }
 
 static inline int
@@ -158,7 +158,7 @@ hw_rule_capture_channels(struct snd_pcm_hw_params *params,
 {
 	struct snd_efw *efw = rule->private;
 	return hw_rule_channels(params, rule, efw,
-				efw->pcm_capture_channels_sets);
+				efw->pcm_capture_channels);
 }
 
 static inline int
@@ -167,14 +167,14 @@ hw_rule_playback_channels(struct snd_pcm_hw_params *params,
 {
 	struct snd_efw *efw = rule->private;
 	return hw_rule_channels(params, rule, efw,
-				efw->pcm_playback_channels_sets);
+				efw->pcm_playback_channels);
 }
 
 static int
 pcm_init_hw_params(struct snd_efw *efw,
 			struct snd_pcm_substream *substream)
 {
-	unsigned int *pcm_channels_sets;
+	unsigned int *pcm_channels;
 	unsigned int rate_bit;
 	int mode, i;
 	int err;
@@ -217,7 +217,7 @@ pcm_init_hw_params(struct snd_efw *efw,
 				SNDRV_PCM_HW_PARAM_RATE,
 				hw_rule_capture_rate, efw,
 				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
-		pcm_channels_sets = efw->pcm_capture_channels_sets;
+		pcm_channels = efw->pcm_capture_channels;
 	} else {
 		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
 		snd_pcm_hw_rule_add(substream->runtime, 0,
@@ -228,7 +228,7 @@ pcm_init_hw_params(struct snd_efw *efw,
 				SNDRV_PCM_HW_PARAM_RATE,
 				hw_rule_playback_rate, efw,
 				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
-		pcm_channels_sets = efw->pcm_playback_channels_sets;
+		pcm_channels = efw->pcm_playback_channels;
 	}
 
 	/* preparing min/max sampling rate */
@@ -242,14 +242,14 @@ pcm_init_hw_params(struct snd_efw *efw,
 			continue;
 
 		mode = get_multiplier_mode_with_index(i);
-		if (pcm_channels_sets[mode] == 0)
+		if (pcm_channels[mode] == 0)
 			continue;
 		substream->runtime->hw.channels_min =
 			min(substream->runtime->hw.channels_min,
-				pcm_channels_sets[mode]);
+				pcm_channels[mode]);
 		substream->runtime->hw.channels_max =
 			max(substream->runtime->hw.channels_max,
-				pcm_channels_sets[mode]);
+				pcm_channels[mode]);
 	}
 
 	/* AM824 in IEC 61883-6 can deliver 24bit data */
@@ -325,7 +325,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	struct snd_efw *efw = substream->private_data;
 	struct amdtp_stream *stream;
 	struct amdtp_stream *opposite;
-	unsigned int *pcm_channels_sets;
+	unsigned int *pcm_channels;
 	int mode;
 	int err;
 
@@ -338,11 +338,11 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		stream = &efw->receive_stream;
 		opposite = &efw->transmit_stream;
-		pcm_channels_sets = efw->pcm_playback_channels_sets;
+		pcm_channels = efw->pcm_playback_channels;
 	} else {
 		stream = &efw->transmit_stream;
 		opposite = &efw->receive_stream;
-		pcm_channels_sets = efw->pcm_capture_channels_sets;
+		pcm_channels = efw->pcm_capture_channels;
 	}
 
 	/* stop stream if it's just for MIDI streams */
@@ -373,7 +373,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	if (!opposite->pcm && amdtp_stream_midi_running(opposite)) {
 		amdtp_stream_set_rate(opposite, params_rate(hw_params));
 		mode = snd_efw_get_multiplier_mode(params_rate(hw_params));
-		amdtp_stream_set_pcm(opposite, pcm_channels_sets[mode]);
+		amdtp_stream_set_pcm(opposite, pcm_channels[mode]);
 		err = snd_efw_stream_start(efw, opposite);
 	}
 
