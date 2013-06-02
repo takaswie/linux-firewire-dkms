@@ -519,11 +519,11 @@ end:
 void snd_efw_destroy_pcm_devices(struct snd_efw *efw)
 {
 	amdtp_stream_pcm_abort(&efw->receive_stream);
-	amdtp_stream_stop(&efw->receive_stream);
+	snd_efw_stream_stop(efw, &efw->receive_stream);
 	snd_efw_stream_destroy(efw, &efw->receive_stream);
 
 	amdtp_stream_pcm_abort(&efw->transmit_stream);
-	amdtp_stream_stop(&efw->transmit_stream);
+	snd_efw_stream_stop(efw, &efw->transmit_stream);
 	snd_efw_stream_destroy(efw, &efw->transmit_stream);
 
 	return;
