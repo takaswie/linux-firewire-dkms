@@ -227,7 +227,7 @@ snd_efw_update(struct fw_unit *unit)
 	struct snd_card *card = dev_get_drvdata(&unit->device);
 	struct snd_efw *efw = card->private_data;
 
-	fcp_bus_reset(efw->unit);
+	snd_efw_command_bus_reset(efw->unit);
 
 	/* bus reset for isochronous transmit stream */
 	if (cmp_connection_update(&efw->output_connection) < 0) {
@@ -326,6 +326,11 @@ snd_efw_probe(struct device *dev)
 		goto end;
 	}
 
+	/* add command stack */
+	err = snd_efw_command_create();
+	if (err < 0)
+		goto end;
+
 	/* create card */
 	err = snd_card_create(index[card_index], id[card_index],
 				THIS_MODULE, sizeof(struct snd_efw), &card);
@@ -392,6 +397,7 @@ snd_efw_probe(struct device *dev)
 
 error:
 	snd_card_free(card);
+	snd_efw_command_destroy();
 
 end:
 	mutex_unlock(&devices_mutex);
@@ -405,6 +411,7 @@ snd_efw_remove(struct device *dev)
 	struct snd_efw *efw = card->private_data;
 
 	snd_efw_destroy_pcm_devices(efw);
+	snd_efw_command_destroy();
 
 	snd_card_disconnect(card);
 	snd_card_free_when_closed(card);

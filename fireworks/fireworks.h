@@ -44,7 +44,6 @@
 #include "../iso-resources.h"
 #include "../amdtp.h"
 #include "../cmp.h"
-#include "../fcp.h"
 
 #define MAX_MIDI_OUTPUTS 2
 #define MAX_MIDI_INPUTS 2
@@ -196,6 +195,9 @@ enum snd_efw_iec60958_format {
 };
 
 /* Echo Fireworks Command functions */
+int snd_efw_command_create(void);
+void snd_efw_command_bus_reset(struct fw_unit *unit);
+void snd_efw_command_destroy(void);
 int snd_efw_command_identify(struct snd_efw *efw);
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 			       struct snd_efw_hwinfo *hwinfo);
