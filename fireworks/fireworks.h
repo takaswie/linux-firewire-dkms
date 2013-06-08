@@ -77,7 +77,7 @@ struct snd_efw {
 	spinlock_t lock;
 
 	/* for EFC */
-	u32 sequence_number;
+	u32 seqnum;
 
 	/* capabilities */
 	unsigned int supported_sampling_rate;
@@ -195,7 +195,7 @@ enum snd_efw_iec60958_format {
 };
 
 /* Echo Fireworks Command functions */
-int snd_efw_command_create(void);
+int snd_efw_command_create(struct snd_efw *efw);
 void snd_efw_command_bus_reset(struct fw_unit *unit);
 void snd_efw_command_destroy(void);
 int snd_efw_command_identify(struct snd_efw *efw);

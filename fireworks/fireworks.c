@@ -326,11 +326,6 @@ snd_efw_probe(struct device *dev)
 		goto end;
 	}
 
-	/* add command stack */
-	err = snd_efw_command_create();
-	if (err < 0)
-		goto end;
-
 	/* create card */
 	err = snd_card_create(index[card_index], id[card_index],
 				THIS_MODULE, sizeof(struct snd_efw), &card);
@@ -346,6 +341,11 @@ snd_efw_probe(struct device *dev)
 	efw->card_index = -1;
 	mutex_init(&efw->mutex);
 	spin_lock_init(&efw->lock);
+
+	/* add command stack */
+	err = snd_efw_command_create(efw);
+	if (err < 0)
+		goto error;
 
 	/* identifing */
 	err = snd_efw_command_identify(efw);

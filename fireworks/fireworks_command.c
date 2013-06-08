@@ -15,9 +15,8 @@
  * You should have received a copy of the GNU General Public License
  * along with this driver; if not, see <http://www.gnu.org/licenses/>.
  *
- * mostly based on FFADO's souce, which is
- * Copyright (C) 2005-2008 by Pieter Palmers
- *
+ * Mostly based on FFADO's souce, which is licensed under GPL version 2 (and
+ * optionally version 3.
  */
 
 #include "../lib.h"
@@ -45,6 +44,9 @@
  *  response:	0xecc080000000
  *
  * As a result, Echo's Fireworks doesn't need AVC generic command sets.
+ *
+ * NOTE: old FFADO implementaion is EFC over AVC but device with firmware
+ * version 5.5 or later don't use it but support it.
  */
 
 struct efc_fields {
@@ -56,7 +58,8 @@ struct efc_fields {
 	u32 retval;
 	u32 params[0];
 };
-#define EFC_HEADER_QUADLETS 6
+#define EFC_HEADER_QUADLETS	6
+#define EFC_SEQNUM_MAX		(1 << 31)	/* prevent over flow */
 
 /* for clock source and sampling rate */
 struct efc_clock {
@@ -148,6 +151,26 @@ enum efc_retval {
 	EFC_RETVAL_INCOMPLETE		= 0x80000000
 };
 
+static const char *const efc_retval_names[] = {
+	[EFC_RETVAL_OK]			= "OK",
+	[EFC_RETVAL_BAD]		= "bad",
+	[EFC_RETVAL_BAD_COMMAND]	= "bad command",
+	[EFC_RETVAL_COMM_ERR]		= "comm err",
+	[EFC_RETVAL_BAD_QUAD_COUNT]	= "bad quad count",
+	[EFC_RETVAL_UNSUPPORTED]	= "unsupported",
+	[EFC_RETVAL_1394_TIMEOUT]	= "1394 timeout",
+	[EFC_RETVAL_DSP_TIMEOUT]	= "DSP timeout",
+	[EFC_RETVAL_BAD_RATE]		= "bad rate",
+	[EFC_RETVAL_BAD_CLOCK]		= "bad clock",
+	[EFC_RETVAL_BAD_CHANNEL]	= "bad channel",
+	[EFC_RETVAL_BAD_PAN]		= "bad pan",
+	[EFC_RETVAL_FLASH_BUSY]		= "flash busy",
+	[EFC_RETVAL_BAD_MIRROR]		= "bad mirror",
+	[EFC_RETVAL_BAD_LED]		= "bad LED",
+	[EFC_RETVAL_BAD_PARAMETER]	= "bad parameter",
+	[EFC_RETVAL_BAD_PARAMETER + 1]	= "incomplete"
+};
+
 /* for phys_in/phys_out/playback/capture/monitor category commands */
 enum snd_efw_mixer_cmd {
 	SND_EFW_MIXER_SET_GAIN		= 0,
@@ -165,21 +188,21 @@ enum snd_efw_mixer_cmd {
 static int
 efc_transaction_run(struct fw_unit *unit,
 		    const void *command, unsigned int command_size,
-		    void *response, unsigned int response_size,
-		    unsigned int response_match_bytes);
+		    void *response, unsigned int size,
+		    u32 seqnum);
 
 static int
 efc(struct snd_efw *efw, unsigned int category,
-		unsigned int command,
-		const u32 *params, unsigned int param_count,
-		void *response, unsigned int response_quadlets)
+    unsigned int command,
+    const u32 *params, unsigned int param_count,
+    void *response, unsigned int response_quadlets)
 {
 	int err;
 
 	unsigned int cmdbuf_bytes;
 	__be32 *cmdbuf;
 	struct efc_fields *efc_fields;
-	u32 sequence_number;
+	u32 seqnum;
 	unsigned int i;
 
 	/* calculate buffer size*/
@@ -191,19 +214,23 @@ efc(struct snd_efw *efw, unsigned int category,
 	if (cmdbuf == NULL)
 		return -ENOMEM;
 
+	/* to keep consistency of sequence number */
+	spin_lock(&efw->lock);
+	seqnum = efw->seqnum;
+	if (efw->seqnum > EFC_SEQNUM_MAX)
+		efw->seqnum = 0;
+	else
+		efw->seqnum += 2;
+	spin_unlock(&efw->lock);
+
 	/* fill efc fields */
 	efc_fields		= (struct efc_fields *)cmdbuf;
 	efc_fields->length	= EFC_HEADER_QUADLETS + param_count;
 	efc_fields->version	= 1;
+	efc_fields->seqnum	= seqnum;
 	efc_fields->category	= category;
 	efc_fields->command	= command;
 	efc_fields->retval	= 0;
-
-	/* sequence number should keep consistency */
-	spin_lock(&efw->lock);
-	efc_fields->seqnum = efw->sequence_number++;
-	sequence_number = efw->sequence_number;
-	spin_unlock(&efw->lock);
 
 	/* fill EFC parameters */
 	for (i = 0; i < param_count; i++)
@@ -216,7 +243,7 @@ efc(struct snd_efw *efw, unsigned int category,
 	/* if return value is positive, it means return bytes */
 	/* TODO: the last parameter should be sequence number */
 	err = efc_transaction_run(efw->unit, cmdbuf, cmdbuf_bytes,
-				  cmdbuf, cmdbuf_bytes, 0);
+				  cmdbuf, cmdbuf_bytes, seqnum);
 	if (err < 0)
 		goto end;
 
@@ -225,14 +252,13 @@ efc(struct snd_efw *efw, unsigned int category,
 		cmdbuf[i] = be32_to_cpu(cmdbuf[i]);
 
 	/* check EFC response fields */
-	if ((efc_fields->seqnum != sequence_number) ||
-	    (efc_fields->version < 1) ||
+	if ((efc_fields->version < 1) ||
 	    (efc_fields->category != category) ||
 	    (efc_fields->command != command) ||
 	    (efc_fields->retval != EFC_RETVAL_OK)) {
-		dev_err(&efw->unit->device, "EFC failed [%u/%u]: %X\n",
+		dev_err(&efw->unit->device, "EFC failed [%u/%u]: %s\n",
 			efc_fields->category, efc_fields->command,
-			efc_fields->retval);
+			efc_retval_names[efc_fields->retval]);
 		err = -EIO;
 		goto end;
 	}
@@ -476,9 +502,9 @@ enum efc_state {
 struct efc_transaction {
 	struct list_head list;
 	struct fw_unit *unit;
-	void *response_buffer;
-	unsigned int response_size;
-	unsigned int response_match_bytes;
+	void *buffer;
+	unsigned int size;
+	u32 seqnum;
 	enum efc_state state;
 	wait_queue_head_t wait;
 };
@@ -486,16 +512,15 @@ struct efc_transaction {
 static int
 efc_transaction_run(struct fw_unit *unit,
 		    const void *command, unsigned int command_size,
-		    void *response, unsigned int response_size,
-		    unsigned int response_match_bytes)
+		    void *response, unsigned int size, u32 seqnum)
 {
 	struct efc_transaction t;
 	int tcode, ret, tries = 0;
 
 	t.unit = unit;
-	t.response_buffer = response;
-	t.response_size = response_size;
-	t.response_match_bytes = response_match_bytes;
+	t.buffer = response;
+	t.size = size;
+	t.seqnum = seqnum + 1;
 	t.state = STATE_PENDING;
 	init_waitqueue_head(&t.wait);
 
@@ -516,7 +541,7 @@ efc_transaction_run(struct fw_unit *unit,
 				   msecs_to_jiffies(EFC_TIMEOUT_MS));
 
 		if (t.state == STATE_COMPLETE) {
-			ret = t.response_size;
+			ret = t.size;
 			break;
 		} else if (t.state == STATE_BUS_RESET) {
 			msleep(ERROR_DELAY_MS);
@@ -534,28 +559,6 @@ efc_transaction_run(struct fw_unit *unit,
 	return ret;
 }
 
-static bool
-is_matching_response(struct efc_transaction *transaction,
-		     const void *response, size_t length)
-{
-	const u8 *p1, *p2;
-	unsigned int mask, i;
-
-	p1 = response;
-	p2 = transaction->response_buffer;
-	mask = transaction->response_match_bytes;
-
-	for (i = 0; ; i++) {
-		if ((mask & 1) && (p1[i] != p2[i]))
-			return false;
-		mask >>= 1;
-		if (!mask)
-			return true;
-		if (--length == 0)
-			return false;
-	}
-}
-
 static void
 efc_response(struct fw_card *card, struct fw_request *request,
 	     int tcode, int destination, int source,
@@ -564,9 +567,12 @@ efc_response(struct fw_card *card, struct fw_request *request,
 {
 	struct efc_transaction *t;
 	unsigned long flags;
+	u32 seqnum;
 
-	if ((length < 1) || (*(const u8*)data & 0xf0) != EFC_RETVAL_OK)
+	if (length < 1)
 		return;
+
+	seqnum = be32_to_cpu(((struct efc_fields *)data)->seqnum);
 
 	spin_lock_irqsave(&transactions_lock, flags);
 	list_for_each_entry(t, &transactions, list) {
@@ -578,12 +584,10 @@ efc_response(struct fw_card *card, struct fw_request *request,
 		if (device->node_id != source)
 			continue;
 
-		if ((t->state == STATE_PENDING) &&
-		    is_matching_response(t, data, length)) {
+		if ((t->state == STATE_PENDING) && (t->seqnum == seqnum)) {
 			t->state = STATE_COMPLETE;
-			t->response_size = min((unsigned int)length,
-					       t->response_size);
-			memcpy(t->response_buffer, data, t->response_size);
+			t->size = min((unsigned int)length, t->size);
+			memcpy(t->buffer, data, t->size);
 			wake_up(&t->wait);
 		}
 	}
@@ -607,16 +611,18 @@ void snd_efw_command_bus_reset(struct fw_unit *unit)
 
 static struct fw_address_handler response_register_handler = {
 	/* TODO: this span should be reconsidered */
-	.length = 0x200,
+	.length = INITIAL_MEMORY_SPACE_EFC_END - INITIAL_MEMORY_SPACE_EFC_RESPONSE,
 	.address_callback = efc_response
 };
 
-int snd_efw_command_create(void)
+int snd_efw_command_create(struct snd_efw *efw)
 {
 	static const struct fw_address_region response_register_region = {
 		.start	= INITIAL_MEMORY_SPACE_EFC_RESPONSE,
 		.end	= INITIAL_MEMORY_SPACE_EFC_END
 	};
+
+	efw->seqnum = 0;
 
 	return fw_core_add_address_handler(&response_register_handler,
 					   &response_register_region);
