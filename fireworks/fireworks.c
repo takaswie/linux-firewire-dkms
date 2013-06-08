@@ -347,11 +347,6 @@ snd_efw_probe(struct device *dev)
 	if (err < 0)
 		goto error;
 
-	/* identifing */
-	err = snd_efw_command_identify(efw);
-	if (err < 0)
-		goto error;
-
 	/* get hardware information */
 	err = get_hardware_info(efw);
 	if (err < 0)

@@ -46,7 +46,8 @@
  * As a result, Echo's Fireworks doesn't need AVC generic command sets.
  *
  * NOTE: old FFADO implementaion is EFC over AVC but device with firmware
- * version 5.5 or later don't use it but support it.
+ * version 5.5 or later don't use it but support it. This module support a part
+ * of commands. Please see FFADO if you want to see whole commands.
  */
 
 struct efc_fields {
@@ -71,14 +72,7 @@ struct efc_clock {
 /* command categories */
 enum efc_category {
 	EFC_CAT_HWINFO			= 0,
-	EFC_CAT_FLASH			= 1,
-	EFC_CAT_TRANSPORT		= 2,
 	EFC_CAT_HWCTL			= 3,
-	EFC_CAT_MIXER_PHYS_OUT		= 4,
-	EFC_CAT_MIXER_PHYS_IN		= 5,
-	EFC_CAT_MIXER_PLAYBACK		= 6,
-	EFC_CAT_MIXER_CAPTURE		= 7,
-	EFC_CAT_MIXER_MONITOR		= 8,
 	EFC_CAT_IOCONF			= 9,
 };
 
@@ -86,48 +80,23 @@ enum efc_category {
 enum efc_cmd_hwinfo {
 	EFC_CMD_HWINFO_GET_CAPS			= 0,
 	EFC_CMD_HWINFO_GET_POLLED		= 1,
-	EFC_CMD_HWINFO_SET_EFR_ADDRESS		= 2,
-	EFC_CMD_HWINFO_READ_SESSION_BLOCK	= 3,
-	EFC_CMD_HWINFO_GET_DEBUG_INFO		= 4,
-	EFC_CMD_HWINFO_SET_DEBUG_TRACKING	= 5
-};
-
-/* flash category commands */
-enum efc_cmd_flash {
-	EFC_CMD_FLASH_ERASE		= 0,
-	EFC_CMD_FLASH_READ		= 1,
-	EFC_CMD_FLASH_WRITE		= 2,
-	EFC_CMD_FLASH_GET_STATUS	= 3,
-	EFC_CMD_FLASH_GET_SESSION_BASE	= 4,
-	EFC_CMD_FLASH_LOCK		= 5
 };
 
 /* hardware control category commands */
 enum efc_cmd_hwctl {
 	EFC_CMD_HWCTL_SET_CLOCK		= 0,
 	EFC_CMD_HWCTL_GET_CLOCK		= 1,
-	EFC_CMD_HWCTL_BSX_HANDSHAKE	= 2,
 	EFC_CMD_HWCTL_CHANGE_FLAGS	= 3,
 	EFC_CMD_HWCTL_GET_FLAGS		= 4,
-	EFC_CMD_HWCTL_IDENTIFY		= 5,
-	EFC_CMD_HWCTL_RECONNECT_PHY	= 6
 };
 /* for flags */
-#define EFC_HWCTL_FLAG_MIXER_UNUSABLE	0x00
-#define EFC_HWCTL_FLAG_MIXER_USABLE	0x01
 #define EFC_HWCTL_FLAG_DIGITAL_PRO	0x02
 #define EFC_HWCTL_FLAG_DIGITAL_RAW	0x04
 
 /* I/O config category commands */
 enum efc_cmd_ioconf {
-	EFC_CMD_IOCONF_SET_MIRROR	= 0,
-	EFC_CMD_IOCONF_GET_MIRROR	= 1,
 	EFC_CMD_IOCONF_SET_DIGITAL_MODE	= 2,
 	EFC_CMD_IOCONF_GET_DIGITAL_MODE	= 3,
-	EFC_CMD_IOCONF_SET_PHANTOM	= 4,
-	EFC_CMD_IOCONF_GET_PHANTOM	= 5,
-	EFC_CMD_IOCONF_SET_ISOC_MAP	= 6,
-	EFC_CMD_IOCONF_GET_ISOC_MAP	= 7,
 };
 
 /* return values in response */
@@ -169,20 +138,6 @@ static const char *const efc_retval_names[] = {
 	[EFC_RETVAL_BAD_LED]		= "bad LED",
 	[EFC_RETVAL_BAD_PARAMETER]	= "bad parameter",
 	[EFC_RETVAL_BAD_PARAMETER + 1]	= "incomplete"
-};
-
-/* for phys_in/phys_out/playback/capture/monitor category commands */
-enum snd_efw_mixer_cmd {
-	SND_EFW_MIXER_SET_GAIN		= 0,
-	SND_EFW_MIXER_GET_GAIN		= 1,
-	SND_EFW_MIXER_SET_MUTE		= 2,
-	SND_EFW_MIXER_GET_MUTE		= 3,
-	SND_EFW_MIXER_SET_SOLO		= 4,
-	SND_EFW_MIXER_GET_SOLO		= 5,
-	SND_EFW_MIXER_SET_PAN		= 6,
-	SND_EFW_MIXER_GET_PAN		= 7,
-	SND_EFW_MIXER_SET_NOMINAL	= 8,
-	SND_EFW_MIXER_GET_NOMINAL	= 9
 };
 
 static int
@@ -275,13 +230,6 @@ efc(struct snd_efw *efw, unsigned int category,
 end:
 	kfree(cmdbuf);
 	return err;
-}
-
-int snd_efw_command_identify(struct snd_efw *efw)
-{
-	return efc(efw, EFC_CAT_HWCTL,
-				EFC_CMD_HWCTL_IDENTIFY,
-				NULL, 0, NULL, 0);
 }
 
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
