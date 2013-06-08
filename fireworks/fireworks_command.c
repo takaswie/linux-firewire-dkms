@@ -561,20 +561,18 @@ static struct fw_address_handler response_register_handler = {
 	.address_callback = efc_response
 };
 
-int snd_efw_command_create(struct snd_efw *efw)
+int snd_efw_command_register(void)
 {
 	static const struct fw_address_region response_register_region = {
 		.start	= INITIAL_MEMORY_SPACE_EFC_RESPONSE,
 		.end	= INITIAL_MEMORY_SPACE_EFC_END
 	};
 
-	efw->seqnum = 0;
-
 	return fw_core_add_address_handler(&response_register_handler,
 					   &response_register_region);
 }
 
-void snd_efw_command_destroy(void)
+void snd_efw_command_unregister(void)
 {
 	WARN_ON(!list_empty(&transactions));
 	fw_core_remove_address_handler(&response_register_handler);

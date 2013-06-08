@@ -342,11 +342,6 @@ snd_efw_probe(struct device *dev)
 	mutex_init(&efw->mutex);
 	spin_lock_init(&efw->lock);
 
-	/* add command stack */
-	err = snd_efw_command_create(efw);
-	if (err < 0)
-		goto error;
-
 	/* get hardware information */
 	err = get_hardware_info(efw);
 	if (err < 0)
@@ -392,7 +387,6 @@ snd_efw_probe(struct device *dev)
 
 error:
 	snd_card_free(card);
-	snd_efw_command_destroy();
 
 end:
 	mutex_unlock(&devices_mutex);
@@ -406,7 +400,6 @@ snd_efw_remove(struct device *dev)
 	struct snd_efw *efw = card->private_data;
 
 	snd_efw_destroy_pcm_devices(efw);
-	snd_efw_command_destroy();
 
 	snd_card_disconnect(card);
 	snd_card_free_when_closed(card);
@@ -477,11 +470,23 @@ static struct fw_driver snd_efw_driver = {
 
 static int __init snd_efw_init(void)
 {
-	return driver_register(&snd_efw_driver.driver);
+	int err;
+
+	err = snd_efw_command_register();
+	if (err < 0)
+		goto end;
+
+	err = driver_register(&snd_efw_driver.driver);
+	if (err < 0)
+		snd_efw_command_unregister();
+
+end:
+	return err;
 }
 
 static void __exit snd_efw_exit(void)
 {
+	snd_efw_command_unregister();
 	driver_unregister(&snd_efw_driver.driver);
 	mutex_destroy(&devices_mutex);
 }
