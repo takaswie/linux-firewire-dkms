@@ -196,7 +196,6 @@ efc(struct snd_efw *efw, unsigned int category,
 		cmdbuf[i] = cpu_to_be32(cmdbuf[i]);
 
 	/* if return value is positive, it means return bytes */
-	/* TODO: the last parameter should be sequence number */
 	err = efc_transaction_run(efw->unit, cmdbuf, cmdbuf_bytes,
 				  cmdbuf, cmdbuf_bytes, seqnum);
 	if (err < 0)
@@ -558,7 +557,6 @@ void snd_efw_command_bus_reset(struct fw_unit *unit)
 }
 
 static struct fw_address_handler response_register_handler = {
-	/* TODO: this span should be reconsidered */
 	.length = INITIAL_MEMORY_SPACE_EFC_END - INITIAL_MEMORY_SPACE_EFC_RESPONSE,
 	.address_callback = efc_response
 };
