@@ -15,7 +15,7 @@
 #include <sound/pcm.h>
 #include <sound/rawmidi.h>
 #include "amdtp.h"
-
+#include <sound/core.h>
 #define TICKS_PER_CYCLE		3072
 #define CYCLES_PER_SECOND	8000
 #define TICKS_PER_SECOND	(TICKS_PER_CYCLE * CYCLES_PER_SECOND)
@@ -509,13 +509,68 @@ static void amdtp_pull_midi(struct amdtp_stream *s,
 	}
 }
 
+static void check_pcm_pointer(struct amdtp_stream *s,
+			      struct snd_pcm_substream *pcm,
+			      unsigned int frames)
+{	unsigned int ptr;
+
+	ptr = s->pcm_buffer_pointer + frames;
+	if (ptr >= pcm->runtime->buffer_size)
+		ptr -= pcm->runtime->buffer_size;
+	ACCESS_ONCE(s->pcm_buffer_pointer) = ptr;
+
+	s->pcm_period_pointer += frames;
+	if (s->pcm_period_pointer >= pcm->runtime->period_size) {
+		s->pcm_period_pointer -= pcm->runtime->period_size;
+		s->pointer_flush = false;
+		tasklet_hi_schedule(&s->period_tasklet);
+	}
+}
+
+static void pcm_period_tasklet(unsigned long data)
+{
+	struct amdtp_stream *s = (void *)data;
+	struct snd_pcm_substream *pcm = ACCESS_ONCE(s->pcm);
+
+	if (pcm)
+		snd_pcm_period_elapsed(pcm);
+}
+
+static int queue_context_packet(struct amdtp_stream *s, unsigned int index,
+				unsigned int header_length,
+				unsigned int payload_length, bool skip)
+{
+	struct fw_iso_packet p = {0};
+	int err;
+
+	p.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
+	p.tag = TAG_CIP;
+	p.header_length = header_length;
+	p.payload_length = payload_length;
+	p.skip = (!skip) ? 0: 1;
+	err = fw_iso_context_queue(s->context, &p, &s->buffer.iso_buffer,
+				   s->buffer.packets[index].offset);
+	if (err < 0) {
+		dev_err(&s->unit->device, "queueing error: %d\n", err);
+		s->packet_index = -1;
+		goto end;
+	}
+
+	if (++index >= QUEUE_LENGTH)
+		index = 0;
+	s->packet_index = index;
+
+	err = 0;
+
+end:
+	return err;
+}
+
 static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle)
 {
 	__be32 *buffer;
-	unsigned int index, data_blocks, syt, ptr;
+	unsigned int index, data_blocks, syt, payload_length;
 	struct snd_pcm_substream *pcm;
-	struct fw_iso_packet packet;
-	int err;
 
 	if (s->packet_index < 0)
 		return;
@@ -537,44 +592,20 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle)
 		s->transfer_samples(s, pcm, buffer, data_blocks);
 	else
 		amdtp_fill_pcm_silence(s, buffer, data_blocks);
+
 	if (s->midi_ports)
 		amdtp_fill_midi(s, buffer, data_blocks);
 
 	s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
 
-	packet.payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
-	packet.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
-	packet.skip = 0;
-	packet.tag = TAG_CIP;
-	packet.sy = 0;
-	packet.header_length = 0;
-
-	err = fw_iso_context_queue(s->context, &packet, &s->buffer.iso_buffer,
-				   s->buffer.packets[index].offset);
-	if (err < 0) {
-		dev_err(&s->unit->device, "queueing error: %d\n", err);
-		s->packet_index = -1;
+	payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
+	if (queue_context_packet(s, index, 0, payload_length, false) < 0) {
 		amdtp_stream_pcm_abort(s);
 		return;
 	}
 
-	if (++index >= QUEUE_LENGTH)
-		index = 0;
-	s->packet_index = index;
-
-	if (pcm) {
-		ptr = s->pcm_buffer_pointer + data_blocks;
-		if (ptr >= pcm->runtime->buffer_size)
-			ptr -= pcm->runtime->buffer_size;
-		ACCESS_ONCE(s->pcm_buffer_pointer) = ptr;
-
-		s->pcm_period_pointer += data_blocks;
-		if (s->pcm_period_pointer >= pcm->runtime->period_size) {
-			s->pcm_period_pointer -= pcm->runtime->period_size;
-			s->pointer_flush = false;
-			tasklet_hi_schedule(&s->period_tasklet);
-		}
-	}
+	if (pcm)
+		check_pcm_pointer(s, pcm, data_blocks);
 }
 
 static void handle_in_packet_data(struct amdtp_stream *s,
@@ -582,11 +613,9 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 {
 	__be32 *buffer;
 	u32 cip_header[2];
-	unsigned int index, frames, data_block_quadlets,
-					data_block_counter, ptr;
+	unsigned int index, data_block_quadlets, data_block_counter,
+		     payload_length, frames = 0;
 	struct snd_pcm_substream *pcm;
-	struct fw_iso_packet packet;
-	int err;
 
 	if (s->packet_index < 0)
 		return;
@@ -641,11 +670,15 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 		 * in IEC 61883-1
 		 */
 		frames = (data_quadlets - 2) / s->data_block_quadlets;
-		pcm = ACCESS_ONCE(s->pcm);
-		if (pcm)
-			s->transfer_samples(s, pcm, buffer, frames);
-		if (s->midi_ports)
-			amdtp_pull_midi(s, buffer, frames);
+		if (frames == 0)
+			pcm = NULL;
+		else {
+			pcm = ACCESS_ONCE(s->pcm);
+			if (pcm)
+				s->transfer_samples(s, pcm, buffer, frames);
+			if (s->midi_ports)
+				amdtp_pull_midi(s, buffer, frames);
+		}
 
 		/* for next packet */
 		s->data_block_quadlets = data_block_quadlets;
@@ -653,48 +686,15 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 	}
 
 	/* queueing a packet for next cycle */
-	packet.payload_length = amdtp_stream_get_max_payload(s);
-	packet.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
-	packet.skip = 0;
-	packet.header_length = 4;
-
-	err = fw_iso_context_queue(s->context, &packet, &s->buffer.iso_buffer,
-				   s->buffer.packets[index].offset);
-	if (err < 0) {
-		dev_err(&s->unit->device, "queueing error: %d\n", err);
-		s->packet_index = -1;
+	payload_length = amdtp_stream_get_max_payload(s);
+	if (queue_context_packet(s, index, 4, payload_length, false) < 0) {
 		amdtp_stream_pcm_abort(s);
 		return;
 	}
 
-	/* calculate packet index */
-	if (++index >= QUEUE_LENGTH)
-		index = 0;
-	s->packet_index = index;
-
 	/* calculate period and buffer borders */
-	if (pcm != NULL) {
-		ptr = s->pcm_buffer_pointer + frames;
-		if (ptr >= pcm->runtime->buffer_size)
-			ptr -= pcm->runtime->buffer_size;
-		ACCESS_ONCE(s->pcm_buffer_pointer) = ptr;
-
-		s->pcm_period_pointer += frames;
-		if (s->pcm_period_pointer >= pcm->runtime->period_size) {
-			s->pcm_period_pointer -= pcm->runtime->period_size;
-			s->pointer_flush = false;
-			tasklet_hi_schedule(&s->period_tasklet);
-		}
-	}
-}
-
-static void pcm_period_tasklet(unsigned long data)
-{
-	struct amdtp_stream *s = (void *)data;
-	struct snd_pcm_substream *pcm = ACCESS_ONCE(s->pcm);
-
 	if (pcm)
-		snd_pcm_period_elapsed(pcm);
+		check_pcm_pointer(s, pcm, frames);
 }
 
 static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
@@ -724,60 +724,14 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 
 	/* each fields in an isochronous header are already used in juju */
 	for (p = 0; p < packets; p += 1) {
-		/* how many quadlet for data in this packet */
+		/* how many quadlets of data in payload of this packet */
 		data_quadlets =
 			(be32_to_cpu(headers[p]) >> ISO_DATA_LENGTH_SHIFT) / 4;
-		/* handle each packet data */
+		/* handle each data in payload */
 		handle_in_packet_data(s, data_quadlets);
 	}
 
 	fw_iso_context_queue_flush(s->context);
-}
-
-static int queue_initial_packets(struct amdtp_stream *s)
-{
-	struct fw_iso_packet initial_packet;
-	unsigned int i;
-	int err;
-
-	/* header length is needed for receive stream */
-	initial_packet.payload_length = amdtp_stream_get_max_payload(s);
-	initial_packet.skip = 0;
-	initial_packet.header_length = 4;
-
-	for (i = 0; i < QUEUE_LENGTH; ++i) {
-		initial_packet.interrupt = IS_ALIGNED(s->packet_index + 1,
-						INTERRUPT_INTERVAL);
-		err = fw_iso_context_queue(s->context, &initial_packet,
-			&s->buffer.iso_buffer, s->buffer.packets[i].offset);
-		if (err < 0)
-			return err;
-		if (++s->packet_index >= QUEUE_LENGTH)
-			s->packet_index = 0;
-	}
-
-	return 0;
-}
-
-static int queue_initial_skip_packets(struct amdtp_stream *s)
-{
-	struct fw_iso_packet skip_packet = {
-		.skip = 1,
-	};
-	unsigned int i;
-	int err;
-
-	for (i = 0; i < QUEUE_LENGTH; ++i) {
-		skip_packet.interrupt = IS_ALIGNED(s->packet_index + 1,
-						   INTERRUPT_INTERVAL);
-		err = fw_iso_context_queue(s->context, &skip_packet, NULL, 0);
-		if (err < 0)
-			return err;
-		if (++s->packet_index >= QUEUE_LENGTH)
-			s->packet_index = 0;
-	}
-
-	return 0;
 }
 
 /**
@@ -805,7 +759,11 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		[CIP_SFC_88200]  = {  0,   67 },
 		[CIP_SFC_176400] = {  0,   67 },
 	};
-	int err;
+	fw_iso_callback_t cb;
+	enum dma_data_direction dir;
+	unsigned int header_size, payload_length;
+	bool skip;
+	int type, err;
 
 	mutex_lock(&s->mutex);
 
@@ -820,30 +778,30 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	s->last_syt_offset = TICKS_PER_CYCLE;
 
 	/* initialize packet buffer */
-	if (s->direction == AMDTP_STREAM_RECEIVE)
-		err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
-					amdtp_stream_get_max_payload(s),
-					DMA_FROM_DEVICE);
-	else
-		err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
-					amdtp_stream_get_max_payload(s),
-					DMA_TO_DEVICE);
+	if (s->direction == AMDTP_STREAM_RECEIVE) {
+		dir = DMA_FROM_DEVICE;
+		type = FW_ISO_CONTEXT_RECEIVE;
+		cb = in_packet_callback;
+		header_size = 4;
+		payload_length = amdtp_stream_get_max_payload(s);
+		skip = false;
+	} else {
+		dir = DMA_TO_DEVICE;
+		type = FW_ISO_CONTEXT_TRANSMIT;
+		cb = out_packet_callback;
+		header_size = 0;
+		payload_length = 0;
+		skip = true;
+	}
+	err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
+				      amdtp_stream_get_max_payload(s), dir);
 	if (err < 0)
 		goto err_unlock;
 
 	/* create isochronous context */
-	if (s->direction == AMDTP_STREAM_RECEIVE)
-		s->context =
-			fw_iso_context_create(fw_parent_device(s->unit)->card,
-					FW_ISO_CONTEXT_RECEIVE,
-					channel, speed, 4,
-					in_packet_callback, s);
-	else
-		s->context =
-			fw_iso_context_create(fw_parent_device(s->unit)->card,
-					FW_ISO_CONTEXT_TRANSMIT,
-					channel, speed, 4,
-					out_packet_callback, s);
+	s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
+					   type, channel, speed, header_size,
+					   cb, s);
 	if (!amdtp_stream_running(s)) {
 		err = PTR_ERR(s->context);
 		if (err == -EBUSY)
@@ -853,20 +811,24 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	}
 
 	amdtp_stream_update(s);
-
-	s->packet_index = 0;
 	s->data_block_counter = 0;
 
-	if (s->direction == AMDTP_STREAM_RECEIVE)
-		err = queue_initial_packets(s);
-	else
-		err = queue_initial_skip_packets(s);
-	if (err < 0)
-		goto err_context;
+	s->packet_index = 0;
+	do {
+		err = queue_context_packet(s, s->packet_index, header_size,
+					   payload_length, skip);
+		if (err < 0)
+			goto err_context;
+	} while (s->packet_index > 0);
 
-	/* NOTE: TAG1 matches CIP. This just affects receive stream */
+	/*
+	 * NOTE:
+	 * The fourth argument is effective for receive context and should be.
+	 * "FW_ISO_CONTEXT_MATCH_TAG1" for receive but Fireworks outputs
+	 * NODATA packets with tag 0.
+	 */
 	err = fw_iso_context_start(s->context, -1, 0,
-					FW_ISO_CONTEXT_MATCH_TAG1);
+			FW_ISO_CONTEXT_MATCH_TAG0 | FW_ISO_CONTEXT_MATCH_TAG1);
 	if (err < 0)
 		goto err_context;
 
