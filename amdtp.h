@@ -48,6 +48,11 @@ enum amdtp_stream_direction {
 	AMDTP_STREAM_TRANSMIT
 };
 
+enum amdtp_stream_sync_mode {
+	AMDTP_STREAM_SYNC_DRIVER_MASTER,
+	AMDTP_STREAM_SYNC_DEVICE_MASTER
+};
+
 struct amdtp_stream {
 	struct fw_unit *unit;
 	enum cip_flags flags;
@@ -84,6 +89,9 @@ struct amdtp_stream {
 
 	struct snd_rawmidi_substream *midi[AMDTP_MAX_MIDI_STREAMS];
 	unsigned long midi_triggered;	/* bit table for each MIDI substream */
+
+	enum amdtp_stream_sync_mode sync_mode;
+	struct amdtp_stream *sync_slave;
 };
 
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
@@ -188,6 +196,16 @@ static inline void amdtp_stream_pcm_trigger(struct amdtp_stream *s,
 static inline bool cip_sfc_is_base_44100(enum cip_sfc sfc)
 {
 	return sfc & 1;
+}
+
+static inline void amdtp_stream_set_sync_mode(enum amdtp_stream_sync_mode mode,
+					      struct amdtp_stream *master,
+					      struct amdtp_stream *slave)
+{
+	master->sync_mode = mode;
+	slave->sync_mode = mode;
+	master->sync_slave = slave;
+	slave->sync_slave = ERR_PTR(-1);
 }
 
 #endif

@@ -35,6 +35,7 @@
 #define AMDTP_FDF_NO_DATA	(0xFF << AMDTP_FDF_SFC_SHIFT)
 /* only "Clock-based rate controll mode" is supported */
 #define AMDTP_FDF_AM824		(0 << (AMDTP_FDF_SFC_SHIFT + 3))
+#define AMDTP_SYT_MASK		0x0000FFFF
 #define AMDTP_DBS_MASK		0x00FF0000
 #define AMDTP_DBS_SHIFT		16
 #define AMDTP_DBC_MASK		0x000000FF
@@ -70,6 +71,9 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	s->pcm = NULL;
 	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1)
 		s->midi[i] = NULL;
+
+	s->sync_mode = AMDTP_STREAM_SYNC_DRIVER_MASTER;
+	s->sync_slave = ERR_PTR(-1);
 
 	return 0;
 }
@@ -566,10 +570,10 @@ end:
 	return err;
 }
 
-static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle)
+static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle, bool nodata)
 {
 	__be32 *buffer;
-	unsigned int index, data_blocks, syt, payload_length;
+	unsigned int index, syt, fdf, data_blocks, payload_length;
 	struct snd_pcm_substream *pcm;
 
 	if (s->packet_index < 0)
@@ -577,26 +581,41 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle)
 	index = s->packet_index;
 
 	data_blocks = calculate_data_blocks(s);
-	syt = calculate_syt(s, cycle);
+
+	/*
+	 * if the device is in non syt match mode,  then the value of syt field
+	 * in transmit packet should derives from received packet.
+	 */
+	if (s->sync_mode == AMDTP_STREAM_SYNC_DEVICE_MASTER)
+		syt = s->last_syt_offset;
+	else
+		syt = calculate_syt(s, cycle);
+
+	if (!nodata)
+		fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
+	else
+		fdf = AMDTP_FDF_NO_DATA;
 
 	buffer = s->buffer.packets[index].buffer;
 	buffer[0] = cpu_to_be32(ACCESS_ONCE(s->source_node_id_field) |
 				(s->data_block_quadlets << AMDTP_DBS_SHIFT) |
 				s->data_block_counter);
 	buffer[1] = cpu_to_be32(CIP_EOH | CIP_FMT_AM | AMDTP_FDF_AM824 |
-				(s->sfc << AMDTP_FDF_SFC_SHIFT) | syt);
+				fdf | syt);
 	buffer += 2;
 
-	pcm = ACCESS_ONCE(s->pcm);
-	if (pcm)
-		s->transfer_samples(s, pcm, buffer, data_blocks);
-	else
-		amdtp_fill_pcm_silence(s, buffer, data_blocks);
+	if (!nodata) {
+		pcm = ACCESS_ONCE(s->pcm);
+		if (pcm)
+			s->transfer_samples(s, pcm, buffer, data_blocks);
+		else
+			amdtp_fill_pcm_silence(s, buffer, data_blocks);
 
-	if (s->midi_ports)
-		amdtp_fill_midi(s, buffer, data_blocks);
+		if (s->midi_ports)
+			amdtp_fill_midi(s, buffer, data_blocks);
 
-	s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
+		s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
+	}
 
 	payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
 	if (queue_context_packet(s, index, 0, payload_length, false) < 0) {
@@ -616,6 +635,7 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 	unsigned int index, data_block_quadlets, data_block_counter,
 		     payload_length, frames = 0;
 	struct snd_pcm_substream *pcm;
+	bool nodata = false;
 
 	if (s->packet_index < 0)
 		return;
@@ -692,6 +712,15 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 		return;
 	}
 
+	/* process sync slave stream */
+	if ((s->sync_mode == AMDTP_STREAM_SYNC_DEVICE_MASTER) &&
+	    (!IS_ERR(s->sync_slave)) &&
+	    (amdtp_stream_pcm_running(s->sync_slave))) {
+		s->sync_slave->last_syt_offset =
+					cip_header[1] & AMDTP_SYT_MASK;
+		queue_out_packet(s->sync_slave, 0, nodata);
+	}
+
 	/* calculate period and buffer borders */
 	if (pcm)
 		check_pcm_pointer(s, pcm, frames);
@@ -711,7 +740,7 @@ static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
 	cycle += QUEUE_LENGTH - packets;
 
 	for (i = 0; i < packets; ++i)
-		queue_out_packet(s, ++cycle);
+		queue_out_packet(s, ++cycle, false);
 	fw_iso_context_queue_flush(s->context);
 }
 
@@ -732,6 +761,14 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 	}
 
 	fw_iso_context_queue_flush(s->context);
+}
+
+/* processing is done by master callback */
+static void sync_slave_callback(struct fw_iso_context *context, u32 cycle,
+				size_t header_length, void *header,
+				void *private_data)
+{
+	return;
 }
 
 /**
@@ -788,7 +825,11 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	} else {
 		dir = DMA_TO_DEVICE;
 		type = FW_ISO_CONTEXT_TRANSMIT;
-		cb = out_packet_callback;
+		if (s->sync_mode == AMDTP_STREAM_SYNC_DEVICE_MASTER)
+			cb = sync_slave_callback;
+		else
+			cb = out_packet_callback;
+
 		header_size = 0;
 		payload_length = 0;
 		skip = true;
