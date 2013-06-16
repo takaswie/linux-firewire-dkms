@@ -61,7 +61,7 @@ midi_open(struct snd_rawmidi_substream *substream)
 	run = stream->midi_triggered;
 
 	/* register pointer */
-	amdtp_stream_midi_insert(stream, substream);
+	amdtp_stream_midi_add(stream, substream);
 
 	/* the other MIDI streams running */
 	if (run > 0) {
@@ -109,7 +109,7 @@ midi_close(struct snd_rawmidi_substream *substream)
 		stream = &efw->transmit_stream;
 
 	/* unregister pointer */
-	amdtp_stream_midi_extract(stream, substream);
+	amdtp_stream_midi_remove(stream, substream);
 
 	/* the other streams is running */
 	if (amdtp_stream_midi_running(stream) > 0)

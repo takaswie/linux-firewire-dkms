@@ -103,10 +103,10 @@ void amdtp_stream_pcm_prepare(struct amdtp_stream *s);
 unsigned long amdtp_stream_pcm_pointer(struct amdtp_stream *s);
 void amdtp_stream_pcm_abort(struct amdtp_stream *s);
 
-void amdtp_stream_midi_insert(struct amdtp_stream *s,
+void amdtp_stream_midi_add(struct amdtp_stream *s,
+			   struct snd_rawmidi_substream *substream);
+void amdtp_stream_midi_remove(struct amdtp_stream *s,
 			      struct snd_rawmidi_substream *substream);
-void amdtp_stream_midi_extract(struct amdtp_stream *s,
-			       struct snd_rawmidi_substream *substream);
 bool amdtp_stream_midi_running(struct amdtp_stream *s);
 
 /**

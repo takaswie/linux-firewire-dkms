@@ -963,22 +963,22 @@ void amdtp_stream_pcm_abort(struct amdtp_stream *s)
 EXPORT_SYMBOL(amdtp_stream_pcm_abort);
 
 /**
- * amdtp_stream_midi_insert - add MIDI stream
+ * amdtp_stream_midi_add - add MIDI stream
  * @s: the AMDTP stream
  * @substream: the MIDI stream to be added
  *
  * This function don't check the number of midi substream but it should be
  * within AMDTP_MAX_MIDI_STREAMS.
  */
-void amdtp_stream_midi_insert(struct amdtp_stream *s,
-			      struct snd_rawmidi_substream *substream)
+void amdtp_stream_midi_add(struct amdtp_stream *s,
+			   struct snd_rawmidi_substream *substream)
 {
 	ACCESS_ONCE(s->midi[substream->number]) = substream;
 }
-EXPORT_SYMBOL(amdtp_stream_midi_insert);
+EXPORT_SYMBOL(amdtp_stream_midi_add);
 
 /**
- * amdtp_stream_midi_extract - remove MIDI stream
+ * amdtp_stream_midi_remove - remove MIDI stream
  * @s: the AMDTP stream
  * @substream: the MIDI stream to be removed
  *
@@ -986,12 +986,12 @@ EXPORT_SYMBOL(amdtp_stream_midi_insert);
  * because the AMDTP stream only with MIDI stream need to be restarted by
  * PCM streams at requested sampling rate.
  */
-void amdtp_stream_midi_extract(struct amdtp_stream *s,
-			       struct snd_rawmidi_substream *substream)
+void amdtp_stream_midi_remove(struct amdtp_stream *s,
+			      struct snd_rawmidi_substream *substream)
 {
 	ACCESS_ONCE(s->midi[substream->number]) = NULL;
 }
-EXPORT_SYMBOL(amdtp_stream_midi_extract);
+EXPORT_SYMBOL(amdtp_stream_midi_remove);
 
 /**
  * amdtp_stream_midi_running - check any MIDI streams are running or not
