@@ -29,16 +29,17 @@
  * Then the number of PCM channels for analog input and output are always fixed
  * but the number of PCM channels for digital input and output are differed.
  *
- * Additionally, according to AudioFire Owner's Manual Version 2.2,
+ * Additionally, according to "AudioFire Owner's Manual Version 2.2",
  * the number of PCM channels for digital input has more restriction
- *  depending on which digital interface is selected.
+ * depending on which digital interface is selected.
  *  - S/PDIF coaxial and optical	: use input 1-2
- *  - ADAT optical with 32.0-48.0 kHz	: use input 1-8
- *  - ADAT optical with 88.2-96.0 kHz	: use input 1-4 (S/MUX format)
- * If these restriction is applied, the number of channels in stream is decided
- * according to above modes.
+ *  - ADAT optical at 32.0-48.0 kHz	: use input 1-8
+ *  - ADAT optical at 88.2-96.0 kHz	: use input 1-4 (S/MUX format)
+ * Even if these restriction is applied, the number of channels in AMDTP stream
+ * is decided according to above 0/1/2 modes. The needless data is filled with
+ * zero.
  *
- * Currently this module doesn't have rules for the latter.
+ * Currently this module doesn't support the latter.
  */
 static unsigned int freq_table[] = {
 	/* multiplier mode 0 */
