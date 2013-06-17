@@ -324,8 +324,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 				struct snd_pcm_hw_params *hw_params)
 {
 	struct snd_efw *efw = substream->private_data;
-	struct amdtp_stream *stream;
-	struct amdtp_stream *opposite;
+	struct amdtp_stream *stream, *opposite;
 	unsigned int *pcm_channels;
 	int mode;
 	int err;
@@ -346,7 +345,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 		pcm_channels = efw->pcm_capture_channels;
 	}
 
-	/* stop stream if it's just for MIDI streams */
+	/* stop stream if it's just for MIDI streams
 	if (amdtp_stream_running(stream) &&
 	    !amdtp_stream_pcm_running(stream) &&
 	    amdtp_stream_midi_running(stream))
@@ -355,6 +354,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	    !amdtp_stream_pcm_running(opposite) &&
 	    amdtp_stream_midi_running(opposite))
 		snd_efw_stream_stop(efw, opposite);
+	*/
 
 	/* set sampling rate if both streams are not running */
 	if (!amdtp_stream_running(stream) ||
@@ -372,18 +372,13 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	amdtp_stream_set_pcm(stream, params_channels(hw_params));
 	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
 
-	/* need to start if opposite stream has MIDI stream */
-	if (!opposite->pcm && amdtp_stream_midi_running(opposite)) {
-		amdtp_stream_set_rate(opposite, params_rate(hw_params));
-		mode = snd_efw_get_multiplier_mode(params_rate(hw_params));
-		amdtp_stream_set_pcm(opposite, pcm_channels[mode]);
-		err = snd_efw_stream_start(efw, opposite);
-		if (err < 0)
-			goto end;
-	}
+	mode = snd_efw_get_multiplier_mode(params_rate(hw_params));
+	amdtp_stream_set_rate(opposite, params_rate(hw_params));
+	amdtp_stream_set_pcm(opposite, pcm_channels[mode]);
+	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
 
 	/* start stream */
-	err = snd_efw_stream_start(efw, stream);
+	err = snd_efw_sync_streams_start(efw);
 
 end:
 	return err;
@@ -393,17 +388,18 @@ static int
 pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
-	struct amdtp_stream *stream;
 
+/*
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		stream = &efw->receive_stream;
 	else
 		stream = &efw->transmit_stream;
-
-	/* don't stop stream if MIDI stream is still running */
+*/
+	/* don't stop stream if MIDI stream is still running
 	if (!amdtp_stream_midi_running(stream))
 		snd_efw_stream_stop(efw, stream);
-
+	*/
+	snd_efw_sync_streams_stop(efw);
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
 

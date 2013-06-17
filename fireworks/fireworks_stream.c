@@ -105,3 +105,80 @@ void snd_efw_stream_destroy(struct snd_efw *efw, struct amdtp_stream *stream)
 
 	return;
 }
+
+int snd_efw_sync_streams_init(struct snd_efw *efw)
+{
+	int err;
+
+	err = snd_efw_stream_init(efw, &efw->receive_stream);
+	if (err < 0)
+		goto end;
+
+	err = snd_efw_stream_init(efw, &efw->transmit_stream);
+	if (err < 0)
+		snd_efw_stream_destroy(efw, &efw->receive_stream);
+end:
+	return err;
+}
+
+int snd_efw_sync_streams_start(struct snd_efw *efw)
+{
+	enum snd_efw_clock_source clock_source;
+	struct amdtp_stream *master, *slave;
+	enum amdtp_stream_sync_mode sync_mode;
+	int err;
+
+	/* TODO: clock source change? */
+	err = snd_efw_command_get_clock_source(efw, &clock_source);
+	if (err < 0)
+		goto end;
+	if (clock_source != SND_EFW_CLOCK_SOURCE_SYTMATCH) {
+		master = &efw->receive_stream;
+		slave = &efw->transmit_stream;
+		sync_mode = AMDTP_STREAM_SYNC_DEVICE_MASTER;
+	} else {
+		master = &efw->transmit_stream;
+		slave = &efw->receive_stream;
+		sync_mode = AMDTP_STREAM_SYNC_DRIVER_MASTER;
+	}
+
+	amdtp_stream_set_sync_mode(sync_mode, master, slave);
+
+	err = snd_efw_stream_start(efw, master);
+	if (err < 0)
+		goto end;
+
+	if (!amdtp_stream_wait_run(master)) {
+		err = -EIO;
+		goto end;
+	}
+
+	err = snd_efw_stream_start(efw, slave);
+	if (err < 0)
+		snd_efw_stream_destroy(efw, master);
+end:
+	return err;
+}
+
+void snd_efw_sync_streams_stop(struct snd_efw *efw)
+{
+	struct amdtp_stream *master, *slave;
+
+	if (efw->transmit_stream.sync_mode == AMDTP_STREAM_SYNC_DEVICE_MASTER) {
+		master = &efw->transmit_stream;
+		slave = &efw->receive_stream;
+	} else {
+		master = &efw->receive_stream;
+		slave = &efw->transmit_stream;
+	}
+
+	snd_efw_stream_stop(efw, slave);
+	snd_efw_stream_stop(efw, master);
+}
+
+void snd_efw_sync_streams_destroy(struct snd_efw *efw)
+{
+	snd_efw_sync_streams_stop(efw);
+	snd_efw_stream_destroy(efw, &efw->receive_stream);
+	snd_efw_stream_destroy(efw, &efw->transmit_stream);
+}
