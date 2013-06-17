@@ -75,8 +75,6 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1)
 		s->midi[i] = NULL;
 
-	init_waitqueue_head(&s->run_wait);
-
 	s->sync_mode = AMDTP_STREAM_SYNC_DRIVER_MASTER;
 	s->sync_slave = ERR_PTR(-1);
 
@@ -737,9 +735,6 @@ static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
 	struct amdtp_stream *s = private_data;
 	unsigned int i, packets = header_length / 4;
 
-	/* TODO: needless? */
-	s->run = true;
-
 	/*
 	 * Compute the cycle of the last queued packet.
 	 * (We need only the four lowest bits for the SYT, so we can ignore
@@ -759,9 +754,6 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 	unsigned int p, data_quadlets, packets = header_length / 4;
 	__be32 *headers = header;
 
-	/* TODO: every time? */
-	s->run = true;
-
 	/* each fields in an isochronous header are already used in juju */
 	for (p = 0; p < packets; p += 1) {
 		/* how many quadlets of data in payload of this packet */
@@ -779,6 +771,29 @@ static void sync_slave_callback(struct fw_iso_context *context, u32 cycle,
 				size_t header_length, void *header,
 				void *private_data)
 {
+	return;
+}
+
+/* this is executed one time */
+static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
+				  size_t header_length, void *header,
+				  void *private_data)
+{
+	struct amdtp_stream *s = private_data;
+
+	/* NOTE: in this module the first callback means running */
+	s->run = true;
+
+	/* TODO: overwriting sc is always OK because there's mc? */
+	if (s->direction == AMDTP_STREAM_RECEIVE)
+		context->callback.sc = in_packet_callback;
+	else if (s->sync_mode == AMDTP_STREAM_SYNC_DRIVER_MASTER)
+		context->callback.sc = out_packet_callback;
+	else
+		context->callback.sc = sync_slave_callback;
+
+	context->callback.sc(context, cycle, header_length, header, s);
+
 	return;
 }
 
@@ -807,7 +822,6 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		[CIP_SFC_88200]  = {  0,   67 },
 		[CIP_SFC_176400] = {  0,   67 },
 	};
-	fw_iso_callback_t cb;
 	enum dma_data_direction dir;
 	unsigned int header_size, payload_length;
 	bool skip;
@@ -829,18 +843,12 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	if (s->direction == AMDTP_STREAM_RECEIVE) {
 		dir = DMA_FROM_DEVICE;
 		type = FW_ISO_CONTEXT_RECEIVE;
-		cb = in_packet_callback;
 		header_size = 4;
 		payload_length = amdtp_stream_get_max_payload(s);
 		skip = false;
 	} else {
 		dir = DMA_TO_DEVICE;
 		type = FW_ISO_CONTEXT_TRANSMIT;
-		if (s->sync_mode == AMDTP_STREAM_SYNC_DEVICE_MASTER)
-			cb = sync_slave_callback;
-		else
-			cb = out_packet_callback;
-
 		header_size = 0;
 		payload_length = 0;
 		skip = true;
@@ -850,10 +858,10 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	if (err < 0)
 		goto err_unlock;
 
-	/* create isochronous context */
+	/* NOTE: this callback is overwritten later */
 	s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
 					   type, channel, speed, header_size,
-					   cb, s);
+					   amdtp_stream_callback, s);
 	if (!amdtp_stream_running(s)) {
 		err = PTR_ERR(s->context);
 		if (err == -EBUSY)
@@ -879,6 +887,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	 * "FW_ISO_CONTEXT_MATCH_TAG1" for receive but Fireworks outputs
 	 * NODATA packets with tag 0.
 	 */
+	init_waitqueue_head(&s->run_wait);
 	s->run = false;
 	err = fw_iso_context_start(s->context, -1, 0,
 			FW_ISO_CONTEXT_MATCH_TAG0 | FW_ISO_CONTEXT_MATCH_TAG1);
