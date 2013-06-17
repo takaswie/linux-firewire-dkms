@@ -618,9 +618,10 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle, bool no
 			amdtp_fill_midi(s, buffer, data_blocks);
 
 		s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
-	}
+		payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
+	} else
+		payload_length = 2;
 
-	payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
 	if (queue_context_packet(s, index, 0, payload_length, false) < 0) {
 		amdtp_stream_pcm_abort(s);
 		return;
@@ -657,6 +658,7 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 		pcm = NULL;
 	} else if ((data_quadlets < 3) ||
 		   ((cip_header[1] & AMDTP_FDF_MASK) == AMDTP_FDF_NO_DATA)) {
+		nodata = true;
 		pcm = NULL;
 	} else {
 		/*
@@ -717,8 +719,8 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 
 	/* process sync slave stream */
 	if ((s->sync_mode == AMDTP_STREAM_SYNC_DEVICE_MASTER) &&
-	    (!IS_ERR(s->sync_slave)) &&
-	    (amdtp_stream_pcm_running(s->sync_slave))) {
+	    !IS_ERR(s->sync_slave) &&
+	    amdtp_stream_pcm_running(s->sync_slave)) {
 		s->sync_slave->last_syt_offset =
 					cip_header[1] & AMDTP_SYT_MASK;
 		queue_out_packet(s->sync_slave, 0, nodata);
