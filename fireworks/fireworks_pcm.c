@@ -378,7 +378,12 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 		mode = snd_efw_get_multiplier_mode(params_rate(hw_params));
 		amdtp_stream_set_pcm(opposite, pcm_channels[mode]);
 		err = snd_efw_stream_start(efw, opposite);
+		if (err < 0)
+			goto end;
 	}
+
+	/* start stream */
+	err = snd_efw_stream_start(efw, stream);
 
 end:
 	return err;
@@ -414,10 +419,11 @@ pcm_prepare(struct snd_pcm_substream *substream)
 	else
 		stream = &efw->transmit_stream;
 
-	/* start stream */
-	err = snd_efw_stream_start(efw, stream);
-	if (err < 0)
+	/* wait for stream run */
+	if (!amdtp_stream_wait_run(stream)) {
+		err = -EIO;
 		goto end;
+	}
 
 	/* initialize buffer pointer */
 	amdtp_stream_pcm_prepare(stream);

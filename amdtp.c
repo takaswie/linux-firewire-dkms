@@ -12,10 +12,11 @@
 #include <linux/firewire.h>
 #include <linux/module.h>
 #include <linux/slab.h>
+#include <linux/sched.h>
 #include <sound/pcm.h>
 #include <sound/rawmidi.h>
 #include "amdtp.h"
-#include <sound/core.h>
+
 #define TICKS_PER_CYCLE		3072
 #define CYCLES_PER_SECOND	8000
 #define TICKS_PER_SECOND	(TICKS_PER_CYCLE * CYCLES_PER_SECOND)
@@ -43,6 +44,8 @@
 /* TODO: make these configurable */
 #define INTERRUPT_INTERVAL	16
 #define QUEUE_LENGTH		48
+/* TODO: propper value? */
+#define	STREAM_TIMEOUT_MS	100
 
 static void pcm_period_tasklet(unsigned long data);
 
@@ -71,6 +74,8 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	s->pcm = NULL;
 	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1)
 		s->midi[i] = NULL;
+
+	init_waitqueue_head(&s->run_wait);
 
 	s->sync_mode = AMDTP_STREAM_SYNC_DRIVER_MASTER;
 	s->sync_slave = ERR_PTR(-1);
@@ -732,6 +737,9 @@ static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
 	struct amdtp_stream *s = private_data;
 	unsigned int i, packets = header_length / 4;
 
+	/* TODO: needless? */
+	s->run = true;
+
 	/*
 	 * Compute the cycle of the last queued packet.
 	 * (We need only the four lowest bits for the SYT, so we can ignore
@@ -750,6 +758,9 @@ static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
 	struct amdtp_stream *s = private_data;
 	unsigned int p, data_quadlets, packets = header_length / 4;
 	__be32 *headers = header;
+
+	/* TODO: every time? */
+	s->run = true;
 
 	/* each fields in an isochronous header are already used in juju */
 	for (p = 0; p < packets; p += 1) {
@@ -868,6 +879,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	 * "FW_ISO_CONTEXT_MATCH_TAG1" for receive but Fireworks outputs
 	 * NODATA packets with tag 0.
 	 */
+	s->run = false;
 	err = fw_iso_context_start(s->context, -1, 0,
 			FW_ISO_CONTEXT_MATCH_TAG0 | FW_ISO_CONTEXT_MATCH_TAG1);
 	if (err < 0)
@@ -964,6 +976,21 @@ void amdtp_stream_pcm_abort(struct amdtp_stream *s)
 	}
 }
 EXPORT_SYMBOL(amdtp_stream_pcm_abort);
+
+/**
+ * amdtp_stream_wait_run - block till stream running or timeout
+ * @s: the AMDTP stream
+ *
+ * If this function return false, the AMDTP stream should be stopped.
+ */
+bool amdtp_stream_wait_run(struct amdtp_stream *s)
+{
+	wait_event_timeout(s->run_wait,
+			   s->run == true,
+			   msecs_to_jiffies(STREAM_TIMEOUT_MS));
+	return s->run;
+}
+EXPORT_SYMBOL(amdtp_stream_wait_run);
 
 /**
  * amdtp_stream_midi_add - add MIDI stream

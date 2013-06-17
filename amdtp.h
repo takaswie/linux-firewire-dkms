@@ -60,6 +60,9 @@ struct amdtp_stream {
 	struct fw_iso_context *context;
 	struct mutex mutex;
 
+	bool run;
+	wait_queue_head_t run_wait;
+
 	enum cip_sfc sfc;
 	unsigned int data_block_quadlets;
 	unsigned int pcm_channels;
@@ -110,6 +113,7 @@ void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
 void amdtp_stream_pcm_prepare(struct amdtp_stream *s);
 unsigned long amdtp_stream_pcm_pointer(struct amdtp_stream *s);
 void amdtp_stream_pcm_abort(struct amdtp_stream *s);
+bool amdtp_stream_wait_run(struct amdtp_stream *s);
 
 void amdtp_stream_midi_add(struct amdtp_stream *s,
 			   struct snd_rawmidi_substream *substream);
