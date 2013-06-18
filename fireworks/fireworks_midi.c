@@ -19,22 +19,9 @@
 #include "fireworks.h"
 
 /*
- * According to MMA/AMEI-027, MIDI stream is multiplexed with PCM stream in an
- * Firewire isochronous stream. And Fireworks need to handle input and output
- * stream with the same sampling rate. Then this module use the rules below:
- *
- * [MIDI stream side]
- *  1.When no stream in both direction is started, start stream with 48000
- *  2.When stream in opposite direction is started, start stream with the same
- *    sampling rate.
- *  3.When stream in the same direction has PCM stream and request to stop MIDI
- *    stream, don't stop stream itself.
- * [PCM stream side]
- *  1.When stream in the both direction is started and has no PCM stream, stop
- *    the stream because it include just MIDI stream. Then restart it with
- *    requested sampling rate by PCM component.
- *  2.When MIDI stream is going to be closed but PCM stream is still running,
- *    the stream is kept to be running.
+ * According to MMA/AMEI-027, MIDI stream is multiplexed with PCM stream in
+ * AMDTP packet. The data rate of MIDI message is much less than PCM so there
+ * is a little problem to suspend MIDI streams.
  */
 
 static int
@@ -42,56 +29,24 @@ midi_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw *efw = substream->rmidi->private_data;
 	struct amdtp_stream *stream;
-	struct amdtp_stream *opposite;
-	int *pcm_channels;
-	int run, mode, sampling_rate = 48000;
 	int err;
 
-	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT) {
+	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
 		stream = &efw->receive_stream;
-		pcm_channels = efw->pcm_capture_channels;
-		opposite = &efw->transmit_stream;
-	} else {
+	else
 		stream = &efw->transmit_stream;
-		pcm_channels = efw->pcm_playback_channels;
-		opposite = &efw->receive_stream;
-	}
-
-	/* check other streams */
-	run = stream->midi_triggered;
 
 	/* register pointer */
 	amdtp_stream_midi_add(stream, substream);
 
-	/* the other MIDI streams running */
-	if (run > 0) {
-		err = 0;
-		goto end;
-	}
-	/* PCM stream starts the stream */
-	else if (amdtp_stream_running(stream)) {
-		err = 0;
-		goto end;
+	/* confirm to start stream in current sampling rate */
+	if (!amdtp_stream_running(stream)) {
+		err = snd_efw_sync_streams_start(efw);
+		if (err < 0)
+			goto end;
 	}
 
-	/* opposite stream is running then use the same sampling rate */
-	if (amdtp_stream_running(opposite))
-		err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
-	else {
-		err = snd_efw_command_set_sampling_rate(efw, sampling_rate);
-		snd_ctl_notify(efw->card, SNDRV_CTL_EVENT_MASK_VALUE,
-				efw->control_id_sampling_rate);
-	}
-	if (err < 0)
-		goto end;
-	mode = snd_efw_get_multiplier_mode(sampling_rate);
-	amdtp_stream_set_rate(stream, sampling_rate);
-	amdtp_stream_set_pcm(stream, pcm_channels[mode]);
-
-	/* start stream just for MIDI */
-	err = snd_efw_stream_start(efw, stream);
-	if (err < 0)
-		goto end;
+	err = 0;
 
 end:
 	return err;
@@ -101,28 +56,25 @@ static int
 midi_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw *efw = substream->rmidi->private_data;
-	struct amdtp_stream *stream;
+	struct amdtp_stream *stream, *opposite;
 
-	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
+	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT) {
 		stream = &efw->receive_stream;
-	else
+		opposite = &efw->transmit_stream;
+	} else {
 		stream = &efw->transmit_stream;
+		opposite = &efw->receive_stream;
+	}
 
 	/* unregister pointer */
 	amdtp_stream_midi_remove(stream, substream);
 
-	/* the other streams is running */
-	if (amdtp_stream_midi_running(stream) > 0)
-		goto end;
+	if (!amdtp_stream_midi_running(stream) &&
+	    !amdtp_stream_midi_running(opposite) &&
+	    !amdtp_stream_pcm_running(stream) &&
+	    !amdtp_stream_pcm_running(opposite))
+		snd_efw_sync_streams_stop(efw);
 
-	/* PCM stream is running */
-	if (stream->pcm)
-		goto end;
-
-	/* stop stream */
-	snd_efw_stream_stop(efw, stream);
-
-end:
 	return 0;
 }
 

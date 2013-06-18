@@ -219,10 +219,11 @@ int snd_efw_command_set_digital_interface(struct snd_efw *efw,
 			enum snd_efw_digital_interface digital_interface);
 
 /* for AMDTP stream and CMP */
-int snd_efw_stream_init(struct snd_efw *efw, struct amdtp_stream *stream);
-int snd_efw_stream_start(struct snd_efw *efw, struct amdtp_stream *stream);
-void snd_efw_stream_stop(struct snd_efw *efw, struct amdtp_stream *stream);
-void snd_efw_stream_destroy(struct snd_efw *efw, struct amdtp_stream *stream);
+int snd_efw_sync_streams_init(struct snd_efw *efw);
+int snd_efw_sync_streams_start(struct snd_efw *efw);
+void snd_efw_sync_streams_stop(struct snd_efw *efw);
+void snd_efw_sync_streams_update(struct snd_efw *efw);
+void snd_efw_sync_streams_destroy(struct snd_efw *efw);
 
 /* for procfs subsystem */
 void snd_efw_proc_init(struct snd_efw *efw);

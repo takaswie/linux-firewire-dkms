@@ -228,24 +228,7 @@ snd_efw_update(struct fw_unit *unit)
 	struct snd_efw *efw = card->private_data;
 
 	snd_efw_command_bus_reset(efw->unit);
-
-	/* bus reset for isochronous transmit stream */
-	if (cmp_connection_update(&efw->output_connection) < 0) {
-		amdtp_stream_pcm_abort(&efw->receive_stream);
-		mutex_lock(&efw->mutex);
-		snd_efw_stream_stop(efw, &efw->receive_stream);
-		mutex_unlock(&efw->mutex);
-	}
-	amdtp_stream_update(&efw->receive_stream);
-
-	/* bus reset for isochronous receive stream */
-	if (cmp_connection_update(&efw->input_connection) < 0) {
-		amdtp_stream_pcm_abort(&efw->transmit_stream);
-		mutex_lock(&efw->mutex);
-		snd_efw_stream_stop(efw, &efw->transmit_stream);
-		mutex_unlock(&efw->mutex);
-	}
-	amdtp_stream_update(&efw->transmit_stream);
+	snd_efw_sync_streams_update(efw);
 
 	return;
 }

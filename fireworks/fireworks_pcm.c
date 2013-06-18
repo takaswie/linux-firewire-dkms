@@ -71,8 +71,9 @@ int snd_efw_get_multiplier_mode(int sampling_rate)
 }
 
 static int
-hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
-			struct snd_efw *efw, unsigned int *channels)
+hw_rule_rate(struct snd_pcm_hw_params *params,
+	     struct snd_pcm_hw_rule *rule,
+	     struct snd_efw *efw, unsigned int *channels)
 {
 	struct snd_interval *r =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
@@ -103,8 +104,9 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 }
 
 static int
-hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
-			struct snd_efw *efw, unsigned int *channels)
+hw_rule_channels(struct snd_pcm_hw_params *params,
+		 struct snd_pcm_hw_rule *rule,
+		 struct snd_efw *efw, unsigned int *channels)
 {
 	struct snd_interval *c =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
@@ -135,36 +137,36 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 	return snd_interval_refine(c, &t);
 }
 
-static inline int
+static int
 hw_rule_capture_rate(struct snd_pcm_hw_params *params,
-				struct snd_pcm_hw_rule *rule)
+		     struct snd_pcm_hw_rule *rule)
 {
 	struct snd_efw *efw = rule->private;
 	return hw_rule_rate(params, rule, efw,
 				efw->pcm_capture_channels);
 }
 
-static inline int
+static int
 hw_rule_playback_rate(struct snd_pcm_hw_params *params,
-				struct snd_pcm_hw_rule *rule)
+		      struct snd_pcm_hw_rule *rule)
 {
 	struct snd_efw *efw = rule->private;
 	return hw_rule_rate(params, rule, efw,
 				efw->pcm_playback_channels);
 }
 
-static inline int
+static int
 hw_rule_capture_channels(struct snd_pcm_hw_params *params,
-				struct snd_pcm_hw_rule *rule)
+			 struct snd_pcm_hw_rule *rule)
 {
 	struct snd_efw *efw = rule->private;
 	return hw_rule_channels(params, rule, efw,
 				efw->pcm_capture_channels);
 }
 
-static inline int
+static int
 hw_rule_playback_channels(struct snd_pcm_hw_params *params,
-				struct snd_pcm_hw_rule *rule)
+			  struct snd_pcm_hw_rule *rule)
 {
 	struct snd_efw *efw = rule->private;
 	return hw_rule_channels(params, rule, efw,
@@ -173,7 +175,7 @@ hw_rule_playback_channels(struct snd_pcm_hw_params *params,
 
 static int
 pcm_init_hw_params(struct snd_efw *efw,
-			struct snd_pcm_substream *substream)
+		   struct snd_pcm_substream *substream)
 {
 	unsigned int *pcm_channels;
 	unsigned int rate_bit;
@@ -258,11 +260,12 @@ pcm_init_hw_params(struct snd_efw *efw,
 	if (err < 0)
 		goto end;
 
-	/* format of PCM samples is 16bit or 24bit inner 32bit */
+	/* TODO: format of PCM samples is 16bit or 24bit inner 32bit */
 	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
 				SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
 	if (err < 0)
 		goto end;
+	/* TODO: */
 	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
 				SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 32);
 	if (err < 0)
@@ -292,14 +295,9 @@ pcm_open(struct snd_pcm_substream *substream)
 	if (err < 0)
 		goto end;
 
-	/*
-	 * The same sampling rate must be used for transmit and receive stream
-	 * as long as the streams include PCM samples
-	 */
-	if ((amdtp_stream_running(&efw->receive_stream) &&
-	     amdtp_stream_pcm_running(&efw->receive_stream)) ||
-	    (amdtp_stream_running(&efw->transmit_stream) &&
-	     amdtp_stream_pcm_running(&efw->transmit_stream))) {
+	/* the same sampling rate is applied when any PCM stream running */
+	if (amdtp_stream_pcm_running(&efw->receive_stream) ||
+	    amdtp_stream_pcm_running(&efw->transmit_stream)) {
 		err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
 		if (err < 0)
 			goto end;
@@ -321,16 +319,12 @@ pcm_close(struct snd_pcm_substream *substream)
 
 static int
 pcm_hw_params(struct snd_pcm_substream *substream,
-				struct snd_pcm_hw_params *hw_params)
+	      struct snd_pcm_hw_params *hw_params)
 {
 	struct snd_efw *efw = substream->private_data;
-	struct amdtp_stream *stream;
-	struct amdtp_stream *opposite;
-	unsigned int *pcm_channels;
-	int mode;
+	struct amdtp_stream *stream, *opposite;
 	int err;
 
-	/* keep PCM ring buffer */
 	err = snd_pcm_lib_alloc_vmalloc_buffer(substream,
 				params_buffer_bytes(hw_params));
 	if (err < 0)
@@ -339,51 +333,35 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		stream = &efw->receive_stream;
 		opposite = &efw->transmit_stream;
-		pcm_channels = efw->pcm_playback_channels;
 	} else {
 		stream = &efw->transmit_stream;
 		opposite = &efw->receive_stream;
-		pcm_channels = efw->pcm_capture_channels;
 	}
 
-	/* stop stream if it's just for MIDI streams */
-	if (amdtp_stream_running(stream) &&
-	    !amdtp_stream_pcm_running(stream) &&
-	    amdtp_stream_midi_running(stream))
-		snd_efw_stream_stop(efw, stream);
-	if (amdtp_stream_running(opposite) &&
-	    !amdtp_stream_pcm_running(opposite) &&
-	    amdtp_stream_midi_running(opposite))
-		snd_efw_stream_stop(efw, opposite);
+	/* decide transfer function */
+	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
 
-	/* set sampling rate if both streams are not running */
-	if (!amdtp_stream_running(stream) ||
-	    !amdtp_stream_running(opposite)) {
+	/*
+	 * when opposite PCM stream is not running, stop streams. Then any
+	 * MIDI streams stop temporarily. Then set requested sampling rate
+	 * and restart.
+	 * When oppiste PCM stream is running, don't change sampling rate and
+	 * don't need to restart.
+	 */
+	if (!amdtp_stream_pcm_running(opposite)) {
+		/* confirm to stop because MIDI may still use it */
+		snd_efw_sync_streams_stop(efw);
+
 		err = snd_efw_command_set_sampling_rate(efw,
-					params_rate(hw_params));
+						params_rate(hw_params));
 		if (err < 0)
 			return err;
 		snd_ctl_notify(efw->card, SNDRV_CTL_EVENT_MASK_VALUE,
-					efw->control_id_sampling_rate);
+			       efw->control_id_sampling_rate);
+
+		/* restart */
+		err = snd_efw_sync_streams_start(efw);
 	}
-
-	/* set AMDTP parameters for transmit stream */
-	amdtp_stream_set_rate(stream, params_rate(hw_params));
-	amdtp_stream_set_pcm(stream, params_channels(hw_params));
-	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
-
-	/* need to start if opposite stream has MIDI stream */
-	if (!opposite->pcm && amdtp_stream_midi_running(opposite)) {
-		amdtp_stream_set_rate(opposite, params_rate(hw_params));
-		mode = snd_efw_get_multiplier_mode(params_rate(hw_params));
-		amdtp_stream_set_pcm(opposite, pcm_channels[mode]);
-		err = snd_efw_stream_start(efw, opposite);
-		if (err < 0)
-			goto end;
-	}
-
-	/* start stream */
-	err = snd_efw_stream_start(efw, stream);
 
 end:
 	return err;
@@ -393,20 +371,19 @@ static int
 pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
-	struct amdtp_stream *stream;
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		stream = &efw->receive_stream;
-	else
-		stream = &efw->transmit_stream;
-
-	/* don't stop stream if MIDI stream is still running */
-	if (!amdtp_stream_midi_running(stream))
-		snd_efw_stream_stop(efw, stream);
+	/* if no PCM/MIDI streams are running, then stop streams */
+	/* TODO: I wonder why but transmit midi is running??? */
+	if (!amdtp_stream_pcm_running(&efw->transmit_stream) &&
+	    !amdtp_stream_pcm_running(&efw->receive_stream) &&
+	    !amdtp_stream_midi_running(&efw->transmit_stream) &&
+	    !amdtp_stream_midi_running(&efw->receive_stream))
+		snd_efw_sync_streams_stop(efw);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
 
+/* It's OK just to consider this pcm substream. */
 static int
 pcm_prepare(struct snd_pcm_substream *substream)
 {
@@ -432,31 +409,33 @@ end:
 	return err;
 }
 
+/* It's OK just to consider this pcm substream. */
 static int
 pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_efw *efw = substream->private_data;
-	struct snd_pcm_substream *pcm;
+	struct amdtp_stream *stream;
+
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		stream = &efw->receive_stream;
+	else
+		stream = &efw->transmit_stream;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		pcm = substream;
+		amdtp_stream_pcm_trigger(stream, substream);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		pcm = NULL;
+		amdtp_stream_pcm_trigger(stream, NULL);
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		amdtp_stream_pcm_trigger(&efw->receive_stream, pcm);
-	else
-		amdtp_stream_pcm_trigger(&efw->transmit_stream, pcm);
-
 	return 0;
 }
 
+/* It's OK just to consider this pcm substream. */
 static snd_pcm_uframes_t
 pcm_pointer(struct snd_pcm_substream *substream)
 {
@@ -507,31 +486,13 @@ int snd_efw_create_pcm_devices(struct snd_efw *efw)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &pcm_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &pcm_capture_ops);
 
-	/* for host transmit and target input */
-	err = snd_efw_stream_init(efw, &efw->transmit_stream);
-	if (err < 0)
-		goto end;
-
-	/* for target output and host receive */
-	err = snd_efw_stream_init(efw, &efw->receive_stream);
-	if (err < 0) {
-		snd_efw_stream_destroy(efw, &efw->transmit_stream);
-		goto end;
-	}
-
+	snd_efw_sync_streams_init(efw);
 end:
 	return err;
 }
 
 void snd_efw_destroy_pcm_devices(struct snd_efw *efw)
 {
-	amdtp_stream_pcm_abort(&efw->receive_stream);
-	snd_efw_stream_stop(efw, &efw->receive_stream);
-	snd_efw_stream_destroy(efw, &efw->receive_stream);
-
-	amdtp_stream_pcm_abort(&efw->transmit_stream);
-	snd_efw_stream_stop(efw, &efw->transmit_stream);
-	snd_efw_stream_destroy(efw, &efw->transmit_stream);
-
+	snd_efw_sync_streams_destroy(efw);
 	return;
 }
