@@ -49,8 +49,8 @@ enum amdtp_stream_direction {
 };
 
 enum amdtp_stream_sync_mode {
-	AMDTP_STREAM_SYNC_DRIVER_MASTER,
-	AMDTP_STREAM_SYNC_DEVICE_MASTER
+	AMDTP_STREAM_SYNC_TO_DRIVER,
+	AMDTP_STREAM_SYNC_TO_DEVICE
 };
 
 struct amdtp_stream {

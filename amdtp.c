@@ -47,6 +47,9 @@
 /* TODO: propper value? */
 #define	STREAM_TIMEOUT_MS	100
 
+#define RECEIVE_PACKET_HEADER_SIZE	4
+#define TRANSMIT_PACKET_HEADER_SIZE	0
+
 static void pcm_period_tasklet(unsigned long data);
 
 /**
@@ -75,7 +78,7 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1)
 		s->midi[i] = NULL;
 
-	s->sync_mode = AMDTP_STREAM_SYNC_DRIVER_MASTER;
+	s->sync_mode = AMDTP_STREAM_SYNC_TO_DRIVER;
 	s->sync_slave = ERR_PTR(-1);
 
 	return 0;
@@ -543,9 +546,9 @@ static void pcm_period_tasklet(unsigned long data)
 		snd_pcm_period_elapsed(pcm);
 }
 
-static int queue_context_packet(struct amdtp_stream *s, unsigned int index,
-				unsigned int header_length,
-				unsigned int payload_length, bool skip)
+static int queue_packet(struct amdtp_stream *s, unsigned int index,
+			unsigned int header_length,
+			unsigned int payload_length, bool skip)
 {
 	struct fw_iso_packet p = {0};
 	int err;
@@ -553,7 +556,7 @@ static int queue_context_packet(struct amdtp_stream *s, unsigned int index,
 	p.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
 	p.tag = TAG_CIP;
 	p.header_length = header_length;
-	p.payload_length = payload_length;
+	p.payload_length = (!skip) ? payload_length : 0;
 	p.skip = (!skip) ? 0: 1;
 	err = fw_iso_context_queue(s->context, &p, &s->buffer.iso_buffer,
 				   s->buffer.packets[index].offset);
@@ -573,7 +576,23 @@ end:
 	return err;
 }
 
-static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle, bool nodata)
+static inline int queue_transmit_packet(struct amdtp_stream *s,
+					unsigned int index,
+					unsigned int payload_length, bool skip)
+{
+	return queue_packet(s, index, TRANSMIT_PACKET_HEADER_SIZE,
+			    payload_length, skip);
+}
+
+static inline int queue_receive_packet(struct amdtp_stream *s,
+				       unsigned int index)
+{
+	return queue_packet(s, index, RECEIVE_PACKET_HEADER_SIZE,
+			    amdtp_stream_get_max_payload(s), false);
+}
+
+static void transmit_packet(struct amdtp_stream *s,
+			    unsigned int cycle, bool nodata)
 {
 	__be32 *buffer;
 	unsigned int index, syt, fdf, data_blocks, payload_length;
@@ -586,18 +605,18 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle, bool no
 	data_blocks = calculate_data_blocks(s);
 
 	/*
-	 * if the device is in non syt match mode,  then the value of syt field
+	 * if the device is in non syt match mode, then the value of syt field
 	 * in transmit packet should derives from received packet.
 	 */
-	if (s->sync_mode == AMDTP_STREAM_SYNC_DEVICE_MASTER)
+	if (s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE)
 		syt = s->last_syt_offset;
 	else
 		syt = calculate_syt(s, cycle);
 
-	if (!nodata)
-		fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
-	else
+	if (nodata)
 		fdf = AMDTP_FDF_NO_DATA;
+	else
+		fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
 
 	buffer = s->buffer.packets[index].buffer;
 	buffer[0] = cpu_to_be32(ACCESS_ONCE(s->source_node_id_field) |
@@ -607,7 +626,10 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle, bool no
 				fdf | syt);
 	buffer += 2;
 
-	if (!nodata) {
+	if (nodata) {
+		pcm = NULL;
+		payload_length = 2;
+	} else {
 		pcm = ACCESS_ONCE(s->pcm);
 		if (pcm)
 			s->transfer_samples(s, pcm, buffer, data_blocks);
@@ -619,10 +641,9 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle, bool no
 
 		s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
 		payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
-	} else
-		payload_length = 2;
+	}
 
-	if (queue_context_packet(s, index, 0, payload_length, false) < 0) {
+	if (queue_transmit_packet(s, index, payload_length, false) < 0) {
 		amdtp_stream_pcm_abort(s);
 		return;
 	}
@@ -631,13 +652,13 @@ static void queue_out_packet(struct amdtp_stream *s, unsigned int cycle, bool no
 		check_pcm_pointer(s, pcm, data_blocks);
 }
 
-static void handle_in_packet_data(struct amdtp_stream *s,
-				  unsigned int data_quadlets)
+static void receive_packet(struct amdtp_stream *s,
+			   unsigned int payload_quadlets)
 {
 	__be32 *buffer;
 	u32 cip_header[2];
-	unsigned int index, data_block_quadlets, data_block_counter,
-		     payload_length, frames = 0;
+	unsigned int index, frames = 0,
+		     data_block_quadlets, data_block_counter;
 	struct snd_pcm_substream *pcm;
 	bool nodata = false;
 
@@ -649,90 +670,68 @@ static void handle_in_packet_data(struct amdtp_stream *s,
 	cip_header[0] = be32_to_cpu(buffer[0]);
 	cip_header[1] = be32_to_cpu(buffer[1]);
 
-	/* checking CIP headers for AMDTP with restriction of this module */
+	/* This module supports AMDTP packet */
 	if (((cip_header[0] & CIP_EOH_MASK) == CIP_EOH) ||
 	    ((cip_header[1] & CIP_EOH_MASK) != CIP_EOH) ||
 	    ((cip_header[1] & CIP_FMT_MASK) != CIP_FMT_AM)) {
 		dev_err(&s->unit->device, "CIP header error: %08X:%08X\n",
 			cip_header[0], cip_header[1]);
 		pcm = NULL;
-	} else if ((data_quadlets < 3) ||
+	} else if ((payload_quadlets < 3) ||
 		   ((cip_header[1] & AMDTP_FDF_MASK) == AMDTP_FDF_NO_DATA)) {
 		nodata = true;
 		pcm = NULL;
 	} else {
-		/*
-		 * NOTE: this module doesn't check dbc and syt field
-		 *
-		 * Echo Audio's Fireworks reports wrong number of data block
-		 * counter. It always reports it with increment by 8 blocks
-		 * even if actual data blocks different from 8.
-		 *
-		 * Handling syt field is related to "presentation" time stamp,
-		 * but ALSA has no implements equivalent to it so this module
-		 * don't support it.
-		 */
 		data_block_quadlets = (cip_header[0] & AMDTP_DBS_MASK) >>
 								AMDTP_DBS_SHIFT;
 		data_block_counter  = cip_header[0] & AMDTP_DBC_MASK;
 
 		/*
-		 * NOTE: Echo Audio's Fireworks reports a fixed value for data
-		 * block quadlets but the actual value differs depending on
-		 * current sampling rate. This is a workaround for Fireworks.
+		 * Some devices of Echo Audio's Fireworks reports a fixed
+		 * value for data block quadlets but the actual value is
+		 * different This is a workaround for this issue.
 		 */
-		if ((data_quadlets - 2) % data_block_quadlets > 0)
+		if ((payload_quadlets - 2) % data_block_quadlets > 0)
 			s->data_block_quadlets = s->pcm_channels +
 					DIV_ROUND_UP(s->midi_ports, 8);
 		else
 			s->data_block_quadlets = data_block_quadlets;
 
-		/* finish to check CIP header */
 		buffer += 2;
 
-		/*
-		 * NOTE: here "frames" is equivalent to "events"
-		 * in IEC 61883-1
-		 */
-		frames = (data_quadlets - 2) / s->data_block_quadlets;
-		if (frames == 0)
-			pcm = NULL;
-		else {
-			pcm = ACCESS_ONCE(s->pcm);
-			if (pcm)
-				s->transfer_samples(s, pcm, buffer, frames);
-			if (s->midi_ports)
-				amdtp_pull_midi(s, buffer, frames);
-		}
+		frames = (payload_quadlets - 2) / s->data_block_quadlets;
+		pcm = ACCESS_ONCE(s->pcm);
+		if (pcm)
+			s->transfer_samples(s, pcm, buffer, frames);
+		if (s->midi_ports)
+			amdtp_pull_midi(s, buffer, frames);
 
 		/* for next packet */
 		s->data_block_quadlets = data_block_quadlets;
 		s->data_block_counter  = data_block_counter;
 	}
 
-	/* queueing a packet for next cycle */
-	payload_length = amdtp_stream_get_max_payload(s);
-	if (queue_context_packet(s, index, 4, payload_length, false) < 0) {
+	if (queue_receive_packet(s, index) < 0) {
 		amdtp_stream_pcm_abort(s);
 		return;
 	}
 
-	/* process sync slave stream */
-	if ((s->sync_mode == AMDTP_STREAM_SYNC_DEVICE_MASTER) &&
+	/* Process sync slave stream */
+	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
 	    !IS_ERR(s->sync_slave) &&
-	    amdtp_stream_pcm_running(s->sync_slave)) {
+	    amdtp_stream_running(s->sync_slave)) {
 		s->sync_slave->last_syt_offset =
 					cip_header[1] & AMDTP_SYT_MASK;
-		queue_out_packet(s->sync_slave, 0, nodata);
+		transmit_packet(s->sync_slave, 0, nodata);
 	}
 
-	/* calculate period and buffer borders */
 	if (pcm)
 		check_pcm_pointer(s, pcm, frames);
 }
 
-static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
-			size_t header_length, void *header, void *private_data)
+static void transmit_stream_callback(struct fw_iso_context *context, u32 cycle,
+				     size_t header_length, void *header,
+				     void *private_data)
 {
 	struct amdtp_stream *s = private_data;
 	unsigned int i, packets = header_length / 4;
@@ -745,33 +744,34 @@ static void out_packet_callback(struct fw_iso_context *context, u32 cycle,
 	cycle += QUEUE_LENGTH - packets;
 
 	for (i = 0; i < packets; ++i)
-		queue_out_packet(s, ++cycle, false);
+		transmit_packet(s, ++cycle, false);
 	fw_iso_context_queue_flush(s->context);
 }
 
-static void in_packet_callback(struct fw_iso_context *context, u32 cycle,
-			size_t header_length, void *header, void *private_data)
+static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
+				    size_t header_length, void *header,
+				    void *private_data)
 {
 	struct amdtp_stream *s = private_data;
-	unsigned int p, data_quadlets, packets = header_length / 4;
+	unsigned int p, payload_quadlets, packets = header_length / 4;
 	__be32 *headers = header;
 
 	/* each fields in an isochronous header are already used in juju */
 	for (p = 0; p < packets; p += 1) {
-		/* how many quadlets of data in payload of this packet */
-		data_quadlets =
+		/* how many quadlets in payload of this packet */
+		payload_quadlets =
 			(be32_to_cpu(headers[p]) >> ISO_DATA_LENGTH_SHIFT) / 4;
 		/* handle each data in payload */
-		handle_in_packet_data(s, data_quadlets);
+		receive_packet(s, payload_quadlets);
 	}
 
 	fw_iso_context_queue_flush(s->context);
 }
 
 /* processing is done by master callback */
-static void sync_slave_callback(struct fw_iso_context *context, u32 cycle,
-				size_t header_length, void *header,
-				void *private_data)
+static void slave_stream_callback(struct fw_iso_context *context, u32 cycle,
+				  size_t header_length, void *header,
+				  void *private_data)
 {
 	return;
 }
@@ -783,16 +783,15 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
 {
 	struct amdtp_stream *s = private_data;
 
-	/* NOTE: in this module the first callback means running */
 	s->run = true;
 
-	/* TODO: overwriting sc is always OK because there's mc? */
+	/* TODO: overwriting sc is always OK? there is mc. */
 	if (s->direction == AMDTP_STREAM_RECEIVE)
-		context->callback.sc = in_packet_callback;
-	else if (s->sync_mode == AMDTP_STREAM_SYNC_DRIVER_MASTER)
-		context->callback.sc = out_packet_callback;
+		context->callback.sc = receive_stream_callback;
+	else if (s->sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER)
+		context->callback.sc = transmit_stream_callback;
 	else
-		context->callback.sc = sync_slave_callback;
+		context->callback.sc = slave_stream_callback;
 
 	context->callback.sc(context, cycle, header_length, header, s);
 
@@ -824,9 +823,8 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		[CIP_SFC_88200]  = {  0,   67 },
 		[CIP_SFC_176400] = {  0,   67 },
 	};
+	unsigned int header_size;
 	enum dma_data_direction dir;
-	unsigned int header_size, payload_length;
-	bool skip;
 	int type, err;
 
 	mutex_lock(&s->mutex);
@@ -845,15 +843,11 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	if (s->direction == AMDTP_STREAM_RECEIVE) {
 		dir = DMA_FROM_DEVICE;
 		type = FW_ISO_CONTEXT_RECEIVE;
-		header_size = 4;
-		payload_length = amdtp_stream_get_max_payload(s);
-		skip = false;
+		header_size = RECEIVE_PACKET_HEADER_SIZE;
 	} else {
 		dir = DMA_TO_DEVICE;
 		type = FW_ISO_CONTEXT_TRANSMIT;
-		header_size = 0;
-		payload_length = 0;
-		skip = true;
+		header_size = TRANSMIT_PACKET_HEADER_SIZE;
 	}
 	err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
 				      amdtp_stream_get_max_payload(s), dir);
@@ -877,8 +871,11 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 
 	s->packet_index = 0;
 	do {
-		err = queue_context_packet(s, s->packet_index, header_size,
-					   payload_length, skip);
+		if (s->direction == AMDTP_STREAM_RECEIVE)
+			err = queue_receive_packet(s, s->packet_index);
+		else
+			err = queue_transmit_packet(s, s->packet_index,
+						    0, true);
 		if (err < 0)
 			goto err_context;
 	} while (s->packet_index > 0);
@@ -1043,9 +1040,10 @@ EXPORT_SYMBOL(amdtp_stream_midi_remove);
 bool amdtp_stream_midi_running(struct amdtp_stream *s)
 {
 	int i;
-	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1) {
-		if (!IS_ERR_OR_NULL(s->midi[i]))
+	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i++) {
+		if (!IS_ERR_OR_NULL(s->midi[i])) {
 			return true;
+		}
 	}
 
 	return false;
