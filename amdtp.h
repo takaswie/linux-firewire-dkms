@@ -14,7 +14,8 @@
  *	be used if supported by the device.
  */
 enum cip_flags {
-	CIP_NONBLOCKING = 0,
+	CIP_NONBLOCKING = 0x00,
+	CIP_BLOCKING	= 0x01,
 };
 
 /**
@@ -71,7 +72,6 @@ struct amdtp_stream {
 				 struct snd_pcm_substream *pcm,
 				 __be32 *buffer, unsigned int frames);
 
-	unsigned int syt_interval;
 	unsigned int source_node_id_field;
 	struct iso_packets_buffer buffer;
 

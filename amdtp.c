@@ -31,6 +31,7 @@
 #define CIP_FMT_MASK		0x3F000000
 #define CIP_FMT_SHIFT		24
 #define CIP_FMT_AM		(0x10 << CIP_FMT_SHIFT)
+#define	CIP_SYT_NO_INFO		0xFFFF
 #define AMDTP_FDF_MASK		0x00FF0000
 #define AMDTP_FDF_SFC_SHIFT	16
 #define AMDTP_FDF_NO_DATA	(0xFF << AMDTP_FDF_SFC_SHIFT)
@@ -50,6 +51,22 @@
 #define RECEIVE_PACKET_HEADER_SIZE	4
 #define TRANSMIT_PACKET_HEADER_SIZE	0
 
+/* params are depends on sampling rate */
+static const struct {
+	unsigned int rate;
+	unsigned int syt_interval;
+	unsigned int data_block;
+	unsigned int syt_offset;
+} amdtp_stream_params[] = {
+	[CIP_SFC_32000]  = {  32000,  8,  4, 3072 },
+	[CIP_SFC_44100]  = {  44100,  8,  0,   67 },
+	[CIP_SFC_48000]  = {  46000,  8,  6, 1024 },
+	[CIP_SFC_88200]  = {  88200, 16,  0,   67 },
+	[CIP_SFC_96000]  = {  96000, 16, 12, 1024 },
+	[CIP_SFC_176400] = { 176400, 32,  0,   67 },
+	[CIP_SFC_192000] = { 192000, 32, 24, 1024 },
+};
+
 static void pcm_period_tasklet(unsigned long data);
 
 /**
@@ -62,9 +79,6 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 		enum amdtp_stream_direction direction, enum cip_flags flags)
 {
 	int i;
-
-	if (flags != CIP_NONBLOCKING)
-		return -EINVAL;
 
 	s->unit = fw_unit_get(unit);
 	s->direction = direction;
@@ -107,27 +121,14 @@ EXPORT_SYMBOL(amdtp_stream_destroy);
  */
 void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate)
 {
-	static const struct {
-		unsigned int rate;
-		unsigned int syt_interval;
-	} rate_info[] = {
-		[CIP_SFC_32000]  = {  32000,  8, },
-		[CIP_SFC_44100]  = {  44100,  8, },
-		[CIP_SFC_48000]  = {  48000,  8, },
-		[CIP_SFC_88200]  = {  88200, 16, },
-		[CIP_SFC_96000]  = {  96000, 16, },
-		[CIP_SFC_176400] = { 176400, 32, },
-		[CIP_SFC_192000] = { 192000, 32, },
-	};
 	unsigned int sfc;
 
 	if (WARN_ON(amdtp_stream_running(s)))
 		return;
 
-	for (sfc = 0; sfc < ARRAY_SIZE(rate_info); ++sfc)
-		if (rate_info[sfc].rate == rate) {
+	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_stream_params); ++sfc)
+		if (amdtp_stream_params[sfc].rate == rate) {
 			s->sfc = sfc;
-			s->syt_interval = rate_info[sfc].syt_interval;
 			return;
 		}
 	WARN_ON(1);
@@ -144,23 +145,14 @@ EXPORT_SYMBOL(amdtp_stream_set_rate);
  */
 unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s)
 {
-	static const unsigned int max_data_blocks[] = {
-		[CIP_SFC_32000]  =  4,
-		[CIP_SFC_44100]  =  6,
-		[CIP_SFC_48000]  =  6,
-		[CIP_SFC_88200]  = 12,
-		[CIP_SFC_96000]  = 12,
-		[CIP_SFC_176400] = 23,
-		[CIP_SFC_192000] = 24,
-	};
-
+	/*
+	 * TODO: move to somewhere
+	 * actually setting these again is not problem but...
+	 */
 	s->data_block_quadlets = s->pcm_channels;
 	s->data_block_quadlets += DIV_ROUND_UP(s->midi_ports, 8);
 
-	if (s->direction == AMDTP_STREAM_RECEIVE)
-		return 8 + s->syt_interval * s->data_block_quadlets * 4;
-	else
-		return 8 + max_data_blocks[s->sfc] * 4 * s->data_block_quadlets;
+	return 8 + amdtp_stream_params[s->sfc].syt_interval * s->data_block_quadlets * 4;
 }
 EXPORT_SYMBOL(amdtp_stream_get_max_payload);
 
@@ -230,10 +222,12 @@ static unsigned int calculate_data_blocks(struct amdtp_stream *s)
 {
 	unsigned int phase, data_blocks;
 
-	if (!cip_sfc_is_base_44100(s->sfc)) {
+	if (s->flags & CIP_BLOCKING)
+		data_blocks = amdtp_stream_params[s->sfc].syt_interval;
+	else if (!cip_sfc_is_base_44100(s->sfc))
 		/* Sample_rate / 8000 is an integer, and precomputed. */
 		data_blocks = s->data_block_state;
-	} else {
+	else {
 		phase = s->data_block_state;
 
 		/*
@@ -293,6 +287,11 @@ static unsigned int calculate_syt(struct amdtp_stream *s,
 
 	if (syt_offset < TICKS_PER_CYCLE) {
 		syt_offset += TRANSFER_DELAY_TICKS - TICKS_PER_CYCLE;
+		/* TODO: these calculation is needless, put them into the table? */
+		if (s->flags & CIP_BLOCKING)
+			syt_offset += TICKS_PER_SECOND *
+				amdtp_stream_params[s->sfc].syt_interval /
+				amdtp_stream_params[s->sfc].rate;
 		syt = (cycle + syt_offset / TICKS_PER_CYCLE) << 12;
 		syt += syt_offset % TICKS_PER_CYCLE;
 
@@ -591,32 +590,31 @@ static inline int queue_receive_packet(struct amdtp_stream *s,
 			    amdtp_stream_get_max_payload(s), false);
 }
 
+/* TODO: cycle and syt has mathmatical relations. */
 static void transmit_packet(struct amdtp_stream *s,
-			    unsigned int cycle, bool nodata)
+			    unsigned int cycle, unsigned int syt, bool nodata)
 {
 	__be32 *buffer;
-	unsigned int index, syt, fdf, data_blocks, payload_length;
+	unsigned int index, fdf, data_blocks, payload_length;
+	bool noinfo;
 	struct snd_pcm_substream *pcm;
 
 	if (s->packet_index < 0)
 		return;
 	index = s->packet_index;
 
-	data_blocks = calculate_data_blocks(s);
-
-	/*
-	 * if the device is in non syt match mode, then the value of syt field
-	 * in transmit packet should derives from received packet.
-	 */
-	if (s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE)
-		syt = s->last_syt_offset;
-	else
-		syt = calculate_syt(s, cycle);
-
-	if (nodata)
+	if (nodata && (s->flags & CIP_BLOCKING)) {
+		data_blocks = 0;
 		fdf = AMDTP_FDF_NO_DATA;
-	else
+		syt = CIP_SYT_NO_INFO;
+		noinfo = true;
+	} else {
+		data_blocks = calculate_data_blocks(s);
 		fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
+		if (s->sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER)
+			syt = calculate_syt(s, cycle);
+		noinfo = (syt == CIP_SYT_NO_INFO);
+	}
 
 	buffer = s->buffer.packets[index].buffer;
 	buffer[0] = cpu_to_be32(ACCESS_ONCE(s->source_node_id_field) |
@@ -626,29 +624,29 @@ static void transmit_packet(struct amdtp_stream *s,
 				fdf | syt);
 	buffer += 2;
 
-	if (nodata) {
-		pcm = NULL;
-		payload_length = 2;
-	} else {
+	if (data_blocks > 0) {
 		pcm = ACCESS_ONCE(s->pcm);
-		if (pcm)
+		if (!noinfo && pcm)
 			s->transfer_samples(s, pcm, buffer, data_blocks);
 		else
 			amdtp_fill_pcm_silence(s, buffer, data_blocks);
 
+		/* TODO: noinfo */
 		if (s->midi_ports)
 			amdtp_fill_midi(s, buffer, data_blocks);
 
-		s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
-		payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
-	}
+		if (!noinfo)
+			s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
+	} else
+		pcm = NULL;
 
+	payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
 	if (queue_transmit_packet(s, index, payload_length, false) < 0) {
 		amdtp_stream_pcm_abort(s);
 		return;
 	}
 
-	if (pcm)
+	if (!noinfo && pcm)
 		check_pcm_pointer(s, pcm, data_blocks);
 }
 
@@ -658,7 +656,7 @@ static void receive_packet(struct amdtp_stream *s,
 	__be32 *buffer;
 	u32 cip_header[2];
 	unsigned int index, frames = 0,
-		     data_block_quadlets, data_block_counter;
+		     data_block_quadlets, data_block_counter, syt;
 	struct snd_pcm_substream *pcm;
 	bool nodata = false;
 
@@ -676,9 +674,10 @@ static void receive_packet(struct amdtp_stream *s,
 	    ((cip_header[1] & CIP_FMT_MASK) != CIP_FMT_AM)) {
 		dev_err(&s->unit->device, "CIP header error: %08X:%08X\n",
 			cip_header[0], cip_header[1]);
-		pcm = NULL;
+		amdtp_stream_pcm_abort(s);
+		return;
 	} else if ((payload_quadlets < 3) ||
-		   ((cip_header[1] & AMDTP_FDF_MASK) == AMDTP_FDF_NO_DATA)) {
+	           ((cip_header[1] & AMDTP_FDF_MASK) == AMDTP_FDF_NO_DATA)) {
 		nodata = true;
 		pcm = NULL;
 	} else {
@@ -718,11 +717,9 @@ static void receive_packet(struct amdtp_stream *s,
 
 	/* Process sync slave stream */
 	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
-	    !IS_ERR(s->sync_slave) &&
-	    amdtp_stream_running(s->sync_slave)) {
-		s->sync_slave->last_syt_offset =
-					cip_header[1] & AMDTP_SYT_MASK;
-		transmit_packet(s->sync_slave, 0, nodata);
+	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave)) {
+		syt = cip_header[1] & AMDTP_SYT_MASK;
+		transmit_packet(s->sync_slave, 0, syt, nodata);
 	}
 
 	if (pcm)
@@ -744,7 +741,7 @@ static void transmit_stream_callback(struct fw_iso_context *context, u32 cycle,
 	cycle += QUEUE_LENGTH - packets;
 
 	for (i = 0; i < packets; ++i)
-		transmit_packet(s, ++cycle, false);
+		transmit_packet(s, ++cycle, 0, false);
 	fw_iso_context_queue_flush(s->context);
 }
 
@@ -811,18 +808,6 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
  */
 int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 {
-	static const struct {
-		unsigned int data_block;
-		unsigned int syt_offset;
-	} initial_state[] = {
-		[CIP_SFC_32000]  = {  4, 3072 },
-		[CIP_SFC_48000]  = {  6, 1024 },
-		[CIP_SFC_96000]  = { 12, 1024 },
-		[CIP_SFC_192000] = { 24, 1024 },
-		[CIP_SFC_44100]  = {  0,   67 },
-		[CIP_SFC_88200]  = {  0,   67 },
-		[CIP_SFC_176400] = {  0,   67 },
-	};
 	unsigned int header_size;
 	enum dma_data_direction dir;
 	int type, err;
@@ -835,8 +820,9 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		goto err_unlock;
 	}
 
-	s->data_block_state = initial_state[s->sfc].data_block;
-	s->syt_offset_state = initial_state[s->sfc].syt_offset;
+	s->data_block_state = amdtp_stream_params[s->sfc].data_block;
+	s->data_block_counter = 0;
+	s->syt_offset_state = amdtp_stream_params[s->sfc].syt_offset;
 	s->last_syt_offset = TICKS_PER_CYCLE;
 
 	/* initialize packet buffer */
@@ -867,7 +853,6 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	}
 
 	amdtp_stream_update(s);
-	s->data_block_counter = 0;
 
 	s->packet_index = 0;
 	do {
