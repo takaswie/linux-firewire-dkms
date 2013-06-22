@@ -597,7 +597,7 @@ static void transmit_packet(struct amdtp_stream *s,
 	__be32 *buffer;
 	unsigned int index, fdf, data_blocks, payload_length;
 	bool noinfo;
-	struct snd_pcm_substream *pcm;
+	struct snd_pcm_substream *pcm = NULL;
 
 	if (s->packet_index < 0)
 		return;
@@ -635,10 +635,9 @@ static void transmit_packet(struct amdtp_stream *s,
 		if (s->midi_ports)
 			amdtp_fill_midi(s, buffer, data_blocks);
 
-		if (!noinfo)
-			s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
-	} else
-		pcm = NULL;
+	}
+
+	s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
 
 	payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
 	if (queue_transmit_packet(s, index, payload_length, false) < 0) {
@@ -668,6 +667,8 @@ static void receive_packet(struct amdtp_stream *s,
 	cip_header[0] = be32_to_cpu(buffer[0]);
 	cip_header[1] = be32_to_cpu(buffer[1]);
 
+	syt = cip_header[1] & AMDTP_SYT_MASK;
+
 	/* This module supports AMDTP packet */
 	if (((cip_header[0] & CIP_EOH_MASK) == CIP_EOH) ||
 	    ((cip_header[1] & CIP_EOH_MASK) != CIP_EOH) ||
@@ -692,7 +693,7 @@ static void receive_packet(struct amdtp_stream *s,
 		 */
 		if ((payload_quadlets - 2) % data_block_quadlets > 0)
 			s->data_block_quadlets = s->pcm_channels +
-					DIV_ROUND_UP(s->midi_ports, 8);
+						DIV_ROUND_UP(s->midi_ports, 8);
 		else
 			s->data_block_quadlets = data_block_quadlets;
 
@@ -717,10 +718,8 @@ static void receive_packet(struct amdtp_stream *s,
 
 	/* Process sync slave stream */
 	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
-	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave)) {
-		syt = cip_header[1] & AMDTP_SYT_MASK;
+	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave))
 		transmit_packet(s->sync_slave, 0, syt, nodata);
-	}
 
 	if (pcm)
 		check_pcm_pointer(s, pcm, frames);
@@ -761,6 +760,11 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 		/* handle each data in payload */
 		receive_packet(s, payload_quadlets);
 	}
+
+	/* when sync to device, flush the packets foor slave stream */
+	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
+	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave))
+		fw_iso_context_queue_flush(s->sync_slave->context);
 
 	fw_iso_context_queue_flush(s->context);
 }
