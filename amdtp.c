@@ -596,24 +596,26 @@ static void transmit_packet(struct amdtp_stream *s,
 {
 	__be32 *buffer;
 	unsigned int index, fdf, data_blocks, payload_length;
-	bool noinfo;
 	struct snd_pcm_substream *pcm = NULL;
 
 	if (s->packet_index < 0)
 		return;
 	index = s->packet_index;
 
-	if (nodata && (s->flags & CIP_BLOCKING)) {
-		data_blocks = 0;
-		fdf = AMDTP_FDF_NO_DATA;
+	if (nodata && (s->flags & CIP_BLOCKING))
 		syt = CIP_SYT_NO_INFO;
-		noinfo = true;
-	} else {
+	else {
 		data_blocks = calculate_data_blocks(s);
 		fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
 		if (s->sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER)
 			syt = calculate_syt(s, cycle);
-		noinfo = (syt == CIP_SYT_NO_INFO);
+	}
+
+	/* only AMDTP blocking mode can support nodata */
+	if ((syt == CIP_SYT_NO_INFO) && (s->flags & CIP_BLOCKING)) {
+		fdf = AMDTP_FDF_NO_DATA;
+		data_blocks = 0;
+		nodata = 1;
 	}
 
 	buffer = s->buffer.packets[index].buffer;
@@ -624,14 +626,13 @@ static void transmit_packet(struct amdtp_stream *s,
 				fdf | syt);
 	buffer += 2;
 
-	if (data_blocks > 0) {
+	if (!nodata) {
 		pcm = ACCESS_ONCE(s->pcm);
-		if (!noinfo && pcm)
+		if (pcm)
 			s->transfer_samples(s, pcm, buffer, data_blocks);
 		else
 			amdtp_fill_pcm_silence(s, buffer, data_blocks);
 
-		/* TODO: noinfo */
 		if (s->midi_ports)
 			amdtp_fill_midi(s, buffer, data_blocks);
 
@@ -645,7 +646,7 @@ static void transmit_packet(struct amdtp_stream *s,
 		return;
 	}
 
-	if (!noinfo && pcm)
+	if (pcm && !nodata)
 		check_pcm_pointer(s, pcm, data_blocks);
 }
 
@@ -718,8 +719,9 @@ static void receive_packet(struct amdtp_stream *s,
 
 	/* Process sync slave stream */
 	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
-	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave))
+	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave)) {
 		transmit_packet(s->sync_slave, 0, syt, nodata);
+	}
 
 	if (pcm)
 		check_pcm_pointer(s, pcm, frames);
