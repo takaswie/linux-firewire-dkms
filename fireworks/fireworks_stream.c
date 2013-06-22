@@ -38,7 +38,7 @@ int snd_efw_stream_init(struct snd_efw *efw, struct amdtp_stream *stream)
 	if (err < 0)
 		goto end;
 
-	err = amdtp_stream_init(stream, efw->unit, s_dir, CIP_NONBLOCKING);
+	err = amdtp_stream_init(stream, efw->unit, s_dir, CIP_BLOCKING);
 	if (err < 0) {
 		cmp_connection_destroy(connection);
 		goto end;
