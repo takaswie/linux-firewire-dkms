@@ -17,110 +17,138 @@
  */
 #include "./bebob.h"
 
-static int amdtp_sfc_table[] = {
-	[CIP_SFC_32000]	 = 32000,
-	[CIP_SFC_44100]	 = 44100,
-	[CIP_SFC_48000]	 = 48000,
-	[CIP_SFC_88200]	 = 88200,
-	[CIP_SFC_96000]	 = 96000,
-	[CIP_SFC_176400] = 176400,
-	[CIP_SFC_192000] = 192000};
-
-int set_sampling_rate(struct fw_unit *unit, int rate,
-		      int direction, unsigned short plug)
+static int
+hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
+	     struct snd_bebob *bebob,
+	     struct snd_bebob_stream_formation *formations)
 {
-	int sfc;
-	u8 *buf;
-	int err;
+	struct snd_interval *r =
+			hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+	const struct snd_interval *c =
+			hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_interval t = {
+		.min = UINT_MAX, .max = 0, .integer = 1
+	};
+	int i;
 
-	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_sfc_table); sfc += 1)
-		if (amdtp_sfc_table[sfc] == rate)
-			break;
+	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
+		/* entry is invalid */
+		if (formations[i].sampling_rate == 0)
+			continue;
 
-	buf = kmalloc(8, GFP_KERNEL);
-	if (!buf) {
-		return -ENOMEM;
+		if (!snd_interval_test(c, formations[i].pcm))
+			continue;
+
+		t.min = min(t.min, formations[i].sampling_rate);
+		t.max = max(t.max, formations[i].sampling_rate);
+
 	}
-
-	buf[0] = 0x00;		/* AV/C CONTROL */
-	buf[1] = 0xff;		/* unit */
-	if (direction > 0)
-		buf[2] = 0x19;	/* INPUT PLUG SIGNAL FORMAT */
-	else
-		buf[2] = 0x18;	/* OUTPUT PLUG SIGNAL FORMAT */
-	buf[3] = 0xff & plug;	/* plug */
-	buf[4] = 0x90;		/* EOH_1, Form_1, FMT means audio and music */
-	buf[5] = 0x00 | sfc;	/* FDF-hi */
-	buf[6] = 0xff;		/* FDF-mid */
-	buf[7] = 0xff;		/* FDF-low */
-
-	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
-	if (err < 0)
-		goto end;
-	if ((err < 6) | (buf[0] != 0x09) /* ACCEPTED */) {
-		dev_err(&unit->device, "failed to set sampe rate\n");
-		err = -EIO;
-		goto end;
-	}
-
-	err = 0;
-end:
-	kfree(buf);
-	return err;
+	return snd_interval_refine(r, &t);
 }
 
-int get_sampling_rate(struct fw_unit *unit, int *rate,
-		      int direction, unsigned short plug)
+static int
+hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
+		 struct snd_bebob *bebob,
+		 struct snd_bebob_stream_formation *formations)
 {
-	int sfc, evt;
-	u8 *buf;
-	int err;
+	struct snd_interval *c =
+		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+	const struct snd_interval *r =
+		hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval t = {
+		.min = UINT_MAX, .max = 0, .integer = 1
+	};
 
-	buf = kmalloc(8, GFP_KERNEL);
-	if (!buf) {
-		return -ENOMEM;
+	int i;
+
+
+	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
+		/* entry is invalid */
+		if (formations[i].sampling_rate == 0)
+			continue;
+
+		if (!snd_interval_test(r, formations[i].sampling_rate))
+			continue;
+
+		t.min = min(t.min, formations[i].pcm);
+		t.max = max(t.max, formations[i].pcm);
 	}
 
-	buf[0] = 0x01;		/* AV/C STATUS */
-	buf[1] = 0xff;		/* unit */
-	if (direction > 0)
-		buf[2] = 0x19;	/* INPUT PLUG SIGNAL FORMAT */
-	else
-		buf[2] = 0x18;	/* OUTPUT PLUG SIGNAL FORMAT */
-	buf[3] = 0xff & plug;	/* plug */
-	buf[4] = 0x90;		/* EOH_1, Form_1, FMT means audio and music */
-	buf[5] = 0xff;		/* FDF-hi */
-	buf[6] = 0xff;		/* FDF-mid */
-	buf[7] = 0xff;		/* FDF-low */
+	return snd_interval_refine(c, &t);
+}
 
-	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
-	if (err < 0)
-		goto end;
-	if ((err < 6) | (buf[0] != 0x0c) /* IMPLEMENTED/STABLE */) {
-		dev_err(&unit->device, "failed to get sampe rate\n");
-		err = -EIO;
-		goto end;
+static inline int
+hw_rule_capture_rate(struct snd_pcm_hw_params *params,
+				struct snd_pcm_hw_rule *rule)
+{
+	struct snd_bebob *bebob = rule->private;
+	return hw_rule_rate(params, rule, bebob,
+				bebob->receive_stream_formations);
+}
+
+static inline int
+hw_rule_playback_rate(struct snd_pcm_hw_params *params,
+				struct snd_pcm_hw_rule *rule)
+{
+	struct snd_bebob *bebob = rule->private;
+	return hw_rule_rate(params, rule, bebob,
+				bebob->transmit_stream_formations);
+}
+
+static inline int
+hw_rule_capture_channels(struct snd_pcm_hw_params *params,
+				struct snd_pcm_hw_rule *rule)
+{
+	struct snd_bebob *bebob = rule->private;
+	return hw_rule_channels(params, rule, bebob,
+				bebob->receive_stream_formations);
+}
+
+static inline int
+hw_rule_playback_channels(struct snd_pcm_hw_params *params,
+				struct snd_pcm_hw_rule *rule)
+{
+	struct snd_bebob *bebob = rule->private;
+	return hw_rule_channels(params, rule, bebob,
+				bebob->transmit_stream_formations);
+}
+
+static void
+prepare_channels(struct snd_pcm_hardware *hw,
+	  struct snd_bebob_stream_formation *formations)
+{
+	int i;
+
+	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
+		/* entry has no PCM channels */
+		if (formations[i].pcm == 0)
+			continue;
+
+		hw->channels_min = min(hw->channels_min, formations[i].pcm);
+		hw->channels_max = max(hw->channels_max, formations[i].pcm);
 	}
 
-	/* check EVT field */
-	evt = (0x30 & buf[5]) >> 4;
-	if (evt != 0) {	/* not AM824 */
-		err = -EINVAL;
-		goto end;
+	return;
+}
+
+static void
+prepare_rates(struct snd_pcm_hardware *hw,
+	  struct snd_bebob_stream_formation *formations)
+{
+	int i;
+
+	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
+		/* entry has no PCM channels */
+		if (formations[i].pcm == 0)
+			continue;
+
+		hw->rate_min = min(hw->rate_min, formations[i].sampling_rate);
+		hw->rate_max = max(hw->rate_max, formations[i].sampling_rate);
+		hw->rates |=
+			snd_pcm_rate_to_rate_bit(formations[i].sampling_rate);
 	}
 
-	/* check sfc field */
-	sfc = 0x07 & buf[5];
-	if (sfc >= ARRAY_SIZE(amdtp_sfc_table)) {
-		err = -EINVAL;
-		goto end;
-	}
-
-	*rate = amdtp_sfc_table[sfc];
-	err = 0;
-end:
-	kfree(buf);
-	return err;
+	return;
 }
 
 static int
@@ -138,9 +166,13 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 			/* for Open Sound System compatibility */
 			SNDRV_PCM_INFO_MMAP_VALID |
 			SNDRV_PCM_INFO_BLOCK_TRANSFER,
-		.rates = bebob->supported_sampling_rates,
-		.rate_min = 32000,
-		.rate_max = 96000,
+		/* set up later */
+		.rates = 0,
+		.rate_min = UINT_MAX,
+		.rate_max = 0,
+		/* set up later */
+		.channels_min = UINT_MAX,
+		.channels_max = 0,
 		.buffer_bytes_max = 1024 * 1024 * 1024,
 		.period_bytes_min = 256,
 		.period_bytes_max = 1024 * 1024 * 1024 / 2,
@@ -152,52 +184,62 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 	substream->runtime->hw = hardware;
 	substream->runtime->delay = substream->runtime->hw.fifo_size;
 
+	/* add rule between channels and sampling rate */
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+		prepare_rates(&substream->runtime->hw, bebob->receive_stream_formations);
+		prepare_channels(&substream->runtime->hw, bebob->receive_stream_formations);
+		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
+		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+				hw_rule_capture_channels, bebob,
+				SNDRV_PCM_HW_PARAM_RATE, -1);
+		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+				hw_rule_capture_rate, bebob,
+				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	} else {
+		prepare_rates(&substream->runtime->hw, bebob->transmit_stream_formations);
+		prepare_channels(&substream->runtime->hw, bebob->transmit_stream_formations);
+		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
+		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+				hw_rule_playback_channels, bebob,
+				SNDRV_PCM_HW_PARAM_RATE, -1);
+		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+				hw_rule_playback_rate, bebob,
+				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	}
+
 	/* AM824 in IEC 61883-6 can deliver 24bit data */
 	err = snd_pcm_hw_constraint_msbits(substream->runtime, 0, 32, 24);
 	if (err < 0)
-		return err;
+		goto end;
 
 	/* format of PCM samples is 16bit or 24bit inner 32bit */
 	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
 				SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
 	if (err < 0)
-		return err;
-	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
-				SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 32);
-	if (err < 0)
-		return err;
+		goto end;
 
 	/* time for period constraint */
 	err = snd_pcm_hw_constraint_minmax(substream->runtime,
 					SNDRV_PCM_HW_PARAM_PERIOD_TIME,
 					500, UINT_MAX);
 	if (err < 0)
-		return err;
+		goto end;
 
-	return 0;
+	err = 0;
+
+end:
+	return err;
 }
 
 static int
 pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
-//	int sampling_rate;
 	int err;
 
-	/* common hardware information */
 	err = pcm_init_hw_params(bebob, substream);
 	if (err < 0)
 		goto end;
-
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
-		substream->runtime->hw.channels_min = bebob->pcm_capture_channels;
-		substream->runtime->hw.channels_max = bebob->pcm_capture_channels;
-	} else {
-		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
-		substream->runtime->hw.channels_min = bebob->pcm_playback_channels;
-		substream->runtime->hw.channels_max = bebob->pcm_playback_channels;
-	}
 
 	snd_pcm_set_sync(substream);
 
@@ -217,7 +259,9 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_bebob *bebob = substream->private_data;
 	struct amdtp_stream *stream;
-	int midi_count;
+	struct snd_bebob_stream_formation *formation;
+	int index;
+	int direction;
 	int err;
 
 	/* keep PCM ring buffer */
@@ -226,30 +270,34 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	if (err < 0)
 		goto end;
 
-	/* set sampling rate if fw isochronous stream is not running */
-//	if (!!IS_ERR(&bebob->transmit_stream.context) ||
-//	    !!IS_ERR(&bebob->receive_stream.context)) {
-//		err = snd_bebob_command_set_sampling_rate(bebob,
-//					params_rate(hw_params));
-//		if (err < 0)
-//			return err;
-//		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
-//					bebob->control_id_sampling_rate);
-//	}
+	index = snd_bebob_get_formation_index(params_rate(hw_params));
+	if (index < 0) {
+		err = -EIO;
+		goto end;
+	}
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		stream = &bebob->receive_stream;
-		midi_count = bebob->midi_input_ports;
+		formation = bebob->receive_stream_formations + index;
+		direction = 0;
 	} else {
 		stream = &bebob->transmit_stream;
-		midi_count = bebob->midi_output_ports;
+		formation = bebob->transmit_stream_formations + index;
+		direction = 1;
 	}
+
+	/* set sampling rate if fw isochronous stream is not running */
+	err = avc_generic_set_sampling_rate(bebob->unit, formation->sampling_rate, direction, 0);
+	if (err < 0)
+		return err;
+//	snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
+//				bebob->control_id_sampling_rate);
 
 	/* set AMDTP parameters for transmit stream */
 	amdtp_stream_set_rate(stream, params_rate(hw_params));
 	amdtp_stream_set_pcm(stream, params_channels(hw_params));
 	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
-	amdtp_stream_set_midi(stream, midi_count);
+
 end:
 	return err;
 }

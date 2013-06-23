@@ -72,6 +72,27 @@ struct snd_bebob_device_info {
 	__be32 dbg_version;
 } __attribute__((packed));
 
+/* defined later */
+struct snd_bebob;
+
+/* for caching entries of stream formation */
+#define SND_BEBOB_STREAM_FORMATION_ENTRIES	9
+struct snd_bebob_stream_formation {
+	unsigned int sampling_rate;
+	unsigned int pcm;
+	unsigned int midi;
+	u8 entry[64];	/* '64' is arbitrary number but enough */
+};
+/* this is a lookup table for index of stream formations */
+extern int sampling_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES];
+
+/* device specific operations */
+struct snd_bebob_ops {
+	int (*probing)(struct snd_bebob *bebob);
+	int (*streaming)(struct snd_bebob *bebob);
+	int (*clocking)(struct snd_bebob *bebob);
+};
+
 struct snd_bebob {
         struct snd_card *card;
         struct fw_device *device;
@@ -80,6 +101,8 @@ struct snd_bebob {
 
         struct mutex mutex;
         spinlock_t lock;
+
+	struct snd_bebob_ops *ops;
 
 	unsigned int supported_sampling_rates;
 
@@ -96,23 +119,57 @@ struct snd_bebob {
 	struct cmp_connection input_connection;
 
 	bool loaded;
+
+	struct snd_bebob_stream_formation
+		receive_stream_formations[SND_BEBOB_STREAM_FORMATION_ENTRIES];
+	struct snd_bebob_stream_formation
+		transmit_stream_formations[SND_BEBOB_STREAM_FORMATION_ENTRIES];
 };
 
-int snd_bebob_stream_init(struct snd_bebob *bebob, struct amdtp_stream *stream);
-int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream);
-void snd_bebob_stream_stop(struct snd_bebob *bebob, struct amdtp_stream *stream);
-void snd_bebob_stream_destroy(struct snd_bebob *bebob, struct amdtp_stream *stream);
+int snd_bebob_get_formation_index(int sampling_rate);
 
-int set_sampling_rate(struct fw_unit *unit, int rate,
-		      int direction, unsigned short plug);
-int get_sampling_rate(struct fw_unit *unit, int *rate,
-		      int direction, unsigned short plug);
+int avc_generic_set_sampling_rate(struct fw_unit *unit, int rate,
+				int direction, unsigned short plug);
+int avc_generic_get_sampling_rate(struct fw_unit *unit, int *rate,
+				int direction, unsigned short plug);
+int avc_generic_get_plug_info(struct fw_unit *unit,
+				unsigned short bus_plugs[2],
+				unsigned short ext_plugs[2]);
+int avc_bridgeco_get_plug_channels(struct fw_unit *unit, int direction,
+				unsigned short plugid, int *channels);
+int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,
+				unsigned short plugid, u8 *position);
+int avc_bridgeco_get_plug_type(struct fw_unit *unit, int direction,
+				unsigned short plugid, int *type);
+int avc_bridgeco_get_plug_cluster_info(struct fw_unit *unit, int direction,
+				int plugid, int cluster_id, u8 *format);
+int avc_bridgeco_get_plug_stream_formation_entry(struct fw_unit *unit,
+				int direction, unsigned short plugid,
+				int entryid, u8 *buf, int *len);
+
+int snd_bebob_stream_get_formation_index(int sampling_rate);
+int snd_bebob_stream_init(struct snd_bebob *bebob,
+			  struct amdtp_stream *stream);
+int snd_bebob_stream_start(struct snd_bebob *bebob,
+			   struct amdtp_stream *stream);
+void snd_bebob_stream_stop(struct snd_bebob *bebob,
+			   struct amdtp_stream *stream);
+void snd_bebob_stream_destroy(struct snd_bebob *bebob,
+			      struct amdtp_stream *stream);
 
 void snd_bebob_destroy_pcm_devices(struct snd_bebob *bebob);
 int snd_bebob_create_pcm_devices(struct snd_bebob *bebob);
 
+void snd_bebob_create_midi_devices(struct snd_bebob *bebob);
+
 void snd_bebob_proc_init(struct snd_bebob *bebob);
 
 int snd_bebob_maudio_detect(struct fw_unit *unit);
+
+/* device specific operations */
+extern struct snd_bebob_ops maudio_bootloader_ops;
+extern struct snd_bebob_ops maudio_fw410_ops;
+extern struct snd_bebob_ops maudio_fw1814_ops;
+extern struct snd_bebob_ops maudio_audiophile_ops;
 
 #endif

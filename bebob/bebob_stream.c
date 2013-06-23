@@ -17,6 +17,29 @@
  */
 #include "./bebob.h"
 
+int snd_bebob_strem_get_formation_index(int sampling_rate)
+{
+        int table[] = {
+                [0] = 22050,
+                [1] = 24000,
+                [2] = 32000,
+                [3] = 44100,
+                [4] = 48000,
+                [5] = 88200,
+                [6] = 96000,
+                [7] = 176400,
+                [8] = 192000,
+        };
+        int i;
+
+        for (i = 0; i < sizeof(table); i += 1) {
+                if (table[i] == sampling_rate)
+                        return i;
+	}
+	return -1;
+}
+
+
 int snd_bebob_stream_init(struct snd_bebob *bebob, struct amdtp_stream *stream)
 {
 	struct cmp_connection *connection;
