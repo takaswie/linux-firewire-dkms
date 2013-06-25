@@ -751,10 +751,11 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 				    void *private_data)
 {
 	struct amdtp_stream *s = private_data;
-	unsigned int p, payload_quadlets, packets = header_length / 4;
+	unsigned int p, payload_quadlets, packets;
 	__be32 *headers = header;
 
-	/* each fields in an isochronous header are already used in juju */
+	packets = header_length / RECEIVE_PACKET_HEADER_SIZE;
+
 	for (p = 0; p < packets; p += 1) {
 		/* how many quadlets in payload of this packet */
 		payload_quadlets =
