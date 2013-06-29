@@ -590,7 +590,14 @@ static inline int queue_receive_packet(struct amdtp_stream *s,
 			    amdtp_stream_get_max_payload(s), false);
 }
 
-/* TODO: cycle and syt has mathmatical relations. */
+/*
+ * The value of syt includes the lower 4 bits of cycle count in its higher
+ * 4 bits. But for convinience, there are separated two arguments.
+ *
+ * "nodata" means the packet should be ignored.
+ * "noinfo" means the packet includes no event which indicates syt. Then
+ * previous and next packets include events which indicate syt.
+ */
 static void transmit_packet(struct amdtp_stream *s,
 			    unsigned int cycle, unsigned int syt, bool nodata)
 {
@@ -602,20 +609,21 @@ static void transmit_packet(struct amdtp_stream *s,
 		return;
 	index = s->packet_index;
 
-	if (nodata && (s->flags & CIP_BLOCKING))
-		syt = CIP_SYT_NO_INFO;
-	else {
+	/* "nodata" isn't supported in AMDTP non-blocking mode */
+	if (!nodata || !(s->flags & CIP_BLOCKING)) {
 		data_blocks = calculate_data_blocks(s);
 		fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
+		/*
+		 * if sync to driver, generate "presentation timestamp",
+		 * else use the value of syt from receive stream.
+		 */
 		if (s->sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER)
 			syt = calculate_syt(s, cycle);
-	}
-
-	/* only AMDTP blocking mode can support nodata */
-	if ((syt == CIP_SYT_NO_INFO) && (s->flags & CIP_BLOCKING)) {
-		fdf = AMDTP_FDF_NO_DATA;
+	} else {
+		/* this code transmit empty packet when it's "nodata" */
 		data_blocks = 0;
-		nodata = 1;
+		fdf = AMDTP_FDF_NO_DATA;
+		syt = CIP_SYT_NO_INFO;
 	}
 
 	buffer = s->buffer.packets[index].buffer;
@@ -626,6 +634,7 @@ static void transmit_packet(struct amdtp_stream *s,
 				fdf | syt);
 	buffer += 2;
 
+	/* Here "nodata" will transmit empty packet. */
 	if (!nodata) {
 		pcm = ACCESS_ONCE(s->pcm);
 		if (pcm)
@@ -636,9 +645,8 @@ static void transmit_packet(struct amdtp_stream *s,
 		if (s->midi_ports)
 			amdtp_fill_midi(s, buffer, data_blocks);
 
+		s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
 	}
-
-	s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
 
 	payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
 	if (queue_transmit_packet(s, index, payload_length, false) < 0) {
@@ -646,7 +654,7 @@ static void transmit_packet(struct amdtp_stream *s,
 		return;
 	}
 
-	if (pcm && !nodata)
+	if (pcm)
 		check_pcm_pointer(s, pcm, data_blocks);
 }
 
