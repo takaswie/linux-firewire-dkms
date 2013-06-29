@@ -25,6 +25,7 @@
 
 #define ISO_DATA_LENGTH_SHIFT	16
 #define TAG_CIP			1
+
 #define CIP_EOH_MASK		0x80000000
 #define CIP_EOH_SHIFT		31
 #define CIP_EOH			(1u << CIP_EOH_SHIFT)
@@ -32,6 +33,10 @@
 #define CIP_FMT_SHIFT		24
 #define CIP_FMT_AM		(0x10 << CIP_FMT_SHIFT)
 #define	CIP_SYT_NO_INFO		0xFFFF
+
+#define CIP_SYT_MAX		0xfbff
+#define SYT_THREADSHOULD	(CIP_SYT_MAX / 2)
+
 #define AMDTP_FDF_MASK		0x00FF0000
 #define AMDTP_FDF_SFC_SHIFT	16
 #define AMDTP_FDF_NO_DATA	(0xFF << AMDTP_FDF_SFC_SHIFT)
@@ -65,6 +70,12 @@ static const struct {
 	[CIP_SFC_96000]  = {  96000, 16, 12, 1024 },
 	[CIP_SFC_176400] = { 176400, 32,  0,   67 },
 	[CIP_SFC_192000] = { 192000, 32, 24, 1024 },
+};
+
+/* for re-ordering receive packets */
+struct sort_table {
+	unsigned int id;
+	u16 tstamp;
 };
 
 static void pcm_period_tasklet(unsigned long data);
@@ -299,6 +310,63 @@ static unsigned int calculate_syt(struct amdtp_stream *s,
 	} else {
 		return 0xffff; /* no info */
 	}
+}
+
+/*
+ * This sort algorism is based on an assumption that the order of packets is not
+ * so random.
+ *  - Maximum two packets except for "noinfo" packets are back to front.
+ *  - Maximum two packets except for "noinfo" packets are in next syt cycle.
+ * If the sequence of packet doesn't follow to these rules, the result brings
+ * wrong sequence of PCM/MIDI data.
+ */
+static void packet_sort(struct sort_table *tbl, unsigned int len)
+{
+	unsigned int i, j, k;
+	uint16_t t;
+
+	i = 0;
+	do {
+		if (tbl[i].tstamp == CIP_SYT_NO_INFO) {
+			i++;
+			continue;
+		}
+		for (j = i + 1; j < len; j++) {
+			if (tbl[j].tstamp == CIP_SYT_NO_INFO)
+				continue;
+			if (((tbl[i].tstamp > tbl[j].tstamp) &&
+			     (tbl[i].tstamp - tbl[j].tstamp <
+						SYT_THREADSHOULD))) {
+				t = tbl[j].tstamp;
+				tbl[j].tstamp = tbl[i].tstamp;
+				tbl[i].tstamp = t;
+				t = tbl[j].id;
+				tbl[j].id = tbl[i].id;
+				tbl[i].id = t;
+			} else if ((tbl[j].tstamp > tbl[i].tstamp) &&
+			           (tbl[j].tstamp - tbl[i].tstamp >
+						SYT_THREADSHOULD)) {
+				for (k = i; k > 0; k--) {
+					if (tbl[k].tstamp == CIP_SYT_NO_INFO)
+						continue;
+					if ((tbl[k].tstamp > tbl[j].tstamp) ||
+					    (tbl[j].tstamp - tbl[k].tstamp >
+						 SYT_THREADSHOULD)) {
+						t = tbl[j].tstamp;
+						tbl[j].tstamp = tbl[k].tstamp;
+						tbl[k].tstamp = t;
+						t = tbl[j].id;
+						tbl[j].id = tbl[k].id;
+						tbl[k].id = t;
+						j = k;
+					}
+					break;
+				}
+			}
+			break;
+		}
+		i = j;
+	} while (i < len);
 }
 
 static void amdtp_write_s32(struct amdtp_stream *s,
