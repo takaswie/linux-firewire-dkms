@@ -564,13 +564,6 @@ static int queue_packet(struct amdtp_stream *s, unsigned int index,
 		s->packet_index = -1;
 		goto end;
 	}
-
-	if (++index >= QUEUE_LENGTH)
-		index = 0;
-	s->packet_index = index;
-
-	err = 0;
-
 end:
 	return err;
 }
@@ -654,23 +647,23 @@ static void transmit_packet(struct amdtp_stream *s,
 		return;
 	}
 
+	if (++index >= QUEUE_LENGTH)
+		index = 0;
+	s->packet_index = index;
+
 	if (pcm)
 		check_pcm_pointer(s, pcm, data_blocks);
 }
 
 static void receive_packet(struct amdtp_stream *s,
+			   unsigned int index,
 			   unsigned int payload_quadlets)
 {
 	__be32 *buffer;
 	u32 cip_header[2];
-	unsigned int index, frames = 0,
-		     data_block_quadlets, data_block_counter, syt;
+	unsigned int data_block_quadlets, data_block_counter, syt, frames = 0;
 	struct snd_pcm_substream *pcm;
 	bool nodata = false;
-
-	if (s->packet_index < 0)
-		return;
-	index = s->packet_index;
 
 	buffer = s->buffer.packets[index].buffer;
 	cip_header[0] = be32_to_cpu(buffer[0]);
@@ -759,18 +752,25 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 				    void *private_data)
 {
 	struct amdtp_stream *s = private_data;
-	unsigned int p, payload_quadlets, packets;
+	unsigned int p, index, payload_quadlets, packets;
 	__be32 *headers = header;
 
 	packets = header_length / RECEIVE_PACKET_HEADER_SIZE;
 
+	index = s->packet_index;
 	for (p = 0; p < packets; p += 1) {
 		/* how many quadlets in payload of this packet */
 		payload_quadlets =
 			(be32_to_cpu(headers[p]) >> ISO_DATA_LENGTH_SHIFT) / 4;
+
 		/* handle each data in payload */
-		receive_packet(s, payload_quadlets);
+		receive_packet(s, index, payload_quadlets);
+
+		if (++index >= QUEUE_LENGTH)
+			index = 0;
 	}
+	s->packet_index = index;
+
 
 	/* when sync to device, flush the packets foor slave stream */
 	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
@@ -823,7 +823,7 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
  */
 int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 {
-	unsigned int header_size;
+	unsigned int header_size, i;
 	enum dma_data_direction dir;
 	int type, err;
 
@@ -869,16 +869,15 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 
 	amdtp_stream_update(s);
 
-	s->packet_index = 0;
-	do {
+	for (i = 0; i < QUEUE_LENGTH; i++) {
 		if (s->direction == AMDTP_STREAM_RECEIVE)
-			err = queue_receive_packet(s, s->packet_index);
+			err = queue_receive_packet(s, i);
 		else
-			err = queue_transmit_packet(s, s->packet_index,
-						    0, true);
+			err = queue_transmit_packet(s, i, 0, true);
 		if (err < 0)
 			goto err_context;
-	} while (s->packet_index > 0);
+	};
+	s->packet_index = 0;
 
 	/*
 	 * NOTE:
