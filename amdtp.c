@@ -729,7 +729,8 @@ static void receive_packet(struct amdtp_stream *s,
 {
 	__be32 *buffer;
 	u32 cip_header[2];
-	unsigned int data_block_quadlets, data_block_counter, syt, frames = 0;
+	unsigned int data_block_quadlets, data_block_counter, data_blocks = 0,
+		     syt;
 	struct snd_pcm_substream *pcm;
 	bool nodata = false;
 
@@ -769,12 +770,12 @@ static void receive_packet(struct amdtp_stream *s,
 
 		buffer += 2;
 
-		frames = (payload_quadlets - 2) / s->data_block_quadlets;
+		data_blocks = (payload_quadlets - 2) / s->data_block_quadlets;
 		pcm = ACCESS_ONCE(s->pcm);
 		if (pcm)
-			s->transfer_samples(s, pcm, buffer, frames);
+			s->transfer_samples(s, pcm, buffer, data_blocks);
 		if (s->midi_ports)
-			amdtp_pull_midi(s, buffer, frames);
+			amdtp_pull_midi(s, buffer, data_blocks);
 
 		/* for next packet */
 		s->data_block_quadlets = data_block_quadlets;
@@ -793,7 +794,7 @@ static void receive_packet(struct amdtp_stream *s,
 	}
 
 	if (pcm)
-		check_pcm_pointer(s, pcm, frames);
+		check_pcm_pointer(s, pcm, data_blocks);
 }
 
 static void transmit_stream_callback(struct fw_iso_context *context, u32 cycle,
