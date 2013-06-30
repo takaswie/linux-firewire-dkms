@@ -33,7 +33,6 @@
 #define CIP_FMT_SHIFT		24
 #define CIP_FMT_AM		(0x10 << CIP_FMT_SHIFT)
 #define	CIP_SYT_NO_INFO		0xFFFF
-
 #define CIP_SYT_MAX		0xfbff
 #define SYT_THREADSHOULD	(CIP_SYT_MAX / 2)
 
@@ -106,6 +105,14 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	s->sync_mode = AMDTP_STREAM_SYNC_TO_DRIVER;
 	s->sync_slave = ERR_PTR(-1);
 
+	if (direction == AMDTP_STREAM_RECEIVE) {
+		s->sort_table = kzalloc(sizeof(struct sort_table) *
+					QUEUE_LENGTH, GFP_KERNEL);
+		if (s->sort_table == NULL)
+			return -1;
+	} else
+		s->sort_table = NULL;
+
 	return 0;
 }
 EXPORT_SYMBOL(amdtp_stream_init);
@@ -117,6 +124,8 @@ EXPORT_SYMBOL(amdtp_stream_init);
 void amdtp_stream_destroy(struct amdtp_stream *s)
 {
 	WARN_ON(amdtp_stream_running(s));
+	if (s->sort_table != NULL)
+		kfree(s->sort_table);
 	mutex_destroy(&s->mutex);
 	fw_unit_put(s->unit);
 }
@@ -821,25 +830,45 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 				    void *private_data)
 {
 	struct amdtp_stream *s = private_data;
-	unsigned int p, index, payload_quadlets, packets;
-	__be32 *headers = header;
+	struct sort_table *tbl = s->sort_table;
+	unsigned int i, index, payload_quadlets, packets;
+	__be32 *b, *headers = header;
 
+	/* The number of packets in buffer */
 	packets = header_length / RECEIVE_PACKET_HEADER_SIZE;
 
-	index = s->packet_index;
-	for (p = 0; p < packets; p += 1) {
-		/* how many quadlets in payload of this packet */
-		payload_quadlets =
-			(be32_to_cpu(headers[p]) >> ISO_DATA_LENGTH_SHIFT) / 4;
-
-		/* handle each data in payload */
-		receive_packet(s, index, payload_quadlets);
-
-		if (++index >= QUEUE_LENGTH)
-			index = 0;
+	/* Store into sort table and sort. */
+	for (i = 0; i < packets; i++) {
+		tbl[i].id = i;
+		index = s->packet_index + i;
+		if (index >= QUEUE_LENGTH)
+			index -= QUEUE_LENGTH;
+		b = s->buffer.packets[index].buffer;
+		tbl[i].tstamp = be32_to_cpu(b[1]) & AMDTP_SYT_MASK;
 	}
-	s->packet_index = index;
+	packet_sort(tbl, packets);
 
+	/*
+	 * TODO:
+	 * To keep the consistency of sequence, some continuous latest packets
+	 * are left in the buffer and handle at next callback.
+	 * packets -= any;
+	 */
+
+	/* handle each data in payload */
+	for (i = 0; i < packets; i++) {
+		index = s->packet_index + tbl[i].id;
+		if (index >= QUEUE_LENGTH)
+			index -= QUEUE_LENGTH;
+		payload_quadlets = (be32_to_cpu(headers[tbl[i].id]) >>
+				    ISO_DATA_LENGTH_SHIFT) / 4;
+		receive_packet(s, index, payload_quadlets);
+	}
+
+	/* arrange index for next cycle */
+	s->packet_index += packets;
+	if (s->packet_index >= QUEUE_LENGTH)
+		s->packet_index -= QUEUE_LENGTH;
 
 	/* when sync to device, flush the packets foor slave stream */
 	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&

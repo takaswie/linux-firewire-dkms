@@ -95,6 +95,8 @@ struct amdtp_stream {
 
 	enum amdtp_stream_sync_mode sync_mode;
 	struct amdtp_stream *sync_slave;
+
+	void *sort_table;
 };
 
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
