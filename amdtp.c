@@ -831,7 +831,7 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 {
 	struct amdtp_stream *s = private_data;
 	struct sort_table *tbl = s->sort_table;
-	unsigned int i, index, payload_quadlets, packets;
+	unsigned int i, j, packets, limit, index, payload_quadlets;
 	__be32 *b, *headers = header;
 
 	/* The number of packets in buffer */
@@ -849,11 +849,19 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 	packet_sort(tbl, packets);
 
 	/*
-	 * TODO:
 	 * To keep the consistency of sequence, some continuous latest packets
 	 * are left in the buffer and handle at next callback.
-	 * packets -= any;
 	 */
+	limit = packets / 3;
+	for (i = 1; i < limit; i++) {
+		for (j = packets - i - 1; j < packets; j++) {
+			if (tbl[j].id + i + 1 < packets)
+				break;
+		}
+		if (j != packets)
+			break;
+	}
+	packets -= i;
 
 	/* handle each data in payload */
 	for (i = 0; i < packets; i++) {
@@ -870,7 +878,7 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 	if (s->packet_index >= QUEUE_LENGTH)
 		s->packet_index -= QUEUE_LENGTH;
 
-	/* when sync to device, flush the packets foor slave stream */
+	/* when sync to device, flush the packets for slave stream */
 	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
 	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave))
 		fw_iso_context_queue_flush(s->sync_slave->context);
