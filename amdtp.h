@@ -74,6 +74,7 @@ struct amdtp_stream {
 
 	unsigned int source_node_id_field;
 	struct iso_packets_buffer buffer;
+	unsigned int max_payload_size;
 
 	struct snd_pcm_substream *pcm;
 	struct tasklet_struct period_tasklet;
@@ -97,6 +98,8 @@ struct amdtp_stream {
 	struct amdtp_stream *sync_slave;
 
 	void *sort_table;
+	void *left_packets;
+	unsigned int remain_packets;
 };
 
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,

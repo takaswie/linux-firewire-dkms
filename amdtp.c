@@ -74,7 +74,8 @@ static const struct {
 /* for re-ordering receive packets */
 struct sort_table {
 	unsigned int id;
-	u16 tstamp;
+	unsigned int tstamp;
+	unsigned int payload_size;
 };
 
 static void pcm_period_tasklet(unsigned long data);
@@ -105,13 +106,8 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	s->sync_mode = AMDTP_STREAM_SYNC_TO_DRIVER;
 	s->sync_slave = ERR_PTR(-1);
 
-	if (direction == AMDTP_STREAM_RECEIVE) {
-		s->sort_table = kzalloc(sizeof(struct sort_table) *
-					QUEUE_LENGTH, GFP_KERNEL);
-		if (s->sort_table == NULL)
-			return -1;
-	} else
-		s->sort_table = NULL;
+	s->sort_table = NULL;
+	s->left_packets = NULL;
 
 	return 0;
 }
@@ -124,8 +120,6 @@ EXPORT_SYMBOL(amdtp_stream_init);
 void amdtp_stream_destroy(struct amdtp_stream *s)
 {
 	WARN_ON(amdtp_stream_running(s));
-	if (s->sort_table != NULL)
-		kfree(s->sort_table);
 	mutex_destroy(&s->mutex);
 	fw_unit_put(s->unit);
 }
@@ -165,14 +159,8 @@ EXPORT_SYMBOL(amdtp_stream_set_rate);
  */
 unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s)
 {
-	/*
-	 * TODO: move to somewhere
-	 * actually setting these again is not problem but...
-	 */
-	s->data_block_quadlets = s->pcm_channels;
-	s->data_block_quadlets += DIV_ROUND_UP(s->midi_ports, 8);
-
-	return 8 + amdtp_stream_params[s->sfc].syt_interval * s->data_block_quadlets * 4;
+	return 8 + amdtp_stream_params[s->sfc].syt_interval *
+		(s->pcm_channels + DIV_ROUND_UP(s->midi_ports, 8)) * 4;
 }
 EXPORT_SYMBOL(amdtp_stream_get_max_payload);
 
@@ -329,10 +317,20 @@ static unsigned int calculate_syt(struct amdtp_stream *s,
  * If the sequence of packet doesn't follow to these rules, the result brings
  * wrong sequence of PCM/MIDI data.
  */
+#define SWAP(tbl, m, n) \
+	t = tbl[n].id; \
+	tbl[n].id = tbl[m].id; \
+	tbl[m].id = t; \
+	t = tbl[n].tstamp; \
+	tbl[n].tstamp = tbl[m].tstamp; \
+	tbl[m].tstamp = t; \
+	t = tbl[n].payload_size; \
+	tbl[n].payload_size = tbl[m].payload_size; \
+	tbl[m].payload_size = t;
+
 static void packet_sort(struct sort_table *tbl, unsigned int len)
 {
-	unsigned int i, j, k;
-	uint16_t t;
+	unsigned int i, j, k, t;
 
 	i = 0;
 	do {
@@ -346,12 +344,7 @@ static void packet_sort(struct sort_table *tbl, unsigned int len)
 			if (((tbl[i].tstamp > tbl[j].tstamp) &&
 			     (tbl[i].tstamp - tbl[j].tstamp <
 						SYT_THREADSHOULD))) {
-				t = tbl[j].tstamp;
-				tbl[j].tstamp = tbl[i].tstamp;
-				tbl[i].tstamp = t;
-				t = tbl[j].id;
-				tbl[j].id = tbl[i].id;
-				tbl[i].id = t;
+				SWAP(tbl, i, j);
 			} else if ((tbl[j].tstamp > tbl[i].tstamp) &&
 			           (tbl[j].tstamp - tbl[i].tstamp >
 						SYT_THREADSHOULD)) {
@@ -361,13 +354,7 @@ static void packet_sort(struct sort_table *tbl, unsigned int len)
 					if ((tbl[k].tstamp > tbl[j].tstamp) ||
 					    (tbl[j].tstamp - tbl[k].tstamp >
 						 SYT_THREADSHOULD)) {
-						t = tbl[j].tstamp;
-						tbl[j].tstamp = tbl[k].tstamp;
-						tbl[k].tstamp = t;
-						t = tbl[j].id;
-						tbl[j].id = tbl[k].id;
-						tbl[k].id = t;
-						j = k;
+						SWAP(tbl, j, k);
 					}
 					break;
 				}
@@ -622,42 +609,43 @@ static void pcm_period_tasklet(unsigned long data)
 		snd_pcm_period_elapsed(pcm);
 }
 
-static int queue_packet(struct amdtp_stream *s, unsigned int index,
+static int queue_packet(struct amdtp_stream *s,
 			unsigned int header_length,
 			unsigned int payload_length, bool skip)
 {
 	struct fw_iso_packet p = {0};
 	int err;
 
-	p.interrupt = IS_ALIGNED(index + 1, INTERRUPT_INTERVAL);
+	p.interrupt = IS_ALIGNED(s->packet_index + 1, INTERRUPT_INTERVAL);
 	p.tag = TAG_CIP;
 	p.header_length = header_length;
 	p.payload_length = (!skip) ? payload_length : 0;
 	p.skip = (!skip) ? 0: 1;
 	err = fw_iso_context_queue(s->context, &p, &s->buffer.iso_buffer,
-				   s->buffer.packets[index].offset);
+				   s->buffer.packets[s->packet_index].offset);
 	if (err < 0) {
 		dev_err(&s->unit->device, "queueing error: %d\n", err);
 		s->packet_index = -1;
 		goto end;
 	}
+
+	if (++s->packet_index >= QUEUE_LENGTH)
+		s->packet_index = 0;
 end:
 	return err;
 }
 
 static inline int queue_transmit_packet(struct amdtp_stream *s,
-					unsigned int index,
 					unsigned int payload_length, bool skip)
 {
-	return queue_packet(s, index, TRANSMIT_PACKET_HEADER_SIZE,
+	return queue_packet(s, TRANSMIT_PACKET_HEADER_SIZE,
 			    payload_length, skip);
 }
 
-static inline int queue_receive_packet(struct amdtp_stream *s,
-				       unsigned int index)
+static inline int queue_receive_packet(struct amdtp_stream *s)
 {
-	return queue_packet(s, index, RECEIVE_PACKET_HEADER_SIZE,
-			    amdtp_stream_get_max_payload(s), false);
+	return queue_packet(s, RECEIVE_PACKET_HEADER_SIZE,
+			    s->max_payload_size, false);
 }
 
 /*
@@ -672,12 +660,11 @@ static void transmit_packet(struct amdtp_stream *s,
 			    unsigned int cycle, unsigned int syt, bool nodata)
 {
 	__be32 *buffer;
-	unsigned int index, fdf, data_blocks, payload_length;
+	unsigned int fdf, data_blocks, payload_length;
 	struct snd_pcm_substream *pcm = NULL;
 
 	if (s->packet_index < 0)
 		return;
-	index = s->packet_index;
 
 	/* "nodata" isn't supported in AMDTP non-blocking mode */
 	if (!nodata || !(s->flags & CIP_BLOCKING)) {
@@ -696,7 +683,7 @@ static void transmit_packet(struct amdtp_stream *s,
 		syt = CIP_SYT_NO_INFO;
 	}
 
-	buffer = s->buffer.packets[index].buffer;
+	buffer = s->buffer.packets[s->packet_index].buffer;
 	buffer[0] = cpu_to_be32(ACCESS_ONCE(s->source_node_id_field) |
 				(s->data_block_quadlets << AMDTP_DBS_SHIFT) |
 				s->data_block_counter);
@@ -719,31 +706,25 @@ static void transmit_packet(struct amdtp_stream *s,
 	}
 
 	payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
-	if (queue_transmit_packet(s, index, payload_length, false) < 0) {
+	if (queue_transmit_packet(s, payload_length, false) < 0) {
 		amdtp_stream_pcm_abort(s);
 		return;
 	}
-
-	if (++index >= QUEUE_LENGTH)
-		index = 0;
-	s->packet_index = index;
 
 	if (pcm)
 		check_pcm_pointer(s, pcm, data_blocks);
 }
 
 static void receive_packet(struct amdtp_stream *s,
-			   unsigned int index,
-			   unsigned int payload_quadlets)
+			   unsigned int payload_quadlets,
+			   __be32 *buffer)
 {
-	__be32 *buffer;
 	u32 cip_header[2];
 	unsigned int data_block_quadlets, data_block_counter, data_blocks = 0,
 		     syt;
 	struct snd_pcm_substream *pcm;
 	bool nodata = false;
 
-	buffer = s->buffer.packets[index].buffer;
 	cip_header[0] = be32_to_cpu(buffer[0]);
 	cip_header[1] = be32_to_cpu(buffer[1]);
 
@@ -763,7 +744,7 @@ static void receive_packet(struct amdtp_stream *s,
 		pcm = NULL;
 	} else {
 		data_block_quadlets = (cip_header[0] & AMDTP_DBS_MASK) >>
-								AMDTP_DBS_SHIFT;
+							AMDTP_DBS_SHIFT;
 		data_block_counter  = cip_header[0] & AMDTP_DBC_MASK;
 
 		/*
@@ -791,16 +772,10 @@ static void receive_packet(struct amdtp_stream *s,
 		s->data_block_counter  = data_block_counter;
 	}
 
-	if (queue_receive_packet(s, index) < 0) {
-		amdtp_stream_pcm_abort(s);
-		return;
-	}
-
 	/* Process sync slave stream */
 	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
-	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave)) {
+	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave))
 		transmit_packet(s->sync_slave, 0, syt, nodata);
-	}
 
 	if (pcm)
 		check_pcm_pointer(s, pcm, data_blocks);
@@ -830,53 +805,61 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 				    void *private_data)
 {
 	struct amdtp_stream *s = private_data;
-	struct sort_table *tbl = s->sort_table;
-	unsigned int i, j, packets, limit, index, payload_quadlets;
-	__be32 *b, *headers = header;
+	struct sort_table *entry, *tbl = s->sort_table;
+	unsigned int i, j, k, packets, index, remain_packets;
+	__be32 *buffer, *headers = header;
 
 	/* The number of packets in buffer */
 	packets = header_length / RECEIVE_PACKET_HEADER_SIZE;
 
 	/* Store into sort table and sort. */
 	for (i = 0; i < packets; i++) {
-		tbl[i].id = i;
+		entry = &tbl[s->remain_packets + i];
+		entry->id = i;
+
 		index = s->packet_index + i;
 		if (index >= QUEUE_LENGTH)
 			index -= QUEUE_LENGTH;
-		b = s->buffer.packets[index].buffer;
-		tbl[i].tstamp = be32_to_cpu(b[1]) & AMDTP_SYT_MASK;
+		buffer = s->buffer.packets[index].buffer;
+		entry->tstamp = be32_to_cpu(buffer[1]) & AMDTP_SYT_MASK;
+
+		entry->payload_size = be32_to_cpu(headers[i]) >>
+				      ISO_DATA_LENGTH_SHIFT;
 	}
-	packet_sort(tbl, packets);
+	packet_sort(tbl, packets + s->remain_packets);
 
 	/*
-	 * To keep the consistency of sequence, some continuous latest packets
-	 * are left in the buffer and handle at next callback.
+	 * for convinience, tbl[i].id >= QUEUE_LENGTH is a label to previous
+	 * packets in buffer.
 	 */
-	limit = packets / 3;
-	for (i = 1; i < limit; i++) {
-		for (j = packets - i - 1; j < packets; j++) {
-			if (tbl[j].id + i + 1 < packets)
-				break;
+	remain_packets = s->remain_packets;
+	s->remain_packets = packets / 4;
+	for (i = 0, j = 0, k = 0; i < remain_packets + packets; i++) {
+		if (tbl[i].id < QUEUE_LENGTH) {
+			index = s->packet_index + tbl[i].id;
+			if (index >= QUEUE_LENGTH)
+				index -= QUEUE_LENGTH;
+			buffer = s->buffer.packets[index].buffer;
+		} else
+			buffer = s->left_packets + s->max_payload_size * j++;
+
+		if (i < remain_packets + packets - s->remain_packets)
+			receive_packet(s, tbl[i].payload_size / 4, buffer);
+		else {
+			tbl[k].id = tbl[i].id + QUEUE_LENGTH;
+			tbl[k].tstamp = tbl[i].tstamp;
+			tbl[k].payload_size = tbl[i].payload_size;
+			memcpy(s->left_packets + s->max_payload_size * k++,
+			       buffer, tbl[i].payload_size);
 		}
-		if (j != packets)
-			break;
-	}
-	packets -= i;
-
-	/* handle each data in payload */
-	for (i = 0; i < packets; i++) {
-		index = s->packet_index + tbl[i].id;
-		if (index >= QUEUE_LENGTH)
-			index -= QUEUE_LENGTH;
-		payload_quadlets = (be32_to_cpu(headers[tbl[i].id]) >>
-				    ISO_DATA_LENGTH_SHIFT) / 4;
-		receive_packet(s, index, payload_quadlets);
 	}
 
-	/* arrange index for next cycle */
-	s->packet_index += packets;
-	if (s->packet_index >= QUEUE_LENGTH)
-		s->packet_index -= QUEUE_LENGTH;
+	for (i = 0; i < packets; i ++) {
+		if (queue_receive_packet(s) < 0) {
+			amdtp_stream_pcm_abort(s);
+			return;
+		}
+	}
 
 	/* when sync to device, flush the packets for slave stream */
 	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
@@ -929,7 +912,7 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
  */
 int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 {
-	unsigned int header_size, i;
+	unsigned int header_size;
 	enum dma_data_direction dir;
 	int type, err;
 
@@ -956,10 +939,25 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		type = FW_ISO_CONTEXT_TRANSMIT;
 		header_size = TRANSMIT_PACKET_HEADER_SIZE;
 	}
+	s->max_payload_size = amdtp_stream_get_max_payload(s);
 	err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
-				      amdtp_stream_get_max_payload(s), dir);
+				      s->max_payload_size, dir);
 	if (err < 0)
 		goto err_unlock;
+
+	s->data_block_quadlets =
+			s->pcm_channels + DIV_ROUND_UP(s->midi_ports, 8);
+
+	/* to sort receive packets */
+	if (s->direction == AMDTP_STREAM_RECEIVE) {
+		s->remain_packets = 0;
+		s->sort_table = kzalloc(sizeof(struct sort_table) *
+					QUEUE_LENGTH, GFP_KERNEL);
+		if (s->sort_table == NULL)
+			return -ENOMEM;
+		s->left_packets = kzalloc(s->max_payload_size *
+					  QUEUE_LENGTH / 4, GFP_KERNEL);
+	}
 
 	/* NOTE: this callback is overwritten later */
 	s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
@@ -975,15 +973,15 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 
 	amdtp_stream_update(s);
 
-	for (i = 0; i < QUEUE_LENGTH; i++) {
+	s->packet_index = 0;
+	do {
 		if (s->direction == AMDTP_STREAM_RECEIVE)
-			err = queue_receive_packet(s, i);
+			err = queue_receive_packet(s);
 		else
-			err = queue_transmit_packet(s, i, 0, true);
+			err = queue_transmit_packet(s, 0, true);
 		if (err < 0)
 			goto err_context;
-	};
-	s->packet_index = 0;
+	} while (s->packet_index > 0);
 
 	/*
 	 * NOTE:
@@ -1064,6 +1062,11 @@ void amdtp_stream_stop(struct amdtp_stream *s)
 	fw_iso_context_destroy(s->context);
 	s->context = ERR_PTR(-1);
 	iso_packets_buffer_destroy(&s->buffer, s->unit);
+
+	if (s->sort_table != NULL)
+		kfree(s->sort_table);
+	if (s->left_packets != NULL)
+		kfree(s->left_packets);
 
 	mutex_unlock(&s->mutex);
 }
