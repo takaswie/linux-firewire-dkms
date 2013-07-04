@@ -33,8 +33,6 @@
 #define CIP_FMT_SHIFT		24
 #define CIP_FMT_AM		(0x10 << CIP_FMT_SHIFT)
 #define	CIP_SYT_NO_INFO		0xFFFF
-#define CIP_SYT_MAX		0xfbff
-#define SYT_THREADSHOULD	(CIP_SYT_MAX / 2)
 
 #define AMDTP_FDF_MASK		0x00FF0000
 #define AMDTP_FDF_SFC_SHIFT	16
@@ -45,6 +43,7 @@
 #define AMDTP_DBS_MASK		0x00FF0000
 #define AMDTP_DBS_SHIFT		16
 #define AMDTP_DBC_MASK		0x000000FF
+#define DBC_THREADSHOULD	(AMDTP_DBC_MASK / 2)
 
 /* TODO: make these configurable */
 #define INTERRUPT_INTERVAL	16
@@ -74,7 +73,7 @@ static const struct {
 /* for re-ordering receive packets */
 struct sort_table {
 	unsigned int id;
-	unsigned int tstamp;
+	unsigned int dbc;
 	unsigned int payload_size;
 };
 
@@ -309,51 +308,33 @@ static unsigned int calculate_syt(struct amdtp_stream *s,
 	}
 }
 
-/*
- * This sort algorism is based on an assumption that the order of packets is not
- * so random.
- *  - Maximum two packets except for "noinfo" packets are back to front.
- *  - Maximum two packets except for "noinfo" packets are in next syt cycle.
- * If the sequence of packet doesn't follow to these rules, the result brings
- * wrong sequence of PCM/MIDI data.
- */
 #define SWAP(tbl, m, n) \
 	t = tbl[n].id; \
 	tbl[n].id = tbl[m].id; \
 	tbl[m].id = t; \
-	t = tbl[n].tstamp; \
-	tbl[n].tstamp = tbl[m].tstamp; \
-	tbl[m].tstamp = t; \
+	t = tbl[n].dbc; \
+	tbl[n].dbc = tbl[m].dbc; \
+	tbl[m].dbc = t; \
 	t = tbl[n].payload_size; \
 	tbl[n].payload_size = tbl[m].payload_size; \
 	tbl[m].payload_size = t;
-
 static void packet_sort(struct sort_table *tbl, unsigned int len)
 {
 	unsigned int i, j, k, t;
 
 	i = 0;
 	do {
-		if (tbl[i].tstamp == CIP_SYT_NO_INFO) {
-			i++;
-			continue;
-		}
 		for (j = i + 1; j < len; j++) {
-			if (tbl[j].tstamp == CIP_SYT_NO_INFO)
-				continue;
-			if (((tbl[i].tstamp > tbl[j].tstamp) &&
-			     (tbl[i].tstamp - tbl[j].tstamp <
-						SYT_THREADSHOULD))) {
+			if (((tbl[i].dbc > tbl[j].dbc) &&
+			     (tbl[i].dbc - tbl[j].dbc < DBC_THREADSHOULD))) {
 				SWAP(tbl, i, j);
-			} else if ((tbl[j].tstamp > tbl[i].tstamp) &&
-			           (tbl[j].tstamp - tbl[i].tstamp >
-						SYT_THREADSHOULD)) {
+			} else if ((tbl[j].dbc > tbl[i].dbc) &&
+			           (tbl[j].dbc - tbl[i].dbc >
+							DBC_THREADSHOULD)) {
 				for (k = i; k > 0; k--) {
-					if (tbl[k].tstamp == CIP_SYT_NO_INFO)
-						continue;
-					if ((tbl[k].tstamp > tbl[j].tstamp) ||
-					    (tbl[j].tstamp - tbl[k].tstamp >
-						 SYT_THREADSHOULD)) {
+					if ((tbl[k].dbc > tbl[j].dbc) ||
+					    (tbl[j].dbc - tbl[k].dbc >
+							DBC_THREADSHOULD)) {
 						SWAP(tbl, j, k);
 					}
 					break;
@@ -720,8 +701,7 @@ static void receive_packet(struct amdtp_stream *s,
 			   __be32 *buffer)
 {
 	u32 cip_header[2];
-	unsigned int data_block_quadlets, data_block_counter, data_blocks = 0,
-		     syt;
+	unsigned int syt, data_blocks = 0;
 	struct snd_pcm_substream *pcm;
 	bool nodata = false;
 
@@ -738,38 +718,46 @@ static void receive_packet(struct amdtp_stream *s,
 			cip_header[0], cip_header[1]);
 		amdtp_stream_pcm_abort(s);
 		return;
-	} else if ((payload_quadlets < 3) ||
-	           ((cip_header[1] & AMDTP_FDF_MASK) == AMDTP_FDF_NO_DATA)) {
+	}
+
+	if ((payload_quadlets < 3) ||
+	    ((cip_header[1] & AMDTP_FDF_MASK) == AMDTP_FDF_NO_DATA)) {
+		if (!(s->flags & CIP_BLOCKING))
+			dev_notice(&s->unit->device, "AMDTP mode error\n");
 		nodata = true;
+		syt = CIP_SYT_NO_INFO;
 		pcm = NULL;
 	} else {
-		data_block_quadlets = (cip_header[0] & AMDTP_DBS_MASK) >>
-							AMDTP_DBS_SHIFT;
-		data_block_counter  = cip_header[0] & AMDTP_DBC_MASK;
+		s->data_block_quadlets =
+			(cip_header[0] & AMDTP_DBS_MASK) >> AMDTP_DBS_SHIFT;
+		s->data_block_counter  = cip_header[0] & AMDTP_DBC_MASK;
 
 		/*
-		 * Some devices of Echo Audio's Fireworks reports a fixed
-		 * value for data block quadlets but the actual value is
-		 * different This is a workaround for this issue.
+		 * A workaround for Echo AudioFirePre8.
+		 *
+		 * The device always reports a fixed value "16" as data block
+		 * size at any sampling rates but actually it's different at
+		 * 96.0/88.2 kHz.
+		 *
+		 * Additionally the value of data block count incremented by
+		 * "8" at any sampling rates but actually it's different at
+		 * 96.0/88.2 kHz.
 		 */
-		if ((payload_quadlets - 2) % data_block_quadlets > 0)
+		if ((payload_quadlets - 2) % s->data_block_quadlets > 0)
 			s->data_block_quadlets = s->pcm_channels +
 						DIV_ROUND_UP(s->midi_ports, 8);
 		else
-			s->data_block_quadlets = data_block_quadlets;
+			s->data_block_quadlets = s->data_block_quadlets;
+
+		data_blocks = (payload_quadlets - 2) / s->data_block_quadlets;
 
 		buffer += 2;
 
-		data_blocks = (payload_quadlets - 2) / s->data_block_quadlets;
 		pcm = ACCESS_ONCE(s->pcm);
 		if (pcm)
 			s->transfer_samples(s, pcm, buffer, data_blocks);
 		if (s->midi_ports)
 			amdtp_pull_midi(s, buffer, data_blocks);
-
-		/* for next packet */
-		s->data_block_quadlets = data_block_quadlets;
-		s->data_block_counter  = data_block_counter;
 	}
 
 	/* Process sync slave stream */
@@ -821,7 +809,7 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 		if (index >= QUEUE_LENGTH)
 			index -= QUEUE_LENGTH;
 		buffer = s->buffer.packets[index].buffer;
-		entry->tstamp = be32_to_cpu(buffer[1]) & AMDTP_SYT_MASK;
+		entry->dbc = be32_to_cpu(buffer[0]) & AMDTP_DBC_MASK;
 
 		entry->payload_size = be32_to_cpu(headers[i]) >>
 				      ISO_DATA_LENGTH_SHIFT;
@@ -847,7 +835,7 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 			receive_packet(s, tbl[i].payload_size / 4, buffer);
 		else {
 			tbl[k].id = tbl[i].id + QUEUE_LENGTH;
-			tbl[k].tstamp = tbl[i].tstamp;
+			tbl[k].dbc = tbl[i].dbc;
 			tbl[k].payload_size = tbl[i].payload_size;
 			memcpy(s->left_packets + s->max_payload_size * k++,
 			       buffer, tbl[i].payload_size);
