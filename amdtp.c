@@ -638,7 +638,7 @@ static inline int queue_receive_packet(struct amdtp_stream *s)
  * previous and next packets include events which indicate syt.
  */
 static void transmit_packet(struct amdtp_stream *s,
-			    unsigned int cycle, unsigned int syt, bool nodata)
+			    unsigned int syt, bool nodata)
 {
 	__be32 *buffer;
 	unsigned int fdf, data_blocks, payload_length;
@@ -646,13 +646,6 @@ static void transmit_packet(struct amdtp_stream *s,
 
 	if (s->packet_index < 0)
 		return;
-
-	/*
-	 * if not sync to device, generate "presentation timestamp",
-	 * else use the value of syt from receive stream.
-	 */
-	if (s->sync_mode != AMDTP_STREAM_SYNC_TO_DEVICE)
-		syt = calculate_syt(s, cycle);
 
 	/* "nodata" is supported just in blocking mode */
 	if (!(s->flags & CIP_BLOCKING) ||
@@ -766,18 +759,19 @@ static void receive_packet(struct amdtp_stream *s,
 	/* Process sync slave stream */
 	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
 	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave))
-		transmit_packet(s->sync_slave, 0, syt, nodata);
+		transmit_packet(s->sync_slave, syt, nodata);
 
 	if (pcm)
 		check_pcm_pointer(s, pcm, data_blocks);
 }
 
+/* This processing is for the device which synchronizes to this module. */
 static void transmit_stream_callback(struct fw_iso_context *context, u32 cycle,
 				     size_t header_length, void *header,
 				     void *private_data)
 {
 	struct amdtp_stream *s = private_data;
-	unsigned int i, packets = header_length / 4;
+	unsigned int i, syt, packets = header_length / 4;
 
 	/*
 	 * Compute the cycle of the last queued packet.
@@ -786,8 +780,10 @@ static void transmit_stream_callback(struct fw_iso_context *context, u32 cycle,
 	 */
 	cycle += QUEUE_LENGTH - packets;
 
-	for (i = 0; i < packets; ++i)
-		transmit_packet(s, ++cycle, 0, false);
+	for (i = 0; i < packets; ++i) {
+		syt = calculate_syt(s, ++cycle);
+		transmit_packet(s, syt, false);
+	}
 	fw_iso_context_queue_flush(s->context);
 }
 
