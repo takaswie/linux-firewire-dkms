@@ -647,21 +647,24 @@ static void transmit_packet(struct amdtp_stream *s,
 	if (s->packet_index < 0)
 		return;
 
-	/* "nodata" isn't supported in AMDTP non-blocking mode */
-	if (!nodata || !(s->flags & CIP_BLOCKING)) {
+	/*
+	 * if not sync to device, generate "presentation timestamp",
+	 * else use the value of syt from receive stream.
+	 */
+	if (s->sync_mode != AMDTP_STREAM_SYNC_TO_DEVICE)
+		syt = calculate_syt(s, cycle);
+
+	/* "nodata" is supported just in blocking mode */
+	if (!(s->flags & CIP_BLOCKING) ||
+	    ((syt != CIP_SYT_NO_INFO) && !nodata)) {
 		data_blocks = calculate_data_blocks(s);
 		fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
-		/*
-		 * if sync to driver, generate "presentation timestamp",
-		 * else use the value of syt from receive stream.
-		 */
-		if (s->sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER)
-			syt = calculate_syt(s, cycle);
+		nodata = false;
 	} else {
-		/* this code transmit empty packet when it's "nodata" */
+		syt = CIP_SYT_NO_INFO;
 		data_blocks = 0;
 		fdf = AMDTP_FDF_NO_DATA;
-		syt = CIP_SYT_NO_INFO;
+		nodata = true;
 	}
 
 	buffer = s->buffer.packets[s->packet_index].buffer;
