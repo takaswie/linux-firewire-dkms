@@ -637,10 +637,10 @@ static inline int queue_receive_packet(struct amdtp_stream *s)
  * "noinfo" means the packet includes no event which indicates syt. Then
  * previous and next packets include events which indicate syt.
  */
-static void transmit_packet(struct amdtp_stream *s,
-			    unsigned int syt, bool nodata)
+static void transmit_packet(struct amdtp_stream *s,unsigned int syt)
 {
 	__be32 *buffer;
+	bool nodata;
 	unsigned int fdf, data_blocks, payload_length;
 	struct snd_pcm_substream *pcm = NULL;
 
@@ -648,8 +648,7 @@ static void transmit_packet(struct amdtp_stream *s,
 		return;
 
 	/* "nodata" is supported just in blocking mode */
-	if (!(s->flags & CIP_BLOCKING) ||
-	    ((syt != CIP_SYT_NO_INFO) && !nodata)) {
+	if (!(s->flags & CIP_BLOCKING) || (syt != CIP_SYT_NO_INFO)) {
 		data_blocks = calculate_data_blocks(s);
 		fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
 		nodata = false;
@@ -697,14 +696,11 @@ static void receive_packet(struct amdtp_stream *s,
 			   __be32 *buffer)
 {
 	u32 cip_header[2];
-	unsigned int syt, data_blocks = 0;
+	unsigned int data_blocks = 0;
 	struct snd_pcm_substream *pcm;
-	bool nodata = false;
 
 	cip_header[0] = be32_to_cpu(buffer[0]);
 	cip_header[1] = be32_to_cpu(buffer[1]);
-
-	syt = cip_header[1] & AMDTP_SYT_MASK;
 
 	/* This module supports AMDTP packet */
 	if (((cip_header[0] & CIP_EOH_MASK) == CIP_EOH) ||
@@ -720,8 +716,6 @@ static void receive_packet(struct amdtp_stream *s,
 	    ((cip_header[1] & AMDTP_FDF_MASK) == AMDTP_FDF_NO_DATA)) {
 		if (!(s->flags & CIP_BLOCKING))
 			dev_notice(&s->unit->device, "AMDTP mode error\n");
-		nodata = true;
-		syt = CIP_SYT_NO_INFO;
 		pcm = NULL;
 	} else {
 		s->data_block_quadlets =
@@ -756,11 +750,6 @@ static void receive_packet(struct amdtp_stream *s,
 			amdtp_pull_midi(s, buffer, data_blocks);
 	}
 
-	/* Process sync slave stream */
-	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
-	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave))
-		transmit_packet(s->sync_slave, syt, nodata);
-
 	if (pcm)
 		check_pcm_pointer(s, pcm, data_blocks);
 }
@@ -782,7 +771,7 @@ static void transmit_stream_callback(struct fw_iso_context *context, u32 cycle,
 
 	for (i = 0; i < packets; ++i) {
 		syt = calculate_syt(s, ++cycle);
-		transmit_packet(s, syt, false);
+		transmit_packet(s, syt);
 	}
 	fw_iso_context_queue_flush(s->context);
 }
@@ -793,7 +782,7 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 {
 	struct amdtp_stream *s = private_data;
 	struct sort_table *entry, *tbl = s->sort_table;
-	unsigned int i, j, k, packets, index, remain_packets;
+	unsigned int i, j, k, packets, index, syt, remain_packets;
 	__be32 *buffer, *headers = header;
 
 	/* The number of packets in buffer */
@@ -816,8 +805,8 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 	packet_sort(tbl, packets + s->remain_packets);
 
 	/*
-	 * for convinience, tbl[i].id >= QUEUE_LENGTH is a label to previous
-	 * packets in buffer.
+	 * for convinience, tbl[i].id >= QUEUE_LENGTH is a label to identify
+	 * previous packets in buffer.
 	 */
 	remain_packets = s->remain_packets;
 	s->remain_packets = packets / 4;
@@ -830,9 +819,17 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 		} else
 			buffer = s->left_packets + s->max_payload_size * j++;
 
-		if (i < remain_packets + packets - s->remain_packets)
+		if (i < remain_packets + packets - s->remain_packets) {
+			/* Process sync slave stream */
+			if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
+			    !IS_ERR(s->sync_slave) &&
+			    amdtp_stream_running(s->sync_slave)) {
+				syt = be32_to_cpu(buffer[1] & AMDTP_SYT_MASK);
+				transmit_packet(s->sync_slave, syt);
+			}
 			receive_packet(s, tbl[i].payload_size / 4, buffer);
-		else {
+
+		} else {
 			tbl[k].id = tbl[i].id + QUEUE_LENGTH;
 			tbl[k].dbc = tbl[i].dbc;
 			tbl[k].payload_size = tbl[i].payload_size;
