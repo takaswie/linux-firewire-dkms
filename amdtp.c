@@ -629,14 +629,6 @@ static inline int queue_receive_packet(struct amdtp_stream *s)
 			    s->max_payload_size, false);
 }
 
-/*
- * The value of syt includes the lower 4 bits of cycle count in its higher
- * 4 bits. But for convinience, there are separated two arguments.
- *
- * "nodata" means the packet should be ignored.
- * "noinfo" means the packet includes no event which indicates syt. Then
- * previous and next packets include events which indicate syt.
- */
 static void transmit_packet(struct amdtp_stream *s,unsigned int syt)
 {
 	__be32 *buffer;
@@ -647,7 +639,6 @@ static void transmit_packet(struct amdtp_stream *s,unsigned int syt)
 	if (s->packet_index < 0)
 		return;
 
-	/* "nodata" is supported just in blocking mode */
 	if (!(s->flags & CIP_BLOCKING) || (syt != CIP_SYT_NO_INFO)) {
 		data_blocks = calculate_data_blocks(s);
 		fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
@@ -754,7 +745,7 @@ static void receive_packet(struct amdtp_stream *s,
 		check_pcm_pointer(s, pcm, data_blocks);
 }
 
-/* This processing is for the device which synchronizes to this module. */
+/* This function is for the device which synchronizes to this module. */
 static void transmit_stream_callback(struct fw_iso_context *context, u32 cycle,
 				     size_t header_length, void *header,
 				     void *private_data)
