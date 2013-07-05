@@ -102,6 +102,7 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1)
 		s->midi[i] = NULL;
 
+	s->run = false;
 	s->sync_mode = AMDTP_STREAM_SYNC_TO_DRIVER;
 	s->sync_slave = ERR_PTR(-1);
 
@@ -118,7 +119,7 @@ EXPORT_SYMBOL(amdtp_stream_init);
  */
 void amdtp_stream_destroy(struct amdtp_stream *s)
 {
-	WARN_ON(amdtp_stream_running(s));
+	WARN_ON(!IS_ERR(s->context));
 	mutex_destroy(&s->mutex);
 	fw_unit_put(s->unit);
 }
@@ -136,7 +137,7 @@ void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate)
 {
 	unsigned int sfc;
 
-	if (WARN_ON(amdtp_stream_running(s)))
+	if (WARN_ON(!IS_ERR(s->context)))
 		return;
 
 	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_stream_params); ++sfc)
@@ -187,7 +188,7 @@ static void amdtp_read_s32(struct amdtp_stream *s,
 void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
 				 snd_pcm_format_t format)
 {
-	if (WARN_ON(amdtp_stream_running(s)))
+	if (WARN_ON(!IS_ERR(s->context)))
 		return;
 
 	switch (format) {
@@ -861,7 +862,6 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
 
 	s->run = true;
 
-	/* TODO: overwriting sc is always OK? there is mc. */
 	if (s->direction == AMDTP_STREAM_RECEIVE)
 		context->callback.sc = receive_stream_callback;
 	else if (s->sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER)
@@ -893,8 +893,8 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 
 	mutex_lock(&s->mutex);
 
-	if (WARN_ON(amdtp_stream_running(s) ||
-		    (!s->pcm_channels && !s->midi_ports))) {
+	if (WARN_ON(!IS_ERR(s->context) ||
+	    (!s->pcm_channels && !s->midi_ports))) {
 		err = -EBADFD;
 		goto err_unlock;
 	}
@@ -938,7 +938,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
 					   type, channel, speed, header_size,
 					   amdtp_stream_callback, s);
-	if (!amdtp_stream_running(s)) {
+	if (!!IS_ERR(s->context)) {
 		err = PTR_ERR(s->context);
 		if (err == -EBUSY)
 			dev_err(&s->unit->device,
@@ -965,7 +965,6 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	 * NODATA packets with tag 0.
 	 */
 	init_waitqueue_head(&s->run_wait);
-	s->run = false;
 	err = fw_iso_context_start(s->context, -1, 0,
 			FW_ISO_CONTEXT_MATCH_TAG0 | FW_ISO_CONTEXT_MATCH_TAG1);
 	if (err < 0)
@@ -1027,7 +1026,7 @@ void amdtp_stream_stop(struct amdtp_stream *s)
 {
 	mutex_lock(&s->mutex);
 
-	if (!amdtp_stream_running(s)) {
+	if (!!IS_ERR(s->context)) {
 		mutex_unlock(&s->mutex);
 		return;
 	}
@@ -1042,6 +1041,8 @@ void amdtp_stream_stop(struct amdtp_stream *s)
 		kfree(s->sort_table);
 	if (s->left_packets != NULL)
 		kfree(s->left_packets);
+
+	s->run = false;
 
 	mutex_unlock(&s->mutex);
 }
