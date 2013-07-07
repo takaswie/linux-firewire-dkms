@@ -161,7 +161,7 @@ static inline void amdtp_stream_set_midi(struct amdtp_stream *s,
  */
 static inline bool amdtp_stream_running(struct amdtp_stream *s)
 {
-	return !IS_ERR(s->context);
+	return (s->run == true);
 }
 
 /**
