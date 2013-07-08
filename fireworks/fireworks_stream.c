@@ -222,11 +222,11 @@ void snd_efw_sync_streams_update(struct snd_efw *efw)
 	bool flag = false;
 
 	if (efw->receive_stream.sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER) {
-		master = &efw->receive_stream;
-		slave = &efw->transmit_stream;
-	} else {
 		master = &efw->transmit_stream;
 		slave = &efw->receive_stream;
+	} else {
+		master = &efw->receive_stream;
+		slave = &efw->transmit_stream;
 	}
 
 	if (master->sync_slave == slave) {
