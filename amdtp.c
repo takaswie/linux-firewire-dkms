@@ -630,7 +630,7 @@ static inline int queue_receive_packet(struct amdtp_stream *s)
 			    s->max_payload_size, false);
 }
 
-static void transmit_packet(struct amdtp_stream *s,unsigned int syt)
+static void transmit_packet(struct amdtp_stream *s, unsigned int syt)
 {
 	__be32 *buffer;
 	bool nodata;
@@ -816,7 +816,7 @@ static void receive_stream_callback(struct fw_iso_context *context, u32 cycle,
 			if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
 			    !IS_ERR(s->sync_slave) &&
 			    amdtp_stream_running(s->sync_slave)) {
-				syt = be32_to_cpu(buffer[1] & AMDTP_SYT_MASK);
+				syt = be32_to_cpu(buffer[1]) & AMDTP_SYT_MASK;
 				transmit_packet(s->sync_slave, syt);
 			}
 			receive_packet(s, tbl[i].payload_size / 4, buffer);
