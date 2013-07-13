@@ -383,50 +383,56 @@ pcm_hw_free(struct snd_pcm_substream *substream)
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
 
-/* It's OK just to consider this pcm substream. */
-static int
-pcm_prepare(struct snd_pcm_substream *substream)
+static int pcm_capture_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
-	struct amdtp_stream *stream;
-	int err = 0;
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		stream = &efw->receive_stream;
-	else
-		stream = &efw->transmit_stream;
+	if (!amdtp_stream_wait_run(&efw->receive_stream))
+		return -EIO;
 
-	/* wait for stream run */
-	if (!amdtp_stream_wait_run(stream)) {
-		err = -EIO;
-		goto end;
-	}
+	amdtp_stream_pcm_prepare(&efw->receive_stream);
 
-	/* initialize buffer pointer */
-	amdtp_stream_pcm_prepare(stream);
+	return 0;
+}
+static int pcm_playback_prepare(struct snd_pcm_substream *substream)
+{
+	struct snd_efw *efw = substream->private_data;
 
-end:
-	return err;
+	if (!amdtp_stream_wait_run(&efw->transmit_stream))
+		return -EIO;
+
+	amdtp_stream_pcm_prepare(&efw->transmit_stream);
+
+	return 0;
 }
 
-/* It's OK just to consider this pcm substream. */
-static int
-pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+static int pcm_capture_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_efw *efw = substream->private_data;
-	struct amdtp_stream *stream;
-
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		stream = &efw->receive_stream;
-	else
-		stream = &efw->transmit_stream;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		amdtp_stream_pcm_trigger(stream, substream);
+		amdtp_stream_pcm_trigger(&efw->receive_stream, substream);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		amdtp_stream_pcm_trigger(stream, NULL);
+		amdtp_stream_pcm_trigger(&efw->receive_stream, NULL);
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	return 0;
+}
+static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
+{
+	struct snd_efw *efw = substream->private_data;
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+		amdtp_stream_pcm_trigger(&efw->transmit_stream, substream);
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+		amdtp_stream_pcm_trigger(&efw->transmit_stream, NULL);
 		break;
 	default:
 		return -EINVAL;
@@ -435,30 +441,16 @@ pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	return 0;
 }
 
-/* It's OK just to consider this pcm substream. */
-static snd_pcm_uframes_t
-pcm_pointer(struct snd_pcm_substream *substream)
+static snd_pcm_uframes_t pcm_capture_pointer(struct snd_pcm_substream *sbstrm)
 {
-	struct snd_efw *efw = substream->private_data;
-
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		return amdtp_stream_pcm_pointer(&efw->receive_stream);
-	else
-		return amdtp_stream_pcm_pointer(&efw->transmit_stream);
+	struct snd_efw *efw = sbstrm->private_data;
+	return amdtp_stream_pcm_pointer(&efw->receive_stream);
 }
-
-static struct snd_pcm_ops pcm_playback_ops = {
-	.open		= pcm_open,
-	.close		= pcm_close,
-	.ioctl		= snd_pcm_lib_ioctl,
-	.hw_params	= pcm_hw_params,
-	.hw_free	= pcm_hw_free,
-	.prepare	= pcm_prepare,
-	.trigger	= pcm_trigger,
-	.pointer	= pcm_pointer,
-	.page		= snd_pcm_lib_get_vmalloc_page,
-	.mmap		= snd_pcm_lib_mmap_vmalloc,
-};
+static snd_pcm_uframes_t pcm_playback_pointer(struct snd_pcm_substream *sbstrm)
+{
+	struct snd_efw *efw = sbstrm->private_data;
+	return amdtp_stream_pcm_pointer(&efw->receive_stream);
+}
 
 static struct snd_pcm_ops pcm_capture_ops = {
 	.open		= pcm_open,
@@ -466,10 +458,23 @@ static struct snd_pcm_ops pcm_capture_ops = {
 	.ioctl		= snd_pcm_lib_ioctl,
 	.hw_params	= pcm_hw_params,
 	.hw_free	= pcm_hw_free,
-	.prepare	= pcm_prepare,
-	.trigger	= pcm_trigger,
-	.pointer	= pcm_pointer,
+	.prepare	= pcm_capture_prepare,
+	.trigger	= pcm_capture_trigger,
+	.pointer	= pcm_capture_pointer,
 	.page		= snd_pcm_lib_get_vmalloc_page,
+};
+
+static struct snd_pcm_ops pcm_playback_ops = {
+	.open		= pcm_open,
+	.close		= pcm_close,
+	.ioctl		= snd_pcm_lib_ioctl,
+	.hw_params	= pcm_hw_params,
+	.hw_free	= pcm_hw_free,
+	.prepare	= pcm_playback_prepare,
+	.trigger	= pcm_playback_trigger,
+	.pointer	= pcm_playback_pointer,
+	.page		= snd_pcm_lib_get_vmalloc_page,
+	.mmap		= snd_pcm_lib_mmap_vmalloc,
 };
 
 int snd_efw_create_pcm_devices(struct snd_efw *efw)
