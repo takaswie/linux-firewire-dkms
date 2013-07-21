@@ -633,23 +633,24 @@ static inline int queue_receive_packet(struct amdtp_stream *s)
 static void transmit_packet(struct amdtp_stream *s, unsigned int syt)
 {
 	__be32 *buffer;
-	bool nodata;
 	unsigned int fdf, data_blocks, payload_length;
 	struct snd_pcm_substream *pcm = NULL;
 
 	if (s->packet_index < 0)
 		return;
 
-	if (!(s->flags & CIP_BLOCKING) || (syt != CIP_SYT_NO_INFO)) {
+	if (!(s->flags & CIP_BLOCKING) || (syt != CIP_SYT_NO_INFO))
 		data_blocks = calculate_data_blocks(s);
-		fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
-		nodata = false;
-	} else {
+	else {
 		syt = CIP_SYT_NO_INFO;
 		data_blocks = 0;
-		fdf = AMDTP_FDF_NO_DATA;
-		nodata = true;
 	}
+
+	/*
+	 * In blocking mode, even if it's "nodata" packet, BeBoB needs FDF to
+	 * indicate sanpling rate.
+	 */
+	fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
 
 	buffer = s->buffer.packets[s->packet_index].buffer;
 	buffer[0] = cpu_to_be32(ACCESS_ONCE(s->source_node_id_field) |
@@ -660,7 +661,7 @@ static void transmit_packet(struct amdtp_stream *s, unsigned int syt)
 	buffer += 2;
 
 	/* Here "nodata" will transmit empty packet. */
-	if (!nodata) {
+	if (data_blocks > 0) {
 		pcm = ACCESS_ONCE(s->pcm);
 		if (pcm)
 			s->transfer_samples(s, pcm, buffer, data_blocks);
@@ -705,42 +706,41 @@ static void receive_packet(struct amdtp_stream *s,
 	}
 
 	if ((payload_quadlets < 3) ||
-	    ((cip_header[1] & AMDTP_FDF_MASK) == AMDTP_FDF_NO_DATA)) {
-		if (!(s->flags & CIP_BLOCKING))
-			dev_notice(&s->unit->device, "AMDTP mode error\n");
-		pcm = NULL;
-	} else {
-		s->data_block_quadlets =
-			(cip_header[0] & AMDTP_DBS_MASK) >> AMDTP_DBS_SHIFT;
-		s->data_block_counter  = cip_header[0] & AMDTP_DBC_MASK;
+	    ((cip_header[1] & AMDTP_FDF_MASK) == AMDTP_FDF_NO_DATA) ||
+	     ((s->flags & CIP_BLOCKING) &&
+	      ((cip_header[1] & AMDTP_SYT_MASK) == CIP_SYT_NO_INFO)))
+		return;
 
-		/*
-		 * A workaround for Echo AudioFirePre8.
-		 *
-		 * The device always reports a fixed value "16" as data block
-		 * size at any sampling rates but actually it's different at
-		 * 96.0/88.2 kHz.
-		 *
-		 * Additionally the value of data block count incremented by
-		 * "8" at any sampling rates but actually it's different at
-		 * 96.0/88.2 kHz.
-		 */
-		if ((payload_quadlets - 2) % s->data_block_quadlets > 0)
-			s->data_block_quadlets = s->pcm_channels +
-						DIV_ROUND_UP(s->midi_ports, 8);
-		else
-			s->data_block_quadlets = s->data_block_quadlets;
+	s->data_block_quadlets =
+		(cip_header[0] & AMDTP_DBS_MASK) >> AMDTP_DBS_SHIFT;
+	s->data_block_counter  = cip_header[0] & AMDTP_DBC_MASK;
 
-		data_blocks = (payload_quadlets - 2) / s->data_block_quadlets;
+	/*
+	 * A workaround for Echo AudioFirePre8.
+	 *
+	 * The device always reports a fixed value "16" as data block
+	 * size at any sampling rates but actually it's different at
+	 * 96.0/88.2 kHz.
+	 *
+	 * Additionally the value of data block count incremented by
+	 * "8" at any sampling rates but actually it's different at
+	 * 96.0/88.2 kHz.
+	 */
+	if ((payload_quadlets - 2) % s->data_block_quadlets > 0)
+		s->data_block_quadlets = s->pcm_channels +
+					 DIV_ROUND_UP(s->midi_ports, 8);
+	else
+		s->data_block_quadlets = s->data_block_quadlets;
 
-		buffer += 2;
+	data_blocks = (payload_quadlets - 2) / s->data_block_quadlets;
 
-		pcm = ACCESS_ONCE(s->pcm);
-		if (pcm)
-			s->transfer_samples(s, pcm, buffer, data_blocks);
-		if (s->midi_ports)
-			amdtp_pull_midi(s, buffer, data_blocks);
-	}
+	buffer += 2;
+
+	pcm = ACCESS_ONCE(s->pcm);
+	if (pcm)
+		s->transfer_samples(s, pcm, buffer, data_blocks);
+	if (s->midi_ports)
+		amdtp_pull_midi(s, buffer, data_blocks);
 
 	if (pcm)
 		check_pcm_pointer(s, pcm, data_blocks);
