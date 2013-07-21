@@ -50,11 +50,11 @@ int snd_bebob_stream_init(struct snd_bebob *bebob, struct amdtp_stream *stream)
 	if (stream == &bebob->receive_stream) {
 		connection = &bebob->output_connection;
 		c_dir = CMP_OUTPUT;
-		s_dir = AMDTP_STREAM_RECEIVE;
+		s_dir = AMDTP_STREAM_IN;
 	} else {
 		connection = &bebob->input_connection;
 		c_dir = CMP_INPUT;
-		s_dir = AMDTP_STREAM_TRANSMIT;
+		s_dir = AMDTP_STREAM_OUT;
 	}
 
 	err = cmp_connection_init(connection, bebob->unit, c_dir, 0);

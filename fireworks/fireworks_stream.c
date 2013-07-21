@@ -27,11 +27,11 @@ static int snd_efw_stream_init(struct snd_efw *efw, struct amdtp_stream *stream)
 	if (stream == &efw->receive_stream) {
 		connection = &efw->output_connection;
 		c_dir = CMP_OUTPUT;
-		s_dir = AMDTP_STREAM_RECEIVE;
+		s_dir = AMDTP_STREAM_IN;
 	} else {
 		connection = &efw->input_connection;
 		c_dir = CMP_INPUT;
-		s_dir = AMDTP_STREAM_TRANSMIT;
+		s_dir = AMDTP_STREAM_OUT;
 	}
 
 	err = cmp_connection_init(connection, efw->unit, c_dir, 0);

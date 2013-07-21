@@ -727,7 +727,7 @@ static int fwspk_probe(struct device *unit_dev)
 		goto err_unit;
 
 	err = amdtp_stream_init(&fwspk->stream, unit,
-				AMDTP_STREAM_TRANSMIT, CIP_NONBLOCKING);
+				AMDTP_STREAM_OUT, CIP_NONBLOCKING);
 	if (err < 0)
 		goto err_connection;
 
