@@ -298,8 +298,8 @@ pcm_open(struct snd_pcm_substream *substream)
 		goto end;
 
 	/* the same sampling rate is applied when any PCM stream running */
-	if (amdtp_stream_pcm_running(&efw->receive_stream) ||
-	    amdtp_stream_pcm_running(&efw->transmit_stream)) {
+	if (amdtp_stream_pcm_running(&efw->tx_stream) ||
+	    amdtp_stream_pcm_running(&efw->rx_stream)) {
 		err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
 		if (err < 0)
 			goto end;
@@ -333,9 +333,9 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 		goto end;
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		stream = &efw->receive_stream;
+		stream = &efw->tx_stream;
 	else
-		stream = &efw->transmit_stream;
+		stream = &efw->rx_stream;
 
 	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
 	err = snd_efw_stream_start_duplex(efw, stream, params_rate(hw_params));
@@ -358,10 +358,10 @@ static int pcm_capture_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
 
-	if (!amdtp_stream_wait_run(&efw->receive_stream))
+	if (!amdtp_stream_wait_run(&efw->tx_stream))
 		return -EIO;
 
-	amdtp_stream_pcm_prepare(&efw->receive_stream);
+	amdtp_stream_pcm_prepare(&efw->tx_stream);
 
 	return 0;
 }
@@ -369,10 +369,10 @@ static int pcm_playback_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
 
-	if (!amdtp_stream_wait_run(&efw->transmit_stream))
+	if (!amdtp_stream_wait_run(&efw->rx_stream))
 		return -EIO;
 
-	amdtp_stream_pcm_prepare(&efw->transmit_stream);
+	amdtp_stream_pcm_prepare(&efw->rx_stream);
 
 	return 0;
 }
@@ -383,10 +383,10 @@ static int pcm_capture_trigger(struct snd_pcm_substream *substream, int cmd)
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		amdtp_stream_pcm_trigger(&efw->receive_stream, substream);
+		amdtp_stream_pcm_trigger(&efw->tx_stream, substream);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		amdtp_stream_pcm_trigger(&efw->receive_stream, NULL);
+		amdtp_stream_pcm_trigger(&efw->tx_stream, NULL);
 		break;
 	default:
 		return -EINVAL;
@@ -400,10 +400,10 @@ static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		amdtp_stream_pcm_trigger(&efw->transmit_stream, substream);
+		amdtp_stream_pcm_trigger(&efw->rx_stream, substream);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		amdtp_stream_pcm_trigger(&efw->transmit_stream, NULL);
+		amdtp_stream_pcm_trigger(&efw->rx_stream, NULL);
 		break;
 	default:
 		return -EINVAL;
@@ -415,12 +415,12 @@ static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 static snd_pcm_uframes_t pcm_capture_pointer(struct snd_pcm_substream *sbstrm)
 {
 	struct snd_efw *efw = sbstrm->private_data;
-	return amdtp_stream_pcm_pointer(&efw->receive_stream);
+	return amdtp_stream_pcm_pointer(&efw->tx_stream);
 }
 static snd_pcm_uframes_t pcm_playback_pointer(struct snd_pcm_substream *sbstrm)
 {
 	struct snd_efw *efw = sbstrm->private_data;
-	return amdtp_stream_pcm_pointer(&efw->transmit_stream);
+	return amdtp_stream_pcm_pointer(&efw->rx_stream);
 }
 
 static struct snd_pcm_ops pcm_capture_ops = {

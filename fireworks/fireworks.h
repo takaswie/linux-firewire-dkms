@@ -107,24 +107,17 @@ struct snd_efw {
 	/* MIDI parameters */
 	unsigned int midi_input_ports;
 	unsigned int midi_output_ports;
-	struct snd_rawmidi_substream *receive_midi[SND_EFW_MAX_MIDI_INPUTS];
-	struct snd_rawmidi_substream *transmit_midi[SND_EFW_MAX_MIDI_OUTPUTS];
-	unsigned long receive_midi_triggered;
-	unsigned long transmit_midi_triggered;
 
 	/* PCM parameters */
 	unsigned int pcm_capture_channels[SND_EFW_MUITIPLIER_MODES];
 	unsigned int pcm_playback_channels[SND_EFW_MUITIPLIER_MODES];
-	/* PCM channels in running stream */
-	unsigned int transmit_pcm_channels;
-	unsigned int receive_pcm_channels;
 
 	/* notification to control components */
 	struct snd_ctl_elem_id *control_id_sampling_rate;
 
 	/* for IEC 61883-1 and -6 streaming */
-	struct amdtp_stream receive_stream;
-	struct amdtp_stream transmit_stream;
+	struct amdtp_stream tx_stream;
+	struct amdtp_stream rx_stream;
 	/* Fireworks has only two plugs */
 	struct cmp_connection output_connection;
 	struct cmp_connection input_connection;
@@ -242,9 +235,6 @@ int snd_efw_create_control_devices(struct snd_efw *efw);
 
 /* for midi component */
 int snd_efw_create_midi_devices(struct snd_efw *efw);
-bool snd_efw_midi_stream_running(struct snd_efw *efw,
-				 struct amdtp_stream *stream);
-void snd_efw_midi_stream_abort(struct snd_efw *efw);
 
 /* for pcm component */
 int snd_efw_create_pcm_devices(struct snd_efw *efw);

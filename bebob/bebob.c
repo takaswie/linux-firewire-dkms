@@ -114,9 +114,9 @@ static int fill_stream_formations(struct snd_bebob *bebob,
 		return -ENOMEM;
 
 	if (direction > 0)
-		formations = bebob->transmit_stream_formations;
+		formations = bebob->rx_stream_formations;
 	else
-		formations = bebob->receive_stream_formations;
+		formations = bebob->tx_stream_formations;
 
 	for (e = 0, index = 0; e < 9; e += 1) {
 		len = FORMATION_MAXIMUM_LENGTH;
@@ -192,8 +192,8 @@ static int detect_channels(struct snd_bebob *bebob)
 
 	/* fill sampling rates in stream_formations */
 	for (i = 0; i < 9; i += 1) {
-		bebob->receive_stream_formations[i].sampling_rate =
-		bebob->transmit_stream_formations[i].sampling_rate =
+		bebob->tx_stream_formations[i].sampling_rate =
+		bebob->rx_stream_formations[i].sampling_rate =
 		sampling_rate_table[i];
 	}
 
@@ -280,21 +280,21 @@ snd_bebob_update(struct fw_unit *unit)
 
 	/* bus reset for isochronous transmit stream */
 	if (cmp_connection_update(&bebob->input_connection) < 0) {
-		amdtp_stream_pcm_abort(&bebob->receive_stream);
+		amdtp_stream_pcm_abort(&bebob->tx_stream);
 		mutex_lock(&bebob->mutex);
-		snd_bebob_stream_stop(bebob, &bebob->receive_stream);
+		snd_bebob_stream_stop(bebob, &bebob->tx_stream);
 		mutex_unlock(&bebob->mutex);
 	}
-	amdtp_stream_update(&bebob->receive_stream);
+	amdtp_stream_update(&bebob->tx_stream);
 
 	/* bus reset for isochronous receive stream */
 	if (cmp_connection_update(&bebob->output_connection) < 0) {
-		amdtp_stream_pcm_abort(&bebob->transmit_stream);
+		amdtp_stream_pcm_abort(&bebob->rx_stream);
 		mutex_lock(&bebob->mutex);
-		snd_bebob_stream_stop(bebob, &bebob->transmit_stream);
+		snd_bebob_stream_stop(bebob, &bebob->rx_stream);
 		mutex_unlock(&bebob->mutex);
 	}
-	amdtp_stream_update(&bebob->transmit_stream);
+	amdtp_stream_update(&bebob->rx_stream);
 
 	return;
 }

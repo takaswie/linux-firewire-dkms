@@ -24,7 +24,7 @@ static int snd_efw_stream_init(struct snd_efw *efw, struct amdtp_stream *stream)
 	enum amdtp_stream_direction s_dir;
 	int err;
 
-	if (stream == &efw->receive_stream) {
+	if (stream == &efw->tx_stream) {
 		connection = &efw->output_connection;
 		c_dir = CMP_OUTPUT;
 		s_dir = AMDTP_STREAM_IN;
@@ -60,7 +60,7 @@ static int snd_efw_stream_start(struct snd_efw *efw,
 		goto end;
 
 	mode = snd_efw_get_multiplier_mode(sampling_rate);
-	if (stream == &efw->receive_stream) {
+	if (stream == &efw->tx_stream) {
 		connection = &efw->output_connection;
 		pcm_channels = efw->pcm_capture_channels[mode];
 	} else {
@@ -97,7 +97,7 @@ static void snd_efw_stream_stop(struct snd_efw *efw,
 
 	amdtp_stream_stop(stream);
 
-	if (stream == &efw->receive_stream)
+	if (stream == &efw->tx_stream)
 		cmp_connection_break(&efw->output_connection);
 	else
 		cmp_connection_break(&efw->input_connection);
@@ -110,7 +110,7 @@ static void snd_efw_stream_update(struct snd_efw *efw,
 {
 	struct cmp_connection *conn;
 
-	if (&efw->receive_stream == stream)
+	if (&efw->tx_stream == stream)
 		conn = &efw->input_connection;
 	else
 		conn = &efw->output_connection;
@@ -129,7 +129,7 @@ static void snd_efw_stream_destroy(struct snd_efw *efw,
 {
 	snd_efw_stream_stop(efw, stream);
 
-	if (stream == &efw->receive_stream)
+	if (stream == &efw->tx_stream)
 		cmp_connection_destroy(&efw->output_connection);
 	else
 		cmp_connection_destroy(&efw->input_connection);
@@ -149,12 +149,12 @@ static int get_roles(struct snd_efw *efw,
 		goto end;
 
 	if (clock_source != SND_EFW_CLOCK_SOURCE_SYTMATCH) {
-		*master = &efw->receive_stream;
-		*slave = &efw->transmit_stream;
+		*master = &efw->tx_stream;
+		*slave = &efw->rx_stream;
 		*sync_mode = AMDTP_STREAM_SYNC_TO_DEVICE;
 	} else {
-		*master = &efw->transmit_stream;
-		*slave = &efw->receive_stream;
+		*master = &efw->rx_stream;
+		*slave = &efw->tx_stream;
 		*sync_mode = AMDTP_STREAM_SYNC_TO_DRIVER;
 	}
 end:
@@ -165,11 +165,11 @@ int snd_efw_stream_init_duplex(struct snd_efw *efw)
 {
 	int err;
 
-	err = snd_efw_stream_init(efw, &efw->receive_stream);
+	err = snd_efw_stream_init(efw, &efw->tx_stream);
 	if (err < 0)
 		goto end;
 
-	err = snd_efw_stream_init(efw, &efw->transmit_stream);
+	err = snd_efw_stream_init(efw, &efw->rx_stream);
 
 end:
 	return err;
@@ -244,13 +244,13 @@ int snd_efw_stream_stop_duplex(struct snd_efw *efw)
 		goto end;
 
 	if (amdtp_stream_pcm_running(slave) ||
-	    snd_efw_midi_stream_running(efw, slave))
+	    amdtp_stream_midi_running(slave))
 		goto end;
 
 	snd_efw_stream_stop(efw, slave);
 
 	if (!amdtp_stream_pcm_running(master) &&
-	    !snd_efw_midi_stream_running(efw, master))
+	    !amdtp_stream_midi_running(master))
 		snd_efw_stream_stop(efw, master);
 
 end:
@@ -261,12 +261,12 @@ void snd_efw_stream_update_duplex(struct snd_efw *efw)
 {
 	struct amdtp_stream *master, *slave;
 
-	if (efw->receive_stream.sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER) {
-		master = &efw->transmit_stream;
-		slave = &efw->receive_stream;
+	if (efw->tx_stream.sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER) {
+		master = &efw->rx_stream;
+		slave = &efw->tx_stream;
 	} else {
-		master = &efw->receive_stream;
-		slave = &efw->transmit_stream;
+		master = &efw->tx_stream;
+		slave = &efw->rx_stream;
 	}
 
 	snd_efw_stream_update(efw, master);
@@ -275,11 +275,11 @@ void snd_efw_stream_update_duplex(struct snd_efw *efw)
 
 void snd_efw_stream_destroy_duplex(struct snd_efw *efw)
 {
-	if (amdtp_stream_pcm_running(&efw->receive_stream))
-		amdtp_stream_pcm_abort(&efw->receive_stream);
-	if (amdtp_stream_pcm_running(&efw->transmit_stream))
-		amdtp_stream_pcm_abort(&efw->transmit_stream);
+	if (amdtp_stream_pcm_running(&efw->tx_stream))
+		amdtp_stream_pcm_abort(&efw->tx_stream);
+	if (amdtp_stream_pcm_running(&efw->rx_stream))
+		amdtp_stream_pcm_abort(&efw->rx_stream);
 
-	snd_efw_stream_destroy(efw, &efw->receive_stream);
-	snd_efw_stream_destroy(efw, &efw->transmit_stream);
+	snd_efw_stream_destroy(efw, &efw->tx_stream);
+	snd_efw_stream_destroy(efw, &efw->rx_stream);
 }

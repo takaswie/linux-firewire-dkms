@@ -83,38 +83,38 @@ Channels
 	/* get the current digital format for input */
 	/* then
 	if (adat) {
-		memcpy(bebob->receive_stream_formations[3], 16+1);
-		memcpy(bebob->receive_stream_formations[4], 16+1);
-		memcpy(bebob->receive_stream_formations[5], 12+1);
-		memcpy(bebob->receive_stream_formations[6], 12+1);
-		memcpy(bebob->receive_stream_formations[7], 4+1);
-		memcpy(bebob->receive_stream_formations[8], 4+1);
+		memcpy(bebob->tx_stream_formations[3], 16+1);
+		memcpy(bebob->tx_stream_formations[4], 16+1);
+		memcpy(bebob->tx_stream_formations[5], 12+1);
+		memcpy(bebob->tx_stream_formations[6], 12+1);
+		memcpy(bebob->tx_stream_formations[7], 4+1);
+		memcpy(bebob->tx_stream_formations[8], 4+1);
 	} else {
-		memcpy(bebob->receive_stream_formations[3], 10+1);
-		memcpy(bebob->receive_stream_formations[4], 10+1);
-		memcpy(bebob->receive_stream_formations[5], 10+1);
-		memcpy(bebob->receive_stream_formations[6], 10+1);
-		memcpy(bebob->receive_stream_formations[7], 4+1);
-		memcpy(bebob->receive_stream_formations[8], 4+1);
+		memcpy(bebob->tx_stream_formations[3], 10+1);
+		memcpy(bebob->tx_stream_formations[4], 10+1);
+		memcpy(bebob->tx_stream_formations[5], 10+1);
+		memcpy(bebob->tx_stream_formations[6], 10+1);
+		memcpy(bebob->tx_stream_formations[7], 4+1);
+		memcpy(bebob->tx_stream_formations[8], 4+1);
 	}
 	*/
 
 	/* get the current digital format for output */
 	/* then
 	if (adat) {
-		memcpy(bebob->transmit_stream_formations[3], 16+1);
-		memcpy(bebob->transmit_stream_formations[4], 16+1);
-		memcpy(bebob->transmit_stream_formations[5], 12+1);
-		memcpy(bebob->transmit_stream_formations[6], 12+1);
-		memcpy(bebob->transmit_stream_formations[7], 4+1);
-		memcpy(bebob->transmit_stream_formations[8], 4+1);
+		memcpy(bebob->rx_stream_formations[3], 16+1);
+		memcpy(bebob->rx_stream_formations[4], 16+1);
+		memcpy(bebob->rx_stream_formations[5], 12+1);
+		memcpy(bebob->rx_stream_formations[6], 12+1);
+		memcpy(bebob->rx_stream_formations[7], 4+1);
+		memcpy(bebob->rx_stream_formations[8], 4+1);
 	} else {
-		memcpy(bebob->transmit_stream_formations[3], 10+1);
-		memcpy(bebob->transmit_stream_formations[4], 10+1);
-		memcpy(bebob->transmit_stream_formations[5], 10+1);
-		memcpy(bebob->transmit_stream_formations[6], 10+1);
-		memcpy(bebob->transmit_stream_formations[7], 4+1);
-		memcpy(bebob->transmit_stream_formations[8], 4+1);
+		memcpy(bebob->rx_stream_formations[3], 10+1);
+		memcpy(bebob->rx_stream_formations[4], 10+1);
+		memcpy(bebob->rx_stream_formations[5], 10+1);
+		memcpy(bebob->rx_stream_formations[6], 10+1);
+		memcpy(bebob->rx_stream_formations[7], 4+1);
+		memcpy(bebob->rx_stream_formations[8], 4+1);
 	}
 	 */
 

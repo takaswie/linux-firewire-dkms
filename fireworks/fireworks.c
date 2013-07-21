@@ -386,7 +386,6 @@ snd_efw_remove(struct device *dev)
 	struct snd_card *card = dev_get_drvdata(dev);
 	struct snd_efw *efw = card->private_data;
 
-	snd_efw_midi_stream_abort(efw);
 	snd_efw_stream_destroy_duplex(efw);
 
 	snd_card_disconnect(card);

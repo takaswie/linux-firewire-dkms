@@ -10,7 +10,7 @@ proc_read_formation(struct snd_info_entry *entry,
 
 	snd_iprintf(buffer, "Reveice Stream:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
-	formation = bebob->receive_stream_formations;
+	formation = bebob->tx_stream_formations;
 	for (i = 0; i < 9; i += 1) {
 		snd_iprintf(buffer,
 			"\t%d\t%d\t%d\n",
@@ -21,7 +21,7 @@ proc_read_formation(struct snd_info_entry *entry,
 
 	snd_iprintf(buffer, "Transmit Stream:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
-	formation = bebob->transmit_stream_formations;
+	formation = bebob->rx_stream_formations;
 	for (i = 0; i < 9; i += 1) {
 		snd_iprintf(buffer,
 			"\t%d\t%d\t%d\n",

@@ -83,7 +83,7 @@ hw_rule_capture_rate(struct snd_pcm_hw_params *params,
 {
 	struct snd_bebob *bebob = rule->private;
 	return hw_rule_rate(params, rule, bebob,
-				bebob->receive_stream_formations);
+				bebob->tx_stream_formations);
 }
 
 static inline int
@@ -92,7 +92,7 @@ hw_rule_playback_rate(struct snd_pcm_hw_params *params,
 {
 	struct snd_bebob *bebob = rule->private;
 	return hw_rule_rate(params, rule, bebob,
-				bebob->transmit_stream_formations);
+				bebob->rx_stream_formations);
 }
 
 static inline int
@@ -101,7 +101,7 @@ hw_rule_capture_channels(struct snd_pcm_hw_params *params,
 {
 	struct snd_bebob *bebob = rule->private;
 	return hw_rule_channels(params, rule, bebob,
-				bebob->receive_stream_formations);
+				bebob->tx_stream_formations);
 }
 
 static inline int
@@ -110,7 +110,7 @@ hw_rule_playback_channels(struct snd_pcm_hw_params *params,
 {
 	struct snd_bebob *bebob = rule->private;
 	return hw_rule_channels(params, rule, bebob,
-				bebob->transmit_stream_formations);
+				bebob->rx_stream_formations);
 }
 
 static void
@@ -186,8 +186,8 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 
 	/* add rule between channels and sampling rate */
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		prepare_rates(&substream->runtime->hw, bebob->receive_stream_formations);
-		prepare_channels(&substream->runtime->hw, bebob->receive_stream_formations);
+		prepare_rates(&substream->runtime->hw, bebob->tx_stream_formations);
+		prepare_channels(&substream->runtime->hw, bebob->tx_stream_formations);
 		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
 		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_capture_channels, bebob,
@@ -196,8 +196,8 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 				hw_rule_capture_rate, bebob,
 				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 	} else {
-		prepare_rates(&substream->runtime->hw, bebob->transmit_stream_formations);
-		prepare_channels(&substream->runtime->hw, bebob->transmit_stream_formations);
+		prepare_rates(&substream->runtime->hw, bebob->rx_stream_formations);
+		prepare_channels(&substream->runtime->hw, bebob->rx_stream_formations);
 		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
 		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_playback_channels, bebob,
@@ -277,12 +277,12 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	}
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		stream = &bebob->receive_stream;
-		formation = bebob->receive_stream_formations + index;
+		stream = &bebob->tx_stream;
+		formation = bebob->tx_stream_formations + index;
 		direction = 0;
 	} else {
-		stream = &bebob->transmit_stream;
-		formation = bebob->transmit_stream_formations + index;
+		stream = &bebob->rx_stream;
+		formation = bebob->rx_stream_formations + index;
 		direction = 1;
 	}
 
@@ -310,10 +310,10 @@ pcm_hw_free(struct snd_pcm_substream *substream)
 	struct cmp_connection *connection;
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		stream = &bebob->receive_stream;
+		stream = &bebob->tx_stream;
 		connection = &bebob->input_connection;
 	} else {
-		stream = &bebob->transmit_stream;
+		stream = &bebob->rx_stream;
 		connection = &bebob->output_connection;
 	}
 
@@ -331,9 +331,9 @@ pcm_prepare(struct snd_pcm_substream *substream)
 	int err = 0;
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		stream = &bebob->receive_stream;
+		stream = &bebob->tx_stream;
 	else
-		stream = &bebob->transmit_stream;
+		stream = &bebob->rx_stream;
 
 	/* start stream */
 	err = snd_bebob_stream_start(bebob, stream);
@@ -365,9 +365,9 @@ pcm_trigger(struct snd_pcm_substream *substream, int cmd)
 	}
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		amdtp_stream_pcm_trigger(&bebob->receive_stream, pcm);
+		amdtp_stream_pcm_trigger(&bebob->tx_stream, pcm);
 	else
-		amdtp_stream_pcm_trigger(&bebob->transmit_stream, pcm);
+		amdtp_stream_pcm_trigger(&bebob->rx_stream, pcm);
 
 	return 0;
 }
@@ -377,9 +377,9 @@ static snd_pcm_uframes_t pcm_pointer(struct snd_pcm_substream *substream)
 	struct snd_bebob *bebob = substream->private_data;
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		return amdtp_stream_pcm_pointer(&bebob->receive_stream);
+		return amdtp_stream_pcm_pointer(&bebob->tx_stream);
 	else
-		return amdtp_stream_pcm_pointer(&bebob->transmit_stream);
+		return amdtp_stream_pcm_pointer(&bebob->rx_stream);
 }
 
 static struct snd_pcm_ops pcm_playback_ops = {
@@ -422,14 +422,14 @@ int snd_bebob_create_pcm_devices(struct snd_bebob *bebob)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &pcm_capture_ops);
 
 	/* for host transmit and target input */
-	err = snd_bebob_stream_init(bebob, &bebob->transmit_stream);
+	err = snd_bebob_stream_init(bebob, &bebob->rx_stream);
 	if (err < 0)
 		goto end;
 
 	/* for host receive and target output */
-	err = snd_bebob_stream_init(bebob, &bebob->receive_stream);
+	err = snd_bebob_stream_init(bebob, &bebob->tx_stream);
 	if (err < 0) {
-		snd_bebob_stream_destroy(bebob, &bebob->transmit_stream);
+		snd_bebob_stream_destroy(bebob, &bebob->rx_stream);
 		goto end;
 	}
 
@@ -439,13 +439,13 @@ end:
 
 void snd_bebob_destroy_pcm_devices(struct snd_bebob *bebob)
 {
-	amdtp_stream_pcm_abort(&bebob->receive_stream);
-	amdtp_stream_stop(&bebob->receive_stream);
-	snd_bebob_stream_destroy(bebob, &bebob->receive_stream);
+	amdtp_stream_pcm_abort(&bebob->tx_stream);
+	amdtp_stream_stop(&bebob->tx_stream);
+	snd_bebob_stream_destroy(bebob, &bebob->tx_stream);
 
-	amdtp_stream_pcm_abort(&bebob->transmit_stream);
-	amdtp_stream_stop(&bebob->transmit_stream);
-	snd_bebob_stream_destroy(bebob, &bebob->transmit_stream);
+	amdtp_stream_pcm_abort(&bebob->rx_stream);
+	amdtp_stream_stop(&bebob->rx_stream);
+	snd_bebob_stream_destroy(bebob, &bebob->rx_stream);
 
 	return;
 }

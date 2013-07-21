@@ -47,7 +47,7 @@ int snd_bebob_stream_init(struct snd_bebob *bebob, struct amdtp_stream *stream)
 	enum amdtp_stream_direction s_dir;
 	int err;
 
-	if (stream == &bebob->receive_stream) {
+	if (stream == &bebob->tx_stream) {
 		connection = &bebob->output_connection;
 		c_dir = CMP_OUTPUT;
 		s_dir = AMDTP_STREAM_IN;
@@ -80,7 +80,7 @@ int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream)
 	if (!IS_ERR(stream->context))
 		goto end;
 
-	if (stream == &bebob->receive_stream)
+	if (stream == &bebob->tx_stream)
 		connection = &bebob->output_connection;
 	else
 		connection = &bebob->input_connection;
@@ -109,7 +109,7 @@ void snd_bebob_stream_stop(struct snd_bebob *bebob, struct amdtp_stream *stream)
 
 	amdtp_stream_stop(stream);
 
-	if (stream == &bebob->receive_stream)
+	if (stream == &bebob->tx_stream)
 		cmp_connection_break(&bebob->output_connection);
 	else
 		cmp_connection_break(&bebob->input_connection);
@@ -121,7 +121,7 @@ void snd_bebob_stream_destroy(struct snd_bebob *bebob, struct amdtp_stream *stre
 {
 	snd_bebob_stream_stop(bebob, stream);
 
-	if (stream == &bebob->receive_stream)
+	if (stream == &bebob->tx_stream)
 		cmp_connection_destroy(&bebob->output_connection);
 	else
 		cmp_connection_destroy(&bebob->input_connection);

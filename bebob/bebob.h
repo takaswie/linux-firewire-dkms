@@ -106,24 +106,20 @@ struct snd_bebob {
 
 	unsigned int supported_sampling_rates;
 
-	unsigned int pcm_capture_channels;
-	unsigned int pcm_playback_channels;
-
 	unsigned int midi_input_ports;
 	unsigned int midi_output_ports;
 
-	struct amdtp_stream receive_stream;
-	struct amdtp_stream transmit_stream;
-
 	struct cmp_connection output_connection;
+	struct amdtp_stream tx_stream;
 	struct cmp_connection input_connection;
+	struct amdtp_stream rx_stream;
 
 	bool loaded;
 
 	struct snd_bebob_stream_formation
-		receive_stream_formations[SND_BEBOB_STREAM_FORMATION_ENTRIES];
+		tx_stream_formations[SND_BEBOB_STREAM_FORMATION_ENTRIES];
 	struct snd_bebob_stream_formation
-		transmit_stream_formations[SND_BEBOB_STREAM_FORMATION_ENTRIES];
+		rx_stream_formations[SND_BEBOB_STREAM_FORMATION_ENTRIES];
 };
 
 int snd_bebob_get_formation_index(int sampling_rate);
