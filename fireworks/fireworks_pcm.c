@@ -211,7 +211,7 @@ pcm_init_hw_params(struct snd_efw *efw,
 
 	/* add rule between channels and sampling rate */
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
+		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32;
 		snd_pcm_hw_rule_add(substream->runtime, 0,
 				SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_capture_channels, efw,
@@ -222,7 +222,9 @@ pcm_init_hw_params(struct snd_efw *efw,
 				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 		pcm_channels = efw->pcm_capture_channels;
 	} else {
-		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
+		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32 |
+						 SNDRV_PCM_FMTBIT_S24 |
+						 SNDRV_PCM_FMTBIT_S16;
 		snd_pcm_hw_rule_add(substream->runtime, 0,
 				SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_playback_channels, efw,
@@ -322,7 +324,7 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	      struct snd_pcm_hw_params *hw_params)
 {
 	struct snd_efw *efw = substream->private_data;
-	struct amdtp_stream *stream, *opposite;
+	struct amdtp_stream *stream;
 	int err;
 
 	err = snd_pcm_lib_alloc_vmalloc_buffer(substream,
@@ -330,38 +332,13 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 	if (err < 0)
 		goto end;
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		stream = &efw->receive_stream;
-		opposite = &efw->transmit_stream;
-	} else {
+	else
 		stream = &efw->transmit_stream;
-		opposite = &efw->receive_stream;
-	}
 
-	/* decide transfer function */
 	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
-
-	/*
-	 * when opposite PCM stream is not running, stop streams. Then any
-	 * MIDI streams stop temporarily. Then set requested sampling rate
-	 * and restart.
-	 * When oppiste PCM stream is running, don't change sampling rate and
-	 * don't need to restart.
-	 */
-	if (!amdtp_stream_pcm_running(opposite)) {
-		/* confirm to stop because MIDI may still use it */
-		snd_efw_sync_streams_stop(efw);
-
-		err = snd_efw_command_set_sampling_rate(efw,
-						params_rate(hw_params));
-		if (err < 0)
-			return err;
-		snd_ctl_notify(efw->card, SNDRV_CTL_EVENT_MASK_VALUE,
-			       efw->control_id_sampling_rate);
-
-		/* restart */
-		err = snd_efw_sync_streams_start(efw);
-	}
+	err = snd_efw_stream_start_duplex(efw, stream, params_rate(hw_params));
 
 end:
 	return err;
@@ -372,13 +349,7 @@ pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
 
-	/* if no PCM/MIDI streams are running, then stop streams */
-	/* TODO: I wonder why but transmit midi is running??? */
-	if (!amdtp_stream_pcm_running(&efw->transmit_stream) &&
-	    !amdtp_stream_pcm_running(&efw->receive_stream) &&
-	    !amdtp_stream_midi_running(&efw->transmit_stream) &&
-	    !amdtp_stream_midi_running(&efw->receive_stream))
-		snd_efw_sync_streams_stop(efw);
+	snd_efw_stream_stop_duplex(efw);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
@@ -449,7 +420,7 @@ static snd_pcm_uframes_t pcm_capture_pointer(struct snd_pcm_substream *sbstrm)
 static snd_pcm_uframes_t pcm_playback_pointer(struct snd_pcm_substream *sbstrm)
 {
 	struct snd_efw *efw = sbstrm->private_data;
-	return amdtp_stream_pcm_pointer(&efw->receive_stream);
+	return amdtp_stream_pcm_pointer(&efw->transmit_stream);
 }
 
 static struct snd_pcm_ops pcm_capture_ops = {
@@ -491,13 +462,7 @@ int snd_efw_create_pcm_devices(struct snd_efw *efw)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &pcm_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &pcm_capture_ops);
 
-	snd_efw_sync_streams_init(efw);
 end:
 	return err;
 }
 
-void snd_efw_destroy_pcm_devices(struct snd_efw *efw)
-{
-	snd_efw_sync_streams_destroy(efw);
-	return;
-}

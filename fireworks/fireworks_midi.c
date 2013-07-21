@@ -23,123 +23,113 @@
  * AMDTP packet. The data rate of MIDI message is much less than PCM so there
  * is a little problem to suspend MIDI streams.
  */
-
-static int
-midi_open(struct snd_rawmidi_substream *substream)
+static int midi_capture_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw *efw = substream->rmidi->private_data;
-	struct amdtp_stream *stream;
-	int err;
 
-	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
-		stream = &efw->receive_stream;
-	else
-		stream = &efw->transmit_stream;
-
-	/* register pointer */
-	amdtp_stream_midi_add(stream, substream);
-
-	/* confirm to start stream in current sampling rate */
-	if (!amdtp_stream_running(stream)) {
-		err = snd_efw_sync_streams_start(efw);
-		if (err < 0)
-			goto end;
-	}
-
-	err = 0;
-
-end:
-	return err;
-}
-
-static int
-midi_close(struct snd_rawmidi_substream *substream)
-{
-	struct snd_efw *efw = substream->rmidi->private_data;
-	struct amdtp_stream *stream, *opposite;
-
-	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT) {
-		stream = &efw->receive_stream;
-		opposite = &efw->transmit_stream;
-	} else {
-		stream = &efw->transmit_stream;
-		opposite = &efw->receive_stream;
-	}
-
-	/* unregister pointer */
-	amdtp_stream_midi_remove(stream, substream);
-
-	if (!amdtp_stream_midi_running(stream) &&
-	    !amdtp_stream_midi_running(opposite) &&
-	    !amdtp_stream_pcm_running(stream) &&
-	    !amdtp_stream_pcm_running(opposite))
-		snd_efw_sync_streams_stop(efw);
+	snd_efw_stream_start_duplex(efw, &efw->receive_stream, 0);
+	amdtp_stream_midi_add(&efw->receive_stream, substream);
 
 	return 0;
 }
 
-static void
-midi_trigger(struct snd_rawmidi_substream *substream, int up)
+static int midi_playback_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw *efw = substream->rmidi->private_data;
-	unsigned long *midi_triggered;
-	unsigned long flags;
 
-	if (substream->stream == SNDRV_RAWMIDI_STREAM_INPUT)
-		midi_triggered = &efw->receive_stream.midi_triggered;
-	else
-		midi_triggered = &efw->transmit_stream.midi_triggered;
+	snd_efw_stream_start_duplex(efw, &efw->transmit_stream, 0);
+	amdtp_stream_midi_add(&efw->transmit_stream, substream);
+
+	return 0;
+}
+
+static int midi_capture_close(struct snd_rawmidi_substream *substream)
+{
+	struct snd_efw *efw = substream->rmidi->private_data;
+
+	amdtp_stream_midi_remove(&efw->receive_stream, substream);
+	snd_efw_stream_stop_duplex(efw);
+
+	return 0;
+}
+
+static int midi_playback_close(struct snd_rawmidi_substream *substream)
+{
+	struct snd_efw *efw = substream->rmidi->private_data;
+
+	amdtp_stream_midi_remove(&efw->transmit_stream, substream);
+	snd_efw_stream_stop_duplex(efw);
+
+	return 0;
+}
+
+static void midi_capture_trigger(struct snd_rawmidi_substream *substrm, int up)
+{
+	struct snd_efw *efw = substrm->rmidi->private_data;
+	unsigned long flags;
 
 	spin_lock_irqsave(&efw->lock, flags);
 
-	/* bit table shows MIDI stream has data or not */
 	if (up)
-		__set_bit(substream->number, midi_triggered);
+		__set_bit(substrm->number, &efw->receive_midi_triggered);
 	else
-		__clear_bit(substream->number, midi_triggered);
+		__clear_bit(substrm->number, &efw->receive_midi_triggered);
 
 	spin_unlock_irqrestore(&efw->lock, flags);
 
 	return;
 }
 
-static struct snd_rawmidi_ops midi_output_ops = {
-	.open		= midi_open,
-	.close		= midi_close,
-	.trigger	= midi_trigger,
+static void midi_playback_trigger(struct snd_rawmidi_substream *substrm, int up)
+{
+	struct snd_efw *efw = substrm->rmidi->private_data;
+	unsigned long flags;
+
+	spin_lock_irqsave(&efw->lock, flags);
+
+	if (up)
+		__set_bit(substrm->number, &efw->transmit_midi_triggered);
+	else
+		__clear_bit(substrm->number, &efw->transmit_midi_triggered);
+
+	spin_unlock_irqrestore(&efw->lock, flags);
+
+	return;
+}
+
+static struct snd_rawmidi_ops midi_capture_ops = {
+	.open		= midi_capture_open,
+	.close		= midi_capture_close,
+	.trigger	= midi_capture_trigger,
 };
 
-static struct snd_rawmidi_ops midi_input_ops = {
-	.open		= midi_open,
-	.close		= midi_close,
-	.trigger	= midi_trigger,
+static struct snd_rawmidi_ops midi_playback_ops = {
+	.open		= midi_playback_open,
+	.close		= midi_playback_close,
+	.trigger	= midi_playback_trigger,
 };
 
-static void
-set_midi_substream_names(struct snd_efw *efw,
+static void set_midi_substream_names(struct snd_efw *efw,
 				     struct snd_rawmidi_str *str)
 {
 	struct snd_rawmidi_substream *subs;
 
-	if (str->substream_count > 2)
-		return;
-
-	list_for_each_entry(subs, &str->substreams, list)
+	list_for_each_entry(subs, &str->substreams, list) {
 		snprintf(subs->name, sizeof(subs->name),
-			"%s MIDI %d", efw->card->shortname, subs->number + 1);
+			 "%s MIDI %d", efw->card->shortname, subs->number + 1);
+	}
 }
 
 int snd_efw_create_midi_devices(struct snd_efw *efw)
 {
 	struct snd_rawmidi *rmidi;
 	struct snd_rawmidi_str *str;
-	struct snd_rawmidi_substream *subs;
-	int err;
+	int i, err;
 
 	/* check the number of midi stream */
-	if ((efw->midi_input_ports > AMDTP_MAX_MIDI_STREAMS) |
-	    (efw->midi_output_ports > AMDTP_MAX_MIDI_STREAMS))
-		return -EINVAL;
+	if ((efw->midi_input_ports > SND_EFW_MAX_MIDI_INPUTS) |
+	    (efw->midi_output_ports > SND_EFW_MAX_MIDI_OUTPUTS))
+		return -EIO;
 
 	/* create midi ports */
 	err = snd_rawmidi_new(efw->card, efw->card->driver, 0,
@@ -156,33 +146,68 @@ int snd_efw_create_midi_devices(struct snd_efw *efw)
 		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_INPUT;
 
 		snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_INPUT,
-					&midi_input_ops);
+					&midi_capture_ops);
 
 		str = &rmidi->streams[SNDRV_RAWMIDI_STREAM_INPUT];
 
 		set_midi_substream_names(efw, str);
-		amdtp_stream_set_midi(&efw->receive_stream,
-				      efw->midi_input_ports);
 	}
 
 	if (efw->midi_output_ports > 0) {
 		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_OUTPUT;
 
 		snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_OUTPUT,
-					&midi_output_ops);
+					&midi_playback_ops);
 
 		str = &rmidi->streams[SNDRV_RAWMIDI_STREAM_OUTPUT];
 
-		list_for_each_entry(subs, &str->substreams, list)
-			efw->transmit_stream.midi[subs->number] = subs;
-
 		set_midi_substream_names(efw, str);
-		amdtp_stream_set_midi(&efw->transmit_stream,
-				      efw->midi_output_ports);
 	}
 
 	if ((efw->midi_output_ports > 0) && (efw->midi_input_ports > 0))
 		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_DUPLEX;
 
+	/* clear related members */
+	for (i = 0; i < SND_EFW_MAX_MIDI_INPUTS; i++)
+		efw->receive_midi[i] = NULL;
+	for (i = 0; i < SND_EFW_MAX_MIDI_OUTPUTS; i++)
+		efw->transmit_midi[i] = NULL;
+	efw->receive_midi_triggered = 0;
+	efw->transmit_midi_triggered = 0;
+
 	return 0;
+}
+
+bool snd_efw_midi_stream_running(struct snd_efw *efw,
+				 struct amdtp_stream *stream)
+{
+	struct snd_rawmidi_substream **midi;
+	unsigned int max;
+	int i;
+
+	if (stream == &efw->receive_stream) {
+		midi = efw->receive_midi;
+		max = SND_EFW_MAX_MIDI_INPUTS;
+	} else {
+		midi = efw->transmit_midi;
+		max = SND_EFW_MAX_MIDI_OUTPUTS;
+	}
+
+	for (i = 0; i < max; i++) {
+		if (midi[i] != NULL)
+			return true;
+	}
+
+	return false;
+}
+
+void snd_efw_midi_stream_abort(struct snd_efw *efw)
+{
+	int i;
+
+	for (i = 0; i < SND_EFW_MAX_MIDI_INPUTS; i++)
+		efw->receive_midi[i] = NULL;
+
+	for (i = 0; i < SND_EFW_MAX_MIDI_OUTPUTS; i++)
+		efw->transmit_midi[i] = NULL;
 }

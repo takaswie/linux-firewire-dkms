@@ -228,7 +228,7 @@ snd_efw_update(struct fw_unit *unit)
 	struct snd_efw *efw = card->private_data;
 
 	snd_efw_command_bus_reset(efw->unit);
-	snd_efw_sync_streams_update(efw);
+	snd_efw_stream_update_duplex(efw);
 
 	return;
 }
@@ -355,6 +355,10 @@ snd_efw_probe(struct device *dev)
 			goto error;
 	}
 
+	err = snd_efw_stream_init_duplex(efw);
+	if (err < 0)
+		goto error;
+
 	/* register card and device */
 	snd_card_set_dev(card, dev);
 	err = snd_card_register(card);
@@ -382,7 +386,8 @@ snd_efw_remove(struct device *dev)
 	struct snd_card *card = dev_get_drvdata(dev);
 	struct snd_efw *efw = card->private_data;
 
-	snd_efw_destroy_pcm_devices(efw);
+	snd_efw_midi_stream_abort(efw);
+	snd_efw_stream_destroy_duplex(efw);
 
 	snd_card_disconnect(card);
 	snd_card_free_when_closed(card);

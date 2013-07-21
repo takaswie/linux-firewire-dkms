@@ -45,8 +45,8 @@
 #include "../amdtp.h"
 #include "../cmp.h"
 
-#define MAX_MIDI_OUTPUTS 2
-#define MAX_MIDI_INPUTS 2
+#define SND_EFW_MAX_MIDI_OUTPUTS 2
+#define SND_EFW_MAX_MIDI_INPUTS 2
 
 #define SND_EFW_MUITIPLIER_MODES 3
 #define HWINFO_NAME_SIZE_BYTES 32
@@ -107,10 +107,17 @@ struct snd_efw {
 	/* MIDI parameters */
 	unsigned int midi_input_ports;
 	unsigned int midi_output_ports;
+	struct snd_rawmidi_substream *receive_midi[SND_EFW_MAX_MIDI_INPUTS];
+	struct snd_rawmidi_substream *transmit_midi[SND_EFW_MAX_MIDI_OUTPUTS];
+	unsigned long receive_midi_triggered;
+	unsigned long transmit_midi_triggered;
 
 	/* PCM parameters */
 	unsigned int pcm_capture_channels[SND_EFW_MUITIPLIER_MODES];
 	unsigned int pcm_playback_channels[SND_EFW_MUITIPLIER_MODES];
+	/* PCM channels in running stream */
+	unsigned int transmit_pcm_channels;
+	unsigned int receive_pcm_channels;
 
 	/* notification to control components */
 	struct snd_ctl_elem_id *control_id_sampling_rate;
@@ -219,11 +226,13 @@ int snd_efw_command_set_digital_interface(struct snd_efw *efw,
 			enum snd_efw_digital_interface digital_interface);
 
 /* for AMDTP stream and CMP */
-int snd_efw_sync_streams_init(struct snd_efw *efw);
-int snd_efw_sync_streams_start(struct snd_efw *efw);
-void snd_efw_sync_streams_stop(struct snd_efw *efw);
-void snd_efw_sync_streams_update(struct snd_efw *efw);
-void snd_efw_sync_streams_destroy(struct snd_efw *efw);
+int snd_efw_stream_init_duplex(struct snd_efw *efw);
+int snd_efw_stream_start_duplex(struct snd_efw *efw,
+				struct amdtp_stream *request,
+				int sampling_rate);
+int snd_efw_stream_stop_duplex(struct snd_efw *efw);
+void snd_efw_stream_update_duplex(struct snd_efw *efw);
+void snd_efw_stream_destroy_duplex(struct snd_efw *efw);
 
 /* for procfs subsystem */
 void snd_efw_proc_init(struct snd_efw *efw);
@@ -232,11 +241,13 @@ void snd_efw_proc_init(struct snd_efw *efw);
 int snd_efw_create_control_devices(struct snd_efw *efw);
 
 /* for midi component */
-int snd_efw_create_midi_devices(struct snd_efw *ef);
+int snd_efw_create_midi_devices(struct snd_efw *efw);
+bool snd_efw_midi_stream_running(struct snd_efw *efw,
+				 struct amdtp_stream *stream);
+void snd_efw_midi_stream_abort(struct snd_efw *efw);
 
 /* for pcm component */
 int snd_efw_create_pcm_devices(struct snd_efw *efw);
-void snd_efw_destroy_pcm_devices(struct snd_efw *efw);
 int snd_efw_get_multiplier_mode(int sampling_rate);
 
 

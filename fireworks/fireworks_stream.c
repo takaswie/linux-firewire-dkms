@@ -17,7 +17,7 @@
  */
 #include "./fireworks.h"
 
-int snd_efw_stream_init(struct snd_efw *efw, struct amdtp_stream *stream)
+static int snd_efw_stream_init(struct snd_efw *efw, struct amdtp_stream *stream)
 {
 	struct cmp_connection *connection;
 	enum cmp_direction c_dir;
@@ -48,19 +48,29 @@ end:
 	return err;
 }
 
-int snd_efw_stream_start(struct snd_efw *efw, struct amdtp_stream *stream)
+static int snd_efw_stream_start(struct snd_efw *efw,
+				struct amdtp_stream *stream, int sampling_rate)
 {
 	struct cmp_connection *connection;
-	int err = 0;
+	unsigned int pcm_channels;
+	int mode, err = 0;
 
 	/* already running */
 	if (amdtp_stream_running(stream))
 		goto end;
 
-	if (stream == &efw->receive_stream)
+	mode = snd_efw_get_multiplier_mode(sampling_rate);
+	if (stream == &efw->receive_stream) {
 		connection = &efw->output_connection;
-	else
+		pcm_channels = efw->pcm_capture_channels[mode];
+	} else {
 		connection = &efw->input_connection;
+		pcm_channels = efw->pcm_playback_channels[mode];
+	}
+
+	amdtp_stream_set_rate(stream, sampling_rate);
+	amdtp_stream_set_pcm(stream, pcm_channels);
+	amdtp_stream_set_midi(stream, 1);
 
 	/*  establish connection via CMP */
 	err = cmp_connection_establish(connection,
@@ -79,7 +89,8 @@ end:
 	return err;
 }
 
-void snd_efw_stream_stop(struct snd_efw *efw, struct amdtp_stream *stream)
+static void snd_efw_stream_stop(struct snd_efw *efw,
+				struct amdtp_stream *stream)
 {
 	if (!amdtp_stream_running(stream))
 		goto end;
@@ -94,7 +105,8 @@ end:
 	return;
 }
 
-void snd_efw_stream_update(struct snd_efw *efw, struct amdtp_stream *stream)
+static void snd_efw_stream_update(struct snd_efw *efw,
+				  struct amdtp_stream *stream)
 {
 	struct cmp_connection *conn;
 
@@ -112,7 +124,8 @@ void snd_efw_stream_update(struct snd_efw *efw, struct amdtp_stream *stream)
 	amdtp_stream_update(stream);
 }
 
-void snd_efw_stream_destroy(struct snd_efw *efw, struct amdtp_stream *stream)
+static void snd_efw_stream_destroy(struct snd_efw *efw,
+				   struct amdtp_stream *stream)
 {
 	snd_efw_stream_stop(efw, stream);
 
@@ -124,7 +137,31 @@ void snd_efw_stream_destroy(struct snd_efw *efw, struct amdtp_stream *stream)
 	return;
 }
 
-int snd_efw_sync_streams_init(struct snd_efw *efw)
+static int get_roles(struct snd_efw *efw,
+		     enum amdtp_stream_sync_mode *sync_mode,
+		     struct amdtp_stream **master, struct amdtp_stream **slave)
+{
+	enum snd_efw_clock_source clock_source;
+	int err;
+
+	err = snd_efw_command_get_clock_source(efw, &clock_source);
+	if (err < 0)
+		goto end;
+
+	if (clock_source != SND_EFW_CLOCK_SOURCE_SYTMATCH) {
+		*master = &efw->receive_stream;
+		*slave = &efw->transmit_stream;
+		*sync_mode = AMDTP_STREAM_SYNC_TO_DEVICE;
+	} else {
+		*master = &efw->transmit_stream;
+		*slave = &efw->receive_stream;
+		*sync_mode = AMDTP_STREAM_SYNC_TO_DRIVER;
+	}
+end:
+	return err;
+}
+
+int snd_efw_stream_init_duplex(struct snd_efw *efw)
 {
 	int err;
 
@@ -133,93 +170,96 @@ int snd_efw_sync_streams_init(struct snd_efw *efw)
 		goto end;
 
 	err = snd_efw_stream_init(efw, &efw->transmit_stream);
-	if (err < 0)
-		snd_efw_stream_destroy(efw, &efw->receive_stream);
+
 end:
 	return err;
 }
 
-int snd_efw_sync_streams_start(struct snd_efw *efw)
+int snd_efw_stream_start_duplex(struct snd_efw *efw,
+				struct amdtp_stream *request,
+				int sampling_rate)
 {
-	enum snd_efw_clock_source clock_source;
 	struct amdtp_stream *master, *slave;
 	enum amdtp_stream_sync_mode sync_mode;
-	unsigned int master_channels, slave_channels;
-	int sampling_rate, mode, err;
+	int err, current_rate;
+	bool slave_flag;
 
-	/*
-	 * TODO: sampling rate and clock source can be retrieved by the same
-	 * EFC command.
-	 */
-	err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
+	err = get_roles(efw, &sync_mode, &master, &slave);
+	if (err < 0)
+		return err;
+
+	if ((request == slave) || amdtp_stream_running(slave))
+		slave_flag = true;
+	else
+		slave_flag = false;
+
+	/* change sampling rate if possible */
+	err = snd_efw_command_get_sampling_rate(efw, &current_rate);
 	if (err < 0)
 		goto end;
-	mode = snd_efw_get_multiplier_mode(sampling_rate);
+	if (sampling_rate == 0)
+		sampling_rate = current_rate;
+	if (sampling_rate != current_rate) {
+		/* master is just for MIDI stream */
+		if (amdtp_stream_running(master) &&
+		    !amdtp_stream_pcm_running(master))
+			snd_efw_stream_stop(efw, master);
 
-	/* TODO: how to deal with clock source change? */
-	err = snd_efw_command_get_clock_source(efw, &clock_source);
-	if (err < 0)
-		goto end;
+		/* slave is just for MIDI stream */
+		if (amdtp_stream_running(slave) &&
+		    !amdtp_stream_pcm_running(slave))
+			snd_efw_stream_stop(efw, slave);
 
-	if (clock_source == SND_EFW_CLOCK_SOURCE_SYTMATCH) {
-		master = &efw->transmit_stream;
-		master_channels = efw->pcm_playback_channels[mode];
-		slave = &efw->receive_stream;
-		slave_channels = efw->pcm_capture_channels[mode];
-		sync_mode = AMDTP_STREAM_SYNC_TO_DRIVER;
-	} else {
-		master = &efw->receive_stream;
-		master_channels = efw->pcm_capture_channels[mode];
-		slave = &efw->transmit_stream;
-		slave_channels = efw->pcm_playback_channels[mode];
-		sync_mode = AMDTP_STREAM_SYNC_TO_DEVICE;
+		err = snd_efw_command_set_sampling_rate(efw, sampling_rate);
+		if (err < 0)
+			return err;
+		snd_ctl_notify(efw->card, SNDRV_CTL_EVENT_MASK_VALUE,
+			       efw->control_id_sampling_rate);
 	}
 
-	amdtp_stream_set_rate(master, sampling_rate);
-	amdtp_stream_set_pcm(master, master_channels);
-
-	amdtp_stream_set_rate(slave, sampling_rate);
-	amdtp_stream_set_pcm(slave, slave_channels);
-
-	amdtp_stream_set_sync_mode(sync_mode, master, slave);
-
-	err = snd_efw_stream_start(efw, master);
-	if (err < 0)
-		goto end;
-
-	if (!amdtp_stream_wait_run(master)) {
-		err = -EIO;
-		goto end;
+	/*  master should be always running */
+	if (!amdtp_stream_running(master)) {
+		amdtp_stream_set_sync_mode(sync_mode, master, slave);
+		err = snd_efw_stream_start(efw, master, sampling_rate);
+		if (err < 0)
+			goto end;
 	}
 
-	err = snd_efw_stream_start(efw, slave);
-	if (err < 0)
-		snd_efw_stream_destroy(efw, master);
+	/* start slave if needed */
+	if (slave_flag && !amdtp_stream_running(slave))
+		err = snd_efw_stream_start(efw, slave, sampling_rate);
+
 end:
 	return err;
 }
 
-void snd_efw_sync_streams_stop(struct snd_efw *efw)
+int snd_efw_stream_stop_duplex(struct snd_efw *efw)
 {
 	struct amdtp_stream *master, *slave;
+	enum amdtp_stream_sync_mode sync_mode;
+	int err;
 
-	if (efw->transmit_stream.sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER) {
-		master = &efw->transmit_stream;
-		slave = &efw->receive_stream;
-	} else {
-		master = &efw->receive_stream;
-		slave = &efw->transmit_stream;
-	}
+	err = get_roles(efw, &sync_mode, &master, &slave);
+	if (err < 0)
+		goto end;
 
-	/* stop master at first because master has a reference to slave */
-	snd_efw_stream_stop(efw, master);
+	if (amdtp_stream_pcm_running(slave) ||
+	    snd_efw_midi_stream_running(efw, slave))
+		goto end;
+
 	snd_efw_stream_stop(efw, slave);
+
+	if (!amdtp_stream_pcm_running(master) &&
+	    !snd_efw_midi_stream_running(efw, master))
+		snd_efw_stream_stop(efw, master);
+
+end:
+	return err;
 }
 
-void snd_efw_sync_streams_update(struct snd_efw *efw)
+void snd_efw_stream_update_duplex(struct snd_efw *efw)
 {
 	struct amdtp_stream *master, *slave;
-	bool flag = false;
 
 	if (efw->receive_stream.sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER) {
 		master = &efw->transmit_stream;
@@ -229,25 +269,16 @@ void snd_efw_sync_streams_update(struct snd_efw *efw)
 		slave = &efw->transmit_stream;
 	}
 
-	if (master->sync_slave == slave) {
-		flag = true;
-		master->sync_slave = ERR_PTR(-1);
-	}
 	snd_efw_stream_update(efw, master);
-
 	snd_efw_stream_update(efw, slave);
-	if (flag)
-		master->sync_slave = slave;
 }
 
-void snd_efw_sync_streams_destroy(struct snd_efw *efw)
+void snd_efw_stream_destroy_duplex(struct snd_efw *efw)
 {
 	if (amdtp_stream_pcm_running(&efw->receive_stream))
 		amdtp_stream_pcm_abort(&efw->receive_stream);
 	if (amdtp_stream_pcm_running(&efw->transmit_stream))
 		amdtp_stream_pcm_abort(&efw->transmit_stream);
-
-	snd_efw_sync_streams_stop(efw);
 
 	snd_efw_stream_destroy(efw, &efw->receive_stream);
 	snd_efw_stream_destroy(efw, &efw->transmit_stream);
