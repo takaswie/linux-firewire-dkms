@@ -196,13 +196,13 @@ void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
 		WARN_ON(1);
 		/* fall through */
 	case SNDRV_PCM_FORMAT_S16:
-		if (s->direction == AMDTP_STREAM_IN)
+		if (s->direction == AMDTP_IN_STREAM)
 			s->transfer_samples = amdtp_read_s16;
 		else
 			s->transfer_samples = amdtp_write_s16;
 		break;
 	case SNDRV_PCM_FORMAT_S32:
-		if (s->direction == AMDTP_STREAM_IN)
+		if (s->direction == AMDTP_IN_STREAM)
 			s->transfer_samples = amdtp_read_s32;
 		else
 			s->transfer_samples = amdtp_write_s32;
@@ -861,7 +861,7 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
 
 	s->run = true;
 
-	if (s->direction == AMDTP_STREAM_IN)
+	if (s->direction == AMDTP_IN_STREAM)
 		context->callback.sc = in_stream_callback;
 	else if (s->sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER)
 		context->callback.sc = out_stream_callback;
@@ -904,7 +904,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	s->last_syt_offset = TICKS_PER_CYCLE;
 
 	/* initialize packet buffer */
-	if (s->direction == AMDTP_STREAM_IN) {
+	if (s->direction == AMDTP_IN_STREAM) {
 		dir = DMA_FROM_DEVICE;
 		type = FW_ISO_CONTEXT_RECEIVE;
 		header_size = IN_PACKET_HEADER_SIZE;
@@ -923,7 +923,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 			s->pcm_channels + DIV_ROUND_UP(s->midi_ports, 8);
 
 	/* to sort receive packets */
-	if (s->direction == AMDTP_STREAM_IN) {
+	if (s->direction == AMDTP_IN_STREAM) {
 		s->remain_packets = 0;
 		s->sort_table = kzalloc(sizeof(struct sort_table) *
 					QUEUE_LENGTH, GFP_KERNEL);
@@ -949,7 +949,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 
 	s->packet_index = 0;
 	do {
-		if (s->direction == AMDTP_STREAM_IN)
+		if (s->direction == AMDTP_IN_STREAM)
 			err = queue_in_packet(s);
 		else
 			err = queue_out_packet(s, 0, true);

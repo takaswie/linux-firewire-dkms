@@ -45,8 +45,8 @@ struct fw_iso_context;
 struct snd_pcm_substream;
 
 enum amdtp_stream_direction {
-	AMDTP_STREAM_IN = 0,
-	AMDTP_STREAM_OUT
+	AMDTP_IN_STREAM= 0,
+	AMDTP_OUT_STREAM
 };
 
 enum amdtp_stream_sync_mode {
