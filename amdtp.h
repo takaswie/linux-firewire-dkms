@@ -12,6 +12,9 @@
  *	sample_rate/8000 samples, with rounding up or down to adjust
  *	for clock skew and left-over fractional samples.  This should
  *	be used if supported by the device.
+ * @CIP_BLOCKING: In blocking mode, each packet contains either zero or
+ *	SYT_INTERVAL samples, with these two types alternating so that
+ *	the overall sample rate comes out right.
  */
 enum cip_flags {
 	CIP_NONBLOCKING = 0x00,
@@ -34,8 +37,7 @@ enum cip_sfc {
 #define AMDTP_OUT_PCM_FORMAT_BITS	(SNDRV_PCM_FMTBIT_S16 | \
 					 SNDRV_PCM_FMTBIT_S32)
 /*
- * This module support maximum 8 MIDI streams
- * This is not in MMA/AMEI RP-027 but for our convinience.
+ * This module support maximum 16 MIDI streams for our convinience.
  * Then AMDTP packets include maximum 2 quadlets in each data blocks.
  */
 #define AMDTP_MAX_MIDI_STREAMS 16
