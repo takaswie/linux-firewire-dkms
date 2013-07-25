@@ -36,11 +36,18 @@ enum cip_sfc {
 
 #define AMDTP_OUT_PCM_FORMAT_BITS	(SNDRV_PCM_FMTBIT_S16 | \
 					 SNDRV_PCM_FMTBIT_S32)
+
 /*
- * This module support maximum 16 MIDI streams for our convinience.
- * Then AMDTP packets include maximum 2 quadlets in each data blocks.
+ * This module supports maximum 16 PCM channel for one PCM stream
+ * This is for our convinience.
  */
-#define AMDTP_MAX_MIDI_STREAMS 16
+#define AMDTP_MAX_CHANNELS_FOR_PCM	16
+/*
+ * This module supports maximum 2 MIDI channels.
+ * Then AMDTP packets include maximum 16 MIDI streams multiplexed.
+ * This is for our convinience.
+ */
+#define AMDTP_MAX_CHANNELS_FOR_MIDI	2
 
 struct fw_unit;
 struct fw_iso_context;
@@ -93,7 +100,7 @@ struct amdtp_stream {
 	unsigned int pcm_period_pointer;
 	bool pointer_flush;
 
-	struct snd_rawmidi_substream *midi[AMDTP_MAX_MIDI_STREAMS];
+	struct snd_rawmidi_substream *midi[AMDTP_MAX_CHANNELS_FOR_MIDI * 8];
 	unsigned long midi_triggered;	/* bit table for each MIDI substream */
 
 	enum amdtp_stream_sync_mode sync_mode;

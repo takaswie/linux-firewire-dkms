@@ -94,7 +94,7 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	s->packet_index = 0;
 
 	s->pcm = NULL;
-	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i += 1)
+	for (i = 0; i < AMDTP_MAX_CHANNELS_FOR_MIDI * 8; i++)
 		s->midi[i] = NULL;
 
 	s->run = false;
@@ -121,7 +121,6 @@ void amdtp_stream_destroy(struct amdtp_stream *s)
 EXPORT_SYMBOL(amdtp_stream_destroy);
 
 /**
-
  * amdtp_stream_set_params - set stream parameters
  * @s: the AMDTP stream to configure
  * @rate: the sample rate
@@ -150,6 +149,11 @@ void amdtp_stream_set_params(struct amdtp_stream *s,
 
 	unsigned int sfc;
 
+	if (WARN_ON(!IS_ERR(s->context)) |
+	    WARN_ON(pcm_channels > AMDTP_MAX_CHANNELS_FOR_PCM) |
+	    WARN_ON(midi_channels > AMDTP_MAX_CHANNELS_FOR_MIDI))
+		return;
+
 	for (sfc = 0; sfc < sizeof(rates); ++sfc)
 		if (rates[sfc] == rate)
 			goto sfc_found;
@@ -176,8 +180,7 @@ EXPORT_SYMBOL(amdtp_stream_set_params);
  * @s: the AMDTP stream
  *
  * This function must not be called before the stream has been configured
- * with amdtp_stream_set_hw_params(), amdtp_stream_set_pcm(), and
- * amdtp_stream_set_midi().
+ * with amdtp_stream_set_params().
  */
 unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s)
 {
@@ -859,8 +862,7 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
  * @speed: firewire speed code
  *
  * The stream cannot be started until it has been configured with
- * amdtp_stream_set_hw_params(), amdtp_stream_set_pcm(), and
- * amdtp_stream_set_midi(); and it must be started before any
+ * amdtp_stream_set_params()  and it must be started before any
  * PCM or MIDI device can be started.
  */
 int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
@@ -1111,11 +1113,9 @@ EXPORT_SYMBOL(amdtp_stream_midi_remove);
 bool amdtp_stream_midi_running(struct amdtp_stream *s)
 {
 	int i;
-	for (i = 0; i < AMDTP_MAX_MIDI_STREAMS; i++) {
-		if (!IS_ERR_OR_NULL(s->midi[i])) {
+	for (i = 0; i < AMDTP_MAX_CHANNELS_FOR_MIDI * 8; i++)
+		if (!IS_ERR_OR_NULL(s->midi[i]))
 			return true;
-		}
-	}
 
 	return false;
 }
