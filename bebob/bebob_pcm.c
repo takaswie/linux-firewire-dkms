@@ -253,20 +253,17 @@ pcm_close(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-static int
-pcm_hw_params(struct snd_pcm_substream *substream,
-				struct snd_pcm_hw_params *hw_params)
+static int pcm_hw_params(struct snd_pcm_substream *substream,
+			 struct snd_pcm_hw_params *hw_params)
 {
 	struct snd_bebob *bebob = substream->private_data;
 	struct amdtp_stream *stream;
 	struct snd_bebob_stream_formation *formation;
-	int index;
-	int direction;
-	int err;
+	int index, direction, err;
 
 	/* keep PCM ring buffer */
 	err = snd_pcm_lib_alloc_vmalloc_buffer(substream,
-				params_buffer_bytes(hw_params));
+					       params_buffer_bytes(hw_params));
 	if (err < 0)
 		goto end;
 
@@ -293,29 +290,21 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 //	snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
 //				bebob->control_id_sampling_rate);
 
-	/* set AMDTP parameters for transmit stream */
-	amdtp_stream_set_rate(stream, params_rate(hw_params));
-	amdtp_stream_set_pcm(stream, params_channels(hw_params));
 	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
-
+	err = snd_bebob_stream_start(bebob, stream, params_rate(hw_params));
 end:
 	return err;
 }
 
-static int
-pcm_hw_free(struct snd_pcm_substream *substream)
+static int pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
 	struct amdtp_stream *stream;
-	struct cmp_connection *connection;
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		stream = &bebob->tx_stream;
-		connection = &bebob->input_connection;
-	} else {
+	else
 		stream = &bebob->rx_stream;
-		connection = &bebob->output_connection;
-	}
 
 	/* stop fw isochronous stream of AMDTP with CMP */
 	snd_bebob_stream_stop(bebob, stream);
@@ -323,77 +312,74 @@ pcm_hw_free(struct snd_pcm_substream *substream)
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
 
-static int
-pcm_prepare(struct snd_pcm_substream *substream)
+static int pcm_capture_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
-	struct amdtp_stream *stream;
 	int err = 0;
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		stream = &bebob->tx_stream;
-	else
-		stream = &bebob->rx_stream;
+	if (!amdtp_stream_wait_run(&bebob->rx_stream))
+		return -EIO;
+	amdtp_stream_pcm_prepare(&bebob->rx_stream);
 
-	/* start stream */
-	err = snd_bebob_stream_start(bebob, stream);
-	if (err < 0)
-		goto end;
+	return err;
+}
+static int pcm_playback_prepare(struct snd_pcm_substream *substream)
+{
+	struct snd_bebob *bebob = substream->private_data;
+	int err = 0;
 
-	/* initialize buffer pointer */
-	amdtp_stream_pcm_prepare(stream);
+	if (!amdtp_stream_wait_run(&bebob->rx_stream))
+		return -EIO;
+	amdtp_stream_pcm_prepare(&bebob->rx_stream);
 
-end:
 	return err;
 }
 
-static int
-pcm_trigger(struct snd_pcm_substream *substream, int cmd)
+static int pcm_capture_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_bebob *bebob = substream->private_data;
-	struct snd_pcm_substream *pcm;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		pcm = substream;
+		amdtp_stream_pcm_trigger(&bebob->tx_stream, substream);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		pcm = NULL;
+		amdtp_stream_pcm_trigger(&bebob->tx_stream, NULL);
 		break;
 	default:
 		return -EINVAL;
 	}
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		amdtp_stream_pcm_trigger(&bebob->tx_stream, pcm);
-	else
-		amdtp_stream_pcm_trigger(&bebob->rx_stream, pcm);
+	return 0;
+}
+static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
+{
+	struct snd_bebob *bebob = substream->private_data;
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+		amdtp_stream_pcm_trigger(&bebob->rx_stream, substream);
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+		amdtp_stream_pcm_trigger(&bebob->rx_stream, NULL);
+		break;
+	default:
+		return -EINVAL;
+	}
 
 	return 0;
 }
 
-static snd_pcm_uframes_t pcm_pointer(struct snd_pcm_substream *substream)
+static snd_pcm_uframes_t pcm_capture_pointer(struct snd_pcm_substream *sbstrm)
 {
-	struct snd_bebob *bebob = substream->private_data;
-
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		return amdtp_stream_pcm_pointer(&bebob->tx_stream);
-	else
-		return amdtp_stream_pcm_pointer(&bebob->rx_stream);
+	struct snd_bebob *bebob = sbstrm->private_data;
+	return amdtp_stream_pcm_pointer(&bebob->tx_stream);
 }
-
-static struct snd_pcm_ops pcm_playback_ops = {
-	.open		= pcm_open,
-	.close		= pcm_close,
-	.ioctl		= snd_pcm_lib_ioctl,
-	.hw_params	= pcm_hw_params,
-	.hw_free	= pcm_hw_free,
-	.prepare	= pcm_prepare,
-	.trigger	= pcm_trigger,
-	.pointer	= pcm_pointer,
-	.page		= snd_pcm_lib_get_vmalloc_page,
-	.mmap		= snd_pcm_lib_mmap_vmalloc,
-};
+static snd_pcm_uframes_t pcm_playback_pointer(struct snd_pcm_substream *sbstrm)
+{
+	struct snd_bebob *bebob = sbstrm->private_data;
+	return amdtp_stream_pcm_pointer(&bebob->rx_stream);
+}
 
 static struct snd_pcm_ops pcm_capture_ops = {
 	.open		= pcm_open,
@@ -401,10 +387,22 @@ static struct snd_pcm_ops pcm_capture_ops = {
 	.ioctl		= snd_pcm_lib_ioctl,
 	.hw_params	= pcm_hw_params,
 	.hw_free	= pcm_hw_free,
-	.prepare	= pcm_prepare,
-	.trigger	= pcm_trigger,
-	.pointer	= pcm_pointer,
+	.prepare	= pcm_capture_prepare,
+	.trigger	= pcm_capture_trigger,
+	.pointer	= pcm_capture_pointer,
 	.page		= snd_pcm_lib_get_vmalloc_page,
+};
+static struct snd_pcm_ops pcm_playback_ops = {
+	.open		= pcm_open,
+	.close		= pcm_close,
+	.ioctl		= snd_pcm_lib_ioctl,
+	.hw_params	= pcm_hw_params,
+	.hw_free	= pcm_hw_free,
+	.prepare	= pcm_playback_prepare,
+	.trigger	= pcm_playback_trigger,
+	.pointer	= pcm_playback_pointer,
+	.page		= snd_pcm_lib_get_vmalloc_page,
+	.mmap		= snd_pcm_lib_mmap_vmalloc,
 };
 
 int snd_bebob_create_pcm_devices(struct snd_bebob *bebob)

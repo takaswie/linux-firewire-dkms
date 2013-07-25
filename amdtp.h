@@ -69,14 +69,14 @@ struct amdtp_stream {
 	enum cip_sfc sfc;
 	unsigned int data_block_quadlets;
 	unsigned int pcm_channels;
-	unsigned int midi_ports;
+	unsigned int midi_channels;
 	void (*transfer_samples)(struct amdtp_stream *s,
 				 struct snd_pcm_substream *pcm,
 				 __be32 *buffer, unsigned int frames);
 
 	unsigned int source_node_id_field;
 	struct iso_packets_buffer buffer;
-	unsigned int max_payload_size;
+	unsigned int transfer_delay;
 
 	struct snd_pcm_substream *pcm;
 	struct tasklet_struct period_tasklet;
@@ -105,10 +105,14 @@ struct amdtp_stream {
 };
 
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
-		enum amdtp_stream_direction direction, enum cip_flags flags);
+		      enum amdtp_stream_direction direction,
+		      enum cip_flags flags);
 void amdtp_stream_destroy(struct amdtp_stream *s);
 
-void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate);
+void amdtp_stream_set_params(struct amdtp_stream *s,
+			     unsigned int rate,
+			     unsigned int pcm_channels,
+			     unsigned int midi_channels);
 unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s);
 
 int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed);
@@ -127,33 +131,6 @@ void amdtp_stream_midi_add(struct amdtp_stream *s,
 void amdtp_stream_midi_remove(struct amdtp_stream *s,
 			      struct snd_rawmidi_substream *substream);
 bool amdtp_stream_midi_running(struct amdtp_stream *s);
-
-/**
- * amdtp_stream_set_pcm - configure format of PCM samples
- * @s: the AMDTP stream to be configured
- * @pcm_channels: the number of PCM samples in each data block, to be encoded
- *                as AM824 multi-bit linear audio
- *
- * This function must not be called while the stream is running.
- */
-static inline void amdtp_stream_set_pcm(struct amdtp_stream *s,
-					unsigned int pcm_channels)
-{
-	s->pcm_channels = pcm_channels;
-}
-
-/**
- * amdtp_stream_set_midi - configure format of MIDI data
- * @s: the AMDTP stream to be configured
- * @midi_ports: the number of MIDI ports (i.e., MPX-MIDI Data Channels)
- *
- * This function must not be called while the stream is running.
- */
-static inline void amdtp_stream_set_midi(struct amdtp_stream *s,
-					 unsigned int midi_ports)
-{
-	s->midi_ports = midi_ports;
-}
 
 /**
  * amdtp_stream_running - check stream is running or not

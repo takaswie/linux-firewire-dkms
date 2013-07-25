@@ -65,25 +65,45 @@ int snd_bebob_stream_init(struct snd_bebob *bebob, struct amdtp_stream *stream)
 	if (err < 0) {
 		cmp_connection_destroy(connection);
 		goto end;
+
 	}
 
 end:
 	return err;
 }
 
-int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream)
+int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
+			   unsigned int sampling_rate)
 {
+	struct snd_bebob_stream_formation *formations;
 	struct cmp_connection *connection;
+	unsigned int i, pcm_channels, midi_channels;
 	int err = 0;
 
 	/* already running */
 	if (!IS_ERR(stream->context))
 		goto end;
 
-	if (stream == &bebob->tx_stream)
+	if (stream == &bebob->tx_stream) {
+		formations = bebob->tx_stream_formations;
 		connection = &bebob->output_connection;
-	else
+	} else {
+		formations = bebob->rx_stream_formations;
 		connection = &bebob->input_connection;
+	}
+
+	pcm_channels = 0;
+	midi_channels = 0;
+	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i++) {
+		if (formations[i].sampling_rate != sampling_rate)
+			continue;
+		pcm_channels = formations[i].pcm;
+		midi_channels = formations[i].midi;
+		break;
+	}
+
+	amdtp_stream_set_params(stream, sampling_rate,
+				pcm_channels, midi_channels);
 
 	/*  establish connection via CMP */
 	err = cmp_connection_establish(connection,

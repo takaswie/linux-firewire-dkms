@@ -147,7 +147,8 @@ int snd_bebob_stream_get_formation_index(int sampling_rate);
 int snd_bebob_stream_init(struct snd_bebob *bebob,
 			  struct amdtp_stream *stream);
 int snd_bebob_stream_start(struct snd_bebob *bebob,
-			   struct amdtp_stream *stream);
+			   struct amdtp_stream *stream,
+			   unsigned int sampling_rate);
 void snd_bebob_stream_stop(struct snd_bebob *bebob,
 			   struct amdtp_stream *stream);
 void snd_bebob_stream_destroy(struct snd_bebob *bebob,

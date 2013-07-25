@@ -54,20 +54,14 @@
 #define IN_PACKET_HEADER_SIZE	4
 #define OUT_PACKET_HEADER_SIZE	0
 
-/* params are depends on sampling rate */
-static const struct {
-	unsigned int rate;
-	unsigned int syt_interval;
-	unsigned int data_block;
-	unsigned int syt_offset;
-} amdtp_stream_params[] = {
-	[CIP_SFC_32000]  = {  32000,  8,  4, 3072 },
-	[CIP_SFC_44100]  = {  44100,  8,  0,   67 },
-	[CIP_SFC_48000]  = {  48000,  8,  6, 1024 },
-	[CIP_SFC_88200]  = {  88200, 16,  0,   67 },
-	[CIP_SFC_96000]  = {  96000, 16, 12, 1024 },
-	[CIP_SFC_176400] = { 176400, 32,  0,   67 },
-	[CIP_SFC_192000] = { 192000, 32, 24, 1024 },
+static const unsigned int amdtp_syt_intervals[] = {
+	[CIP_SFC_32000]  =  8,
+	[CIP_SFC_44100]  =  8,
+	[CIP_SFC_48000]  =  8,
+	[CIP_SFC_88200]  = 16,
+	[CIP_SFC_96000]  = 16,
+	[CIP_SFC_176400] = 32,
+	[CIP_SFC_192000] = 32,
 };
 
 /* for re-ordering receive packets */
@@ -86,7 +80,8 @@ static void pcm_period_tasklet(unsigned long data);
  * @flags: the packet transmission method to use
  */
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
-		enum amdtp_stream_direction direction, enum cip_flags flags)
+		      enum amdtp_stream_direction direction,
+		      enum cip_flags flags)
 {
 	int i;
 
@@ -126,28 +121,55 @@ void amdtp_stream_destroy(struct amdtp_stream *s)
 EXPORT_SYMBOL(amdtp_stream_destroy);
 
 /**
- * amdtp_stream_set_rate - set the sample rate
+
+ * amdtp_stream_set_params - set stream parameters
  * @s: the AMDTP stream to configure
  * @rate: the sample rate
+ * @pcm_channels: the number of PCM samples in each data block, to be encoded
+ *                as AM824 multi-bit linear audio
+ * @midi_data_channels: the number of MIDI Conformant Data Channels, i.e.,
+ *                      quadlets (_not_ the number of MPX-MIDI Data Channels)
  *
- * The sample rate must be set before the stream is started, and must not be
+ * The parameters must be set before the stream is started, and must not be
  * changed while the stream is running.
  */
-void amdtp_stream_set_rate(struct amdtp_stream *s, unsigned int rate)
+void amdtp_stream_set_params(struct amdtp_stream *s,
+			     unsigned int rate,
+			     unsigned int pcm_channels,
+			     unsigned int midi_channels)
 {
+	unsigned int rates[] = {
+		[CIP_SFC_32000]  =  32000,
+		[CIP_SFC_44100]  =  44100,
+		[CIP_SFC_48000]  =  48000,
+		[CIP_SFC_88200]  =  88200,
+		[CIP_SFC_96000]  =  96000,
+		[CIP_SFC_176400] = 176400,
+		[CIP_SFC_192000] = 192000
+	};
+
 	unsigned int sfc;
 
-	if (WARN_ON(!IS_ERR(s->context)))
-		return;
-
-	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_stream_params); ++sfc)
-		if (amdtp_stream_params[sfc].rate == rate) {
-			s->sfc = sfc;
-			return;
-		}
+	for (sfc = 0; sfc < sizeof(rates); ++sfc)
+		if (rates[sfc] == rate)
+			goto sfc_found;
 	WARN_ON(1);
+	return;
+
+sfc_found:
+	s->sfc = sfc;
+	s->pcm_channels = pcm_channels;
+	s->midi_channels = midi_channels;
+	s->data_block_quadlets = pcm_channels + midi_channels;
+
+	/* default buffering in the device */
+	s->transfer_delay = TRANSFER_DELAY_TICKS - TICKS_PER_CYCLE;
+	if (s->flags & CIP_BLOCKING)
+		/* additional buffering needed to adjust for no-data packets */
+		s->transfer_delay += TICKS_PER_SECOND *
+					amdtp_syt_intervals[sfc]/ rate;
 }
-EXPORT_SYMBOL(amdtp_stream_set_rate);
+EXPORT_SYMBOL(amdtp_stream_set_params);
 
 /**
  * amdtp_stream_get_max_payload - get the stream's packet size
@@ -159,8 +181,7 @@ EXPORT_SYMBOL(amdtp_stream_set_rate);
  */
 unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s)
 {
-	return 8 + amdtp_stream_params[s->sfc].syt_interval *
-		(s->pcm_channels + DIV_ROUND_UP(s->midi_ports, 8)) * 4;
+	return 8 + amdtp_syt_intervals[s->sfc] * s->data_block_quadlets * 4;
 }
 EXPORT_SYMBOL(amdtp_stream_get_max_payload);
 
@@ -231,7 +252,7 @@ static unsigned int calculate_data_blocks(struct amdtp_stream *s)
 	unsigned int phase, data_blocks;
 
 	if (s->flags & CIP_BLOCKING)
-		data_blocks = amdtp_stream_params[s->sfc].syt_interval;
+		data_blocks = amdtp_syt_intervals[s->sfc];
 	else if (!cip_sfc_is_base_44100(s->sfc))
 		/* Sample_rate / 8000 is an integer, and precomputed. */
 		data_blocks = s->data_block_state;
@@ -295,11 +316,8 @@ static unsigned int calculate_syt(struct amdtp_stream *s,
 
 	if (syt_offset < TICKS_PER_CYCLE) {
 		syt_offset += TRANSFER_DELAY_TICKS - TICKS_PER_CYCLE;
-		/* TODO: these calculation is needless, put them into the table? */
 		if (s->flags & CIP_BLOCKING)
-			syt_offset += TICKS_PER_SECOND *
-				amdtp_stream_params[s->sfc].syt_interval /
-				amdtp_stream_params[s->sfc].rate;
+			syt_offset += s->transfer_delay;
 		syt = (cycle + syt_offset / TICKS_PER_CYCLE) << 12;
 		syt += syt_offset % TICKS_PER_CYCLE;
 
@@ -468,47 +486,19 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 {
 	unsigned int m, f, c, port;
 	int len;
-	u8 b[4];
+	u8 b[2];
 
-	/*
-	 * This module can't support "negotiation procedure" in
-	 * MMA/AMEI RP-027. Then a maximum data rate is 3,125 bytes per second
-	 * without 1 byte label. This table is for the restriction. With this
-	 * table, the maximum data rate is between 2,000 to 3,000 bytes per
-	 * second.
-	 */
-	static const int block_interval[] = {
-		[CIP_SFC_32000]   = 16,
-		[CIP_SFC_44100]   = 16,
-		[CIP_SFC_48000]   = 16,
-		[CIP_SFC_88200]   = 32,
-		[CIP_SFC_96000]   = 32,
-		[CIP_SFC_176400]  = 64,
-		[CIP_SFC_192000]  = 64
-	};
-
-	for (f = 0; f < frames; f += 1) {
-		/* skip PCM data */
+	for (f = 0; f < frames; f++) {
 		buffer += s->pcm_channels;
 
-		/*
-		 * According to MMA/AMEI RP-027, one channels of AM824 can
-		 * handle 8 MIDI streams.
-		 */
 		m = (s->data_block_counter + f) % 8;
-		for (c = 0; c < DIV_ROUND_UP(s->midi_ports, 8); c += 1) {
-			/* MIDI stream number */
-			port = c * 8 + m;
-
+		for (c = 0; c < s->midi_channels; c++) {
 			b[0] = 0x80;
 			b[1] = 0x00;
-			b[2] = 0x00;
-			b[3] = 0x00;
 			len = 0;
 
-			if ((m == (s->data_block_counter + f) %
-						block_interval[s->sfc]) &&
-			    (s->midi[port] != NULL) &&
+			port = c * 8 + m;
+			if ((s->midi[port] != NULL) &&
 			    test_bit(port, &s->midi_triggered)) {
 				len = snd_rawmidi_transmit(s->midi[port],
 								b + 1, 1);
@@ -518,9 +508,7 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 					b[0] = 0x81;
 			}
 
-			buffer[c] = (b[0] << 24) | (b[1] << 16) |
-							(b[2] << 8) | b[3];
-			buffer[c] = be32_to_cpu(buffer[c]);
+			buffer[c] = be32_to_cpu((b[0] << 24) | (b[1] << 16));
 		}
 		buffer += s->data_block_quadlets - s->pcm_channels;
 	}
@@ -529,36 +517,26 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 static void amdtp_pull_midi(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
-	unsigned int m, f, p, port;
-	int len, ret;
+	unsigned int m, f, c, port;
+	int len;
 	u8 *b;
 
-	for (f = 0; f < frames; f += 1) {
+	for (f = 0; f < frames; f++) {
 		buffer += s->pcm_channels;
 
 		m = (s->data_block_counter + f) % 8;
-
-		for (p = 0; p < s->midi_ports; p += 1) {
-			b = (u8 *)&buffer[p];
-
+		for (c = 0; c < s->midi_channels; c++) {
+			b = (u8 *)&buffer[c];
 			if (b[0] < 0x81 || 0x83 < b[0])
 				continue;
 
-			len = b[0] - 0x80;
-
-			/* MIDI stream number */
-			port = p * 8 + m;
-
+			port = c * 8 + m;
 			if ((s->midi[port] == NULL) ||
 			    !test_bit(port, &s->midi_triggered))
 				continue;
 
-			ret = snd_rawmidi_receive(s->midi[port], b + 1, len);
-			if (ret != len) {
-				dev_err(&s->unit->device,
-				"MIDI[%d] receive: %08X %08X %08X %08X\n",
-				port, b[0], b[1], b[2], b[3]);
-			}
+			len = b[0] - 0x80;
+			snd_rawmidi_receive(s->midi[port], b + 1, len);
 		}
 		buffer += s->data_block_quadlets - s->pcm_channels;
 	}
@@ -627,7 +605,7 @@ static inline int queue_out_packet(struct amdtp_stream *s,
 static inline int queue_in_packet(struct amdtp_stream *s)
 {
 	return queue_packet(s, IN_PACKET_HEADER_SIZE,
-			    s->max_payload_size, false);
+			    amdtp_stream_get_max_payload(s), false);
 }
 
 static void handle_out_packet(struct amdtp_stream *s, unsigned int syt)
@@ -667,7 +645,7 @@ static void handle_out_packet(struct amdtp_stream *s, unsigned int syt)
 		else
 			amdtp_fill_pcm_silence(s, buffer, data_blocks);
 
-		if (s->midi_ports)
+		if (s->midi_channels > 0)
 			amdtp_fill_midi(s, buffer, data_blocks);
 
 		s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
@@ -726,8 +704,7 @@ static void handle_in_packet(struct amdtp_stream *s,
 	 * 96.0/88.2 kHz.
 	 */
 	if ((payload_quadlets - 2) % s->data_block_quadlets > 0)
-		s->data_block_quadlets = s->pcm_channels +
-					 DIV_ROUND_UP(s->midi_ports, 8);
+		s->data_block_quadlets = s->pcm_channels + s->midi_channels;
 	else
 		s->data_block_quadlets = s->data_block_quadlets;
 
@@ -738,7 +715,7 @@ static void handle_in_packet(struct amdtp_stream *s,
 	pcm = ACCESS_ONCE(s->pcm);
 	if (pcm)
 		s->transfer_samples(s, pcm, buffer, data_blocks);
-	if (s->midi_ports)
+	if (s->midi_channels > 0)
 		amdtp_pull_midi(s, buffer, data_blocks);
 
 	if (pcm)
@@ -808,7 +785,8 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 				index -= QUEUE_LENGTH;
 			buffer = s->buffer.packets[index].buffer;
 		} else
-			buffer = s->left_packets + s->max_payload_size * j++;
+			buffer = s->left_packets +
+				 amdtp_stream_get_max_payload(s) * j++;
 
 		if (i < remain_packets + packets - s->remain_packets) {
 			/* Process sync slave stream */
@@ -824,7 +802,8 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 			tbl[k].id = tbl[i].id + QUEUE_LENGTH;
 			tbl[k].dbc = tbl[i].dbc;
 			tbl[k].payload_size = tbl[i].payload_size;
-			memcpy(s->left_packets + s->max_payload_size * k++,
+			memcpy(s->left_packets +
+					amdtp_stream_get_max_payload(s) * k++,
 			       buffer, tbl[i].payload_size);
 		}
 	}
@@ -886,6 +865,19 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
  */
 int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 {
+
+	static const struct {
+		unsigned int data_block;
+		unsigned int syt_offset;
+	} initial_state[] = {
+		[CIP_SFC_32000]  = {  4, 3072 },
+		[CIP_SFC_48000]  = {  6, 1024 },
+		[CIP_SFC_96000]  = { 12, 1024 },
+		[CIP_SFC_192000] = { 24, 1024 },
+		[CIP_SFC_44100]  = {  0,   67 },
+		[CIP_SFC_88200]  = {  0,   67 },
+		[CIP_SFC_176400] = {  0,   67 }
+	};
 	unsigned int header_size;
 	enum dma_data_direction dir;
 	int type, err;
@@ -893,14 +885,14 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	mutex_lock(&s->mutex);
 
 	if (WARN_ON(!IS_ERR(s->context) ||
-	    (!s->pcm_channels && !s->midi_ports))) {
+	    (s->data_block_quadlets < 1))) {
 		err = -EBADFD;
 		goto err_unlock;
 	}
 
-	s->data_block_state = amdtp_stream_params[s->sfc].data_block;
 	s->data_block_counter = 0;
-	s->syt_offset_state = amdtp_stream_params[s->sfc].syt_offset;
+	s->data_block_state = initial_state[s->sfc].data_block;
+	s->syt_offset_state = initial_state[s->sfc].syt_offset;
 	s->last_syt_offset = TICKS_PER_CYCLE;
 
 	/* initialize packet buffer */
@@ -913,14 +905,10 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		type = FW_ISO_CONTEXT_TRANSMIT;
 		header_size = OUT_PACKET_HEADER_SIZE;
 	}
-	s->max_payload_size = amdtp_stream_get_max_payload(s);
 	err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
-				      s->max_payload_size, dir);
+				      amdtp_stream_get_max_payload(s), dir);
 	if (err < 0)
 		goto err_unlock;
-
-	s->data_block_quadlets =
-			s->pcm_channels + DIV_ROUND_UP(s->midi_ports, 8);
 
 	/* to sort receive packets */
 	if (s->direction == AMDTP_IN_STREAM) {
@@ -929,7 +917,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 					QUEUE_LENGTH, GFP_KERNEL);
 		if (s->sort_table == NULL)
 			return -ENOMEM;
-		s->left_packets = kzalloc(s->max_payload_size *
+		s->left_packets = kzalloc(amdtp_stream_get_max_payload(s) *
 					  QUEUE_LENGTH / 4, GFP_KERNEL);
 	}
 

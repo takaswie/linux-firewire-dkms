@@ -52,7 +52,7 @@ static int snd_efw_stream_start(struct snd_efw *efw,
 				struct amdtp_stream *stream, int sampling_rate)
 {
 	struct cmp_connection *connection;
-	unsigned int pcm_channels;
+	unsigned int pcm_channels, midi_channels;
 	int mode, err = 0;
 
 	/* already running */
@@ -63,14 +63,14 @@ static int snd_efw_stream_start(struct snd_efw *efw,
 	if (stream == &efw->tx_stream) {
 		connection = &efw->output_connection;
 		pcm_channels = efw->pcm_capture_channels[mode];
+		midi_channels = DIV_ROUND_UP(efw->midi_output_ports, 8);
 	} else {
 		connection = &efw->input_connection;
 		pcm_channels = efw->pcm_playback_channels[mode];
+		midi_channels = DIV_ROUND_UP(efw->midi_input_ports, 8);
 	}
 
-	amdtp_stream_set_rate(stream, sampling_rate);
-	amdtp_stream_set_pcm(stream, pcm_channels);
-	amdtp_stream_set_midi(stream, 1);
+	amdtp_stream_set_params(stream, sampling_rate, pcm_channels, midi_channels);
 
 	/*  establish connection via CMP */
 	err = cmp_connection_establish(connection,
