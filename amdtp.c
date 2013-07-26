@@ -599,7 +599,7 @@ end:
 }
 
 static inline int queue_out_packet(struct amdtp_stream *s,
-					unsigned int payload_length, bool skip)
+				   unsigned int payload_length, bool skip)
 {
 	return queue_packet(s, OUT_PACKET_HEADER_SIZE,
 			    payload_length, skip);
@@ -665,8 +665,8 @@ static void handle_out_packet(struct amdtp_stream *s, unsigned int syt)
 }
 
 static void handle_in_packet(struct amdtp_stream *s,
-			   unsigned int payload_quadlets,
-			   __be32 *buffer)
+			     unsigned int payload_quadlets,
+			     __be32 *buffer)
 {
 	u32 cip_header[2];
 	unsigned int data_blocks = 0;
@@ -719,8 +719,8 @@ static void handle_in_packet(struct amdtp_stream *s,
 
 /* This function is for the device which synchronizes to this module. */
 static void out_stream_callback(struct fw_iso_context *context, u32 cycle,
-				     size_t header_length, void *header,
-				     void *private_data)
+				size_t header_length, void *header,
+				void *private_data)
 {
 	struct amdtp_stream *s = private_data;
 	unsigned int i, syt, packets = header_length / 4;
@@ -740,8 +740,8 @@ static void out_stream_callback(struct fw_iso_context *context, u32 cycle,
 }
 
 static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
-				    size_t header_length, void *header,
-				    void *private_data)
+			       size_t header_length, void *header,
+			       void *private_data)
 {
 	struct amdtp_stream *s = private_data;
 	struct sort_table *entry, *tbl = s->sort_table;
