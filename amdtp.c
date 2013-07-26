@@ -691,12 +691,9 @@ static void handle_in_packet(struct amdtp_stream *s,
 	      ((cip_header[1] & AMDTP_SYT_MASK) == CIP_SYT_NO_INFO)))
 		return;
 
-	s->data_block_quadlets =
-		(cip_header[0] & AMDTP_DBS_MASK) >> AMDTP_DBS_SHIFT;
-	s->data_block_counter  = cip_header[0] & AMDTP_DBC_MASK;
-
 	/*
-	 * A workaround for Echo AudioFirePre8.
+	 * This module don't use the value of dbs and dbc beceause Echo
+	 * AudioFirePre8 reports inappropriate value.
 	 *
 	 * The device always reports a fixed value "16" as data block
 	 * size at any sampling rates but actually it's different at
@@ -706,11 +703,6 @@ static void handle_in_packet(struct amdtp_stream *s,
 	 * "8" at any sampling rates but actually it's different at
 	 * 96.0/88.2 kHz.
 	 */
-	if ((payload_quadlets - 2) % s->data_block_quadlets > 0)
-		s->data_block_quadlets = s->pcm_channels + s->midi_channels;
-	else
-		s->data_block_quadlets = s->data_block_quadlets;
-
 	data_blocks = (payload_quadlets - 2) / s->data_block_quadlets;
 
 	buffer += 2;
