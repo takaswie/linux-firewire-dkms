@@ -77,6 +77,9 @@ struct amdtp_stream {
 	unsigned int data_block_quadlets;
 	unsigned int pcm_channels;
 	unsigned int midi_channels;
+
+	u8 pcm_positions[AMDTP_MAX_CHANNELS_FOR_PCM];
+	u8 midi_positions[AMDTP_MAX_CHANNELS_FOR_MIDI];
 	void (*transfer_samples)(struct amdtp_stream *s,
 				 struct snd_pcm_substream *pcm,
 				 __be32 *buffer, unsigned int frames);

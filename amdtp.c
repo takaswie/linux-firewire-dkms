@@ -147,7 +147,7 @@ void amdtp_stream_set_params(struct amdtp_stream *s,
 		[CIP_SFC_192000] = 192000
 	};
 
-	unsigned int sfc;
+	unsigned int i, sfc;
 
 	if (WARN_ON(!IS_ERR(s->context)) |
 	    WARN_ON(pcm_channels > AMDTP_MAX_CHANNELS_FOR_PCM) |
@@ -172,6 +172,12 @@ sfc_found:
 		/* additional buffering needed to adjust for no-data packets */
 		s->transfer_delay += TICKS_PER_SECOND *
 					amdtp_syt_intervals[sfc]/ rate;
+
+	/* set the position of PCM and MIDI channels */
+	for (i = 0; i < pcm_channels; i++)
+		s->pcm_positions[i] = i;
+	for (i = 0; i < midi_channels; i++)
+		s->midi_positions[i] = pcm_channels + i;
 }
 EXPORT_SYMBOL(amdtp_stream_set_params);
 
@@ -301,6 +307,7 @@ static unsigned int calculate_syt(struct amdtp_stream *s,
 		 * elements is about 1386.23.  Rounding the results of this
 		 * formula to the SYT precision results in a sequence of
 		 * differences that begins with:
+
 		 *   1386 1386 1387 1386 1386 1386 1387 1386 1386 1386 1387 ...
 		 * This code generates _exactly_ the same sequence.
 		 */
@@ -373,22 +380,20 @@ static void amdtp_write_s32(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int channels, remaining_frames, frame_step, i, c;
+	unsigned int remaining_frames, i, c;
 	const u32 *src;
 
-	channels = s->pcm_channels;
 	src = (void *)runtime->dma_area +
 			frames_to_bytes(runtime, s->pcm_buffer_pointer);
 	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
-	frame_step = s->data_block_quadlets - channels;
 
 	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < channels; ++c) {
-			*buffer = cpu_to_be32((*src >> 8) | 0x40000000);
+		for (c = 0; c < s->pcm_channels; ++c) {
+			buffer[s->pcm_positions[c]] =
+					cpu_to_be32((*src >> 8) | 0x40000000);
 			src++;
-			buffer++;
 		}
-		buffer += frame_step;
+		buffer += s->data_block_quadlets;
 		if (--remaining_frames == 0)
 			src = (void *)runtime->dma_area;
 	}
@@ -399,22 +404,20 @@ static void amdtp_write_s16(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int channels, remaining_frames, frame_step, i, c;
+	unsigned int remaining_frames, i, c;
 	const u16 *src;
 
-	channels = s->pcm_channels;
 	src = (void *)runtime->dma_area +
 			frames_to_bytes(runtime, s->pcm_buffer_pointer);
 	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
-	frame_step = s->data_block_quadlets - channels;
 
 	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < channels; ++c) {
-			*buffer = cpu_to_be32((*src << 8) | 0x40000000);
+		for (c = 0; c < s->pcm_channels; ++c) {
+			buffer[s->pcm_positions[c]] =
+					cpu_to_be32((*src << 8) | 0x40000000);
 			src++;
-			buffer++;
 		}
-		buffer += frame_step;
+		buffer += s->data_block_quadlets;
 		if (--remaining_frames == 0)
 			src = (void *)runtime->dma_area;
 	}
@@ -425,22 +428,19 @@ static void amdtp_read_s32(struct amdtp_stream *s,
 			   __be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int channels, remaining_frames, frame_step, i, c;
+	unsigned int remaining_frames, i, c;
 	u32 *dst;
 
-	channels = s->pcm_channels;
 	dst  = (void *)runtime->dma_area +
 			frames_to_bytes(runtime, s->pcm_buffer_pointer);
 	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
-	frame_step = s->data_block_quadlets - channels;
 
 	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < channels; ++c) {
-			*dst = be32_to_cpu(*buffer) << 8;
+		for (c = 0; c < s->pcm_channels; ++c) {
+			*dst = be32_to_cpu(buffer[s->pcm_positions[c]]) << 8;
 			dst += 1;
-			buffer += 1;
 		}
-		buffer += frame_step;
+		buffer += s->data_block_quadlets;
 		if (--remaining_frames == 0)
 			dst = (void *)runtime->dma_area;
 	}
@@ -451,22 +451,19 @@ static void amdtp_read_s16(struct amdtp_stream *s,
 			   __be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int channels, remaining_frames, frame_step, i, c;
+	unsigned int remaining_frames, i, c;
 	u16 *dst;
 
-	channels = s->pcm_channels;
 	dst = (void *)runtime->dma_area +
 			frames_to_bytes(runtime, s->pcm_buffer_pointer);
 	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
-	frame_step = s->data_block_quadlets - channels;
 
 	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < channels; ++c) {
-			*dst = be32_to_cpu(*buffer) << 8;
+		for (c = 0; c < s->pcm_channels; ++c) {
+			*dst = be32_to_cpu(buffer[s->pcm_positions[c]]) << 8;
 			dst += 1;
-			buffer += 1;
 		}
-		buffer += frame_step;
+		buffer +=s->data_block_quadlets;
 		if (--remaining_frames == 0)
 			dst = (void *)runtime->dma_area;
 	}
@@ -479,7 +476,7 @@ static void amdtp_fill_pcm_silence(struct amdtp_stream *s,
 
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < s->pcm_channels; ++c)
-			buffer[c] = cpu_to_be32(0x40000000);
+			buffer[s->pcm_positions[c]] = cpu_to_be32(0x40000000);
 		buffer += s->data_block_quadlets;
 	}
 }
@@ -492,8 +489,6 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 	u8 b[2];
 
 	for (f = 0; f < frames; f++) {
-		buffer += s->pcm_channels;
-
 		m = (s->data_block_counter + f) % 8;
 		for (c = 0; c < s->midi_channels; c++) {
 			b[0] = 0x80;
@@ -510,10 +505,10 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 				else
 					b[0] = 0x81;
 			}
-
-			buffer[c] = be32_to_cpu((b[0] << 24) | (b[1] << 16));
+			buffer[s->midi_positions[c]] =
+				be32_to_cpu((b[0] << 24) | (b[1] << 16));
 		}
-		buffer += s->data_block_quadlets - s->pcm_channels;
+		buffer += s->data_block_quadlets;
 	}
 }
 
@@ -529,7 +524,7 @@ static void amdtp_pull_midi(struct amdtp_stream *s,
 
 		m = (s->data_block_counter + f) % 8;
 		for (c = 0; c < s->midi_channels; c++) {
-			b = (u8 *)&buffer[c];
+			b = (u8 *)&buffer[s->midi_positions[c]];
 			if (b[0] < 0x81 || 0x83 < b[0])
 				continue;
 
@@ -541,7 +536,7 @@ static void amdtp_pull_midi(struct amdtp_stream *s,
 			len = b[0] - 0x80;
 			snd_rawmidi_receive(s->midi[port], b + 1, len);
 		}
-		buffer += s->data_block_quadlets - s->pcm_channels;
+		buffer += s->data_block_quadlets;
 	}
 }
 
