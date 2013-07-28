@@ -39,6 +39,54 @@ int snd_bebob_strem_get_formation_index(int sampling_rate)
 	return -1;
 }
 
+static int mapping_channels(struct snd_bebob *bebob, struct amdtp_stream *s)
+{
+	unsigned int cl, ch, clusters, channels, pos, pcm, midi;
+	u8 *buf, type;
+	int dir, err;
+
+	/* maybe 256 is enough... */
+	buf = kzalloc(256, GFP_KERNEL);
+	if (buf == NULL) {
+		err = -ENOMEM;
+		goto end;
+	}
+
+	if (s == &bebob->tx_stream)
+		dir = 0;
+	else
+		dir = 1;
+
+	err = avc_bridgeco_get_plug_channel_position(bebob->unit, dir, 0, buf);
+	if (err < 0)
+		goto end;
+
+	clusters = *buf;
+	buf++;
+	pcm = 0;
+	midi = 0;
+	for (cl = 0; cl < clusters; cl++) {
+		err = avc_bridgeco_get_plug_cluster_type(bebob->unit, dir, 0,
+							 cl, &type);
+		if (err < 0)
+			goto end;
+
+		channels = *buf;
+		buf++;
+		for (ch = 0; ch < channels; ch++) {
+			pos = *buf - 1;
+			buf++;
+			if (type != 0x0a)
+				s->pcm_positions[pcm++] = pos;
+			else
+				s->midi_positions[midi++] = pos;
+			buf++;
+		}
+	}
+
+end:
+	return err;
+}
 
 int snd_bebob_stream_init(struct snd_bebob *bebob, struct amdtp_stream *stream)
 {
@@ -104,6 +152,10 @@ int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
 
 	amdtp_stream_set_params(stream, sampling_rate,
 				pcm_channels, midi_channels);
+
+	err = mapping_channels(bebob, stream);
+	if (err < 0)
+		goto end;
 
 	/*  establish connection via CMP */
 	err = cmp_connection_establish(connection,

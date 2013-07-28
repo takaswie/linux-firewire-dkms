@@ -290,16 +290,12 @@ end:
 	return err;
 }
 
-int avc_bridgeco_get_plug_cluster_info(struct fw_unit *unit, int direction,
-				       int plugid, int cluster_id, u8 *format)
+int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit, int direction,
+				       int plugid, int cluster_id, u8 *type)
 {
-	u8 *buf;
-	int err;
-
 	/* cluster info includes characters for name but we don't need it */
-	buf = kmalloc(12, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
+	u8 buf[12];
+	int err;
 
 	buf[0] = 0x01;
 	buf[1] = 0xff;
@@ -319,24 +315,15 @@ int avc_bridgeco_get_plug_cluster_info(struct fw_unit *unit, int direction,
 
 	/* transaction */
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
-	if (err < 0) {
-		goto end;
-	} else if (err < 12) {
+	if (err < 0)
+		; /* through */
+	else if ((err < 12) && (buf[0] != 0x0c))
 		err = -EIO;
-		goto end;
-	} else if (buf[0] == 0x0a) {
-		*format = -1;
-		goto end;
-	} else if (buf[0] != 0x0c) {
-		err = -EIO;
-		goto end;
+	else {
+		*type = buf[11];
+		err = 0;
 	}
-
-	*format = buf[11];
-	err = 0;
-
 end:
-	kfree(buf);
 	return err;
 }
 

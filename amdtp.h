@@ -41,7 +41,7 @@ enum cip_sfc {
  * This module supports maximum 16 PCM channel for one PCM stream
  * This is for our convinience.
  */
-#define AMDTP_MAX_CHANNELS_FOR_PCM	16
+#define AMDTP_MAX_CHANNELS_FOR_PCM	64
 /*
  * This module supports maximum 2 MIDI channels.
  * Then AMDTP packets include maximum 16 MIDI streams multiplexed.

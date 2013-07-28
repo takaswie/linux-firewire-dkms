@@ -137,7 +137,7 @@ int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,
 				unsigned short plugid, u8 *position);
 int avc_bridgeco_get_plug_type(struct fw_unit *unit, int direction,
 				unsigned short plugid, int *type);
-int avc_bridgeco_get_plug_cluster_info(struct fw_unit *unit, int direction,
+int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit, int direction,
 				int plugid, int cluster_id, u8 *format);
 int avc_bridgeco_get_plug_stream_formation_entry(struct fw_unit *unit,
 				int direction, unsigned short plugid,
