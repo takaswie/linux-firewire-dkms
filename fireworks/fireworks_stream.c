@@ -138,7 +138,7 @@ static void snd_efw_stream_destroy(struct snd_efw *efw,
 }
 
 static int get_roles(struct snd_efw *efw,
-		     enum amdtp_stream_sync_mode *sync_mode,
+		     enum cip_flags *sync_mode,
 		     struct amdtp_stream **master, struct amdtp_stream **slave)
 {
 	enum snd_efw_clock_source clock_source;
@@ -151,11 +151,11 @@ static int get_roles(struct snd_efw *efw,
 	if (clock_source != SND_EFW_CLOCK_SOURCE_SYTMATCH) {
 		*master = &efw->tx_stream;
 		*slave = &efw->rx_stream;
-		*sync_mode = AMDTP_STREAM_SYNC_TO_DEVICE;
+		*sync_mode = CIP_SYNC_TO_DEVICE;
 	} else {
 		*master = &efw->rx_stream;
 		*slave = &efw->tx_stream;
-		*sync_mode = AMDTP_STREAM_SYNC_TO_DRIVER;
+		*sync_mode = ~CIP_SYNC_TO_DEVICE;
 	}
 end:
 	return err;
@@ -180,7 +180,7 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 				int sampling_rate)
 {
 	struct amdtp_stream *master, *slave;
-	enum amdtp_stream_sync_mode sync_mode;
+	enum cip_flags sync_mode;
 	int err, current_rate;
 	bool slave_flag;
 
@@ -219,7 +219,7 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 
 	/*  master should be always running */
 	if (!amdtp_stream_running(master)) {
-		amdtp_stream_set_sync_mode(sync_mode, master, slave);
+		amdtp_stream_set_sync(sync_mode, master, slave);
 		err = snd_efw_stream_start(efw, master, sampling_rate);
 		if (err < 0)
 			goto end;
@@ -236,7 +236,7 @@ end:
 int snd_efw_stream_stop_duplex(struct snd_efw *efw)
 {
 	struct amdtp_stream *master, *slave;
-	enum amdtp_stream_sync_mode sync_mode;
+	enum cip_flags sync_mode;
 	int err;
 
 	err = get_roles(efw, &sync_mode, &master, &slave);
@@ -261,12 +261,12 @@ void snd_efw_stream_update_duplex(struct snd_efw *efw)
 {
 	struct amdtp_stream *master, *slave;
 
-	if (efw->tx_stream.sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER) {
-		master = &efw->rx_stream;
-		slave = &efw->tx_stream;
-	} else {
+	if (efw->tx_stream.flags & CIP_SYNC_TO_DEVICE) {
 		master = &efw->tx_stream;
 		slave = &efw->rx_stream;
+	} else {
+		master = &efw->rx_stream;
+		slave = &efw->tx_stream;
 	}
 
 	snd_efw_stream_update(efw, master);

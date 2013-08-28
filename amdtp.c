@@ -98,7 +98,6 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 		s->midi[i] = NULL;
 
 	s->run = false;
-	s->sync_mode = AMDTP_STREAM_SYNC_TO_DRIVER;
 	s->sync_slave = ERR_PTR(-1);
 
 	s->sort_table = NULL;
@@ -780,14 +779,14 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 
 		if (i < remain_packets + packets - s->remain_packets) {
 			/* Process sync slave stream */
-			if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
+			if ((s->flags & CIP_BLOCKING) &&
+			    (s->flags & CIP_SYNC_TO_DEVICE) &&
 			    !IS_ERR(s->sync_slave) &&
 			    amdtp_stream_running(s->sync_slave)) {
 				syt = be32_to_cpu(buffer[1]) & AMDTP_SYT_MASK;
 				handle_out_packet(s->sync_slave, syt);
 			}
 			handle_in_packet(s, tbl[i].payload_size / 4, buffer);
-
 		} else {
 			tbl[k].id = tbl[i].id + QUEUE_LENGTH;
 			tbl[k].dbc = tbl[i].dbc;
@@ -806,7 +805,8 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 	}
 
 	/* when sync to device, flush the packets for slave stream */
-	if ((s->sync_mode == AMDTP_STREAM_SYNC_TO_DEVICE) &&
+	if ((s->flags & CIP_BLOCKING) &&
+	    (s->flags & CIP_SYNC_TO_DEVICE) &&
 	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave))
 		fw_iso_context_queue_flush(s->sync_slave->context);
 
@@ -832,7 +832,7 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
 
 	if (s->direction == AMDTP_IN_STREAM)
 		context->callback.sc = in_stream_callback;
-	else if (s->sync_mode == AMDTP_STREAM_SYNC_TO_DRIVER)
+	else if (!(s->flags & CIP_SYNC_TO_DEVICE))
 		context->callback.sc = out_stream_callback;
 	else
 		context->callback.sc = slave_stream_callback;
