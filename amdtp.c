@@ -96,6 +96,7 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	s->pcm = NULL;
 	for (i = 0; i < AMDTP_MAX_CHANNELS_FOR_MIDI * 8; i++)
 		s->midi[i] = NULL;
+	s->blocks_for_midi = UINT_MAX;
 
 	init_waitqueue_head(&s->run_wait);
 	s->run = false;
@@ -493,7 +494,8 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 			len = 0;
 
 			port = c * 8 + m;
-			if ((s->midi[port] != NULL) &&
+			if ((f < s->blocks_for_midi) &&
+			    (s->midi[port] != NULL) &&
 			    test_bit(port, &s->midi_triggered)) {
 				len = snd_rawmidi_transmit(s->midi[port],
 								b + 1, 1);
@@ -1061,14 +1063,20 @@ EXPORT_SYMBOL(amdtp_stream_wait_run);
  * amdtp_stream_midi_add - add MIDI stream
  * @s: the AMDTP stream
  * @substream: the MIDI stream to be added
+ * @blocks_for_midi: if this is not zero(n), MIDI messages are transmitted in
+ *	the first n data blocks in an AMDTP packet. This is no effects for
+ *	in stream. This is a quirk for Echo Fireworks.
  *
  * This function don't check the number of midi substream but it should be
  * within AMDTP_MAX_MIDI_STREAMS.
  */
 void amdtp_stream_midi_add(struct amdtp_stream *s,
-			   struct snd_rawmidi_substream *substream)
+			   struct snd_rawmidi_substream *substream,
+			   unsigned int blocks_for_midi)
 {
 	ACCESS_ONCE(s->midi[substream->number]) = substream;
+	if (blocks_for_midi > 0)
+		s->blocks_for_midi = blocks_for_midi;
 }
 EXPORT_SYMBOL(amdtp_stream_midi_add);
 

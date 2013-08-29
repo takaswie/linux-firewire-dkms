@@ -28,7 +28,7 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 	struct snd_efw *efw = substream->rmidi->private_data;
 
 	snd_efw_stream_start_duplex(efw, &efw->tx_stream, 0);
-	amdtp_stream_midi_add(&efw->tx_stream, substream);
+	amdtp_stream_midi_add(&efw->tx_stream, substream, 0);
 
 	return 0;
 }
@@ -38,7 +38,11 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 	struct snd_efw *efw = substream->rmidi->private_data;
 
 	snd_efw_stream_start_duplex(efw, &efw->rx_stream, 0);
-	amdtp_stream_midi_add(&efw->rx_stream, substream);
+	/*
+	 * Fireworks ignores MIDI messages in more than 8 data blocks in an
+	 * AMDTP packet.
+	 */
+	amdtp_stream_midi_add(&efw->rx_stream, substream, 8);
 
 	return 0;
 }
