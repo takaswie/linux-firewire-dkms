@@ -218,9 +218,6 @@ static void amdtp_read_s32(struct amdtp_stream *s,
 void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
 				 snd_pcm_format_t format)
 {
-	if (WARN_ON(!IS_ERR(s->context)))
-		return;
-
 	switch (format) {
 	default:
 		WARN_ON(1);
