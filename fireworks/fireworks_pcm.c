@@ -222,9 +222,7 @@ pcm_init_hw_params(struct snd_efw *efw,
 				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 		pcm_channels = efw->pcm_capture_channels;
 	} else {
-		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32 |
-						 SNDRV_PCM_FMTBIT_S24 |
-						 SNDRV_PCM_FMTBIT_S16;
+		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
 		snd_pcm_hw_rule_add(substream->runtime, 0,
 				SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_playback_channels, efw,
@@ -339,7 +337,6 @@ pcm_hw_params(struct snd_pcm_substream *substream,
 
 	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
 	err = snd_efw_stream_start_duplex(efw, stream, params_rate(hw_params));
-
 end:
 	return err;
 }

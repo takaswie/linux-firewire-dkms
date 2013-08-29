@@ -97,6 +97,7 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	for (i = 0; i < AMDTP_MAX_CHANNELS_FOR_MIDI * 8; i++)
 		s->midi[i] = NULL;
 
+	init_waitqueue_head(&s->run_wait);
 	s->run = false;
 	s->sync_slave = ERR_PTR(-1);
 
@@ -940,7 +941,6 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	 * "FW_ISO_CONTEXT_MATCH_TAG1" for receive but Fireworks outputs
 	 * NODATA packets with tag 0.
 	 */
-	init_waitqueue_head(&s->run_wait);
 	err = fw_iso_context_start(s->context, -1, 0,
 			FW_ISO_CONTEXT_MATCH_TAG0 | FW_ISO_CONTEXT_MATCH_TAG1);
 	if (err < 0)
