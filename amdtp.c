@@ -96,6 +96,7 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	s->pcm = NULL;
 	for (i = 0; i < AMDTP_MAX_CHANNELS_FOR_MIDI * 8; i++)
 		s->midi[i] = NULL;
+	s->blocks_for_midi = UINT_MAX;
 
 	init_waitqueue_head(&s->run_wait);
 	s->run = false;
@@ -493,7 +494,8 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 			len = 0;
 
 			port = c * 8 + m;
-			if ((s->midi[port] != NULL) &&
+			if ((f < s->blocks_for_midi) &&
+			    (s->midi[port] != NULL) &&
 			    test_bit(port, &s->midi_triggered)) {
 				len = snd_rawmidi_transmit(s->midi[port],
 								b + 1, 1);

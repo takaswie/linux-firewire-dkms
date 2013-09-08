@@ -102,7 +102,10 @@ struct amdtp_stream {
 	bool pointer_flush;
 
 	struct snd_rawmidi_substream *midi[AMDTP_MAX_CHANNELS_FOR_MIDI * 8];
-	unsigned long midi_triggered;	/* bit table for each MIDI substream */
+	/* bit table for each MIDI substream */
+	unsigned long midi_triggered;
+	/* the first number of data blocks in an AMDTP packet for MIDI */
+	unsigned int blocks_for_midi;
 
 	void *sort_table;
 	void *left_packets;
