@@ -387,3 +387,37 @@ nb_1394_playback_channels_2x: 0xC
 nb_1394_capture_channels_2x: 0xC
 nb_1394_playback_channels_4x: 0xA
 nb_1394_capture_channels_4x: 0xA
+
+== Echo AudioFire4 ==
+guid_hi: 0x14860F
+guid_lo: 0x5A616E83
+type: 0xAF4
+version: 0x0
+vendor_name: Echo Digital Audio
+model_name: AudioFire4
+dsp_version: 0x0
+arm_version: 0x5070300
+fpga_version: 0x3000200
+flags: 0xE1
+max_sample_rate: 0x17700
+min_sample_rate: 0x7D00
+supported_clock: 0x9
+nb_phys_audio_out: 0x6
+nb_phys_audio_in: 0x6
+nb_in_groups: 0x2
+in_group[0x0]: type 0x0, count 0x4
+in_group[0x1]: type 0x1, count 0x2
+nb_out_groups: 0x2
+out_group[0x0]: type 0x0, count 0x4
+out_group[0x1]: type 0x1, count 0x2
+nb_1394_playback_channels: 0x6
+nb_1394_capture_channels: 0x6
+nb_1394_playback_channels_2x: 0x6
+nb_1394_capture_channels_2x: 0x6
+nb_1394_playback_channels_4x: 0x6
+nb_1394_capture_channels_4x: 0x6
+nb_midi_out: 0x1
+nb_midi_in: 0x1
+mixer_playback_channels: 0x6
+mixer_capture_channels: 0x6
+
