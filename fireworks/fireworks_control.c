@@ -365,9 +365,8 @@ end:
  */
 static char *clock_src_descs[] = {"Internal", "SYT Match", "Word",
 				     "S/PDIF", "ADAT1", "ADAT2"};
-static int
-control_clock_source_info(struct snd_kcontrol *kctl,
-			  struct snd_ctl_elem_info *einf)
+static int control_clock_source_info(struct snd_kcontrol *kctl,
+				     struct snd_ctl_elem_info *einf)
 {
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int value, i;
@@ -400,9 +399,8 @@ control_clock_source_info(struct snd_kcontrol *kctl,
 
 	return 0;
 }
-static int
-control_clock_source_get(struct snd_kcontrol *kctl,
-			 struct snd_ctl_elem_value *uval)
+static int control_clock_source_get(struct snd_kcontrol *kctl,
+				    struct snd_ctl_elem_value *uval)
 {
 	int err = 0;
 
@@ -429,9 +427,30 @@ control_clock_source_get(struct snd_kcontrol *kctl,
 end:
 	return err;
 }
-static int
-control_clock_source_put(struct snd_kcontrol *kctl,
-			 struct snd_ctl_elem_value *uval)
+static bool check_clock_input(struct snd_efw *efw,
+			      enum snd_efw_clock_source source)
+{
+	struct snd_efw_phys_meters *meters;
+	int len = sizeof(struct snd_efw_phys_meters);
+	bool result;
+
+	meters = kzalloc(len, GFP_KERNEL);
+	if (meters == NULL)
+		return false;
+
+	if (snd_efw_command_get_phys_meters(efw, meters, len) < 0) {
+		snd_printk(KERN_INFO"my error\n");
+		result = false;
+		goto end;
+	}
+
+	result = (meters->clock_in & (1 << source));
+end:
+	kfree(meters);
+	return result;
+}
+static int control_clock_source_put(struct snd_kcontrol *kctl,
+				    struct snd_ctl_elem_value *uval)
 {
 	int changed = 0;
 
@@ -440,7 +459,7 @@ control_clock_source_put(struct snd_kcontrol *kctl,
 
 	/* get index from user value */
 	value = uval->value.enumerated.item[0];
-	for (index = 0; index < ARRAY_SIZE(clock_src_descs); index += 1) {
+	for (index = 0; index < ARRAY_SIZE(clock_src_descs); index++) {
 		/* not supported */
 		if (!((1 << index) & efw->supported_clock_source))
 			continue;
@@ -449,6 +468,9 @@ control_clock_source_put(struct snd_kcontrol *kctl,
 		else
 			value -= 1;
 	}
+
+	if (!check_clock_input(efw, index))
+		return 0;
 
 	/* set clock */
 	if (snd_efw_command_set_clock_source(efw, index) < 0)

@@ -158,15 +158,15 @@ struct snd_efw_hwinfo {
 
 /* for hardware metering */
 struct snd_efw_phys_meters {
-	u32 status;
-	u32 detect_spdif;
-	u32 detect_adat;
+	u32 clock_in;
 	u32 reserved0;
 	u32 reserved1;
-	u32 nb_output_meters;
-	u32 nb_input_meters;
 	u32 reserved2;
 	u32 reserved3;
+	u32 nb_output_meters;
+	u32 nb_input_meters;
+	u32 reserved4;
+	u32 reserved5;
 	u32 values[0];
 } __packed;
 
