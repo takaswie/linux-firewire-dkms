@@ -322,6 +322,12 @@ command_set_clock(struct snd_efw *efw,
 				(u32 *)&clock, 3, NULL, 0);
 
 	err = 0;
+	/*
+	 * With firmware version 5.8, just after changing clock state, these
+	 * parameters are not immediately retrieved by get command. In my
+	 * trial, there needs to be 100msec to get changed parameters.
+	 */
+	msleep(150);
 end:
 	return err;
 }
