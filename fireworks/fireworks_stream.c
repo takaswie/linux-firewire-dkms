@@ -61,11 +61,11 @@ static int snd_efw_stream_start(struct snd_efw *efw,
 
 	mode = snd_efw_get_multiplier_mode(sampling_rate);
 	if (stream == &efw->tx_stream) {
-		conn= &efw->out_conn;
+		conn = &efw->out_conn;
 		pcm_channels = efw->pcm_capture_channels[mode];
 		midi_channels = DIV_ROUND_UP(efw->midi_output_ports, 8);
 	} else {
-		conn= &efw->in_conn;
+		conn = &efw->in_conn;
 		pcm_channels = efw->pcm_playback_channels[mode];
 		midi_channels = DIV_ROUND_UP(efw->midi_input_ports, 8);
 	}
@@ -170,7 +170,6 @@ int snd_efw_stream_init_duplex(struct snd_efw *efw)
 		goto end;
 
 	err = snd_efw_stream_init(efw, &efw->rx_stream);
-
 end:
 	return err;
 }
@@ -181,7 +180,7 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 {
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
-	int err, current_rate;
+	int err, curr_rate;
 	bool slave_flag;
 
 	err = get_roles(efw, &sync_mode, &master, &slave);
@@ -194,12 +193,12 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 		slave_flag = false;
 
 	/* change sampling rate if possible */
-	err = snd_efw_command_get_sampling_rate(efw, &current_rate);
+	err = snd_efw_command_get_sampling_rate(efw, &curr_rate);
 	if (err < 0)
 		goto end;
 	if (sampling_rate == 0)
-		sampling_rate = current_rate;
-	if (sampling_rate != current_rate) {
+		sampling_rate = curr_rate;
+	if (sampling_rate != curr_rate) {
 		/* master is just for MIDI stream */
 		if (amdtp_stream_running(master) &&
 		    !amdtp_stream_pcm_running(master))
@@ -223,12 +222,18 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 		err = snd_efw_stream_start(efw, master, sampling_rate);
 		if (err < 0)
 			goto end;
+
+		err = amdtp_stream_wait_run(master);
+		if (err < 0)
+			goto end;
 	}
 
 	/* start slave if needed */
 	if (slave_flag && !amdtp_stream_running(slave))
 		err = snd_efw_stream_start(efw, slave, sampling_rate);
-
+		if (err < 0)
+			goto end;
+		err = amdtp_stream_wait_run(slave);
 end:
 	return err;
 }

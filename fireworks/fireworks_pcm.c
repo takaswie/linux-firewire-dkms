@@ -284,8 +284,7 @@ end:
 	return err;
 }
 
-static int
-pcm_open(struct snd_pcm_substream *substream)
+static int pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
 	int sampling_rate;
@@ -311,38 +310,19 @@ end:
 	return err;
 }
 
-static int
-pcm_close(struct snd_pcm_substream *substream)
+static int pcm_close(struct snd_pcm_substream *substream)
 {
 	return 0;
 }
 
-static int
-pcm_hw_params(struct snd_pcm_substream *substream,
-	      struct snd_pcm_hw_params *hw_params)
+static int pcm_hw_params(struct snd_pcm_substream *substream,
+			 struct snd_pcm_hw_params *hw_params)
 {
-	struct snd_efw *efw = substream->private_data;
-	struct amdtp_stream *stream;
-	int err;
-
-	err = snd_pcm_lib_alloc_vmalloc_buffer(substream,
+	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
 				params_buffer_bytes(hw_params));
-	if (err < 0)
-		goto end;
-
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		stream = &efw->tx_stream;
-	else
-		stream = &efw->rx_stream;
-
-	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
-	err = snd_efw_stream_start_duplex(efw, stream, params_rate(hw_params));
-end:
-	return err;
 }
 
-static int
-pcm_hw_free(struct snd_pcm_substream *substream)
+static int pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
 
@@ -354,24 +334,32 @@ pcm_hw_free(struct snd_pcm_substream *substream)
 static int pcm_capture_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	int err;
 
-	if (!amdtp_stream_wait_run(&efw->tx_stream))
-		return -EIO;
+	err = snd_efw_stream_start_duplex(efw, &efw->tx_stream, runtime->rate);
+	if (err < 0)
+		goto end;
 
+	amdtp_stream_set_pcm_format(&efw->tx_stream, runtime->format);
 	amdtp_stream_pcm_prepare(&efw->tx_stream);
-
-	return 0;
+end:
+	return err;
 }
 static int pcm_playback_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	int err;
 
-	if (!amdtp_stream_wait_run(&efw->rx_stream))
-		return -EIO;
+	err = snd_efw_stream_start_duplex(efw, &efw->rx_stream, runtime->rate);
+	if (err < 0)
+		goto end;
 
+	amdtp_stream_set_pcm_format(&efw->rx_stream, runtime->format);
 	amdtp_stream_pcm_prepare(&efw->rx_stream);
-
-	return 0;
+end:
+	return err;
 }
 
 static int pcm_capture_trigger(struct snd_pcm_substream *substream, int cmd)
