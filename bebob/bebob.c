@@ -312,14 +312,12 @@ snd_bebob_card_free(struct snd_card *card)
 	return;
 }
 
-static int
-snd_bebob_probe(struct device *dev)
+static int snd_bebob_probe(struct fw_unit *unit,
+			   const struct ieee1394_device_id *entry)
 {
-	struct fw_unit *unit = fw_unit(dev);
-	int card_index;
 	struct snd_card *card;
 	struct snd_bebob *bebob;
-	int err;
+	int card_index, err;
 
 	mutex_lock(&devices_mutex);
 
@@ -379,14 +377,13 @@ snd_bebob_probe(struct device *dev)
 	snd_bebob_proc_init(bebob);
 
 	/* register card and device */
-	snd_card_set_dev(card, dev);
+	snd_card_set_dev(card, &unit->device);
 	err = snd_card_register(card);
 	if (err < 0) {
 		snd_card_free(card);
 		goto error;
 	}
-
-	dev_set_drvdata(dev, card);
+	dev_set_drvdata(&unit->device, card);
 	devices_used |= 1 << card_index;
 	bebob->card_index = card_index;
 
@@ -402,23 +399,16 @@ end:
 	return err;
 }
 
-static int
-snd_bebob_remove(struct device *dev)
+static void snd_bebob_remove(struct fw_unit *unit)
 {
-	struct snd_card *card = dev_get_drvdata(dev);
-	struct snd_bebob *bebob = card->private_data;
+	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
 
-	if (!card)
-		goto end;
-
-	/* destroy devices */
 	snd_bebob_destroy_pcm_devices(bebob);
 
-	snd_card_disconnect(card);
-	snd_card_free_when_closed(card);
+	snd_card_disconnect(bebob->card);
+	snd_card_free_when_closed(bebob->card);
 
-end:
-	return 0;
+	return;
 }
 
 #define VENDOR_MAUDIO1	0x00000d6c
@@ -509,10 +499,10 @@ static struct fw_driver snd_bebob_driver = {
 		.owner	= THIS_MODULE,
 		.name	= "snd-bebob",
 		.bus	= &fw_bus_type,
-		.probe	= snd_bebob_probe,
-		.remove	= snd_bebob_remove,
 	},
-	.update	= snd_bebob_update,
+	.probe    = snd_bebob_probe,
+	.update	  = snd_bebob_update,
+	.remove   = snd_bebob_remove,
 	.id_table = snd_bebob_id_table,
 };
 

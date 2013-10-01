@@ -1,6 +1,6 @@
 = Developing for snd-fireworks=
 
-2012/04/16 坂本 貴史
+2013/10/01 坂本 貴史
 Takashi Sakamoto <o-takashi@sakamocchi.jp>
 
 == General ==
@@ -87,15 +87,15 @@ Hardware information is in the end of this README.
 DKMS - Dynamic Kernel Module Support is easy for installing or updating external modules.
 http://linux.dell.com/dkms/
 
-You should create new directory named "alsa-firewire-3.9" in the directory which your
+You should create new directory named "alsa-firewire-3.11" in the directory which your
 system DKMS setting indicate. The path is "/usr/src" in my Ubuntu rootfs.
-("3.9" just means for Linux 3.9)
+("3.11" just means for Linux 3.11)
 
 Then follow usual DKMS steps, for example:
- sudo dkms add -m alsa-firewire -v 3.9
- sudo dkms build -m alsa-firewire -v 3.9
- sudo dkms install -m alsa-firewire -v 3.9
- sudo dkms remove -m alsa-firewire -v 3.9 --all
+ sudo dkms add -m alsa-firewire -v 3.11
+ sudo dkms build -m alsa-firewire -v 3.11
+ sudo dkms install -m alsa-firewire -v 3.11
+ sudo dkms remove -m alsa-firewire -v 3.11 --all
 
 Of cource, you should install dkms package in advance. For example, in Ubuntu system:
 sudo apt-get install dkms
@@ -103,7 +103,7 @@ sudo apt-get install dkms
 
 = snd-fireworks.koの開発 =
 
-2013/04/016 坂本 貴史
+2013/10/01 坂本 貴史
 Takashi Sakamoto <o-takashi@sakamocchi.jp>
 
 == 概要 ==
@@ -157,23 +157,19 @@ re-lib.koにデータ受信機能とMIDI処理を実装することが、この�
 
 == インストール ==
 
-私が開発に用いているカーネルは、Linux3.8-rc3です。
+私が開発に用いているカーネルは、Linux3.11です。
 
-私はAudioFirePre8を使って開発をしており、それ以外のデバイスがちゃんと動くかどうかは確認し
+私はAudioFire4とAudioFirePre8を使って開発をしており、それ以外のデバイスがちゃんと動くかどうかは確認し
 ていません。下記の「ハードウェアの基本情報」を教えていただけると助かります。
 
-procfsが有効なカーネルでは、AV/Cコマンドの受信内容の一部を出力できます。
+procfsが有効なカーネルでは、ハードウェアの特定の情報を出力できます。
 （以下、「X」はALSAが装置に割り振ったカード番号）
 	ハードウェアの基本情報
-		/proc/asound/cardX/efc_hardware
+		/proc/asound/cardX/#hardware
 	現在の標本化周波数とクロック源
-		/proc/asound/cardX/efc_clock
+		/proc/asound/cardX/#clock
 	現在のハードウェアメーター（装置への入出力の大きさ）
-		/proc/asound/cardX/efc_meters
-	現在の入出力設定（ゲインなど）
-		/proc/asound/cardX/efc_mixer
-	現在の内部ルーティング（装置への入力と出力のルーティング）
-		/proc/asound/cardX/efc_monitor
+		/proc/asound/cardX/#meters
 
 
 == いまできること ==
@@ -191,15 +187,12 @@ PCM再生・録音が始まっているときに可能です。
 
 3.alsamixerやamixerを使い、装置の挙動の一部を変更可能
 現在、標本化周波数、クロック源、デジタル出力モード、S/PDIFフォーマットを変更できます。
-入出力ルーティングは未実装です。
 
 4.procfsでの装置情報の取得
-ハードウェア情報、入出力ルーティング、入出力モニター、入出力ミキサー、クロック情報を出
-力することができます。
+ハードウェア情報、クロック情報、メーター情報を出力することができます。
 
 == 残りの作業 ==
 
-1.MIDIの再生・録音の実装
 2.ハードウェアモニター、メーター、ミキサーへのインターフェイスの実装
 3.ALSAにsnd-firewire-lib.koへのパッチをコミット
 4.ALSAにsnd-fireworks.koのパッチを新規にコミット
@@ -233,16 +226,16 @@ DKMS - Dynamic Kernel Module Supportはカーネルモジュールのインス�
 
 http://linux.dell.com/dkms/
 
-初めに、alsa-firewire-3.9というディレクトリを、システムのDKMSがデフォルトのソースディ
+初めに、alsa-firewire-3.11というディレクトリを、システムのDKMSがデフォルトのソースディ
 レクトリに使うディレクトリに作成し、ソース一式を入れて下さい。Ubuntuのルートファイルシ
 ステムであれば、/usr/srcになります。
-(3.9はただLinux 3.9を指しているだけ)
+(3.11はただLinux 3.11を指しているだけ)
 
 作成したら、DKMSの通常のステップを踏みます。例えば以下です。
- sudo dkms add -m alsa-firewire -v 3.9
- sudo dkms build -m alsa-firewire -v 3.9
- sudo dkms install -m alsa-firewire -v 3.9
- sudo dkms remove -m alsa-firewire -v 3.9 --all
+ sudo dkms add -m alsa-firewire -v 3.11
+ sudo dkms build -m alsa-firewire -v 3.11
+ sudo dkms install -m alsa-firewire -v 3.11
+ sudo dkms remove -m alsa-firewire -v 3.11 --all
 
 もちろん、あらかじめシステムにDKMSパッケージをインストールしておいて下さい。例えばUbuntu
 であれば、端末で以下を実行します。

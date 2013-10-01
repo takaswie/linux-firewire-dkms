@@ -285,14 +285,12 @@ snd_efw_card_free(struct snd_card *card)
 	return;
 }
 
-static int
-snd_efw_probe(struct device *dev)
+static int snd_efw_probe(struct fw_unit *unit,
+			 const struct ieee1394_device_id *entry)
 {
-	struct fw_unit *unit = fw_unit(dev);
-	int card_index;
 	struct snd_card *card;
 	struct snd_efw *efw;
-	int err;
+	int card_index, err;
 
 	mutex_lock(&devices_mutex);
 
@@ -360,11 +358,11 @@ snd_efw_probe(struct device *dev)
 		goto error;
 
 	/* register card and device */
-	snd_card_set_dev(card, dev);
+	snd_card_set_dev(card, &unit->device);
 	err = snd_card_register(card);
 	if (err < 0)
 		goto error;
-	dev_set_drvdata(dev, card);
+	dev_set_drvdata(&unit->device, card);
 	devices_used |= 1 << card_index;
 	efw->card_index = card_index;
 
@@ -380,18 +378,16 @@ end:
 	return err;
 }
 
-static int
-snd_efw_remove(struct device *dev)
+static void snd_efw_remove(struct fw_unit *unit)
 {
-	struct snd_card *card = dev_get_drvdata(dev);
-	struct snd_efw *efw = card->private_data;
+	struct snd_efw *efw= dev_get_drvdata(&unit->device);
 
 	snd_efw_stream_destroy_duplex(efw);
 
-	snd_card_disconnect(card);
-	snd_card_free_when_closed(card);
+	snd_card_disconnect(efw->card);
+	snd_card_free_when_closed(efw->card);
 
-	return 0;
+	return;
 }
 
 #define VENDOR_GIBSON			0x00075b
@@ -448,10 +444,10 @@ static struct fw_driver snd_efw_driver = {
 		.owner = THIS_MODULE,
 		.name = "snd-fireworks",
 		.bus = &fw_bus_type,
-		.probe = snd_efw_probe,
-		.remove = snd_efw_remove,
 	},
-	.update = snd_efw_update,
+	.probe    = snd_efw_probe,
+	.update   = snd_efw_update,
+	.remove   = snd_efw_remove,
 	.id_table = snd_efw_id_table,
 };
 
