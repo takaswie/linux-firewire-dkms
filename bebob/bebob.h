@@ -109,9 +109,9 @@ struct snd_bebob {
 	unsigned int midi_input_ports;
 	unsigned int midi_output_ports;
 
-	struct cmp_connection output_connection;
+	struct cmp_connection out_conn;
 	struct amdtp_stream tx_stream;
-	struct cmp_connection input_connection;
+	struct cmp_connection in_conn;
 	struct amdtp_stream rx_stream;
 
 	bool loaded;

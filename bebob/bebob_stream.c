@@ -90,28 +90,28 @@ end:
 
 int snd_bebob_stream_init(struct snd_bebob *bebob, struct amdtp_stream *stream)
 {
-	struct cmp_connection *connection;
+	struct cmp_connection *conn;
 	enum cmp_direction c_dir;
 	enum amdtp_stream_direction s_dir;
 	int err;
 
 	if (stream == &bebob->tx_stream) {
-		connection = &bebob->output_connection;
+		conn= &bebob->out_conn;
 		c_dir = CMP_OUTPUT;
 		s_dir = AMDTP_IN_STREAM;
 	} else {
-		connection = &bebob->input_connection;
+		conn= &bebob->in_conn;
 		c_dir = CMP_INPUT;
 		s_dir = AMDTP_OUT_STREAM;
 	}
 
-	err = cmp_connection_init(connection, bebob->unit, c_dir, 0);
+	err = cmp_connection_init(conn, bebob->unit, c_dir, 0);
 	if (err < 0)
 		goto end;
 
 	err = amdtp_stream_init(stream, bebob->unit, s_dir, CIP_NONBLOCKING);
 	if (err < 0) {
-		cmp_connection_destroy(connection);
+		cmp_connection_destroy(conn);
 		goto end;
 
 	}
@@ -124,7 +124,7 @@ int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
 			   unsigned int sampling_rate)
 {
 	struct snd_bebob_stream_formation *formations;
-	struct cmp_connection *connection;
+	struct cmp_connection *conn;
 	unsigned int i, pcm_channels, midi_channels;
 	int err = 0;
 
@@ -134,10 +134,10 @@ int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
 
 	if (stream == &bebob->tx_stream) {
 		formations = bebob->tx_stream_formations;
-		connection = &bebob->output_connection;
+		conn= &bebob->out_conn;
 	} else {
 		formations = bebob->rx_stream_formations;
-		connection = &bebob->input_connection;
+		conn= &bebob->in_conn;
 	}
 
 	pcm_channels = 0;
@@ -158,17 +158,17 @@ int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
 		goto end;
 
 	/*  establish connection via CMP */
-	err = cmp_connection_establish(connection,
+	err = cmp_connection_establish(conn,
 				amdtp_stream_get_max_payload(stream));
 	if (err < 0)
 		goto end;
 
 	/* start amdtp stream */
 	err = amdtp_stream_start(stream,
-				 connection->resources.channel,
-				 connection->speed);
+				 conn->resources.channel,
+				 conn->speed);
 	if (err < 0)
-		cmp_connection_break(connection);
+		cmp_connection_break(conn);
 
 end:
 	return err;
@@ -182,9 +182,9 @@ void snd_bebob_stream_stop(struct snd_bebob *bebob, struct amdtp_stream *stream)
 	amdtp_stream_stop(stream);
 
 	if (stream == &bebob->tx_stream)
-		cmp_connection_break(&bebob->output_connection);
+		cmp_connection_break(&bebob->out_conn);
 	else
-		cmp_connection_break(&bebob->input_connection);
+		cmp_connection_break(&bebob->in_conn);
 end:
 	return;
 }
@@ -194,9 +194,9 @@ void snd_bebob_stream_destroy(struct snd_bebob *bebob, struct amdtp_stream *stre
 	snd_bebob_stream_stop(bebob, stream);
 
 	if (stream == &bebob->tx_stream)
-		cmp_connection_destroy(&bebob->output_connection);
+		cmp_connection_destroy(&bebob->out_conn);
 	else
-		cmp_connection_destroy(&bebob->input_connection);
+		cmp_connection_destroy(&bebob->in_conn);
 
 	return;
 }

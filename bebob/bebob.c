@@ -276,7 +276,7 @@ snd_bebob_update(struct fw_unit *unit)
 	fcp_bus_reset(bebob->unit);
 
 	/* bus reset for isochronous transmit stream */
-	if (cmp_connection_update(&bebob->input_connection) < 0) {
+	if (cmp_connection_update(&bebob->in_conn) < 0) {
 		amdtp_stream_pcm_abort(&bebob->tx_stream);
 		mutex_lock(&bebob->mutex);
 		snd_bebob_stream_stop(bebob, &bebob->tx_stream);
@@ -285,7 +285,7 @@ snd_bebob_update(struct fw_unit *unit)
 	amdtp_stream_update(&bebob->tx_stream);
 
 	/* bus reset for isochronous receive stream */
-	if (cmp_connection_update(&bebob->output_connection) < 0) {
+	if (cmp_connection_update(&bebob->out_conn) < 0) {
 		amdtp_stream_pcm_abort(&bebob->rx_stream);
 		mutex_lock(&bebob->mutex);
 		snd_bebob_stream_stop(bebob, &bebob->rx_stream);
