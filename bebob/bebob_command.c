@@ -58,7 +58,8 @@ int avc_generic_set_sampling_rate(struct fw_unit *unit, int rate,
 	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
 	if (err < 0)
 		goto end;
-	if ((err < 6) | (buf[0] != 0x09) /* ACCEPTED */) {
+	/* ACCEPTED or INTERIM is OK */
+	if ((err < 6) || ((buf[0] != 0x0f) && (buf[0] != 0x09))) {
 		dev_err(&unit->device, "failed to set sampe rate\n");
 		err = -EIO;
 		goto end;
@@ -97,7 +98,8 @@ int avc_generic_get_sampling_rate(struct fw_unit *unit, int *rate,
 	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
 	if (err < 0)
 		goto end;
-	if ((err < 6) | (buf[0] != 0x0c) /* IMPLEMENTED/STABLE */) {
+	/* IMPLEMENTED/STABLE is OK */
+	if ((err < 6) | (buf[0] != 0x0c)){
 		dev_err(&unit->device, "failed to get sampe rate\n");
 		err = -EIO;
 		goto end;
@@ -144,7 +146,8 @@ int avc_generic_get_plug_info(struct fw_unit *unit,
 	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
 	if (err < 0)
 		goto end;
-	else if ((err < 6) | (buf[0] != 0x0c /* IMPLEMENTED/STABLE */)) {
+	/* IMPLEMENTED/STABLE is OK */
+	else if ((err < 6) | (buf[0] != 0x0c)) {
 		err = -EIO;
 		goto end;
 	}
@@ -189,7 +192,8 @@ int avc_bridgeco_get_plug_type(struct fw_unit *unit, int direction,
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
 	if (err < 0)
 		goto end;
-	else if ((err < 6) | (buf[0] != 0x0c /* IMPLEMENTED/STABLE */)) {
+	/* IMPLEMENTED/STABLE is OK */
+	else if ((err < 6) | (buf[0] != 0x0c)) {
 		err = -EIO;
 		goto end;
 	}
@@ -231,7 +235,8 @@ int avc_bridgeco_get_plug_channels(struct fw_unit *unit, int direction,
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
 	if (err < 0)
 		goto end;
-	if ((err < 6) | (buf[0] != 0x0c /* IMPLEMENTED/STABLE */)) {
+	/* IMPLEMENTED/STABLE is OK */
+	if ((err < 6) | (buf[0] != 0x0c)) {
 		err = -EIO;
 		goto end;
 	}
@@ -276,7 +281,8 @@ int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,
 	err = fcp_avc_transaction(unit, buf, 12, buf, 256, 0);
 	if (err < 0)
 		goto end;
-	if ((err < 6) | (buf[0] != 0x0c /* IMPLEMENTED/STABLE */)) {
+	/* IMPLEMENTED/STABLE is OK */
+	if ((err < 6) | (buf[0] != 0x0c)) {
 		err = -EIO;
 		goto end;
 	}
@@ -313,7 +319,6 @@ int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit, int direction,
 	buf[10] = 0xff & (cluster_id + 1);
 	buf[11] = 0x00;
 
-	/* transaction */
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
 	if (err < 0)
 		; /* through */
@@ -356,7 +361,6 @@ int avc_bridgeco_get_plug_stream_formation_entry(struct fw_unit *unit,
 	buf[10] = 0xff & entryid;	/* entry ID */
 	buf[11] = 0x00;			/* padding */
 
-	/* transaction */
 	err = fcp_avc_transaction(unit, buf, 12, buf, *len, 0);
 	if ((err < 0) || (buf[0] != 0x0c))
 		goto end;
