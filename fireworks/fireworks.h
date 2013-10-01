@@ -119,8 +119,8 @@ struct snd_efw {
 	struct amdtp_stream tx_stream;
 	struct amdtp_stream rx_stream;
 	/* Fireworks has only two plugs */
-	struct cmp_connection output_connection;
-	struct cmp_connection input_connection;
+	struct cmp_connection out_conn;
+	struct cmp_connection in_conn;
 };
 
 struct snd_efw_hwinfo {
