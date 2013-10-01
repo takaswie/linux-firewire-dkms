@@ -48,8 +48,7 @@
 /* TODO: make these configurable */
 #define INTERRUPT_INTERVAL	16
 #define QUEUE_LENGTH		48
-/* TODO: propper value? */
-#define	STREAM_TIMEOUT_MS	100
+#define STREAM_TIMEOUT_MS	100
 
 #define IN_PACKET_HEADER_SIZE	4
 #define OUT_PACKET_HEADER_SIZE	0
@@ -83,8 +82,6 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 		      enum amdtp_stream_direction direction,
 		      enum cip_flags flags)
 {
-	int i;
-
 	s->unit = fw_unit_get(unit);
 	s->direction = direction;
 	s->flags = flags;
@@ -94,8 +91,6 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	s->packet_index = 0;
 
 	s->pcm = NULL;
-	for (i = 0; i < AMDTP_MAX_CHANNELS_FOR_MIDI * 8; i++)
-		s->midi[i] = NULL;
 	s->blocks_for_midi = UINT_MAX;
 
 	init_waitqueue_head(&s->run_wait);
