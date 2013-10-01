@@ -1,9 +1,6 @@
 #include "bebob.h"
 #include <sound/core.h>
 
-#define VENDOR_MAUDIO	0x00000d6c
-#define VENDOR_YAMAHA	0x0000a0de
-
 MODULE_DESCRIPTION("bridgeCo BeBoB driver");
 MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp>");
 MODULE_LICENSE("GPL v2");
@@ -424,6 +421,10 @@ end:
 	return 0;
 }
 
+#define VENDOR_MAUDIO1	0x00000d6c
+#define VENDOR_MAUDIO2	0x000007f5
+#define VENDOR_YAMAHA	0x0000a0de
+
 #define MODEL_YAMAHA_GO44			0x0010000b
 #define MODEL_YAMAHA_GO46			0x0010000c
 #define MODEL_MAUDIO_OZONIC			0x0000000a
@@ -451,21 +452,21 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO,
+		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_OZONIC,
 	},
 	/* Firewire 410 has two IDs, for bootloader and itself */
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO,
+		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_FW_BOOTLOADER,
 		.driver_data	= (kernel_ulong_t)&maudio_bootloader_ops
 	},
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO,
+		.vendor_id	= VENDOR_MAUDIO2,
 		.model_id	= MODEL_MAUDIO_FW_410,
 		.driver_data	= (kernel_ulong_t)&maudio_fw410_ops
 	},
@@ -473,7 +474,7 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO,
+		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_AUDIOPHILE_BOTH,
 		.driver_data	= (kernel_ulong_t)&maudio_audiophile_ops
 	},
@@ -481,21 +482,21 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO,
+		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_SOLO,
 	},
 	/* Firewire 1814 has two IDs, for bootloader and itself */
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO,
+		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_FW_1814_BOOTLOADER,
 		.driver_data	= (kernel_ulong_t)&maudio_bootloader_ops
 	},
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO,
+		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_FW_1814,
 		.driver_data	= (kernel_ulong_t)&maudio_fw1814_ops
 	},
