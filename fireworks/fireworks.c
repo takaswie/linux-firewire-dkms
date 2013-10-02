@@ -380,7 +380,8 @@ end:
 
 static void snd_efw_remove(struct fw_unit *unit)
 {
-	struct snd_efw *efw= dev_get_drvdata(&unit->device);
+	struct snd_card *card = dev_get_drvdata(&unit->device);
+	struct snd_efw *efw = card->private_data;
 
 	snd_efw_stream_destroy_duplex(efw);
 
