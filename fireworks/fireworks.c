@@ -403,8 +403,8 @@ static void snd_efw_remove(struct fw_unit *unit)
 #define  MODEL_ECHO_AUDIOFIRE_2		0x000af2
 #define  MODEL_ECHO_AUDIOFIRE_4		0x000af4
 #define  MODEL_ECHO_AUDIOFIRE_8		0x000af8
-/* #define  MODEL_ECHO_AUDIOFIRE_8A	0x?????? */
-/* #define  MODEL_ECHO_AUDIOFIRE_PRE8	0x?????? */
+#define  MODEL_ECHO_AUDIOFIRE_8A	0x000af9	// model as of July 2009
+#define  MODEL_ECHO_AUDIOFIRE_PRE8	0x000af9	// the same ID
 #define  MODEL_ECHO_AUDIOFIRE_12	0x00af12
 #define  MODEL_ECHO_FIREWORKS_8		0x0000f8
 #define  MODEL_ECHO_FIREWORKS_HDMI	0x00afd1
