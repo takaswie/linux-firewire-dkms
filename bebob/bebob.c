@@ -401,8 +401,7 @@ end:
 
 static void snd_bebob_remove(struct fw_unit *unit)
 {
-	struct snd_card *card = dev_get_drvdata(&unit->device);
-	struct snd_bebob *bebob = card->private_data;
+	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
 
 	snd_bebob_destroy_pcm_devices(bebob);
 
