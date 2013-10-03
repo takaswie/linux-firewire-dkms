@@ -221,18 +221,6 @@ end:
 	return err;
 }
 
-static void
-snd_efw_update(struct fw_unit *unit)
-{
-	struct snd_card *card = dev_get_drvdata(&unit->device);
-	struct snd_efw *efw = card->private_data;
-
-	snd_efw_command_bus_reset(efw->unit);
-	snd_efw_stream_update_duplex(efw);
-
-	return;
-}
-
 static bool match_fireworks_device_name(struct fw_unit *unit)
 {
 	static const char *const models[] = {
@@ -376,6 +364,38 @@ error:
 end:
 	mutex_unlock(&devices_mutex);
 	return err;
+}
+
+static void snd_efw_update(struct fw_unit *unit)
+{
+	struct snd_card *card = dev_get_drvdata(&unit->device);
+	struct snd_efw *efw = card->private_data;
+
+	snd_efw_command_bus_reset(efw->unit);
+
+	/*
+	 * There are two reasons to fail update streams. The main reason is
+	 * to fail asynchronous transaction for EFC commands just after bus
+	 * reset. To prevent this as much as possible, waiting 100 msec. But
+	 * sometimes the application experiences prepare error. It will tell
+	 * Input/output error.
+	 */
+	msleep(100);
+
+	/*
+	 * The another reason (but rare) is, as a result of Juju's rediscovering
+	 *nodes at bus reset, there is a case of changing node  id reflecting
+	 * bus topology. Then the devices are regenerated. This causes execution
+	 * of driver's probe() process and changing the number of id as sound
+	 * cards. Then the path of logical device nodes are changed. In user
+	 * land, status error appears and tell'No such device'.
+	 *
+	 * Even if updating is successed, the sound is not smooth, is not
+	 * fluent. At least, noises, at largest, blank sound for 1-2 seconds.
+	 */
+	snd_efw_stream_update_duplex(efw);
+
+	return;
 }
 
 static void snd_efw_remove(struct fw_unit *unit)

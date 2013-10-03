@@ -120,6 +120,7 @@ static void snd_efw_stream_update(struct snd_efw *efw,
 		mutex_lock(&efw->mutex);
 		snd_efw_stream_stop(efw, stream);
 		mutex_unlock(&efw->mutex);
+		return;
 	}
 	amdtp_stream_update(stream);
 }

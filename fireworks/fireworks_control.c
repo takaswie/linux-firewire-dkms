@@ -439,7 +439,6 @@ static bool check_clock_input(struct snd_efw *efw,
 		return false;
 
 	if (snd_efw_command_get_phys_meters(efw, meters, len) < 0) {
-		snd_printk(KERN_INFO"my error\n");
 		result = false;
 		goto end;
 	}
