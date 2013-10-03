@@ -270,8 +270,7 @@ end:
 static void
 snd_bebob_update(struct fw_unit *unit)
 {
-	struct snd_card *card = dev_get_drvdata(&unit->device);
-	struct snd_bebob *bebob = card->private_data;
+	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
 
 	fcp_bus_reset(bebob->unit);
 
@@ -383,7 +382,7 @@ static int snd_bebob_probe(struct fw_unit *unit,
 		snd_card_free(card);
 		goto error;
 	}
-	dev_set_drvdata(&unit->device, card);
+	dev_set_drvdata(&unit->device, bebob);
 	devices_used |= 1 << card_index;
 	bebob->card_index = card_index;
 

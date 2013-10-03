@@ -350,7 +350,7 @@ static int snd_efw_probe(struct fw_unit *unit,
 	err = snd_card_register(card);
 	if (err < 0)
 		goto error;
-	dev_set_drvdata(&unit->device, card);
+	dev_set_drvdata(&unit->device, efw);
 	devices_used |= 1 << card_index;
 	efw->card_index = card_index;
 
@@ -368,8 +368,7 @@ end:
 
 static void snd_efw_update(struct fw_unit *unit)
 {
-	struct snd_card *card = dev_get_drvdata(&unit->device);
-	struct snd_efw *efw = card->private_data;
+	struct snd_efw *efw = dev_get_drvdata(&unit->device);
 
 	snd_efw_command_bus_reset(efw->unit);
 
