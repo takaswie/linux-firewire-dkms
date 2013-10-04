@@ -20,7 +20,8 @@
 #include "fireworks.h"
 
 MODULE_DESCRIPTION("Echo Fireworks driver");
-MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
+MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp>"
+	      "Clemens Ladisch <clemens@ladisch.de>");
 MODULE_LICENSE("GPL v2");
 
 static int index[SNDRV_CARDS]	= SNDRV_DEFAULT_IDX;
