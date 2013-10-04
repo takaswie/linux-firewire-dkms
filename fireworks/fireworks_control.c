@@ -102,7 +102,7 @@ control_digital_interface_info(struct snd_kcontrol *kctl,
 
 	einf->value.enumerated.items = 0;
 	for (i = 0; i < ARRAY_SIZE(digital_iface_descs); i += 1) {
-		if ((1 << i) & efw->supported_digital_interface)
+		if (BIT(i) & efw->supported_digital_interface)
 			einf->value.enumerated.items += 1;
 	}
 
@@ -115,7 +115,7 @@ control_digital_interface_info(struct snd_kcontrol *kctl,
 	/* skip unsupported clock source */
 	value = einf->value.enumerated.item;
 	for (i = 0; i < ARRAY_SIZE(digital_iface_descs); i += 1) {
-		if (!((1 << i) & efw->supported_digital_interface))
+		if (!(BIT(i) & efw->supported_digital_interface))
 			continue;
 		else if (value == 0)
 			break;
@@ -150,7 +150,7 @@ control_digital_interface_get(struct snd_kcontrol *kctl,
 	/* generate user value */
 	uval->value.enumerated.item[0] = 0;
 	for (i = 0; i < digital_interface; i += 1) {
-		if ((1 << i) & efw->supported_digital_interface)
+		if (BIT(i) & efw->supported_digital_interface)
 			uval->value.enumerated.item[0] += 1;
 	}
 
@@ -170,7 +170,7 @@ control_digital_interface_put(struct snd_kcontrol *kctl,
 	value = uval->value.enumerated.item[0];
 	for (index = 0; index < ARRAY_SIZE(digital_iface_descs); index++) {
 		/* not supported */
-		if (!((1 << index) & efw->supported_digital_interface))
+		if (!(BIT(index) & efw->supported_digital_interface))
 			continue;
 		else if (value == 0)
 			break;
@@ -271,7 +271,7 @@ control_sampling_rate_info(struct snd_kcontrol *kctl,
 	/* maximum value for user */
 	einf->value.enumerated.items = 0;
 	for (i = 0; i < ARRAY_SIZE(sampling_rate_descs); i += 1) {
-		if ((1 << i) & efw->supported_sampling_rate)
+		if (BIT(i) & efw->supported_sampling_rate)
 			einf->value.enumerated.items += 1;
 	}
 
@@ -284,7 +284,7 @@ control_sampling_rate_info(struct snd_kcontrol *kctl,
 	/* skip unsupported clock source */
 	value = einf->value.enumerated.item;
 	for (i = 0; i < ARRAY_SIZE(sampling_rate_descs); i += 1) {
-		if (!((1 << i) & efw->supported_sampling_rate))
+		if (!(BIT(i) & efw->supported_sampling_rate))
 			continue;
 		else if (value == 0)
 			break;
@@ -320,7 +320,7 @@ control_sampling_rate_get(struct snd_kcontrol *kctl,
 	/* get user value */
 	uval->value.enumerated.item[0] = 0;
 	for (i = 0; i < index; i += 1) {
-		if ((1 << i) & efw->supported_sampling_rate)
+		if (BIT(i) & efw->supported_sampling_rate)
 			uval->value.enumerated.item[0] += 1;
 	}
 
@@ -340,7 +340,7 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 	value = uval->value.enumerated.item[0];
 	for (index = 0; index < ARRAY_SIZE(sampling_rates); index += 1) {
 		/* not supported */
-		if (!((1 << index) & efw->supported_sampling_rate))
+		if (!(BIT(index) & efw->supported_sampling_rate))
 			continue;
 		else if (value == 0)
 			break;
@@ -374,7 +374,7 @@ static int control_clock_source_info(struct snd_kcontrol *kctl,
 	/* skip unsupported clock source */
 	einf->value.enumerated.items = 0;
 	for (i = 0; i < ARRAY_SIZE(clock_src_descs); i += 1) {
-		if ((1 << i) & efw->supported_clock_source)
+		if (BIT(i) & efw->supported_clock_source)
 			einf->value.enumerated.items += 1;
 	}
 
@@ -387,7 +387,7 @@ static int control_clock_source_info(struct snd_kcontrol *kctl,
 	/* skip unsupported clock source */
 	value = einf->value.enumerated.item;
 	for (i = 0; i < ARRAY_SIZE(clock_src_descs); i += 1) {
-		if (!((1 << i) & efw->supported_clock_source))
+		if (!(BIT(i) & efw->supported_clock_source))
 			continue;
 		else if (value == 0)
 			break;
@@ -420,7 +420,7 @@ static int control_clock_source_get(struct snd_kcontrol *kctl,
 	/* generate user value */
 	uval->value.enumerated.item[0] = 0;
 	for (i = 0; i < clock_source; i += 1) {
-		if ((1 << i) & efw->supported_clock_source)
+		if (BIT(i) & efw->supported_clock_source)
 			uval->value.enumerated.item[0] += 1;
 	}
 
@@ -443,7 +443,7 @@ static bool check_clock_input(struct snd_efw *efw,
 		goto end;
 	}
 
-	result = (meters->clock_in & (1 << source));
+	result = (meters->clock_in & BIT(source));
 end:
 	kfree(meters);
 	return result;
@@ -460,7 +460,7 @@ static int control_clock_source_put(struct snd_kcontrol *kctl,
 	value = uval->value.enumerated.item[0];
 	for (index = 0; index < ARRAY_SIZE(clock_src_descs); index++) {
 		/* not supported */
-		if (!((1 << index) & efw->supported_clock_source))
+		if (!(BIT(index) & efw->supported_clock_source))
 			continue;
 		else if (value == 0)
 			break;
@@ -545,7 +545,6 @@ int snd_efw_create_control_devices(struct snd_efw *efw)
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
-
 		kctl = snd_ctl_new1(&global_iec60958_format_control, efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)

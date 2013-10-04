@@ -302,7 +302,7 @@ snd_bebob_card_free(struct snd_card *card)
 
 	if (bebob->card_index >= 0) {
 		mutex_lock(&devices_mutex);
-		devices_used &= ~(1 << bebob->card_index);
+		devices_used &= ~BIT(bebob->card_index);
 		mutex_unlock(&devices_mutex);
 	}
 
@@ -322,7 +322,7 @@ static int snd_bebob_probe(struct fw_unit *unit,
 
 	/* check registered cards */
 	for (card_index = 0; card_index < SNDRV_CARDS; card_index += 1) {
-		if (!(devices_used & (1 << card_index)) && enable[card_index])
+		if (!(devices_used & BIT(card_index)) && enable[card_index])
 			break;
 	}
 	if (card_index >= SNDRV_CARDS) {
@@ -383,7 +383,7 @@ static int snd_bebob_probe(struct fw_unit *unit,
 		goto error;
 	}
 	dev_set_drvdata(&unit->device, bebob);
-	devices_used |= 1 << card_index;
+	devices_used |= BIT(card_index);
 	bebob->card_index = card_index;
 
 	/* proved */

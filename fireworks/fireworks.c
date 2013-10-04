@@ -65,19 +65,19 @@ get_hardware_info(struct snd_efw *efw)
 		goto end;
 
 	/* capabilities */
-	if (hwinfo->flags & (1 << FLAG_DYNADDR_SUPPORTED))
+	if (hwinfo->flags & BIT(FLAG_DYNADDR_SUPPORTED))
 		efw->dynaddr_support = 1;
-	if (hwinfo->flags & (1 << FLAG_MIRRORING_SUPPORTED))
+	if (hwinfo->flags & BIT(FLAG_MIRRORING_SUPPORTED))
 		efw->mirroring_support = 1;
-	if (hwinfo->flags & (1 << FLAG_SPDIF_AES_EBU_XLR_SUPPORTED))
+	if (hwinfo->flags & BIT(FLAG_SPDIF_AES_EBU_XLR_SUPPORTED))
 		efw->aes_ebu_xlr_support = 1;
-	if (hwinfo->flags & (1 << FLAG_HAS_DSP_MIXER))
+	if (hwinfo->flags & BIT(FLAG_HAS_DSP_MIXER))
 		efw->has_dsp_mixer = 1;
-	if (hwinfo->flags & (1 << FLAG_HAS_FPGA))
+	if (hwinfo->flags & BIT(FLAG_HAS_FPGA))
 		efw->has_fpga = 1;
-	if (hwinfo->flags & (1 << FLAG_HAS_PHANTOM))
+	if (hwinfo->flags & BIT(FLAG_HAS_PHANTOM))
 		efw->has_phantom = 1;
-	if (hwinfo->flags & (1 << FLAG_SPDIF_COAX_SUPPORTED)) {
+	if (hwinfo->flags & BIT(FLAG_SPDIF_COAX_SUPPORTED)) {
 		efw->supported_digital_interface = BIT(2) | BIT(3);
 		/* TODO: find better way... */
 		if (strcmp(hwinfo->model_name, "AudioFire8a")
@@ -259,7 +259,7 @@ snd_efw_card_free(struct snd_card *card)
 
 	if (efw->card_index >= 0) {
 		mutex_lock(&devices_mutex);
-		devices_used &= ~(1 << efw->card_index);
+		devices_used &= ~BIT(efw->card_index);
 		mutex_unlock(&devices_mutex);
 	}
 
@@ -288,7 +288,7 @@ static int snd_efw_probe(struct fw_unit *unit,
 
 	/* check registered cards */
 	for (card_index = 0; card_index < SNDRV_CARDS; ++card_index)
-		if (!(devices_used & (1 << card_index)) && enable[card_index])
+		if (!(devices_used & BIT(card_index)) && enable[card_index])
 			break;
 	if (card_index >= SNDRV_CARDS) {
 		err = -ENOENT;
@@ -351,7 +351,7 @@ static int snd_efw_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 	dev_set_drvdata(&unit->device, efw);
-	devices_used |= 1 << card_index;
+	devices_used |= BIT(card_index);
 	efw->card_index = card_index;
 
 	/* proved */

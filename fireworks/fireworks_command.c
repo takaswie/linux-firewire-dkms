@@ -60,7 +60,7 @@ struct efc_fields {
 	u32 params[0];
 };
 #define EFC_HEADER_QUADLETS	6
-#define EFC_SEQNUM_MAX		(1 << 31)	/* prevent over flow */
+#define EFC_SEQNUM_MAX		BIT(31)	/* prevent over flow */
 
 /* for clock source and sampling rate */
 struct efc_clock {
