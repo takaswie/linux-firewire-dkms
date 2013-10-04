@@ -253,6 +253,12 @@ end:
  *
  * snd_efw_hwinfo.min_sample_rate and struct efc_hwinfo.max_sample_rate
  * is a minimum and maximum sampling rate
+ *
+ * During streaming, the users can send command to change sampling rate and
+ * Fireworks can responds it and change its sampling rate. This is a bit fun;)
+ *
+ * But I note that as a result of changing the number of channels, if payload
+ * size of AMDTP packet is changed, the streaming is broken.
  */
 static char *sampling_rate_descs[] = {"5512Hz", "8000Hz", "11025Hz",
 				      "16000Hz", "22050Hz", "32000Hz",

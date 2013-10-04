@@ -21,7 +21,7 @@
 /*
  * NOTE:
  * Fireworks changes its PCM channels according to its sampling rate.
- * There are three modes. Here "capture" or "playback" is appplied to XXX.
+ * There are three modes. Here _XXX is either _playback or _capture.
  *  0:  32.0- 48.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels    applied
  *  1:  88.2- 96.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels_2x applied
  *  2: 176.4-192.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels_4x applied
@@ -29,17 +29,15 @@
  * Then the number of PCM channels for analog input and output are always fixed
  * but the number of PCM channels for digital input and output are differed.
  *
- * Additionally, according to "AudioFire Owner's Manual Version 2.2",
- * the number of PCM channels for digital input has more restriction
+ * Additionally, according to "AudioFire Owner's Manual Version 2.2", in some
+ * model, the number of PCM channels for digital input has more restriction
  * depending on which digital interface is selected.
  *  - S/PDIF coaxial and optical	: use input 1-2
  *  - ADAT optical at 32.0-48.0 kHz	: use input 1-8
  *  - ADAT optical at 88.2-96.0 kHz	: use input 1-4 (S/MUX format)
- * Even if these restriction is applied, the number of channels in AMDTP stream
- * is decided according to above 0/1/2 modes. The needless data is filled with
+ * Even if these restriction exists, the number of channels in AMDTP stream
+ * is decided according to above 0/1/2 modes. The needless channel is filled with
  * zero.
- *
- * Currently this module doesn't support the latter.
  */
 static unsigned int freq_table[] = {
 	/* multiplier mode 0 */
