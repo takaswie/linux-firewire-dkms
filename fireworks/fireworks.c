@@ -39,11 +39,12 @@ static unsigned int devices_used;
 
 #define FLAG_DYNADDR_SUPPORTED			0
 #define FLAG_MIRRORING_SUPPORTED		1
-#define FLAG_SPDIF_COAX_SUPPORTED		2
+#define FLAG_HAS_OPTICAL_INTERFACE		2
 #define FLAG_SPDIF_AES_EBU_XLR_SUPPORTED	3
 #define FLAG_HAS_DSP_MIXER			4
 #define FLAG_HAS_FPGA				5
 #define FLAG_HAS_PHANTOM			6
+#define FLAG_HAS_PLAYBACK_ROUTING		7
 /* other flags exist but unknown... */
 
 static int
@@ -77,12 +78,12 @@ get_hardware_info(struct snd_efw *efw)
 		efw->has_fpga = 1;
 	if (hwinfo->flags & BIT(FLAG_HAS_PHANTOM))
 		efw->has_phantom = 1;
-	if (hwinfo->flags & BIT(FLAG_SPDIF_COAX_SUPPORTED)) {
-		efw->supported_digital_interface = BIT(2) | BIT(3);
-		/* TODO: find better way... */
-		if (strcmp(hwinfo->model_name, "AudioFire8a")
-		 || strcmp(hwinfo->model_name, "AudioFirePre8"))
-			efw->supported_digital_interface |= BIT(0);
+	if (strcmp(hwinfo->vendor_name, "Gibson") != 0) {
+		/* all models except for Gibson's have coaxial interface */
+		efw->supported_digital_interface = BIT(0);
+
+		if (hwinfo->flags & BIT(FLAG_HAS_OPTICAL_INTERFACE))
+			efw->supported_digital_interface |= BIT(2) | BIT(3);
 	}
 
 	/* for input physical metering */

@@ -519,7 +519,7 @@ static struct snd_kcontrol_new global_iec60958_format_control = {
 
 int snd_efw_create_control_devices(struct snd_efw *efw)
 {
-	int err;
+	int i, count, err;
 	struct snd_kcontrol *kctl;
 
 	kctl = snd_ctl_new1(&physical_metering, efw);
@@ -533,6 +533,7 @@ int snd_efw_create_control_devices(struct snd_efw *efw)
 		if (err < 0)
 			goto end;
 	}
+
 	if (efw->supported_sampling_rate > 0) {
 		kctl = snd_ctl_new1(&global_sampling_rate_control, efw);
 		err = snd_ctl_add(efw->card, kctl);
@@ -540,12 +541,18 @@ int snd_efw_create_control_devices(struct snd_efw *efw)
 			goto end;
 		efw->control_id_sampling_rate = &kctl->id;
 	}
-	if (efw->supported_digital_interface > 0) {
-		kctl = snd_ctl_new1(&global_digital_interface_control, efw);
+
+	for (i = 0, count = 0; i < sizeof(digital_iface_descs); i++)
+		if (efw->supported_digital_interface & (BIT(i)))
+			count++;
+	if (count > 0) {
+		kctl = snd_ctl_new1(&global_iec60958_format_control, efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
-		kctl = snd_ctl_new1(&global_iec60958_format_control, efw);
+	}
+	if (count > 1) {
+		kctl = snd_ctl_new1(&global_digital_interface_control, efw);
 		err = snd_ctl_add(efw->card, kctl);
 		if (err < 0)
 			goto end;
