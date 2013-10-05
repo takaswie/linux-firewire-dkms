@@ -19,6 +19,23 @@ MODULE_PARM_DESC(enable, "enable BeBoB sound card");
 static DEFINE_MUTEX(devices_mutex);
 static unsigned int devices_used;
 
+#define VENDOR_MAUDIO1	0x00000d6c
+#define VENDOR_MAUDIO2	0x000007f5
+#define VENDOR_YAMAHA	0x0000a0de
+
+#define MODEL_YAMAHA_GO44			0x0010000b
+#define MODEL_YAMAHA_GO46			0x0010000c
+#define MODEL_MAUDIO_OZONIC			0x0000000a
+#define MODEL_MAUDIO_FW410_BOOTLOADER		0x00010058
+#define MODEL_MAUDIO_FW_410			0x00010046
+#define MODEL_MAUDIO_AUDIOPHILE_BOTH		0x00010060
+#define MODEL_MAUDIO_SOLO			0x00010062
+#define MODEL_MAUDIO_FW_1814_BOOTLOADER		0x00010070
+#define MODEL_MAUDIO_FW_1814			0x00010071
+
+/* I don't know why but juju has a limitation for CSR_NAME */
+#define JUJU_LIMIT 11
+
 int sampling_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES] = {
 	[0] = 22050,
 	[1] = 24000,
@@ -156,7 +173,7 @@ end:
 }
 
 /* In this function, 2 means input and output */
-static int detect_channels(struct snd_bebob *bebob)
+int snd_bebob_discover(struct snd_bebob *bebob)
 {
 	/* the number of plugs for input and output */
 	unsigned short bus_plugs[2];
@@ -207,50 +224,44 @@ end:
 	return err;
 }
 
-static int name_device(struct snd_bebob *bebob)
+static int name_device(struct snd_bebob *bebob, int vendor_id)
 {
-	struct snd_bebob_device_info info = {0};
-
-	char vendor[24];
-	char model[24];
+	char vendor[24] = {};
+	char model[24] = {};
 	u32 id;
-	u32 data[2];
+	u32 data[2] = {};
 	u32 revision;
 	int err = 0;
 
-	/* get vendor name
-	err = fw_csr_string(bebob->unit->directory, CSR_VENDOR, vendor, 24);
-	if (err < 0)
-		goto end;
-	*/
-strcpy(vendor, "takaswie:-)");
-
-	/* get hardware revision */
-	err = snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
-				BEBOB_ADDR_REG_INFO, &info, sizeof(info));
-	if (err < 0)
-		goto end;
+	/* get vendor name */
+	if ((vendor_id == VENDOR_MAUDIO1) || (vendor_id == VENDOR_MAUDIO2))
+		strcpy(vendor, "M-Audio");
+	else if (vendor_id == VENDOR_YAMAHA)
+		strcpy(vendor, "YAMAHA");
+	else
+		strcpy(vendor, "Unknown");
 
 	/* get model name */
-	err = fw_csr_string(bebob->unit->directory, CSR_MODEL, model, 24);
+	err = fw_csr_string(bebob->unit->directory, CSR_MODEL,
+			    model, sizeof(model));
 	if (err < 0)
 		goto end;
 
 	/* get hardware id */
 	err = snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
-			0xffffc8020018, &id, 4);
+			0xffffc8020018, &id, sizeof(id));
 	if (err < 0)
 		goto end;
 
 	/* get hardware revision */
 	err = snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
-			0xffffc802001c, &revision, 4);
+			0xffffc802001c, &revision, sizeof(revision));
 	if (err < 0)
 		goto end;
 
 	/* get GUID */
 	err = snd_fw_transaction(bebob->unit, TCODE_READ_BLOCK_REQUEST,
-			0xffffc8020010, data, 8);
+			0xffffc8020010, data, sizeof(data));
 	if (err < 0)
 		goto end;
 
@@ -258,41 +269,13 @@ strcpy(vendor, "takaswie:-)");
 	strcpy(bebob->card->shortname, model);
 	snprintf(bebob->card->longname, sizeof(bebob->card->longname),
 		"%s %s (id:%d, rev:%d), GUID %08x%08x at %s, S%d",
-		vendor, model,
-		id, revision,
+		vendor, model, id, revision,
 		data[0], data[1],
-		dev_name(&bebob->unit->device), 100 << bebob->device->max_speed);
+		dev_name(&bebob->unit->device),
+		100 << bebob->device->max_speed);
 
 end:
 	return err;
-}
-
-static void
-snd_bebob_update(struct fw_unit *unit)
-{
-	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
-
-	fcp_bus_reset(bebob->unit);
-
-	/* bus reset for isochronous transmit stream */
-	if (cmp_connection_update(&bebob->in_conn) < 0) {
-		amdtp_stream_pcm_abort(&bebob->tx_stream);
-		mutex_lock(&bebob->mutex);
-		snd_bebob_stream_stop(bebob, &bebob->tx_stream);
-		mutex_unlock(&bebob->mutex);
-	}
-	amdtp_stream_update(&bebob->tx_stream);
-
-	/* bus reset for isochronous receive stream */
-	if (cmp_connection_update(&bebob->out_conn) < 0) {
-		amdtp_stream_pcm_abort(&bebob->rx_stream);
-		mutex_lock(&bebob->mutex);
-		snd_bebob_stream_stop(bebob, &bebob->rx_stream);
-		mutex_unlock(&bebob->mutex);
-	}
-	amdtp_stream_update(&bebob->rx_stream);
-
-	return;
 }
 
 static void
@@ -311,8 +294,20 @@ snd_bebob_card_free(struct snd_card *card)
 	return;
 }
 
-static int snd_bebob_probe(struct fw_unit *unit,
-			   const struct ieee1394_device_id *entry)
+static bool
+check_audiophile_booted(struct snd_bebob *bebob)
+{
+	char name[24] = {0};
+
+	if (fw_csr_string(bebob->unit->directory, CSR_MODEL, name, sizeof(name)) < 0)
+		return false;
+
+	return !(strncmp(name, "FW Audiophile Bootloader", JUJU_LIMIT) == 0);
+}
+
+static int
+snd_bebob_probe(struct fw_unit *unit,
+		const struct ieee1394_device_id *entry)
 {
 	struct snd_card *card;
 	struct snd_bebob *bebob;
@@ -345,23 +340,32 @@ static int snd_bebob_probe(struct fw_unit *unit,
 	bebob->card_index = -1;
 	mutex_init(&bebob->mutex);
 	spin_lock_init(&bebob->lock);
-	bebob->loaded = false;
 
-	/* TODO: get the ops in device entry table. */
+	bebob->spec = (const struct snd_bebob_spec *)entry->driver_data;
 
-	/* device specific probing like bootloading */
-	if (bebob->ops && bebob->ops->probing) {
-		err = bebob->ops->probing(bebob);
-		/* wait for loading firmware */
-		if (err > 0)
-			err = -EIO;
-	} else
-		err = detect_channels(bebob);
+	/* try to load firmware if necessary */
+	if (!bebob->spec->load)
+		goto loaded;
+	/* MAudio Audiophile has the same id for both  */
+	else if ((entry->model_id == MODEL_MAUDIO_AUDIOPHILE_BOTH) &&
+	         check_audiophile_booted(bebob))
+		goto loaded;
+	else {
+		bebob->spec->load(bebob);
+		/* just do this */
+		err = -EIO;
+		goto end;
+	}
+
+loaded:
+	if (!bebob->spec->discover)
+		goto error;
+	err = bebob->spec->discover(bebob);
 	if (err < 0)
 		goto error;
 
 	/* name device with communication */
-	err = name_device(bebob);
+	err = name_device(bebob, entry->vendor_id);
 	if (err < 0)
 		goto error;
 
@@ -398,6 +402,35 @@ end:
 	return err;
 }
 
+static void
+snd_bebob_update(struct fw_unit *unit)
+{
+	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
+
+	fcp_bus_reset(bebob->unit);
+
+	/* bus reset for isochronous transmit stream */
+	if (cmp_connection_update(&bebob->in_conn) < 0) {
+		amdtp_stream_pcm_abort(&bebob->tx_stream);
+		mutex_lock(&bebob->mutex);
+		snd_bebob_stream_stop(bebob, &bebob->tx_stream);
+		mutex_unlock(&bebob->mutex);
+	}
+	amdtp_stream_update(&bebob->tx_stream);
+
+	/* bus reset for isochronous receive stream */
+	if (cmp_connection_update(&bebob->out_conn) < 0) {
+		amdtp_stream_pcm_abort(&bebob->rx_stream);
+		mutex_lock(&bebob->mutex);
+		snd_bebob_stream_stop(bebob, &bebob->rx_stream);
+		mutex_unlock(&bebob->mutex);
+	}
+	amdtp_stream_update(&bebob->rx_stream);
+
+	return;
+}
+
+
 static void snd_bebob_remove(struct fw_unit *unit)
 {
 	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
@@ -410,32 +443,20 @@ static void snd_bebob_remove(struct fw_unit *unit)
 	return;
 }
 
-#define VENDOR_MAUDIO1	0x00000d6c
-#define VENDOR_MAUDIO2	0x000007f5
-#define VENDOR_YAMAHA	0x0000a0de
-
-#define MODEL_YAMAHA_GO44			0x0010000b
-#define MODEL_YAMAHA_GO46			0x0010000c
-#define MODEL_MAUDIO_OZONIC			0x0000000a
-#define MODEL_MAUDIO_FW_BOOTLOADER		0x00010058
-#define MODEL_MAUDIO_FW_410			0x00010046
-#define MODEL_MAUDIO_AUDIOPHILE_BOTH		0x00010060
-#define MODEL_MAUDIO_SOLO			0x00010062
-#define MODEL_MAUDIO_FW_1814_BOOTLOADER		0x00010070
-#define MODEL_MAUDIO_FW_1814			0x00010071
-
 static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
 		.vendor_id	= VENDOR_YAMAHA,
 		.model_id	= MODEL_YAMAHA_GO44,
+		.driver_data	= (kernel_ulong_t)&yamaha_go_spec
 	},
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
 		.vendor_id	= VENDOR_YAMAHA,
 		.model_id	= MODEL_YAMAHA_GO46,
+		.driver_data	= (kernel_ulong_t)&yamaha_go_spec
 	},
 	/* Ozonic has one ID, no bootloader */
 	{
@@ -448,16 +469,16 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO1,
-		.model_id	= MODEL_MAUDIO_FW_BOOTLOADER,
-		.driver_data	= (kernel_ulong_t)&maudio_bootloader_ops
+		.vendor_id	= VENDOR_MAUDIO2,
+		.model_id	= MODEL_MAUDIO_FW410_BOOTLOADER,
+		.driver_data	= (kernel_ulong_t)&maudio_bootloader_spec
 	},
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
 		.vendor_id	= VENDOR_MAUDIO2,
 		.model_id	= MODEL_MAUDIO_FW_410,
-		.driver_data	= (kernel_ulong_t)&maudio_fw410_ops
+		.driver_data	= (kernel_ulong_t)&maudio_fw410_spec
 	},
 	/* Firewire Audiophile has one ID for both bootloader and itself */
 	{
@@ -465,7 +486,7 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 				  IEEE1394_MATCH_MODEL_ID,
 		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_AUDIOPHILE_BOTH,
-		.driver_data	= (kernel_ulong_t)&maudio_audiophile_ops
+		.driver_data	= (kernel_ulong_t)&maudio_audiophile_spec
 	},
 	/* Firewire Solo has one ID, no bootloader */
 	{
@@ -480,14 +501,14 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 				  IEEE1394_MATCH_MODEL_ID,
 		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_FW_1814_BOOTLOADER,
-		.driver_data	= (kernel_ulong_t)&maudio_bootloader_ops
+		.driver_data	= (kernel_ulong_t)&maudio_bootloader_spec
 	},
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
 		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_FW_1814,
-		.driver_data	= (kernel_ulong_t)&maudio_fw1814_ops
+		.driver_data	= (kernel_ulong_t)&maudio_fw1814_spec
 	},
 	{}
 };

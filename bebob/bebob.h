@@ -87,10 +87,30 @@ struct snd_bebob_stream_formation {
 extern int sampling_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES];
 
 /* device specific operations */
-struct snd_bebob_ops {
-	int (*probing)(struct snd_bebob *bebob);
-	int (*streaming)(struct snd_bebob *bebob);
-	int (*clocking)(struct snd_bebob *bebob);
+struct snd_bebob_clock_spec {
+	int num;
+	char **labels;
+	int (*get)(struct snd_bebob *bebob);
+	int (*set)(struct snd_bebob *bebob, int id);
+};
+struct snd_bebob_dig_iface_spec {
+	int num;
+	char **labels;
+	int (*get)(struct snd_bebob *bebob);
+	int (*set)(struct snd_bebob *bebob, int id);
+};
+struct snd_bebob_meter_spec {
+	int num;
+	char **labels;
+	int bytes;
+	int (*get)(struct snd_bebob *bebob);
+};
+struct snd_bebob_spec {
+	int (*load)(struct snd_bebob *bebob);
+	int (*discover)(struct snd_bebob *bebob);
+	struct snd_bebob_clock_spec *clock;
+	struct snd_bebob_dig_iface_spec *dig_iface;
+	struct snd_bebob_meter_spec *meter;
 };
 
 struct snd_bebob {
@@ -102,7 +122,7 @@ struct snd_bebob {
         struct mutex mutex;
         spinlock_t lock;
 
-	struct snd_bebob_ops *ops;
+	const struct snd_bebob_spec *spec;
 
 	unsigned int supported_sampling_rates;
 
@@ -126,6 +146,7 @@ int snd_bebob_get_formation_index(int sampling_rate);
 
 int avc_generic_set_sampling_rate(struct fw_unit *unit, int rate,
 				int direction, unsigned short plug);
+
 int avc_generic_get_sampling_rate(struct fw_unit *unit, int *rate,
 				int direction, unsigned short plug);
 int avc_generic_get_plug_info(struct fw_unit *unit,
@@ -161,12 +182,15 @@ void snd_bebob_create_midi_devices(struct snd_bebob *bebob);
 
 void snd_bebob_proc_init(struct snd_bebob *bebob);
 
-int snd_bebob_maudio_detect(struct fw_unit *unit);
+int snd_bebob_discover(struct snd_bebob *bebob);
 
 /* device specific operations */
-extern struct snd_bebob_ops maudio_bootloader_ops;
-extern struct snd_bebob_ops maudio_fw410_ops;
-extern struct snd_bebob_ops maudio_fw1814_ops;
-extern struct snd_bebob_ops maudio_audiophile_ops;
+extern struct snd_bebob_spec maudio_bootloader_spec;
+extern struct snd_bebob_spec maudio_fw1814_spec;
+extern struct snd_bebob_spec maudio_fw410_spec;
+extern struct snd_bebob_spec maudio_audiophile_spec;
+extern struct snd_bebob_spec maudio_one_clock_spec;
+
+extern struct snd_bebob_spec yamaha_go_spec;
 
 #endif
