@@ -38,6 +38,8 @@ MODULE_PARM_DESC(enable, "enable Fireworks sound card");
 static DEFINE_MUTEX(devices_mutex);
 static unsigned int devices_used;
 
+#define MAX_TRIES_AFTER_BUS_RESET 5
+
 #define FLAG_DYNADDR_SUPPORTED			0
 #define FLAG_MIRRORING_SUPPORTED		1
 #define FLAG_HAS_OPTICAL_INTERFACE		2
@@ -371,31 +373,64 @@ end:
 static void snd_efw_update(struct fw_unit *unit)
 {
 	struct snd_efw *efw = dev_get_drvdata(&unit->device);
+	int tries, err;
 
 	snd_efw_command_bus_reset(efw->unit);
 
 	/*
-	 * There are two reasons to fail update streams. The main reason is
-	 * to fail asynchronous transaction for EFC commands just after bus
-	 * reset. To prevent this as much as possible, waiting 100 msec. But
-	 * sometimes the application experiences prepare error. It will tell
-	 * Input/output error.
+	 * NOTE:
+	 * There is a reason the application get error by bus reset during
+	 * playing/recording.
+	 *
+	 * Fireworks doesn't sometimes respond FCP command after bus reset.
+	 * Then the normal process to start streaming is failed. Here EFC
+	 * identify command is used to check this. When all of trials are
+	 * failed, the PCM stream is stopped, then the application fails to
+	 * play/record and the users see 'input/output'
+	 * error.
+	 *
+	 * Referring to OHCI1394, the connection should be redo within 1 sec
+	 * after bus reset. Inner snd-firewire-lib, FCP commands are retried
+	 * three times if failed. If identify commands are executed 5 times,
+	 * totally, FCP commands are sent 15 times till completely failed. But
+	 * the total time is not assume-able because it's asynchronous
+	 * transactions. Here we wait 500msec between each commands. I hope
+	 * total time within 1 sec.
 	 */
-	msleep(100);
+	tries = 0;
+	do {
+		err = snd_efw_command_identify(efw);
+		if (err == 0)
+			break;
+		msleep(100);
+	} while (tries++ < MAX_TRIES_AFTER_BUS_RESET);
+
+	if (err < 0) {
+		snd_efw_stream_destroy_duplex(efw);
+		goto end;
+	}
 
 	/*
-	 * The another reason (but rare) is, as a result of Juju's rediscovering
-	 *nodes at bus reset, there is a case of changing node  id reflecting
-	 * bus topology. Then the devices are regenerated. This causes execution
-	 * of driver's probe() process and changing the number of id as sound
-	 * cards. Then the path of logical device nodes are changed. In user
-	 * land, status error appears and tell'No such device'.
+	 * NOTE:
+	 * There is another reason that the application get error by bus reset
+	 * during playing/recording.
 	 *
-	 * Even if updating is successed, the sound is not smooth, is not
-	 * fluent. At least, noises, at largest, blank sound for 1-2 seconds.
+	 * As a result of Juju's rediscovering nodes at bus reset, there is a
+	 * case of changing node id reflecting identified-tree. Then sometimes
+	 * logical devices are removed and re-probed. When connecting new sound
+	 * cards, this behavior brings an issue.
+	 *
+	 * When connecting new sound cards in Firewire bus, if remove/probe is
+	 * generated for the current sound cards, the ids for current sound
+	 * cards are sometimes changed and character devices are also changed.
+	 * Then user-land application fails to play/record and the users see
+	 * 'No such device' error.
+	 *
+	 * Even if all is OK, the sound is not smooth, not fluent. At least,
+	 * short noises, at largest, blank sound for 1-3 seconds.
 	 */
 	snd_efw_stream_update_duplex(efw);
-
+end:
 	return;
 }
 

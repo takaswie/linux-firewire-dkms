@@ -88,6 +88,7 @@ enum efc_cmd_hwctl {
 	EFC_CMD_HWCTL_GET_CLOCK		= 1,
 	EFC_CMD_HWCTL_CHANGE_FLAGS	= 3,
 	EFC_CMD_HWCTL_GET_FLAGS		= 4,
+	EFC_CMD_HWCTL_IDENTIFY		= 5
 };
 /* for flags */
 #define EFC_HWCTL_FLAG_DIGITAL_PRO	0x02
@@ -229,6 +230,12 @@ efc(struct snd_efw *efw, unsigned int category,
 end:
 	kfree(cmdbuf);
 	return err;
+}
+
+int snd_efw_command_identify(struct snd_efw *efw)
+{
+	return efc(efw, EFC_CAT_HWCTL, EFC_CMD_HWCTL_IDENTIFY,
+		   NULL, 0, NULL, 0);
 }
 
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
