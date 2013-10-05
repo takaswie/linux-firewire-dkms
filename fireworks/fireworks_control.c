@@ -368,6 +368,8 @@ end:
  * Global Control: Clock Source Control
  *
  * snd_efw_hwinfo.supported_clocks is a flags for this control
+ *
+ * Fireworks has an ability to change its clock source even if streaming.
  */
 static char *clock_src_descs[] = {"Internal", "SYT Match", "Word",
 				     "S/PDIF", "ADAT1", "ADAT2"};
