@@ -417,14 +417,15 @@ static void snd_efw_update(struct fw_unit *unit)
 	 *
 	 * As a result of Juju's rediscovering nodes at bus reset, there is a
 	 * case of changing node id reflecting identified-tree. Then sometimes
-	 * logical devices are removed and re-probed. When connecting new sound
-	 * cards, this behavior brings an issue.
+	 * logical devices are removed and re-probed. When
+	 * connecting/disconnecting sound cards or disconnecting, this behavior
+	 * brings an issue.
 	 *
-	 * When connecting new sound cards in Firewire bus, if remove/probe is
-	 * generated for the current sound cards, the ids for current sound
-	 * cards are sometimes changed and character devices are also changed.
-	 * Then user-land application fails to play/record and the users see
-	 * 'No such device' error.
+	 * When connecting/disconnecting sound cards or in Firewire bus, if
+	 * remove/probe is generated for the current sound cards, the ids for
+	 * current sound cards are sometimes changed and character devices are
+	 * also changed. Then user-land application fails to play/record and the
+	 * users see 'No such device' error.
 	 *
 	 * Even if all is OK, the sound is not smooth, not fluent. At least,
 	 * short noises, at largest, blank sound for 1-3 seconds.
