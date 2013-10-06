@@ -90,7 +90,7 @@ extern int sampling_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES];
 struct snd_bebob_clock_spec {
 	int num;
 	char **labels;
-	int (*get)(struct snd_bebob *bebob);
+	int (*get)(struct snd_bebob *bebob, int *id);
 	int (*set)(struct snd_bebob *bebob, int id);
 };
 struct snd_bebob_dig_iface_spec {
@@ -144,9 +144,13 @@ struct snd_bebob {
 
 int snd_bebob_get_formation_index(int sampling_rate);
 
+int avc_audio_set_selector(struct fw_unit *unit, int subunit_id,
+			   int fb_id, int number);
+int avc_audio_get_selector(struct fw_unit *unit, int subunit_id,
+			   int fb_id, int *number);
+
 int avc_generic_set_sampling_rate(struct fw_unit *unit, int rate,
 				int direction, unsigned short plug);
-
 int avc_generic_get_sampling_rate(struct fw_unit *unit, int *rate,
 				int direction, unsigned short plug);
 int avc_generic_get_plug_info(struct fw_unit *unit,
@@ -177,6 +181,8 @@ void snd_bebob_stream_destroy(struct snd_bebob *bebob,
 
 void snd_bebob_destroy_pcm_devices(struct snd_bebob *bebob);
 int snd_bebob_create_pcm_devices(struct snd_bebob *bebob);
+
+int snd_bebob_create_control_devices(struct snd_bebob *bebob);
 
 void snd_bebob_create_midi_devices(struct snd_bebob *bebob);
 

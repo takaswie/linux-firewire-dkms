@@ -27,6 +27,86 @@ static int amdtp_sfc_table[] = {
 	[CIP_SFC_176400] = 176400,
 	[CIP_SFC_192000] = 192000};
 
+int avc_audio_set_selector(struct fw_unit *unit, int subunit_id,
+			   int fb_id, int number)
+{
+	u8 *buf;
+	int err;
+
+	buf = kmalloc(12, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0]  = 0x00;
+	buf[1]  = 0x08 | (0x07 & subunit_id);
+	buf[2]  = 0xb8;
+	buf[3]  = 0x80;
+	buf[4]  = 0xff & fb_id;
+	buf[5]  = 0x10;
+	buf[6]  = 0x02;
+	buf[7]  = 0xff & number;
+	buf[8]  = 0x01;
+	buf[9]  = 0x00;
+	buf[10] = 0x00;
+	buf[11] = 0x00;
+
+	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 6) || (buf[0] != 0x09)) {
+		dev_err(&unit->device,
+			"failed to set to selector %d: 0x%02X\n",
+			fb_id, buf[0]);
+		err = -EIO;
+		goto end;
+	}
+
+	err = 0;
+end:
+	return err;
+}
+
+int avc_audio_get_selector(struct fw_unit *unit, int subunit_id,
+			   int fb_id, int *number)
+{
+	u8 *buf;
+	int err;
+
+	buf = kmalloc(12, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0]  = 0x01;
+	buf[1]  = 0x08 | (0x07 & subunit_id);
+	buf[2]  = 0xb8;
+	buf[3]  = 0x80;
+	buf[4]  = 0xff & fb_id;
+	buf[5]  = 0x10;
+	buf[6]  = 0x02;
+	buf[7]  = 0x00;
+	buf[8]  = 0x01;
+	buf[9]  = 0x00;
+	buf[10] = 0x00;
+	buf[11] = 0x00;
+
+	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 6) || (buf[0] != 0x0c)) {
+		dev_err(&unit->device,
+			"failed to get from selector %d: 0x%02X\n",
+			fb_id, buf[0]);
+		err = -EIO;
+		goto end;
+	}
+
+	*number = buf[7];
+	err = 0;
+end:
+	return err;
+}
+
+
 int avc_generic_set_sampling_rate(struct fw_unit *unit, int rate,
 				  int direction, unsigned short plug)
 {
@@ -99,7 +179,7 @@ int avc_generic_get_sampling_rate(struct fw_unit *unit, int *rate,
 	if (err < 0)
 		goto end;
 	/* IMPLEMENTED/STABLE is OK */
-	if ((err < 6) | (buf[0] != 0x0c)){
+	if ((err < 6) || (buf[0] != 0x0c)){
 		dev_err(&unit->device, "failed to get sampe rate\n");
 		err = -EIO;
 		goto end;
@@ -147,7 +227,7 @@ int avc_generic_get_plug_info(struct fw_unit *unit,
 	if (err < 0)
 		goto end;
 	/* IMPLEMENTED/STABLE is OK */
-	else if ((err < 6) | (buf[0] != 0x0c)) {
+	else if ((err < 6) || (buf[0] != 0x0c)) {
 		err = -EIO;
 		goto end;
 	}
@@ -193,7 +273,7 @@ int avc_bridgeco_get_plug_type(struct fw_unit *unit, int direction,
 	if (err < 0)
 		goto end;
 	/* IMPLEMENTED/STABLE is OK */
-	else if ((err < 6) | (buf[0] != 0x0c)) {
+	else if ((err < 6) || (buf[0] != 0x0c)) {
 		err = -EIO;
 		goto end;
 	}
@@ -236,7 +316,7 @@ int avc_bridgeco_get_plug_channels(struct fw_unit *unit, int direction,
 	if (err < 0)
 		goto end;
 	/* IMPLEMENTED/STABLE is OK */
-	if ((err < 6) | (buf[0] != 0x0c)) {
+	if ((err < 6) || (buf[0] != 0x0c)) {
 		err = -EIO;
 		goto end;
 	}
@@ -282,7 +362,7 @@ int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,
 	if (err < 0)
 		goto end;
 	/* IMPLEMENTED/STABLE is OK */
-	if ((err < 6) | (buf[0] != 0x0c)) {
+	if ((err < 6) || (buf[0] != 0x0c)) {
 		err = -EIO;
 		goto end;
 	}

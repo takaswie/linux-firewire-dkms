@@ -57,9 +57,8 @@ static int fw1814_discover(struct snd_bebob *bebob) {
 static char *fw1814_clock_labels[] = {
 	"Internal with Digital Mute", "Digital",
 	"Word Clock", "Internal with Digital unmute"};
-static int fw1814_clock_get(struct snd_bebob *bebob)
+static int fw1814_clock_get(struct snd_bebob *bebob, int *id)
 {
-	int id;
 	return id;
 }
 static int fw1814_clock_set(struct snd_bebob *bebob, int id)
@@ -86,9 +85,8 @@ static int fw1814_meter_get(struct snd_bebob *bebob) {
 }
 
 static char *fw410_clock_labels[] = {"Internal", "Optical", "Coaxial"};
-static int fw410_clock_get(struct snd_bebob *bebob)
+static int fw410_clock_get(struct snd_bebob *bebob, int *id)
 {
-	int id;
 	return id;
 }
 static int fw410_clock_set(struct snd_bebob *bebob, int id)
@@ -119,9 +117,8 @@ static int fw410_meter_get(struct snd_bebob *bebob)
 }
 
 static char *audiophile_clock_labels[] = {"Internal", "Digital"};
-static int audiophile_clock_get(struct snd_bebob *bebob)
+static int audiophile_clock_get(struct snd_bebob *bebob, int *id)
 {
-	int id;
 	return id;
 }
 static int audiophile_clock_set(struct snd_bebob *bebob, int id)
@@ -140,9 +137,8 @@ static int audiophile_meter_get(struct snd_bebob *bebob)
 }
 
 static char *solo_clock_labels[] = {"Internal", "Digital"};
-static int solo_clock_get(struct snd_bebob *bebob)
+static int solo_clock_get(struct snd_bebob *bebob, int *id)
 {
-	int id;
 	return id;
 }
 static int solo_clock_set(struct snd_bebob *bebob, int id)

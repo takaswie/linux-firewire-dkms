@@ -374,6 +374,11 @@ loaded:
 	if (err < 0)
 		goto error;
 
+
+	err = snd_bebob_create_control_devices(bebob);
+	if (err < 0)
+		goto error;
+
 	snd_bebob_create_midi_devices(bebob);
 
 	/* proc interfaces */
