@@ -33,9 +33,6 @@ static unsigned int devices_used;
 #define MODEL_MAUDIO_FW_1814_BOOTLOADER		0x00010070
 #define MODEL_MAUDIO_FW_1814			0x00010071
 
-/* I don't know why but juju has a limitation for CSR_NAME */
-#define JUJU_LIMIT 11
-
 int sampling_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES] = {
 	[0] = 22050,
 	[1] = 24000,
@@ -302,7 +299,10 @@ check_audiophile_booted(struct snd_bebob *bebob)
 	if (fw_csr_string(bebob->unit->directory, CSR_MODEL, name, sizeof(name)) < 0)
 		return false;
 
-	return !(strncmp(name, "FW Audiophile Bootloader", JUJU_LIMIT) == 0);
+	if (strncmp(name, "FW Audiophile Bootloader", 15) == 0)
+		return false;
+	else
+		return true;
 }
 
 static int
@@ -353,8 +353,9 @@ snd_bebob_probe(struct fw_unit *unit,
 	else {
 		bebob->spec->load(bebob);
 		/* just do this */
-		err = -EIO;
-		goto end;
+		err = 0;
+		snd_printk(KERN_INFO"loading firmware\n");
+		goto error;
 	}
 
 loaded:
@@ -412,6 +413,10 @@ snd_bebob_update(struct fw_unit *unit)
 {
 	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
 
+	/* this is for firmware bootloader */
+	if (bebob == NULL)
+		goto end;
+
 	fcp_bus_reset(bebob->unit);
 
 	/* bus reset for isochronous transmit stream */
@@ -432,6 +437,7 @@ snd_bebob_update(struct fw_unit *unit)
 	}
 	amdtp_stream_update(&bebob->rx_stream);
 
+end:
 	return;
 }
 
@@ -440,11 +446,16 @@ static void snd_bebob_remove(struct fw_unit *unit)
 {
 	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
 
+	/* this is for firmware bootloader */
+	if (bebob == NULL)
+		goto end;
+
 	snd_bebob_destroy_pcm_devices(bebob);
 
 	snd_card_disconnect(bebob->card);
 	snd_card_free_when_closed(bebob->card);
 
+end:
 	return;
 }
 
