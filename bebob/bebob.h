@@ -142,7 +142,10 @@ struct snd_bebob {
 
 	/* MAudio specific */
 	int clk_src;
-	int clk_iface;	/* handle both of input and output in this member */
+	int in_dig_fmt;
+	int out_dig_fmt;
+	int in_dig_iface;
+	int out_dig_iface;
 	int clk_lock;
 };
 

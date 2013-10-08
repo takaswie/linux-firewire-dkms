@@ -173,9 +173,13 @@ reset_device(struct snd_bebob *bebob)
 	return fcp_avc_transaction(bebob->unit, buf, 8, buf, 8, 0);
 }
 
+/*
+ * dig_fmt: 0x00:S/PDIF, 0x01:ADAT
+ * clk_lock: 0x00:unlock, 0x01:lock
+ */
 static int
 set_clock_params(struct snd_bebob *bebob, int clk_src,
-		 int clk_iface, int clk_lock)
+		 int in_dig_fmt, int out_dig_fmt, int clk_lock)
 {
 	int err;
 	u8 *buf;
@@ -191,13 +195,13 @@ set_clock_params(struct snd_bebob *bebob, int clk_src,
 	buf[4]  = 0x00;
 	buf[5]  = 0x04;			/* has 4 parameters */
 	buf[6]  = 0xff & clk_src;	/* clock source */
-	buf[7]  = 0xff & clk_iface;	/* input digital interface */
-	buf[8]  = 0xff & clk_iface;	/* output digital interface */
+	buf[7]  = 0xff & in_dig_fmt;	/* input digital format */
+	buf[8]  = 0xff & out_dig_fmt;	/* output digital format */
 	buf[9]  = 0xff & clk_lock;	/* lock these settings */
 	buf[10] = 0x00;		/* padding  */
 	buf[11] = 0x00;		/* padding */
 
-	err = fcp_avc_transaction(bebob->unit, buf, 8, buf, 8, 0);
+	err = fcp_avc_transaction(bebob->unit, buf, 12, buf, 12, 0);
 	if (err < 0)
 		goto end;
 	if ((err < 6) || (buf[0] != 0x09)) {
@@ -209,10 +213,108 @@ set_clock_params(struct snd_bebob *bebob, int clk_src,
 
 	bebob->clk_src		= buf[6];
 	/* handle both of input and output in this member */
-	bebob->clk_iface	= buf[7];
+	bebob->in_dig_fmt	= buf[7];
+	bebob->out_dig_fmt	= buf[8];
 	bebob->clk_lock		= buf[9];
 
 	err = 0;
+end:
+	kfree(buf);
+	return err;
+}
+/*
+ * dig_iface: 0x00:Optical, 0x01:Coaxial
+ */
+static int
+set_dig_iface(struct snd_bebob *bebob, int in_dig_iface, int out_dig_iface)
+{
+	int err;
+	u8 *buf;
+
+	buf = kmalloc(12, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0]  = 0x00;			/* CONTROL */
+	buf[1]  = 0xff;			/* UNIT */
+	buf[2]  = 0x00;			/* vendor dependent */
+	buf[3]  = 0x04;
+	buf[4]  = 0x04;
+	buf[5]  = 0x10;
+	buf[6]  = 0x02;			/* has 2 parameters */
+	buf[7]  = 0xff & in_dig_iface;	/* input digital interface */
+	buf[8]  = 0xff & out_dig_iface;	/* output digital interface */
+	buf[9]  = 0x00;			/* padding */
+	buf[10] = 0x00;			/* padding */
+	buf[11] = 0x00;			/* padding */
+
+	err = fcp_avc_transaction(bebob->unit, buf, 12, buf, 12, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 6) || (buf[0] != 0x09)) {
+		dev_err(&bebob->unit->device,
+			"failed to set digital interface\n");
+		err = -EIO;
+		goto end;
+	}
+
+	bebob->in_dig_iface = buf[7];
+	bebob->out_dig_iface = buf[8];
+	err = 0;
+
+end:
+	kfree(buf);
+	return err;
+}
+
+/* for special customized devices */
+static char *special_clock_labels[] = {
+	"Interna1l with Digital Mute", "Digital",
+	"Word Clock", "Internal"};
+static int special_clock_get(struct snd_bebob *bebob, int *id)
+{
+	*id = bebob->clk_src;
+	return 0;
+}
+static int special_clock_set(struct snd_bebob *bebob, int id)
+{
+	return set_clock_params(bebob, id,
+				bebob->in_dig_fmt, bebob->out_dig_fmt,
+				bebob->clk_lock);
+}
+static char *special_dig_iface_labels[] = {
+	"ADAT Optical", "S/PDIF Optical", "S/PDIF Coaxial"
+};
+static int special_dig_iface_get(struct snd_bebob *bebob, int *id)
+{
+	/* for simplicity, the same value for input/output */
+	*id = (0x01 & bebob->in_dig_fmt) | ((bebob->in_dig_iface & 0x01) << 1);
+
+	/* normalizing */
+	if (*id > 0)
+		(*id)--;
+	return 0;
+}
+static int special_dig_iface_set(struct snd_bebob *bebob, int id)
+{
+	int err;
+	int dig_fmt;
+	int dig_iface;
+
+	/* normalizing */
+	if (id > 0)
+		id++;
+
+	dig_fmt = id & 0x01;
+	dig_iface = (id >> 1) & 0x01;
+
+	/* for simplicity, the same value for input/output */
+	err = set_clock_params(bebob, bebob->clk_src, dig_fmt, dig_fmt,
+			       bebob->clk_lock);
+	if (err < 0)
+		goto end;
+
+	err = set_dig_iface(bebob, dig_iface, dig_iface);
 end:
 	return err;
 }
@@ -223,39 +325,17 @@ static int fw1814_discover(struct snd_bebob *bebob)
 	int err;
 
 	/* initialize these parameters because doesn't allow driver to ask */
-	err = set_clock_params(bebob, 0x00, 0x00, 0x00);
+	err = set_clock_params(bebob, 0x03, 0x00, 0x00, 0x00);
 	if (err < 0)
 		dev_err(&bebob->unit->device,
 			"Failed to initialize clock params\n");
 
-	return 0;
-}
-static char *fw1814_clock_labels[] = {
-	"Internal with Digital Mute", "Digital",
-	"Word Clock", "Internal with Digital unmute"};
-static int fw1814_clock_get(struct snd_bebob *bebob, int *id)
-{
-	*id = bebob->clk_src;
-	return 0;
-}
-static int fw1814_clock_set(struct snd_bebob *bebob, int id)
-{
-	return set_clock_params(bebob, id, bebob->clk_iface, bebob->clk_lock);
-}
-static char *fw1814_dig_iface_labels[] = {
-	"Optical", "Coaxial"
-};
-static int fw1814_dig_iface_get(struct snd_bebob *bebob, int *id)
-{
-	*id = bebob->clk_iface;
-	return 0;
-}
-static int fw1814_dig_iface_set(struct snd_bebob *bebob, int id)
-{
-	if (bebob->clk_lock > 0)
-		return -EINVAL;
+	err = set_dig_iface(bebob, 0x00, 0x00);
+	if (err < 0)
+		dev_err(&bebob->unit->device,
+			"Failed to initialize digital interface\n");
 
-	return set_clock_params(bebob, bebob->clk_src, id, bebob->clk_lock);
+	return 0;
 }
 static char *fw1814_meter_labels[] = {
 	ANA_IN, ANA_IN, ANA_IN, ANA_IN,
@@ -298,30 +378,6 @@ end:
 /* ProjectMix I/O specific controls */
 static int projectmix_discover(struct snd_bebob *bebob) {
 	return 0;
-}
-static char *projectmix_clock_labels[] = {
-	"Internal with Digital Mute", "Digital",
-	"Word Clock", "Internal with Digital unmute"};
-static int projectmix_clock_get(struct snd_bebob *bebob, int *id)
-{
-	*id = bebob->clk_src;
-	return 0;
-}
-static int projectmix_clock_set(struct snd_bebob *bebob, int id)
-{
-	return set_clock_params(bebob, id, bebob->clk_iface, bebob->clk_lock);
-}
-static char *projectmix_dig_iface_labels[] = {
-	"Optical", "Coaxial"
-};
-static int projectmix_dig_iface_get(struct snd_bebob *bebob, int *id)
-{
-	*id = bebob->clk_iface;
-	return 0;
-}
-static int projectmix_dig_iface_set(struct snd_bebob *bebob, int id)
-{
-	return set_clock_params(bebob, bebob->clk_src, id, bebob->clk_lock);
 }
 static char *projectmix_meter_labels[] = {
 	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
@@ -552,19 +608,21 @@ struct snd_bebob_spec maudio_bootloader_spec = {
 	.dig_iface	= NULL
 };
 
+/* for special customized devices */
+static struct snd_bebob_clock_spec special_clock_spec = {
+	.num	= ARRAY_SIZE(special_clock_labels),
+	.labels	= special_clock_labels,
+	.get	= &special_clock_get,
+	.set	= &special_clock_set
+};
+static struct snd_bebob_dig_iface_spec special_dig_iface_spec = {
+	.num	= ARRAY_SIZE(special_dig_iface_labels),
+	.labels	= special_dig_iface_labels,
+	.get	= &special_dig_iface_get,
+	.set	= &special_dig_iface_set
+};
+
 /* Firewire 1814 specification */
-static struct snd_bebob_clock_spec fw1814_clock_spec = {
-	.num	= ARRAY_SIZE(fw1814_clock_labels),
-	.labels	= fw1814_clock_labels,
-	.get	= &fw1814_clock_get,
-	.set	= &fw1814_clock_set
-};
-static struct snd_bebob_dig_iface_spec fw1814_dig_iface_spec = {
-	.num	= ARRAY_SIZE(fw1814_dig_iface_labels),
-	.labels	= fw1814_dig_iface_labels,
-	.get	= &fw1814_dig_iface_get,
-	.set	= &fw1814_dig_iface_set
-};
 static struct snd_bebob_meter_spec fw1814_meter_spec = {
 	.num	= ARRAY_SIZE(fw1814_meter_labels),
 	.labels	= fw1814_meter_labels,
@@ -573,24 +631,12 @@ static struct snd_bebob_meter_spec fw1814_meter_spec = {
 struct snd_bebob_spec maudio_fw1814_spec = {
 	.load		= NULL,
 	.discover	= &fw1814_discover,
-	.clock		= &fw1814_clock_spec,
-	.dig_iface	= &fw1814_dig_iface_spec,
+	.clock		= &special_clock_spec,
+	.dig_iface	= &special_dig_iface_spec,
 	.meter		= &fw1814_meter_spec
 };
 
 /* ProjectMix specification */
-static struct snd_bebob_clock_spec projectmix_clock_spec = {
-	.num	= ARRAY_SIZE(projectmix_clock_labels),
-	.labels	= projectmix_clock_labels,
-	.get	= &projectmix_clock_get,
-	.set	= &projectmix_clock_set
-};
-static struct snd_bebob_dig_iface_spec projectmix_dig_iface_spec = {
-	.num	= ARRAY_SIZE(projectmix_dig_iface_labels),
-	.labels	= projectmix_dig_iface_labels,
-	.get	= &projectmix_dig_iface_get,
-	.set	= &projectmix_dig_iface_set
-};
 static struct snd_bebob_meter_spec projectmix_meter_spec = {
 	.num	= ARRAY_SIZE(projectmix_meter_labels),
 	.labels	= projectmix_meter_labels,
@@ -599,8 +645,8 @@ static struct snd_bebob_meter_spec projectmix_meter_spec = {
 struct snd_bebob_spec maudio_projectmix_spec = {
 	.load		= NULL,
 	.discover	= &projectmix_discover,
-	.clock		= &projectmix_clock_spec,
-	.dig_iface	= &projectmix_dig_iface_spec,
+	.clock		= &special_clock_spec,
+	.dig_iface	= &special_dig_iface_spec,
 	.meter		= &projectmix_meter_spec
 };
 
@@ -612,7 +658,7 @@ static struct snd_bebob_clock_spec fw410_clock_spec = {
 	.set	= &fw410_clock_set
 };
 static struct snd_bebob_dig_iface_spec fw410_dig_iface_spec = {
-	.num	= ARRAY_SIZE(fw1814_dig_iface_labels),
+	.num	= ARRAY_SIZE(fw410_dig_iface_labels),
 	.labels	= fw410_dig_iface_labels,
 	.get	= &fw410_dig_iface_get,
 	.set	= &fw410_dig_iface_set
