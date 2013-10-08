@@ -102,8 +102,7 @@ struct snd_bebob_dig_iface_spec {
 struct snd_bebob_meter_spec {
 	int num;
 	char **labels;
-	int bytes;
-	int (*get)(struct snd_bebob *bebob);
+	int (*get)(struct snd_bebob *bebob, u32 *target, int size);
 };
 struct snd_bebob_spec {
 	int (*load)(struct snd_bebob *bebob);
@@ -195,7 +194,8 @@ extern struct snd_bebob_spec maudio_bootloader_spec;
 extern struct snd_bebob_spec maudio_fw1814_spec;
 extern struct snd_bebob_spec maudio_fw410_spec;
 extern struct snd_bebob_spec maudio_audiophile_spec;
-extern struct snd_bebob_spec maudio_one_clock_spec;
+extern struct snd_bebob_spec maudio_solo_spec;
+extern struct snd_bebob_spec maudio_ozonic_spec;
 
 extern struct snd_bebob_spec yamaha_go_spec;
 

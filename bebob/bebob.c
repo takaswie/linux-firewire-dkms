@@ -480,6 +480,7 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 				  IEEE1394_MATCH_MODEL_ID,
 		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_OZONIC,
+		.driver_data	= (kernel_ulong_t)&maudio_ozonic_spec
 	},
 	/* Firewire 410 has two IDs, for bootloader and itself */
 	{
@@ -510,6 +511,7 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 				  IEEE1394_MATCH_MODEL_ID,
 		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_SOLO,
+		.driver_data	= (kernel_ulong_t)&maudio_solo_spec
 	},
 	/* Firewire 1814 has two IDs, for bootloader and itself */
 	{
