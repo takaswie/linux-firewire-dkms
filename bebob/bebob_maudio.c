@@ -267,6 +267,80 @@ end:
 	return err;
 }
 
+/*
+ * I guess this is SIGNAL SOURCE command in 'Connection and Compatibility
+ * Management 1.0 (1394TA 199032)'.
+ */
+static int
+get_signal_source(struct fw_unit *u, int *unit, int *plugid)
+{
+	int err;
+	u8 *buf;
+
+	buf = kmalloc(8, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0] = 0x01;	/* STATUS */
+	buf[1] = 0xff;	/* UNIT */
+	buf[2] = 0x1A;	/* SIGNAL SOURCE? */
+	buf[3] = 0x0f;
+	buf[4] = 0xff;
+	buf[5] = 0xfe;
+	buf[6] = 0x60;
+	buf[7] = 0x01;
+
+	err = fcp_avc_transaction(u, buf, 8, buf, 8, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 0) || (buf[0] != 0x0c)) {
+		dev_err(&u->device,
+			"failed to get signal status\n");
+		err = -EIO;
+		goto end;
+	}
+
+	*unit = buf[4];
+	*plugid = buf[5];
+end:
+	kfree(buf);
+	return err;
+}
+static int
+set_signal_source(struct fw_unit *u, int unit, int plugid)
+{
+	int err;
+	u8 *buf;
+
+	buf = kmalloc(8, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0] = 0x00;	/* CONTROL */
+	buf[1] = 0xff;	/* UNIT */
+	buf[2] = 0x1A;	/* SIGNAL SOURCE? */
+	buf[3] = 0x0f;
+	buf[4] = 0xff & unit;
+	buf[5] = 0xff & plugid;
+	buf[6] = 0x60;
+	buf[7] = 0x01;
+
+	err = fcp_avc_transaction(u, buf, 8, buf, 8, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 0) || ((buf[0] != 0x09) && (buf[0] != 0x0f))) {
+		dev_err(&u->device,
+			"failed to set signal status\n");
+		err = -EIO;
+		goto end;
+	}
+
+	err = 0;
+end:
+	kfree(buf);
+	return err;
+}
+
 /* for special customized devices */
 static char *special_clock_labels[] = {
 	"Interna1l with Digital Mute", "Digital",
@@ -415,25 +489,53 @@ end:
 }
 
 /* Firewire 410 specific controls */
-static char *fw410_clock_labels[] = {"Internal", "Optical", "Coaxial"};
+static char *fw410_clock_labels[] = {
+	"Internal", "Digital Optical", "Digital Coaxial"
+};
 static int fw410_clock_get(struct snd_bebob *bebob, int *id)
 {
-	return *id;
+	int err, unit, plugid;
+
+	err = get_signal_source(bebob->unit, &unit, &plugid);
+	if (err < 0)
+		goto end;
+
+	if ((unit == 0xff) && (plugid == 0x82))
+		*id = 2;
+	else if ((unit == 0xff) && (plugid == 0x83))
+		*id = 1;
+	else
+		*id = 0;
+end:
+	return err;
 }
 static int fw410_clock_set(struct snd_bebob *bebob, int id)
 {
-	return id;
+	int unit, plugid;
+
+	if (id == 0) {
+		unit = 0x60;
+		plugid = 0x01;
+	} else if (id == 1) {
+		unit = 0xff;
+		plugid = 0x83;
+	} else {
+		unit = 0xff;
+		plugid = 0x82;
+	}
+
+	return set_signal_source(bebob->unit, unit, plugid);
 }
 static char *fw410_dig_iface_labels[] = {
-	"Optical", "Coaxial"
+	"S/PDIF Optical", "S/PDIF Coaxial"
 };
 static int fw410_dig_iface_get(struct snd_bebob *bebob, int *id)
 {
-	return *id;
+	return avc_audio_get_selector(bebob->unit, 0, 1, id);
 }
 static int fw410_dig_iface_set(struct snd_bebob *bebob, int id)
 {
-	return id;
+	return avc_audio_set_selector(bebob->unit, 0, 1, id);
 }
 static char *fw410_meter_labels[] = {
 	ANA_IN, DIG_IN,
@@ -462,14 +564,38 @@ end:
 }
 
 /* Firewire Audiophile specific controls */
-static char *audiophile_clock_labels[] = {"Internal", "Digital"};
+static char *audiophile_clock_labels[] = {
+	"Internal", "Digital Coaxial"
+};
 static int audiophile_clock_get(struct snd_bebob *bebob, int *id)
 {
+	int err, unit, plugid;
+
+	err = get_signal_source(bebob->unit, &unit, &plugid);
+	if (err < 0)
+		goto end;
+
+	if ((unit == 0xff) && (plugid == 0x82))
+		*id = 1;
+	else
+		*id = 0;
+end:
+	return err;
 	return *id;
 }
 static int audiophile_clock_set(struct snd_bebob *bebob, int id)
 {
-	return id;
+	int unit, plugid;
+
+	if (id == 0) {
+		unit = 0x60;
+		plugid = 0x01;
+	} else {
+		unit = 0xff;
+		plugid = 0x82;
+	}
+
+	return set_signal_source(bebob->unit, unit, plugid);
 }
 static char *audiophile_meter_labels[] = {
 	ANA_IN, DIG_IN,
@@ -489,7 +615,7 @@ static int audiophile_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 	if (err < 0)
 		goto end;
 
-	for (c = 0; c < channels; c++) 
+	for (c = 0; c < channels; c++)
 		buf[c] = be32_to_cpu(buf[c]);
 
 end:
@@ -497,14 +623,37 @@ end:
 }
 
 /* Firewire Solo specific controls */
-static char *solo_clock_labels[] = {"Internal", "Digital"};
+static char *solo_clock_labels[] = {
+	"Internal", "Digital Coaxial"
+};
 static int solo_clock_get(struct snd_bebob *bebob, int *id)
 {
-	return *id;
+	int err, unit, plugid;
+
+	err = get_signal_source(bebob->unit, &unit, &plugid);
+	if (err < 0)
+		goto end;
+
+	if ((unit == 0xff) && (plugid == 0x81))
+		*id = 1;
+	else
+		*id = 0;
+end:
+	return err;
 }
 static int solo_clock_set(struct snd_bebob *bebob, int id)
 {
-	return id;
+	int unit, plugid;
+
+	if (id == 0) {
+		unit = 0x60;
+		plugid = 0x01;
+	} else {
+		unit = 0xff;
+		plugid = 0x81;
+	}
+
+	return set_signal_source(bebob->unit, unit, plugid);
 }
 static char *solo_meter_labels[] = {
 	ANA_IN, DIG_IN,
