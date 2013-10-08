@@ -15,13 +15,16 @@
 #define STRM_IN		"Stream In"
 #define AUX_OUT		"Aux Out"
 #define HP_OUT		"HP Out"
+/* for ProjectMix and NRV */
+#define UNKNOWN_METER	"Unknown"
 
 /*
- * FW1814 don't use AVC for control. The driver cannot refer to current
- * parameters by asynchronous transaction. The driver is allowed to write
- * transaction so MUST remember the current values.
+ * FW1814/ProjectMix don't use AVC for control. The driver cannot refer to
+ * current parameters by asynchronous transaction. The driver is allowed to
+ * write transaction so MUST remember the current values.
  */
-#define	FW1814_CONTROL_OFFSET	0x00700000
+#define	MAUDIO_CONTROL_OFFSET	0x00700000
+
 /*
  * GAIN for inputs:
  * Write 32bit. upper 16bit for left chennal and lower 16bit for right.
@@ -149,12 +152,12 @@ get_meter(struct snd_bebob *bebob, void *buf, int size)
 }
 
 /*
- * FW1814 cannot give a way to read its control. So drivers should remember
- * the value for each parameters. Windows driver, after loading firmware, write
- * all parameters just after flushing.
+ * FW1814 and ProjectMix cannot give a way to read its control. So drivers
+ * should remember the value for each parameters. Windows driver, after loading
+ * firmware, write all parameters just after flushing.
  */
 static int
-flush_fw1814(struct snd_bebob *bebob)
+reset_device(struct snd_bebob *bebob)
 {
 	u8 buf[8];
 
@@ -170,7 +173,61 @@ flush_fw1814(struct snd_bebob *bebob)
 	return fcp_avc_transaction(bebob->unit, buf, 8, buf, 8, 0);
 }
 
-static int fw1814_discover(struct snd_bebob *bebob) {
+static int
+set_clock_params(struct snd_bebob *bebob, int clk_src,
+		 int clk_iface, int clk_lock)
+{
+	int err;
+	u8 *buf;
+
+	buf = kmalloc(12, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0]  = 0x00;		/* CONTROL */
+	buf[1]  = 0xff;		/* UNIT */
+	buf[2]  = 0x00;		/* vendor dependent */
+	buf[3]  = 0x04;
+	buf[4]  = 0x00;
+	buf[5]  = 0x04;			/* has 4 parameters */
+	buf[6]  = 0xff & clk_src;	/* clock source */
+	buf[7]  = 0xff & clk_iface;	/* input digital interface */
+	buf[8]  = 0xff & clk_iface;	/* output digital interface */
+	buf[9]  = 0xff & clk_lock;	/* lock these settings */
+	buf[10] = 0x00;		/* padding  */
+	buf[11] = 0x00;		/* padding */
+
+	err = fcp_avc_transaction(bebob->unit, buf, 8, buf, 8, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 6) || (buf[0] != 0x09)) {
+		dev_err(&bebob->unit->device,
+			"failed to set clock params\n");
+		err = -EIO;
+		goto end;
+	}
+
+	bebob->clk_src		= buf[6];
+	/* handle both of input and output in this member */
+	bebob->clk_iface	= buf[7];
+	bebob->clk_lock		= buf[9];
+
+	err = 0;
+end:
+	return err;
+}
+
+/* Firewire 1814 specific controls */
+static int fw1814_discover(struct snd_bebob *bebob)
+{
+	int err;
+
+	/* initialize these parameters because doesn't allow driver to ask */
+	err = set_clock_params(bebob, 0x00, 0x00, 0x00);
+	if (err < 0)
+		dev_err(&bebob->unit->device,
+			"Failed to initialize clock params\n");
+
 	return 0;
 }
 static char *fw1814_clock_labels[] = {
@@ -178,25 +235,28 @@ static char *fw1814_clock_labels[] = {
 	"Word Clock", "Internal with Digital unmute"};
 static int fw1814_clock_get(struct snd_bebob *bebob, int *id)
 {
-	return *id;
+	*id = bebob->clk_src;
+	return 0;
 }
 static int fw1814_clock_set(struct snd_bebob *bebob, int id)
 {
-	return id;
+	return set_clock_params(bebob, id, bebob->clk_iface, bebob->clk_lock);
 }
 static char *fw1814_dig_iface_labels[] = {
 	"Optical", "Coaxial"
 };
-static int fw1814_dig_iface_get(struct snd_bebob *bebob)
+static int fw1814_dig_iface_get(struct snd_bebob *bebob, int *id)
 {
-	int id;
-	return id;
+	*id = bebob->clk_iface;
+	return 0;
 }
 static int fw1814_dig_iface_set(struct snd_bebob *bebob, int id)
 {
-	return id;
-}
+	if (bebob->clk_lock > 0)
+		return -EINVAL;
 
+	return set_clock_params(bebob, bebob->clk_src, id, bebob->clk_lock);
+}
 static char *fw1814_meter_labels[] = {
 	ANA_IN, ANA_IN, ANA_IN, ANA_IN,
 	DIG_IN,
@@ -235,6 +295,70 @@ end:
 	return err;
 }
 
+/* ProjectMix I/O specific controls */
+static int projectmix_discover(struct snd_bebob *bebob) {
+	return 0;
+}
+static char *projectmix_clock_labels[] = {
+	"Internal with Digital Mute", "Digital",
+	"Word Clock", "Internal with Digital unmute"};
+static int projectmix_clock_get(struct snd_bebob *bebob, int *id)
+{
+	*id = bebob->clk_src;
+	return 0;
+}
+static int projectmix_clock_set(struct snd_bebob *bebob, int id)
+{
+	return set_clock_params(bebob, id, bebob->clk_iface, bebob->clk_lock);
+}
+static char *projectmix_dig_iface_labels[] = {
+	"Optical", "Coaxial"
+};
+static int projectmix_dig_iface_get(struct snd_bebob *bebob, int *id)
+{
+	*id = bebob->clk_iface;
+	return 0;
+}
+static int projectmix_dig_iface_set(struct snd_bebob *bebob, int id)
+{
+	return set_clock_params(bebob, bebob->clk_src, id, bebob->clk_lock);
+}
+static char *projectmix_meter_labels[] = {
+	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
+	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
+	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
+	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
+	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER
+};
+static int projectmix_meter_get(struct snd_bebob *bebob, u32 *target, int size)
+{
+	u16 *buf;
+	int c, channels, err;
+
+	channels = ARRAY_SIZE(projectmix_meter_labels) * 2;
+	if (size < channels * sizeof(u32))
+		return -EINVAL;
+
+	/* omit last 4 bytes because it's clock info. */
+	buf = kmalloc(80, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	err = get_meter(bebob, (void *)buf, 80);
+	if (err < 0)
+		goto end;
+
+	/* some channels are not used and convert u16 to u32 */
+	/* TODO: breakdown */
+	for (c = 0; c < channels; c++)
+		target[c] = be32_to_cpu(buf[c]) << 8;
+
+end:
+	kfree(buf);
+	return err;
+}
+
+/* Firewire 410 specific controls */
 static char *fw410_clock_labels[] = {"Internal", "Optical", "Coaxial"};
 static int fw410_clock_get(struct snd_bebob *bebob, int *id)
 {
@@ -247,10 +371,9 @@ static int fw410_clock_set(struct snd_bebob *bebob, int id)
 static char *fw410_dig_iface_labels[] = {
 	"Optical", "Coaxial"
 };
-static int fw410_dig_iface_get(struct snd_bebob *bebob)
+static int fw410_dig_iface_get(struct snd_bebob *bebob, int *id)
 {
-	int id;
-	return id;
+	return *id;
 }
 static int fw410_dig_iface_set(struct snd_bebob *bebob, int id)
 {
@@ -282,6 +405,7 @@ end:
 	return err;
 }
 
+/* Firewire Audiophile specific controls */
 static char *audiophile_clock_labels[] = {"Internal", "Digital"};
 static int audiophile_clock_get(struct snd_bebob *bebob, int *id)
 {
@@ -316,6 +440,7 @@ end:
 	return err;
 }
 
+/* Firewire Solo specific controls */
 static char *solo_clock_labels[] = {"Internal", "Digital"};
 static int solo_clock_get(struct snd_bebob *bebob, int *id)
 {
@@ -365,6 +490,7 @@ end:
 	return err;
 }
 
+/* Ozonic specific controls */
 static char *ozonic_meter_labels[] = {
 	ANA_IN, ANA_IN,
 	STRM_IN, STRM_IN,
@@ -388,6 +514,35 @@ static int ozonic_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 end:
 	return err;
 }
+
+/* NRV10 specific controls */
+static char *nrv10_meter_labels[] = {
+	/* TODO: this is based on my assumption */
+	ANA_IN, ANA_IN, ANA_IN, ANA_IN,
+	DIG_IN,
+	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT,
+	DIG_IN
+};
+static int nrv10_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+{
+	int c, channels, err;
+
+	channels = ARRAY_SIZE(nrv10_meter_labels) * 2;
+	if (size < channels * sizeof(u32))
+		return -EINVAL;
+
+	/* TODO: are there clock info or not? */
+	err = get_meter(bebob, (void *)buf, size);
+	if (err < 0)
+		goto end;
+
+	for (c = 0; c < channels; c++)
+		buf[c] = be32_to_cpu(buf[c]);
+
+end:
+	return err;
+}
+
 
 /* BeBoB bootloader specification */
 struct snd_bebob_spec maudio_bootloader_spec = {
@@ -421,6 +576,32 @@ struct snd_bebob_spec maudio_fw1814_spec = {
 	.clock		= &fw1814_clock_spec,
 	.dig_iface	= &fw1814_dig_iface_spec,
 	.meter		= &fw1814_meter_spec
+};
+
+/* ProjectMix specification */
+static struct snd_bebob_clock_spec projectmix_clock_spec = {
+	.num	= ARRAY_SIZE(projectmix_clock_labels),
+	.labels	= projectmix_clock_labels,
+	.get	= &projectmix_clock_get,
+	.set	= &projectmix_clock_set
+};
+static struct snd_bebob_dig_iface_spec projectmix_dig_iface_spec = {
+	.num	= ARRAY_SIZE(projectmix_dig_iface_labels),
+	.labels	= projectmix_dig_iface_labels,
+	.get	= &projectmix_dig_iface_get,
+	.set	= &projectmix_dig_iface_set
+};
+static struct snd_bebob_meter_spec projectmix_meter_spec = {
+	.num	= ARRAY_SIZE(projectmix_meter_labels),
+	.labels	= projectmix_meter_labels,
+	.get	= &projectmix_meter_get
+};
+struct snd_bebob_spec maudio_projectmix_spec = {
+	.load		= NULL,
+	.discover	= &projectmix_discover,
+	.clock		= &projectmix_clock_spec,
+	.dig_iface	= &projectmix_dig_iface_spec,
+	.meter		= &projectmix_meter_spec
 };
 
 /* Firewire 410 specification */
@@ -502,3 +683,18 @@ struct snd_bebob_spec maudio_ozonic_spec = {
 	.dig_iface	= NULL,
 	.meter		= &ozonic_meter_spec
 };
+
+/* NRV10 specification */
+static struct snd_bebob_meter_spec nrv10_meter_spec = {
+	.num	= ARRAY_SIZE(nrv10_meter_labels),
+	.labels	= nrv10_meter_labels,
+	.get	= &nrv10_meter_get
+};
+struct snd_bebob_spec maudio_nrv10_spec = {
+	.load		= NULL,
+	.discover	= &snd_bebob_discover,
+	.clock		= NULL,
+	.dig_iface	= NULL,
+	.meter		= &nrv10_meter_spec
+};
+

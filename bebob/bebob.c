@@ -32,6 +32,8 @@ static unsigned int devices_used;
 #define MODEL_MAUDIO_SOLO			0x00010062
 #define MODEL_MAUDIO_FW_1814_BOOTLOADER		0x00010070
 #define MODEL_MAUDIO_FW_1814			0x00010071
+#define MODEL_MAUDIO_NRV10			0x00010081
+#define MODEL_MAUDIO_PROJECTMIX			0x00010091
 
 int sampling_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES] = {
 	[0] = 22050,
@@ -527,6 +529,22 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 		.vendor_id	= VENDOR_MAUDIO1,
 		.model_id	= MODEL_MAUDIO_FW_1814,
 		.driver_data	= (kernel_ulong_t)&maudio_fw1814_spec
+	},
+	/* NRV10 is booted just after power on. */
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= VENDOR_MAUDIO1,
+		.model_id	= MODEL_MAUDIO_NRV10,
+		.driver_data	= (kernel_ulong_t)&maudio_nrv10_spec
+	},
+	/* ProjectMix is booted just after power on. */
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= VENDOR_MAUDIO1,
+		.model_id	= MODEL_MAUDIO_PROJECTMIX,
+		.driver_data	= (kernel_ulong_t)&maudio_projectmix_spec
 	},
 	{}
 };

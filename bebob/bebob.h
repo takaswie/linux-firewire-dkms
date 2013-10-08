@@ -96,7 +96,7 @@ struct snd_bebob_clock_spec {
 struct snd_bebob_dig_iface_spec {
 	int num;
 	char **labels;
-	int (*get)(struct snd_bebob *bebob);
+	int (*get)(struct snd_bebob *bebob, int *id);
 	int (*set)(struct snd_bebob *bebob, int id);
 };
 struct snd_bebob_meter_spec {
@@ -139,6 +139,11 @@ struct snd_bebob {
 		tx_stream_formations[SND_BEBOB_STREAM_FORMATION_ENTRIES];
 	struct snd_bebob_stream_formation
 		rx_stream_formations[SND_BEBOB_STREAM_FORMATION_ENTRIES];
+
+	/* MAudio specific */
+	int clk_src;
+	int clk_iface;	/* handle both of input and output in this member */
+	int clk_lock;
 };
 
 int snd_bebob_get_formation_index(int sampling_rate);
@@ -191,7 +196,9 @@ int snd_bebob_discover(struct snd_bebob *bebob);
 
 /* device specific operations */
 extern struct snd_bebob_spec maudio_bootloader_spec;
+extern struct snd_bebob_spec maudio_projectmix_spec;
 extern struct snd_bebob_spec maudio_fw1814_spec;
+extern struct snd_bebob_spec maudio_nrv10_spec;
 extern struct snd_bebob_spec maudio_fw410_spec;
 extern struct snd_bebob_spec maudio_audiophile_spec;
 extern struct snd_bebob_spec maudio_solo_spec;
