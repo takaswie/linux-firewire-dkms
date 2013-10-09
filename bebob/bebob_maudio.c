@@ -6,8 +6,18 @@
 
 #define MAUDIO_SPECIFIC_ADDRESS	0xffc700000000
 
+#define METER_OFFSET		0x00600000
+
+/* some device has sync info after metering data */
+#define METER_SIZE_FW1814	84	/* with sync info */
+#define METER_SIZE_PROJECTMIX	84	/* with sync info */
+#define METER_SIZE_FW410	76	/* with sync info */
+#define METER_SIZE_AUDIOPHILE	60	/* with sync info */
+#define METER_SIZE_SOLO		52	/* with sync info */
+#define METER_SIZE_OZONIC	48
+#define METER_SIZE_NRV10	80
+
 /* labels for metering */
-#define METER_OFFSET	0x00600000
 #define ANA_IN		"Analog In"
 #define ANA_OUT		"Analog Out"
 #define DIG_IN		"Digital_in"
@@ -149,6 +159,30 @@ get_meter(struct snd_bebob *bebob, void *buf, int size)
 	return snd_fw_transaction(bebob->unit, TCODE_READ_BLOCK_REQUEST,
 				  MAUDIO_SPECIFIC_ADDRESS + METER_OFFSET,
 				  buf, size);
+}
+
+/*
+ * BeBoB don't tell drivers to detect digital input, just show clock sync or not.
+ */
+static int
+check_sync(struct snd_bebob *bebob, int size, int *sync)
+{
+	int err;
+	u8 *buf;
+
+	buf = kmalloc(size, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	err = get_meter(bebob, buf, size);
+	if (err < 0)
+		goto end;
+
+	*sync = (buf[size - 3] != 0xff);
+	err = 0;
+end:
+	kfree(buf);
+	return err;
 }
 
 /*
@@ -427,11 +461,11 @@ static int fw1814_meter_get(struct snd_bebob *bebob, u32 *target, int size)
 		return -EINVAL;
 
 	/* omit last 4 bytes because it's clock info. */
-	buf = kmalloc(80, GFP_KERNEL);
+	buf = kmalloc(METER_SIZE_FW1814, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
-	err = get_meter(bebob, (void *)buf, 80);
+	err = get_meter(bebob, (void *)buf, METER_SIZE_FW1814);
 	if (err < 0)
 		goto end;
 
@@ -470,11 +504,11 @@ static int projectmix_meter_get(struct snd_bebob *bebob, u32 *target, int size)
 		return -EINVAL;
 
 	/* omit last 4 bytes because it's clock info. */
-	buf = kmalloc(80, GFP_KERNEL);
+	buf = kmalloc(METER_SIZE_PROJECTMIX, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
-	err = get_meter(bebob, (void *)buf, 80);
+	err = get_meter(bebob, (void *)buf, METER_SIZE_PROJECTMIX);
 	if (err < 0)
 		goto end;
 
