@@ -59,7 +59,7 @@ control_digital_interface_info(struct snd_kcontrol *kctl,
 	einf->value.enumerated.items = spec->num;
 
 	if (einf->value.enumerated.item >= einf->value.enumerated.items)
-		einf->value.enumerated.item = einf->value.enumerated.items;
+		einf->value.enumerated.item = einf->value.enumerated.items - 1;
 
 	strcpy(einf->value.enumerated.name,
 	       spec->labels[einf->value.enumerated.item]);
@@ -221,7 +221,7 @@ static int control_clock_source_info(struct snd_kcontrol *kctl,
 	einf->value.enumerated.items = spec->num;
 
 	if (einf->value.enumerated.item >= einf->value.enumerated.items)
-		einf->value.enumerated.item = einf->value.enumerated.items;
+		einf->value.enumerated.item = einf->value.enumerated.items - 1;
 
 	strcpy(einf->value.enumerated.name,
 	       spec->labels[einf->value.enumerated.item]);
