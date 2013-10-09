@@ -260,11 +260,6 @@ end:
  * But I note that as a result of changing the number of channels, if payload
  * size of AMDTP packet is changed, the streaming is broken.
  */
-static char *sampling_rate_descs[] = {"5512Hz", "8000Hz", "11025Hz",
-				      "16000Hz", "22050Hz", "32000Hz",
-				      "44100Hz", "48000Hz", "64000Hz",
-				      "88200Hz", "96000Hz", "176400Hz",
-				      "192000Hz"};
 static int sampling_rates[] = {5512, 8000, 11025, 16000, 22500, 32000, 44100,
 			       48000, 64000, 88200, 96000, 176400, 192000};
 static int
@@ -276,10 +271,9 @@ control_sampling_rate_info(struct snd_kcontrol *kctl,
 
 	/* maximum value for user */
 	einf->value.enumerated.items = 0;
-	for (i = 0; i < ARRAY_SIZE(sampling_rate_descs); i += 1) {
+	for (i = 0; i < ARRAY_SIZE(sampling_rates); i++)
 		if (BIT(i) & efw->supported_sampling_rate)
-			einf->value.enumerated.items += 1;
-	}
+			einf->value.enumerated.items++;
 
 	einf->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
 	einf->count = 1;
@@ -289,16 +283,16 @@ control_sampling_rate_info(struct snd_kcontrol *kctl,
 
 	/* skip unsupported clock source */
 	value = einf->value.enumerated.item;
-	for (i = 0; i < ARRAY_SIZE(sampling_rate_descs); i += 1) {
+	for (i = 0; i < ARRAY_SIZE(sampling_rates); i++) {
 		if (!(BIT(i) & efw->supported_sampling_rate))
 			continue;
 		else if (value == 0)
 			break;
 		else
-			value -= 1;
+			value--;
 	}
 
-	strcpy(einf->value.enumerated.name, sampling_rate_descs[i]);
+	sprintf(einf->value.enumerated.name, "%dHz", sampling_rates[i]);
 
 	return 0;
 }
