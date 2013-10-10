@@ -36,7 +36,7 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 		if (formations[i].pcm == 0)
 			continue;
 
-		if (!snd_interval_test(c, sampling_rate_table[i]))
+		if (!snd_interval_test(c, formations[i].pcm))
 			continue;
 
 		t.min = min(t.min, sampling_rate_table[i]);
@@ -69,8 +69,8 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 		if (!snd_interval_test(r, sampling_rate_table[i]))
 			continue;
 
-		t.min = min(t.min, sampling_rate_table[i]);
-		t.max = max(t.max, sampling_rate_table[i]);
+		t.min = min(t.min, formations[i].pcm);
+		t.max = max(t.max, formations[i].pcm);
 	}
 
 	return snd_interval_refine(c, &t);
