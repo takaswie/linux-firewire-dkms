@@ -31,11 +31,32 @@
 
 /*
  * Offsets from information register.
- * In detail, see struct hw_info in bebob_proc.c
  */
-#define INFO_OFFSET_GUID		0x10
+#define INFO_OFFSET_GUID			0x10
 #define INFO_OFFSET_HW_MODEL_ID		0x18
 #define INFO_OFFSET_HW_MODEL_REVISION	0x1c
+
+/* contents of information register */
+struct snd_bebob_device_info {
+	__be64 manufacturer;
+	__be32 protocol_version;
+	__be32 bld_version;
+	__be64 guid;
+	__be32 model_id;
+	__be32 model_revision;
+	__be64 fw_date;
+	__be64 fw_time;
+	__be32 fw_id;
+	__be32 fw_version;
+	__be32 base_address;
+	__be32 maximum_size;
+	__be64 bld_date;
+	__be64 bld_time;
+	__be64 dbg_date;
+	__be64 dbg_time;
+	__be32 dbg_id;
+	__be32 dbg_version;
+} __attribute__((packed));
 
 /* defined later */
 struct snd_bebob;
