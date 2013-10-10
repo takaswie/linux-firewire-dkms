@@ -241,20 +241,20 @@ name_device(struct snd_bebob *bebob, int vendor_id)
 		goto end;
 
 	/* get hardware id */
-	err = snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
-			0xffffc8020018, &id, sizeof(id));
+	err = snd_bebob_read_quad(bebob, INFO_OFFSET_HW_MODEL_ID,
+				  &id, sizeof(id));
 	if (err < 0)
 		goto end;
 
 	/* get hardware revision */
-	err = snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
-			0xffffc802001c, &revision, sizeof(revision));
+	err = snd_bebob_read_quad(bebob, INFO_OFFSET_HW_MODEL_REVISION,
+				  &revision, sizeof(revision));
 	if (err < 0)
 		goto end;
 
 	/* get GUID */
-	err = snd_fw_transaction(bebob->unit, TCODE_READ_BLOCK_REQUEST,
-			0xffffc8020010, data, sizeof(data));
+	err = snd_bebob_read_block(bebob, INFO_OFFSET_GUID,
+				   data, sizeof(data));
 	if (err < 0)
 		goto end;
 

@@ -29,26 +29,12 @@
 #define BEBOB_ADDR_REG_INFO	0xffffc8020000
 #define BEBOB_ADDR_REG_REQ	0xffffc8021000
 
-/* offsets of information register */
-#define REG_INFO_SIZE				0x68
-#define REG_INFO_OFFSET_MANUFACTURER_NAME	0x00
-#define REG_INFO_OFFSET_PROTOCOL_VERSION	0x08
-#define REG_INFO_OFFSET_BOOTLOADER_VERSION	0x0c
-#define REG_INFO_OFFSET_GUID			0x10
-#define REG_INFO_OFFSET_HW_MODEL_ID		0x18
-#define REG_INFO_OFFSET_HW_MODEL_REVISION	0x1c
-#define REG_INFO_OFFSET_FW_DATE			0x20
-#define REG_INFO_OFFSET_FW_TIME			0x28
-#define REG_INFO_OFFSET_FW_ID			0x30
-#define REG_INFO_OFFSET_FW_VERSION		0x34
-#define REG_INFO_OFFSET_BASE_ADDRESS		0x38
-#define REG_INFO_OFFSET_MAX_IMAGE_LENGTH	0x3c
-#define REG_INFO_OFFSET_BOOTLOADER_DATE		0x40
-#define REG_INFO_OFFSET_BOOTLOADER_TIME		0x48
-#define REG_INFO_OFFSET_DEBUGGER_DATE		0x50
-#define REG_INFO_OFFSET_DEBUGGER_TIME		0x58
-#define REG_INFO_OFFSET_DEBUGGER_ID		0x60
-#define REG_INFO_OFFSET_DEBUGGER_VERSION	0x64
+/*
+ * Offsets from information register.
+ */
+#define INFO_OFFSET_GUID			0x10
+#define INFO_OFFSET_HW_MODEL_ID		0x18
+#define INFO_OFFSET_HW_MODEL_REVISION	0x1c
 
 /* contents of information register */
 struct snd_bebob_device_info {
@@ -147,6 +133,22 @@ struct snd_bebob {
 	int out_dig_iface;
 	int clk_lock;
 };
+
+static inline int
+snd_bebob_read_block(struct snd_bebob *bebob, u64 addr, void *buf, int size)
+{
+	return snd_fw_transaction(bebob->unit, TCODE_READ_BLOCK_REQUEST,
+				  BEBOB_ADDR_REG_INFO + addr,
+				  buf, size);
+}
+
+static inline int
+snd_bebob_read_quad(struct snd_bebob *bebob, u64 addr, void *buf, int size)
+{
+	return snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
+				  BEBOB_ADDR_REG_INFO + addr,
+				  buf, size);
+}
 
 int snd_bebob_get_formation_index(int sampling_rate);
 
