@@ -33,14 +33,14 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 
 	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
 		/* entry is invalid */
-		if (formations[i].sampling_rate == 0)
+		if (formations[i].pcm == 0)
 			continue;
 
-		if (!snd_interval_test(c, formations[i].pcm))
+		if (!snd_interval_test(c, sampling_rate_table[i]))
 			continue;
 
-		t.min = min(t.min, formations[i].sampling_rate);
-		t.max = max(t.max, formations[i].sampling_rate);
+		t.min = min(t.min, sampling_rate_table[i]);
+		t.max = max(t.max, sampling_rate_table[i]);
 
 	}
 	return snd_interval_refine(r, &t);
@@ -61,17 +61,16 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 
 	int i;
 
-
 	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
 		/* entry is invalid */
-		if (formations[i].sampling_rate == 0)
+		if (formations[i].pcm == 0)
 			continue;
 
-		if (!snd_interval_test(r, formations[i].sampling_rate))
+		if (!snd_interval_test(r, sampling_rate_table[i]))
 			continue;
 
-		t.min = min(t.min, formations[i].pcm);
-		t.max = max(t.max, formations[i].pcm);
+		t.min = min(t.min, sampling_rate_table[i]);
+		t.max = max(t.max, sampling_rate_table[i]);
 	}
 
 	return snd_interval_refine(c, &t);
@@ -142,10 +141,9 @@ prepare_rates(struct snd_pcm_hardware *hw,
 		if (formations[i].pcm == 0)
 			continue;
 
-		hw->rate_min = min(hw->rate_min, formations[i].sampling_rate);
-		hw->rate_max = max(hw->rate_max, formations[i].sampling_rate);
-		hw->rates |=
-			snd_pcm_rate_to_rate_bit(formations[i].sampling_rate);
+		hw->rate_min = min(hw->rate_min, sampling_rate_table[i]);
+		hw->rate_max = max(hw->rate_max, sampling_rate_table[i]);
+		hw->rates |= snd_pcm_rate_to_rate_bit(sampling_rate_table[i]);
 	}
 
 	return;
@@ -258,7 +256,6 @@ static int pcm_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_bebob *bebob = substream->private_data;
 	struct amdtp_stream *stream;
-	struct snd_bebob_stream_formation *formation;
 	int index, direction, err;
 
 	/* keep PCM ring buffer */
@@ -275,16 +272,16 @@ static int pcm_hw_params(struct snd_pcm_substream *substream,
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		stream = &bebob->tx_stream;
-		formation = bebob->tx_stream_formations + index;
 		direction = 0;
 	} else {
 		stream = &bebob->rx_stream;
-		formation = bebob->rx_stream_formations + index;
 		direction = 1;
 	}
 
 	/* set sampling rate if fw isochronous stream is not running */
-	err = avc_generic_set_sampling_rate(bebob->unit, formation->sampling_rate, direction, 0);
+	err = avc_generic_set_sampling_rate(bebob->unit,
+					    sampling_rate_table[index],
+					    direction, 0);
 	if (err < 0)
 		return err;
 //	snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,

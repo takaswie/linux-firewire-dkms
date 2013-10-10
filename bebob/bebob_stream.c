@@ -125,7 +125,7 @@ int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
 {
 	struct snd_bebob_stream_formation *formations;
 	struct cmp_connection *conn;
-	unsigned int i, pcm_channels, midi_channels;
+	unsigned int index, pcm_channels, midi_channels;
 	int err = 0;
 
 	/* already running */
@@ -140,15 +140,9 @@ int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
 		conn= &bebob->in_conn;
 	}
 
-	pcm_channels = 0;
-	midi_channels = 0;
-	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i++) {
-		if (formations[i].sampling_rate != sampling_rate)
-			continue;
-		pcm_channels = formations[i].pcm;
-		midi_channels = formations[i].midi;
-		break;
-	}
+	index = snd_bebob_get_formation_index(sampling_rate);
+	pcm_channels = formations[index].pcm;
+	midi_channels = formations[index].midi;
 
 	amdtp_stream_set_params(stream, sampling_rate,
 				pcm_channels, midi_channels);

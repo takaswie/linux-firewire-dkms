@@ -35,7 +35,7 @@ static unsigned int devices_used;
 #define MODEL_MAUDIO_NRV10			0x00010081
 #define MODEL_MAUDIO_PROJECTMIX			0x00010091
 
-int sampling_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES] = {
+unsigned int sampling_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES] = {
 	[0] = 22050,
 	[1] = 24000,
 	[2] = 32000,
@@ -203,13 +203,6 @@ int snd_bebob_discover(struct snd_bebob *bebob)
 		}
 	}
 
-	/* fill sampling rates in stream_formations */
-	for (i = 0; i < 9; i += 1) {
-		bebob->tx_stream_formations[i].sampling_rate =
-		bebob->rx_stream_formations[i].sampling_rate =
-		sampling_rate_table[i];
-	}
-
 	/* store formations */
 	for (i = 0; i < 2; i += 1) {
 		err = fill_stream_formations(bebob, i, 0);
@@ -223,7 +216,8 @@ end:
 	return err;
 }
 
-static int name_device(struct snd_bebob *bebob, int vendor_id)
+static int
+name_device(struct snd_bebob *bebob, int vendor_id)
 {
 	char vendor[24] = {};
 	char model[24] = {};

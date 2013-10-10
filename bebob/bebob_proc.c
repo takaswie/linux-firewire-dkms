@@ -49,7 +49,7 @@ proc_read_formation(struct snd_info_entry *entry,
 	for (i = 0; i < 9; i += 1) {
 		snd_iprintf(buffer,
 			"\t%d\t%d\t%d\n",
-			formation[i].sampling_rate,
+			sampling_rate_table[i],
 			formation[i].pcm,
 			formation[i].midi);
 	}
@@ -60,7 +60,7 @@ proc_read_formation(struct snd_info_entry *entry,
 	for (i = 0; i < 9; i += 1) {
 		snd_iprintf(buffer,
 			"\t%d\t%d\t%d\n",
-			formation[i].sampling_rate,
+			sampling_rate_table[i],
 			formation[i].pcm,
 			formation[i].midi);
 	}

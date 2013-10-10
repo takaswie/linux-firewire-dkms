@@ -78,13 +78,12 @@ struct snd_bebob;
 /* for caching entries of stream formation */
 #define SND_BEBOB_STREAM_FORMATION_ENTRIES	9
 struct snd_bebob_stream_formation {
-	unsigned int sampling_rate;
 	unsigned int pcm;
 	unsigned int midi;
 	u8 entry[64];	/* '64' is arbitrary number but enough */
 };
 /* this is a lookup table for index of stream formations */
-extern int sampling_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES];
+extern unsigned int sampling_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES];
 
 /* device specific operations */
 struct snd_bebob_clock_spec {
