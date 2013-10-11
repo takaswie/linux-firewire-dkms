@@ -39,6 +39,7 @@ int snd_bebob_strem_get_formation_index(int sampling_rate)
 	return -1;
 }
 
+/* TODO: to use chache because there are some devices which don't respond */
 static int mapping_channels(struct snd_bebob *bebob, struct amdtp_stream *s)
 {
 	unsigned int cl, ch, clusters, channels, pos, pcm, midi;
@@ -53,9 +54,9 @@ static int mapping_channels(struct snd_bebob *bebob, struct amdtp_stream *s)
 	}
 
 	if (s == &bebob->tx_stream)
-		dir = 0;
-	else
 		dir = 1;
+	else
+		dir = 0;
 
 	err = avc_bridgeco_get_plug_channel_position(bebob->unit, dir, 0, buf);
 	if (err < 0)

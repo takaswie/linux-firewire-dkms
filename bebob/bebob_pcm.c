@@ -186,7 +186,7 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		prepare_rates(&substream->runtime->hw, bebob->tx_stream_formations);
 		prepare_channels(&substream->runtime->hw, bebob->tx_stream_formations);
-		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
+		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32;
 		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_capture_channels, bebob,
 				SNDRV_PCM_HW_PARAM_RATE, -1);
@@ -314,9 +314,11 @@ static int pcm_capture_prepare(struct snd_pcm_substream *substream)
 	struct snd_bebob *bebob = substream->private_data;
 	int err = 0;
 
-	if (!amdtp_stream_wait_run(&bebob->rx_stream))
+	if (!amdtp_stream_wait_run(&bebob->tx_stream)) {
+		snd_printk(KERN_INFO"\n");
 		return -EIO;
-	amdtp_stream_pcm_prepare(&bebob->rx_stream);
+	}
+	amdtp_stream_pcm_prepare(&bebob->tx_stream);
 
 	return err;
 }
