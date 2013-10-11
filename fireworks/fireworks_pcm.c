@@ -317,7 +317,7 @@ static int pcm_hw_params(struct snd_pcm_substream *substream,
 			 struct snd_pcm_hw_params *hw_params)
 {
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
-				params_buffer_bytes(hw_params));
+						params_buffer_bytes(hw_params));
 }
 
 static int pcm_hw_free(struct snd_pcm_substream *substream)
