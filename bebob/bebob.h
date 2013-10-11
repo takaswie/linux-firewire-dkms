@@ -167,7 +167,7 @@ int snd_bebob_create_pcm_devices(struct snd_bebob *bebob);
 
 int snd_bebob_create_control_devices(struct snd_bebob *bebob);
 
-void snd_bebob_create_midi_devices(struct snd_bebob *bebob);
+int snd_bebob_create_midi_devices(struct snd_bebob *bebob);
 
 void snd_bebob_proc_init(struct snd_bebob *bebob);
 

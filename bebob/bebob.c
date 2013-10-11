@@ -210,6 +210,10 @@ int snd_bebob_discover(struct snd_bebob *bebob)
 			goto end;
 	}
 
+	/* TODO: count MIDI external plugs */
+	bebob->midi_input_ports = 1;
+	bebob->midi_output_ports = 1;
+
 	err = 0;
 
 end:
@@ -378,7 +382,9 @@ loaded:
 	if (err < 0)
 		goto error;
 
-	snd_bebob_create_midi_devices(bebob);
+	err = snd_bebob_create_midi_devices(bebob);
+	if (err < 0)
+		goto error;
 
 	err = snd_bebob_stream_init_duplex(bebob);
 	if (err < 0)
