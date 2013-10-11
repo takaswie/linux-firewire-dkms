@@ -1,5 +1,12 @@
 #include "./bebob.h"
 
+/*
+ * NOTE:
+ *  For streaming, both of output and input streams are needed for Firewire 410
+ *  and Ozonic. The opposite stream is OK for the others even if the clock
+ *  source is not SYT-Match.
+ */
+
 #define MAUDIO_BOOTLOADER_CUE1	0x01000000
 #define MAUDIO_BOOTLOADER_CUE2	0x00001101
 #define MAUDIO_BOOTLOADER_CUE3	0x00000000
