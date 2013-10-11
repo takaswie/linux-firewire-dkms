@@ -17,7 +17,8 @@
  */
 #include "./bebob.h"
 
-int snd_bebob_strem_get_formation_index(int sampling_rate)
+static int
+get_formation_index(int sampling_rate)
 {
         int table[] = {
                 [0] = 22050,
@@ -40,7 +41,8 @@ int snd_bebob_strem_get_formation_index(int sampling_rate)
 }
 
 /* TODO: to use chache because there are some devices which don't respond */
-static int mapping_channels(struct snd_bebob *bebob, struct amdtp_stream *s)
+static int
+mapping_channels(struct snd_bebob *bebob, struct amdtp_stream *s)
 {
 	unsigned int cl, ch, clusters, channels, pos, pcm, midi;
 	u8 *buf, type;
@@ -89,7 +91,8 @@ end:
 	return err;
 }
 
-int snd_bebob_stream_init(struct snd_bebob *bebob, struct amdtp_stream *stream)
+static int
+stream_init(struct snd_bebob *bebob, struct amdtp_stream *stream)
 {
 	struct cmp_connection *conn;
 	enum cmp_direction c_dir;
@@ -110,19 +113,19 @@ int snd_bebob_stream_init(struct snd_bebob *bebob, struct amdtp_stream *stream)
 	if (err < 0)
 		goto end;
 
-	err = amdtp_stream_init(stream, bebob->unit, s_dir, CIP_NONBLOCKING);
+	err = amdtp_stream_init(stream, bebob->unit, s_dir, CIP_BLOCKING);
 	if (err < 0) {
 		cmp_connection_destroy(conn);
 		goto end;
-
 	}
 
 end:
 	return err;
 }
 
-int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
-			   unsigned int sampling_rate)
+static int
+stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
+	     unsigned int sampling_rate)
 {
 	struct snd_bebob_stream_formation *formations;
 	struct cmp_connection *conn;
@@ -130,7 +133,7 @@ int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
 	int err = 0;
 
 	/* already running */
-	if (!IS_ERR(stream->context))
+	if (amdtp_stream_running(stream))
 		goto end;
 
 	if (stream == &bebob->tx_stream) {
@@ -141,7 +144,7 @@ int snd_bebob_stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
 		conn= &bebob->in_conn;
 	}
 
-	index = snd_bebob_get_formation_index(sampling_rate);
+	index = get_formation_index(sampling_rate);
 	pcm_channels = formations[index].pcm;
 	midi_channels = formations[index].midi;
 
@@ -169,9 +172,10 @@ end:
 	return err;
 }
 
-void snd_bebob_stream_stop(struct snd_bebob *bebob, struct amdtp_stream *stream)
+static void
+stream_stop(struct snd_bebob *bebob, struct amdtp_stream *stream)
 {
-	if (!!IS_ERR(stream->context))
+	if (!amdtp_stream_running(stream))
 		goto end;
 
 	amdtp_stream_stop(stream);
@@ -184,14 +188,184 @@ end:
 	return;
 }
 
-void snd_bebob_stream_destroy(struct snd_bebob *bebob, struct amdtp_stream *stream)
+static void
+stream_update(struct snd_bebob *bebob, struct amdtp_stream *stream)
 {
-	snd_bebob_stream_stop(bebob, stream);
+	struct cmp_connection *conn;
+
+	if (stream == &bebob->tx_stream)
+		conn = &bebob->out_conn;
+	else
+		conn = &bebob->in_conn;
+
+	if (cmp_connection_update(conn) < 0) {
+		amdtp_stream_pcm_abort(stream);
+		mutex_lock(&bebob->mutex);
+		stream_stop(bebob, stream);
+		mutex_unlock(&bebob->mutex);
+		return;
+	}
+	amdtp_stream_update(stream);
+}
+
+static void
+stream_destroy(struct snd_bebob *bebob, struct amdtp_stream *stream)
+{
+	stream_stop(bebob, stream);
 
 	if (stream == &bebob->tx_stream)
 		cmp_connection_destroy(&bebob->out_conn);
 	else
 		cmp_connection_destroy(&bebob->in_conn);
+}
 
-	return;
+static int
+get_roles(struct snd_bebob *bebob, enum cip_flags *sync_mode,
+	  struct amdtp_stream **master, struct amdtp_stream **slave)
+{
+	/* currently this module doesn't support SYT-Match mode */
+	*sync_mode = CIP_SYNC_TO_DEVICE;
+	*master = &bebob->tx_stream;
+	*slave = &bebob->rx_stream;
+
+	return 0;
+}
+
+int snd_bebob_stream_init_duplex(struct snd_bebob *bebob)
+{
+	int err;
+
+	err = stream_init(bebob, &bebob->tx_stream);
+	if (err < 0)
+		goto end;
+	err = stream_init(bebob, &bebob->rx_stream);
+end:
+	return err;
+}
+
+int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
+				  struct amdtp_stream *request,
+				  unsigned int sampling_rate)
+{
+	struct amdtp_stream *master, *slave;
+	enum cip_flags sync_mode;
+	int err, in_rate, out_rate;
+	bool slave_flag;
+
+	err = get_roles(bebob, &sync_mode, &master, &slave);
+	if (err < 0)
+		goto end;
+
+	if ((request == slave) || amdtp_stream_running(slave))
+		slave_flag = true;
+	else
+		slave_flag = false;
+
+	/* change sampling rate if possible */
+	err = avc_generic_get_sampling_rate(bebob->unit, &out_rate, 0, 0);
+	if (err < 0)
+		goto end;
+	err = avc_generic_get_sampling_rate(bebob->unit, &in_rate, 1, 0);
+	if (err < 0)
+		goto end;
+	if (in_rate != out_rate)
+		goto end;
+
+	if (sampling_rate == 0)
+		sampling_rate = in_rate;
+	if (sampling_rate != in_rate) {
+		/* master is just for MIDI stream */
+		if (amdtp_stream_running(master) &&
+		    !amdtp_stream_pcm_running(master))
+			stream_stop(bebob, master);
+
+		/* slave is just for MIDI stream */
+		if (amdtp_stream_running(slave) &&
+		    !amdtp_stream_pcm_running(slave))
+			stream_stop(bebob, slave);
+
+		/* move to strem_start? */
+		err = avc_generic_set_sampling_rate(bebob->unit,
+						    sampling_rate, 1, 0);
+		if (err < 0)
+			goto end;
+		err = avc_generic_set_sampling_rate(bebob->unit,
+						    sampling_rate, 0, 0);
+		if (err < 0)
+			goto end;
+		/* TODO: notify */
+	}
+
+	/* master should be always running */
+	if (!amdtp_stream_running(master)) {
+		amdtp_stream_set_sync(sync_mode, master, slave);
+		err = stream_start(bebob, master, sampling_rate);
+		if (err < 0)
+			goto end;
+
+		err = amdtp_stream_wait_run(master);
+		if (err < 0)
+			goto end;
+	}
+
+	/* start slave if needed */
+	if (slave_flag && !amdtp_stream_running(slave)) {
+		err = stream_start(bebob, slave, sampling_rate);
+		if (err < 0)
+			goto end;
+		err = amdtp_stream_wait_run(slave);
+	}
+
+end:
+	return err;
+}
+
+int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
+{
+	struct amdtp_stream *master, *slave;
+	enum cip_flags sync_mode;
+	int err;
+
+	err = get_roles(bebob, &sync_mode, &master, &slave);
+	if (err < 0)
+		goto end;
+
+	if (amdtp_stream_pcm_running(slave) ||
+	    amdtp_stream_midi_running(slave))
+		goto end;
+
+	stream_stop(bebob, slave);
+
+	if (!amdtp_stream_pcm_running(master) &&
+	    !amdtp_stream_midi_running(master))
+		stream_stop(bebob, master);
+end:
+	return err;
+}
+
+void snd_bebob_stream_update_duplex(struct snd_bebob *bebob)
+{
+	struct amdtp_stream *master, *slave;
+
+	if (bebob->tx_stream.flags & CIP_SYNC_TO_DEVICE) {
+		master = &bebob->tx_stream;
+		slave = &bebob->rx_stream;
+	} else {
+		master = &bebob->rx_stream;
+		slave = &bebob->tx_stream;
+	}
+
+	stream_update(bebob, master);
+	stream_update(bebob, slave);
+}
+
+void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
+{
+	if (amdtp_stream_pcm_running(&bebob->tx_stream))
+		amdtp_stream_pcm_abort(&bebob->tx_stream);
+	if (amdtp_stream_pcm_running(&bebob->rx_stream))
+		amdtp_stream_pcm_abort(&bebob->rx_stream);
+
+	stream_destroy(bebob, &bebob->tx_stream);
+	stream_destroy(bebob, &bebob->rx_stream);
 }

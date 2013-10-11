@@ -155,7 +155,7 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 {
 	int err = 0;
 
-	struct snd_pcm_hardware hardware = {
+	struct snd_pcm_hardware hw = {
 		.info = SNDRV_PCM_INFO_MMAP |
 			SNDRV_PCM_INFO_BATCH |
 			SNDRV_PCM_INFO_INTERLEAVED |
@@ -179,14 +179,14 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 		.fifo_size = 0,
 	};
 
-	substream->runtime->hw = hardware;
+	substream->runtime->hw = hw;
 	substream->runtime->delay = substream->runtime->hw.fifo_size;
 
 	/* add rule between channels and sampling rate */
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		prepare_rates(&substream->runtime->hw, bebob->tx_stream_formations);
 		prepare_channels(&substream->runtime->hw, bebob->tx_stream_formations);
-		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32;
+		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
 		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_capture_channels, bebob,
 				SNDRV_PCM_HW_PARAM_RATE, -1);
@@ -233,11 +233,21 @@ static int
 pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
-	int err;
+	int sampling_rate, err;
 
 	err = pcm_init_hw_params(bebob, substream);
 	if (err < 0)
 		goto end;
+
+	if (amdtp_stream_pcm_running(&bebob->tx_stream) ||
+	    amdtp_stream_pcm_running(&bebob->rx_stream)) {
+		err = avc_generic_get_sampling_rate(bebob->unit, &sampling_rate, 1, 0);
+		if (err < 0)
+			goto end;
+
+		substream->runtime->hw.rate_min = sampling_rate;
+		substream->runtime->hw.rate_max = sampling_rate;
+	}
 
 	snd_pcm_set_sync(substream);
 
@@ -251,90 +261,61 @@ pcm_close(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-static int pcm_hw_params(struct snd_pcm_substream *substream,
-			 struct snd_pcm_hw_params *hw_params)
+static int
+pcm_hw_params(struct snd_pcm_substream *substream,
+	      struct snd_pcm_hw_params *hw_params)
 {
-	struct snd_bebob *bebob = substream->private_data;
-	struct amdtp_stream *stream;
-	int index, direction, err;
-
-	/* keep PCM ring buffer */
-	err = snd_pcm_lib_alloc_vmalloc_buffer(substream,
-					       params_buffer_bytes(hw_params));
-	if (err < 0)
-		goto end;
-
-	index = snd_bebob_get_formation_index(params_rate(hw_params));
-	if (index < 0) {
-		err = -EIO;
-		goto end;
-	}
-
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		stream = &bebob->tx_stream;
-		direction = 0;
-	} else {
-		stream = &bebob->rx_stream;
-		direction = 1;
-	}
-
-	/* set sampling rate if fw isochronous stream is not running */
-	err = avc_generic_set_sampling_rate(bebob->unit,
-					    sampling_rate_table[index],
-					    direction, 0);
-	if (err < 0)
-		return err;
-//	snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
-//				bebob->control_id_sampling_rate);
-
-	amdtp_stream_set_pcm_format(stream, params_format(hw_params));
-	err = snd_bebob_stream_start(bebob, stream, params_rate(hw_params));
-end:
-	return err;
+	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
+						params_buffer_bytes(hw_params));
 }
 
-static int pcm_hw_free(struct snd_pcm_substream *substream)
+static int
+pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
-	struct amdtp_stream *stream;
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
-		stream = &bebob->tx_stream;
-	else
-		stream = &bebob->rx_stream;
-
-	/* stop fw isochronous stream of AMDTP with CMP */
-	snd_bebob_stream_stop(bebob, stream);
+	snd_bebob_stream_stop_duplex(bebob);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
 
-static int pcm_capture_prepare(struct snd_pcm_substream *substream)
+static int
+pcm_capture_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
-	int err = 0;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	int err;
 
-	if (!amdtp_stream_wait_run(&bebob->tx_stream)) {
-		snd_printk(KERN_INFO"\n");
-		return -EIO;
-	}
+	err = snd_bebob_stream_start_duplex(bebob, &bebob->tx_stream,
+					    runtime->rate);
+	if (err < 0)
+		goto end;
+
+	amdtp_stream_set_pcm_format(&bebob->tx_stream, runtime->format);
 	amdtp_stream_pcm_prepare(&bebob->tx_stream);
-
+end:
 	return err;
 }
-static int pcm_playback_prepare(struct snd_pcm_substream *substream)
+static int
+pcm_playback_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
-	int err = 0;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	int err;
 
-	if (!amdtp_stream_wait_run(&bebob->rx_stream))
-		return -EIO;
+	err = snd_bebob_stream_start_duplex(bebob, &bebob->rx_stream,
+					    runtime->rate);
+	if (err < 0)
+		goto end;
+
+	amdtp_stream_set_pcm_format(&bebob->rx_stream, runtime->format);
 	amdtp_stream_pcm_prepare(&bebob->rx_stream);
-
+end:
 	return err;
 }
 
-static int pcm_capture_trigger(struct snd_pcm_substream *substream, int cmd)
+static int
+pcm_capture_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_bebob *bebob = substream->private_data;
 
@@ -351,7 +332,8 @@ static int pcm_capture_trigger(struct snd_pcm_substream *substream, int cmd)
 
 	return 0;
 }
-static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
+static int
+pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_bebob *bebob = substream->private_data;
 
@@ -369,12 +351,14 @@ static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 	return 0;
 }
 
-static snd_pcm_uframes_t pcm_capture_pointer(struct snd_pcm_substream *sbstrm)
+static snd_pcm_uframes_t
+pcm_capture_pointer(struct snd_pcm_substream *sbstrm)
 {
 	struct snd_bebob *bebob = sbstrm->private_data;
 	return amdtp_stream_pcm_pointer(&bebob->tx_stream);
 }
-static snd_pcm_uframes_t pcm_playback_pointer(struct snd_pcm_substream *sbstrm)
+static snd_pcm_uframes_t
+pcm_playback_pointer(struct snd_pcm_substream *sbstrm)
 {
 	struct snd_bebob *bebob = sbstrm->private_data;
 	return amdtp_stream_pcm_pointer(&bebob->rx_stream);
@@ -418,31 +402,6 @@ int snd_bebob_create_pcm_devices(struct snd_bebob *bebob)
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &pcm_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &pcm_capture_ops);
 
-	/* for host transmit and target input */
-	err = snd_bebob_stream_init(bebob, &bebob->rx_stream);
-	if (err < 0)
-		goto end;
-
-	/* for host receive and target output */
-	err = snd_bebob_stream_init(bebob, &bebob->tx_stream);
-	if (err < 0) {
-		snd_bebob_stream_destroy(bebob, &bebob->rx_stream);
-		goto end;
-	}
-
 end:
 	return err;
-}
-
-void snd_bebob_destroy_pcm_devices(struct snd_bebob *bebob)
-{
-	amdtp_stream_pcm_abort(&bebob->tx_stream);
-	amdtp_stream_stop(&bebob->tx_stream);
-	snd_bebob_stream_destroy(bebob, &bebob->tx_stream);
-
-	amdtp_stream_pcm_abort(&bebob->rx_stream);
-	amdtp_stream_stop(&bebob->rx_stream);
-	snd_bebob_stream_destroy(bebob, &bebob->rx_stream);
-
-	return;
 }

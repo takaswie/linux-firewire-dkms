@@ -366,20 +366,23 @@ loaded:
 	if (err < 0)
 		goto error;
 
-	/* create devices */
-	err = snd_bebob_create_pcm_devices(bebob);
+	/* proc interfaces */
+	snd_bebob_proc_init(bebob);
+
+	/* create interfaces */
+	err = snd_bebob_create_control_devices(bebob);
 	if (err < 0)
 		goto error;
 
-
-	err = snd_bebob_create_control_devices(bebob);
+	err = snd_bebob_create_pcm_devices(bebob);
 	if (err < 0)
 		goto error;
 
 	snd_bebob_create_midi_devices(bebob);
 
-	/* proc interfaces */
-	snd_bebob_proc_init(bebob);
+	err = snd_bebob_stream_init_duplex(bebob);
+	if (err < 0)
+		goto error;
 
 	/* register card and device */
 	snd_card_set_dev(card, &unit->device);
@@ -411,30 +414,11 @@ snd_bebob_update(struct fw_unit *unit)
 
 	/* this is for firmware bootloader */
 	if (bebob == NULL)
-		goto end;
+		return;
 
 	fcp_bus_reset(bebob->unit);
 
-	/* bus reset for isochronous transmit stream */
-	if (cmp_connection_update(&bebob->in_conn) < 0) {
-		amdtp_stream_pcm_abort(&bebob->tx_stream);
-		mutex_lock(&bebob->mutex);
-		snd_bebob_stream_stop(bebob, &bebob->tx_stream);
-		mutex_unlock(&bebob->mutex);
-	}
-	amdtp_stream_update(&bebob->tx_stream);
-
-	/* bus reset for isochronous receive stream */
-	if (cmp_connection_update(&bebob->out_conn) < 0) {
-		amdtp_stream_pcm_abort(&bebob->rx_stream);
-		mutex_lock(&bebob->mutex);
-		snd_bebob_stream_stop(bebob, &bebob->rx_stream);
-		mutex_unlock(&bebob->mutex);
-	}
-	amdtp_stream_update(&bebob->rx_stream);
-
-end:
-	return;
+	snd_bebob_stream_update_duplex(bebob);
 }
 
 
@@ -446,7 +430,7 @@ static void snd_bebob_remove(struct fw_unit *unit)
 	if (bebob == NULL)
 		goto end;
 
-	snd_bebob_destroy_pcm_devices(bebob);
+	snd_bebob_stream_destroy_duplex(bebob);
 
 	snd_card_disconnect(bebob->card);
 	snd_card_free_when_closed(bebob->card);

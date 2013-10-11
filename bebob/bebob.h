@@ -155,18 +155,14 @@ int avc_bridgeco_get_plug_stream_formation_entry(struct fw_unit *unit,
 				int direction, unsigned short plugid,
 				int entryid, u8 *buf, int *len);
 
-int snd_bebob_stream_get_formation_index(int sampling_rate);
-int snd_bebob_stream_init(struct snd_bebob *bebob,
-			  struct amdtp_stream *stream);
-int snd_bebob_stream_start(struct snd_bebob *bebob,
-			   struct amdtp_stream *stream,
-			   unsigned int sampling_rate);
-void snd_bebob_stream_stop(struct snd_bebob *bebob,
-			   struct amdtp_stream *stream);
-void snd_bebob_stream_destroy(struct snd_bebob *bebob,
-			      struct amdtp_stream *stream);
+int snd_bebob_stream_init_duplex(struct snd_bebob *bebob);
+int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
+				  struct amdtp_stream *stream,
+				   unsigned int sampling_rate);
+int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob);
+void snd_bebob_stream_update_duplex(struct snd_bebob *bebob);
+void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob);
 
-void snd_bebob_destroy_pcm_devices(struct snd_bebob *bebob);
 int snd_bebob_create_pcm_devices(struct snd_bebob *bebob);
 
 int snd_bebob_create_control_devices(struct snd_bebob *bebob);
