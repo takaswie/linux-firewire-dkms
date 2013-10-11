@@ -39,8 +39,8 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 		if (!snd_interval_test(c, formations[i].pcm))
 			continue;
 
-		t.min = min(t.min, sampling_rate_table[i]);
-		t.max = max(t.max, sampling_rate_table[i]);
+		t.min = min(t.min, snd_bebob_rate_table[i]);
+		t.max = max(t.max, snd_bebob_rate_table[i]);
 
 	}
 	return snd_interval_refine(r, &t);
@@ -66,7 +66,7 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 		if (formations[i].pcm == 0)
 			continue;
 
-		if (!snd_interval_test(r, sampling_rate_table[i]))
+		if (!snd_interval_test(r, snd_bebob_rate_table[i]))
 			continue;
 
 		t.min = min(t.min, formations[i].pcm);
@@ -141,9 +141,9 @@ prepare_rates(struct snd_pcm_hardware *hw,
 		if (formations[i].pcm == 0)
 			continue;
 
-		hw->rate_min = min(hw->rate_min, sampling_rate_table[i]);
-		hw->rate_max = max(hw->rate_max, sampling_rate_table[i]);
-		hw->rates |= snd_pcm_rate_to_rate_bit(sampling_rate_table[i]);
+		hw->rate_min = min(hw->rate_min, snd_bebob_rate_table[i]);
+		hw->rate_max = max(hw->rate_max, snd_bebob_rate_table[i]);
+		hw->rates |= snd_pcm_rate_to_rate_bit(snd_bebob_rate_table[i]);
 	}
 
 	return;

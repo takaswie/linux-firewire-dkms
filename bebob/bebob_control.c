@@ -98,7 +98,7 @@ control_digital_interface_put(struct snd_kcontrol *kctl,
 /*
  * Global Control: Sampling Rate Control
  *
- * refer to sampling_rate_table.
+ * refer to snd_bebob_rate_table.
  */
 static int
 control_sampling_rate_info(struct snd_kcontrol *kctl,
@@ -109,7 +109,7 @@ control_sampling_rate_info(struct snd_kcontrol *kctl,
 
 	/* maximum value for user */
 	einf->value.enumerated.items = 0;
-	for (i = 0; i < ARRAY_SIZE(sampling_rate_table); i++)
+	for (i = 0; i < ARRAY_SIZE(snd_bebob_rate_table); i++)
 		if ((bebob->tx_stream_formations[i].pcm > 0) &&
 		    (bebob->rx_stream_formations[i].pcm > 0))
 			einf->value.enumerated.items++;
@@ -122,7 +122,7 @@ control_sampling_rate_info(struct snd_kcontrol *kctl,
 
 	/* skip unsupported sampling rates */
 	value = einf->value.enumerated.item;
-	for (i = 0; i < ARRAY_SIZE(sampling_rate_table); i++) {
+	for (i = 0; i < ARRAY_SIZE(snd_bebob_rate_table); i++) {
 		if ((bebob->tx_stream_formations[i].pcm == 0) ||
 		    (bebob->rx_stream_formations[i].pcm == 0))
 			continue;
@@ -132,7 +132,7 @@ control_sampling_rate_info(struct snd_kcontrol *kctl,
 			value--;
 	}
 
-	sprintf(einf->value.enumerated.name, "%dHz", sampling_rate_table[i]);
+	sprintf(einf->value.enumerated.name, "%dHz", snd_bebob_rate_table[i]);
 
 	return 0;
 }
@@ -155,8 +155,8 @@ control_sampling_rate_get(struct snd_kcontrol *kctl,
 	if (out_rate != in_rate)
 		goto end;
 
-	for (index = 0; index < ARRAY_SIZE(sampling_rate_table); index++)
-		if (sampling_rate_table[index] == out_rate)
+	for (index = 0; index < ARRAY_SIZE(snd_bebob_rate_table); index++)
+		if (snd_bebob_rate_table[index] == out_rate)
 			break;
 
 	uval->value.enumerated.item[0] = 0;
@@ -180,7 +180,7 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 
 	/* get index from user value*/
 	value = uval->value.enumerated.item[0];
-	for (index = 0; index < ARRAY_SIZE(sampling_rate_table); index++) {
+	for (index = 0; index < ARRAY_SIZE(snd_bebob_rate_table); index++) {
 		if ((bebob->tx_stream_formations[index].pcm == 0) ||
 		    (bebob->rx_stream_formations[index].pcm == 0))
 			continue;
@@ -190,7 +190,7 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 			value--;
 	}
 
-	rate = sampling_rate_table[index];
+	rate = snd_bebob_rate_table[index];
 	err = avc_generic_set_sampling_rate(bebob->unit, rate, 0, 0);
 	if (err < 0)
 		goto end;

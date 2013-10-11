@@ -111,10 +111,8 @@ proc_read_formation(struct snd_info_entry *entry,
 	formation = bebob->tx_stream_formations;
 	for (i = 0; i < 9; i += 1) {
 		snd_iprintf(buffer,
-			"\t%d\t%d\t%d\n",
-			sampling_rate_table[i],
-			formation[i].pcm,
-			formation[i].midi);
+			"\t%d\t%d\t%d\n", snd_bebob_rate_table[i],
+			formation[i].pcm, formation[i].midi);
 	}
 
 	snd_iprintf(buffer, "Transmit Stream:\n");
@@ -122,10 +120,8 @@ proc_read_formation(struct snd_info_entry *entry,
 	formation = bebob->rx_stream_formations;
 	for (i = 0; i < 9; i += 1) {
 		snd_iprintf(buffer,
-			"\t%d\t%d\t%d\n",
-			sampling_rate_table[i],
-			formation[i].pcm,
-			formation[i].midi);
+			"\t%d\t%d\t%d\n", snd_bebob_rate_table[i],
+			formation[i].pcm, formation[i].midi);
 	}
 
 	return;

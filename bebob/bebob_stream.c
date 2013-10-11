@@ -17,24 +17,28 @@
  */
 #include "./bebob.h"
 
+/* 128 is an arbitrary number but it's enough */
+#define FORMATION_MAXIMUM_LENGTH 128
+
+unsigned int snd_bebob_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES] = {
+	[0] = 22050,
+	[1] = 24000,
+	[2] = 32000,
+	[3] = 44100,
+	[4] = 48000,
+	[5] = 88200,
+	[6] = 96000,
+	[7] = 176400,
+	[8] = 192000,
+};
+
 static int
 get_formation_index(int sampling_rate)
 {
-        int table[] = {
-                [0] = 22050,
-                [1] = 24000,
-                [2] = 32000,
-                [3] = 44100,
-                [4] = 48000,
-                [5] = 88200,
-                [6] = 96000,
-                [7] = 176400,
-                [8] = 192000,
-        };
         int i;
 
-        for (i = 0; i < sizeof(table); i += 1) {
-                if (table[i] == sampling_rate)
+        for (i = 0; i < sizeof(snd_bebob_rate_table); i += 1) {
+                if (snd_bebob_rate_table[i] == sampling_rate)
                         return i;
 	}
 	return -1;
@@ -368,4 +372,176 @@ void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
 
 	stream_destroy(bebob, &bebob->tx_stream);
 	stream_destroy(bebob, &bebob->rx_stream);
+}
+
+int snd_bebob_get_formation_index(int sampling_rate)
+{
+	int i;
+
+	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
+		if (snd_bebob_rate_table[i] == sampling_rate)
+			return i;
+	}
+	return -1;
+}
+
+static void
+set_stream_formation(u8 *buf, int len,
+		     struct snd_bebob_stream_formation *formation)
+{
+	int channels, format;
+	int e;
+
+	for (e = 0; e < buf[4]; e += 1) {
+		channels = buf[5 + e * 2];
+		format = buf[6 + e * 2];
+
+		switch (format) {
+		/* PCM for IEC 60958-3 */
+		case 0x00:
+		/* PCM for IEC 61883-3 to 7 */
+		case 0x01:
+		case 0x02:
+		case 0x03:
+		case 0x04:
+		case 0x05:
+		/* PCM for Multi bit linear audio */
+		case 0x06:
+		case 0x07:
+			formation->pcm += channels;
+			break;
+		/* MIDI comformant (MMA/AMEI RP-027) */
+		case 0x0d:
+			formation->midi += channels;
+			break;
+		default:
+			break;
+		}
+	}
+
+	/* store this entry for future use */
+	memcpy(formation->entry, buf, len);
+
+	return;
+}
+
+static int
+fill_stream_formations(struct snd_bebob *bebob,
+		       int direction, unsigned short plugid)
+{
+	int freq_table[] = {
+		[0x00] = 0,	/*  22050 */
+		[0x01] = 1,	/*  24000 */
+		[0x02] = 2,	/*  32000 */
+		[0x03] = 3,	/*  44100 */
+		[0x04] = 4,	/*  48000 */
+		[0x05] = 6,	/*  96000 */
+		[0x06] = 7,	/* 176400 */
+		[0x07] = 8,	/* 192000 */
+		[0x0a] = 5	/*  88200 */
+	};
+
+	u8 *buf;
+	struct snd_bebob_stream_formation *formations;
+	int index;
+	int len;
+	int e, i;
+	int err;
+
+	buf = kmalloc(FORMATION_MAXIMUM_LENGTH, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	if (direction > 0)
+		formations = bebob->rx_stream_formations;
+	else
+		formations = bebob->tx_stream_formations;
+
+	for (e = 0, index = 0; e < 9; e += 1) {
+		len = FORMATION_MAXIMUM_LENGTH;
+		/* get entry */
+		memset(buf, 0, len);
+		err = avc_bridgeco_get_plug_stream_formation_entry(bebob->unit, direction, plugid, e, buf, &len);
+		if (err < 0)
+			goto end;
+		/* reach the end of entries */
+		else if (buf[0] != 0x0c)
+			break;
+		/*
+		 * this module can support a hierarchy combination that:
+		 *  Root:	Audio and Music (0x90)
+		 *  Level 1:	AM824 Compound  (0x40)
+		 */
+		else if ((buf[11] != 0x90) || (buf[12] != 0x40))
+			break;
+		/* check formation length */
+		else if (len < 1)
+			break;
+
+		/* formation information includes own value for sampling rate. */
+		if ((buf[13] > 0x07) && (buf[13] != 0x0a))
+			break;
+		for (i = 0; i < sizeof(freq_table); i += 1) {
+			if (i == buf[13])
+				index = freq_table[i];
+		}
+
+		/* parse and set stream formation */
+		set_stream_formation(buf + 11, len - 11, &formations[index]);
+	};
+
+	err = 0;
+
+end:
+	kfree(buf);
+	return err;
+}
+
+/* In this function, 2 means input and output */
+int snd_bebob_discover(struct snd_bebob *bebob)
+{
+	/* the number of plugs for input and output */
+	unsigned short bus_plugs[2];
+	unsigned short ext_plugs[2];
+	int type, i;
+	int err;
+
+	err = avc_generic_get_plug_info(bebob->unit, bus_plugs, ext_plugs);
+	if (err < 0)
+		goto end;
+
+	/*
+	 * This module supports one PCR input plug and one PCR output plug
+	 * then ignores the others.
+	 */
+	for (i = 0; i < 2; i += 1) {
+		if (bus_plugs[i]  == 0) {
+			err = -EIO;
+			goto end;
+		}
+
+		err = avc_bridgeco_get_plug_type(bebob->unit, i, 0, &type);
+		if (err < 0)
+			goto end;
+		else if (type != 0x00) {
+			err = -EIO;
+			goto end;
+		}
+	}
+
+	/* store formations */
+	for (i = 0; i < 2; i += 1) {
+		err = fill_stream_formations(bebob, i, 0);
+		if (err < 0)
+			goto end;
+	}
+
+	/* TODO: count MIDI external plugs */
+	bebob->midi_input_ports = 1;
+	bebob->midi_output_ports = 1;
+
+	err = 0;
+
+end:
+	return err;
 }

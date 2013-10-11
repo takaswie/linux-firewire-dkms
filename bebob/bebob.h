@@ -48,7 +48,7 @@ struct snd_bebob_stream_formation {
 	u8 entry[64];	/* '64' is arbitrary number but enough */
 };
 /* this is a lookup table for index of stream formations */
-extern unsigned int sampling_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES];
+extern unsigned int snd_bebob_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES];
 
 /* device specific operations */
 struct snd_bebob_clock_spec {
