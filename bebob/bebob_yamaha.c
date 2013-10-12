@@ -1,4 +1,41 @@
+/*
+ * bebob_yamaha.c - a part of driver for BeBoB based devices
+ *
+ * Copyright (c) 2013 Takashi Sakamoto
+ *
+ * This driver is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License, version 2.
+ *
+ * This driver is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this driver; if not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "./bebob.h"
+
+/*
+ * NOTE:
+ * Yamaha GO44 is not considered to be used as stand-alone mixer. So any streams
+ * should be accompanied. If changing the state, a LED on the device starts to
+ * blink and sound nothins even if streaming. There seems to be one way to
+ * revocer this state, just power-off. GO46 is better for this purpose,
+ * stand-alone mixer.
+ *
+ * Both of them have a capability to change its sampling rate up to 192.0kHz.
+ * At 192.0kHz, the device reports 4 PCM-in, 1 MIDI-in, 6 PCM-out, 1 MIDI-out.
+ * But Yamaha's driver reduce 2 PCM-in, 1 MIDI-in, 2 PCM-out, 1 MIDI-out to use
+ * 'Extended Stream Format Information Command - Single Request' in 'Additional
+ * AVC commands' defined by BridgeCo.
+ * This ALSA driver don't do this because a bit tiresome. Then isochronous
+ * streaming with many asynchronous transactions brings sounds with noises.
+ * Unfortunately current 'ffado-mixer' generated many asynchronous transaction
+ * to observe device's state, mainly check cmp connection and signal format. I
+ * reccomend users to close ffado-mixer at 192.0kHz if mixer is needless.
+ */
 
 static int
 detect_dig_in(struct snd_bebob *bebob, int *detect)

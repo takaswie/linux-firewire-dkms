@@ -1,3 +1,20 @@
+/*
+ * bebob_control.c - a part of driver for BeBoB based devices
+ *
+ * Copyright (c) 2013 Takashi Sakamoto
+ *
+ * This driver is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License, version 2.
+ *
+ * This driver is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this driver; if not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "bebob.h"
 
 /*
@@ -321,7 +338,6 @@ int snd_bebob_create_control_devices(struct snd_bebob *bebob)
 			goto end;
 	}
 
-	err = 0;
 end:
 	return err;
 }

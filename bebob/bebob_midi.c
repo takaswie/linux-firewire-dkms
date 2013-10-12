@@ -1,5 +1,5 @@
 /*
- * bebob_midi.c - driver for BeBoB based devices
+ * bebob_midi.c - a part of driver for BeBoB based devices
  * Copyright (c) 2013 Takashi Sakamoto
  *
  * This driver is free software; you can redistribute it and/or modify
@@ -13,6 +13,7 @@
  * You should have received a copy of the GNU General Public License
  * along with this driver; if not, see <http://www.gnu.org/licenses/>.
  */
+
 #include "bebob.h"
 
 /*

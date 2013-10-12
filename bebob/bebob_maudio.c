@@ -1,10 +1,44 @@
+/*
+ * bebob_maudio.c - a part of driver for BeBoB based devices
+ *
+ * Copyright (c) 2013 Takashi Sakamoto
+ *
+ * This driver is free software; you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License, version 2.
+ *
+ * This driver is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with this driver; if not, see <http://www.gnu.org/licenses/>.
+ */
+
 #include "./bebob.h"
 
 /*
  * NOTE:
- *  For streaming, both of output and input streams are needed for Firewire 410
- *  and Ozonic. The opposite stream is OK for the others even if the clock
- *  source is not SYT-Match.
+ * For Firewire 410 and Firewire Audiophile, this module requests firmware
+ * version 5058 or later. With former version, BeBoB chipset needs downloading
+ * firmware and the driver should do this. To do this with ALSA, I examinate
+ * whether it's OK or not to include firmware binary blob to alsa-firmware
+ * package. With later version, the firmware is in ROM of chipset and the
+ * driver just send a cue to load it when probing the device. This cue is sent
+ * just once.
+ *
+ * For streaming, both of output and input streams are needed for Firewire 410
+ * and Ozonic. The single stream is OK for the other devices even if the clock
+ * source is not SYT-Match (and no devices use SYT-Match).
+ *
+ * Without streaming, the devices except for Firewire Audiophile can mix any
+ * input and output. For this purpose, use ffado-mixer. Audiophile need to
+ * any stream for this purpose.
+ *
+ * Firewire 1814 and ProjectMix I/O uses special firmware. It will be freezed
+ * if receiving any commands which the firmware can't understand. These devices
+ * utilize completely different system to control. It is read/write transaction
+ * directly into a certain address.
  */
 
 #define MAUDIO_BOOTLOADER_CUE1	0x01000000

@@ -1,8 +1,7 @@
 /*
- * bebob_stream.c - driver for BeBoB based devices
+ * bebob_command.c - driver for BeBoB based devices
  *
  * Copyright (c) 2013 Takashi Sakamoto
- *
  *
  * This driver is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License, version 2.
