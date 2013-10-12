@@ -90,7 +90,8 @@ static struct snd_bebob_clock_spec clock_spec = {
 };
 struct snd_bebob_spec yamaha_go_spec = {
 	.load		= NULL,
-	.discover	= &snd_bebob_discover,
+	.discover	= &snd_bebob_stream_discover,
+	.map		= &snd_bebob_stream_map,
 	.clock		= &clock_spec,
 	.dig_iface	= NULL,
 	.meter		= NULL

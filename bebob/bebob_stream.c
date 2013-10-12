@@ -44,9 +44,8 @@ get_formation_index(int sampling_rate)
 	return -1;
 }
 
-/* TODO: to use chache because there are some devices which don't respond */
-static int
-mapping_channels(struct snd_bebob *bebob, struct amdtp_stream *s)
+int snd_bebob_stream_map(struct snd_bebob *bebob,
+			 struct amdtp_stream *stream)
 {
 	unsigned int cl, ch, clusters, channels, pos, pcm, midi;
 	u8 *buf, type;
@@ -59,7 +58,7 @@ mapping_channels(struct snd_bebob *bebob, struct amdtp_stream *s)
 		goto end;
 	}
 
-	if (s == &bebob->tx_stream)
+	if (stream == &bebob->tx_stream)
 		dir = 1;
 	else
 		dir = 0;
@@ -84,9 +83,9 @@ mapping_channels(struct snd_bebob *bebob, struct amdtp_stream *s)
 			pos = *buf - 1;
 			buf++;
 			if (type != 0x0a)
-				s->pcm_positions[pcm++] = pos;
+				stream->pcm_positions[pcm++] = pos;
 			else
-				s->midi_positions[midi++] = pos;
+				stream->midi_positions[midi++] = pos;
 			buf++;
 		}
 	}
@@ -155,9 +154,12 @@ stream_start(struct snd_bebob *bebob, struct amdtp_stream *stream,
 	amdtp_stream_set_params(stream, sampling_rate,
 				pcm_channels, midi_channels);
 
-	err = mapping_channels(bebob, stream);
-	if (err < 0)
-		goto end;
+	/* channel mapping */
+	if (bebob->spec->map != NULL) {
+		err = bebob->spec->map(bebob, stream);
+		if (err < 0)
+			goto end;
+	}
 
 	/*  establish connection via CMP */
 	err = cmp_connection_establish(conn,
@@ -419,9 +421,6 @@ set_stream_formation(u8 *buf, int len,
 		}
 	}
 
-	/* store this entry for future use */
-	memcpy(formation->entry, buf, len);
-
 	return;
 }
 
@@ -498,7 +497,7 @@ end:
 }
 
 /* In this function, 2 means input and output */
-int snd_bebob_discover(struct snd_bebob *bebob)
+int snd_bebob_stream_discover(struct snd_bebob *bebob)
 {
 	/* the number of plugs for input and output */
 	unsigned short bus_plugs[2];

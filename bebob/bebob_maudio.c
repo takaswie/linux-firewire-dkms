@@ -386,12 +386,14 @@ end:
 static char *special_clock_labels[] = {
 	"Interna1l with Digital Mute", "Digital",
 	"Word Clock", "Internal"};
-static int special_clock_get(struct snd_bebob *bebob, int *id)
+static int
+special_clock_get(struct snd_bebob *bebob, int *id)
 {
 	*id = bebob->clk_src;
 	return 0;
 }
-static int special_clock_set(struct snd_bebob *bebob, int id)
+static int
+special_clock_set(struct snd_bebob *bebob, int id)
 {
 	return set_clock_params(bebob, id,
 				bebob->in_dig_fmt, bebob->out_dig_fmt,
@@ -400,7 +402,8 @@ static int special_clock_set(struct snd_bebob *bebob, int id)
 static char *special_dig_iface_labels[] = {
 	"ADAT Optical", "S/PDIF Optical", "S/PDIF Coaxial"
 };
-static int special_dig_iface_get(struct snd_bebob *bebob, int *id)
+static int
+special_dig_iface_get(struct snd_bebob *bebob, int *id)
 {
 	/* for simplicity, the same value for input/output */
 	*id = (0x01 & bebob->in_dig_fmt) | ((bebob->in_dig_iface & 0x01) << 1);
@@ -410,7 +413,8 @@ static int special_dig_iface_get(struct snd_bebob *bebob, int *id)
 		(*id)--;
 	return 0;
 }
-static int special_dig_iface_set(struct snd_bebob *bebob, int id)
+static int
+special_dig_iface_set(struct snd_bebob *bebob, int id)
 {
 	int err;
 	int dig_fmt;
@@ -434,8 +438,58 @@ end:
 	return err;
 }
 
-/* Firewire 1814 specific controls */
-static int fw1814_discover(struct snd_bebob *bebob)
+static void
+special_stream_formation_set(struct snd_bebob *bebob)
+{
+	int i;
+
+	/*
+	 * the stream formation is different depending on digital interface
+	 */
+	if (bebob->in_dig_iface == 0x01) {
+		bebob->tx_stream_formations[2].pcm = 16;
+		bebob->tx_stream_formations[3].pcm = 16;
+		bebob->tx_stream_formations[4].pcm = 16;
+		bebob->tx_stream_formations[5].pcm = 12;
+		bebob->tx_stream_formations[6].pcm = 12;
+		bebob->tx_stream_formations[7].pcm = 2;
+		bebob->tx_stream_formations[8].pcm = 2;
+	} else {
+		bebob->tx_stream_formations[2].pcm = 10;
+		bebob->tx_stream_formations[3].pcm = 10;
+		bebob->tx_stream_formations[4].pcm = 10;
+		bebob->tx_stream_formations[5].pcm = 10;
+		bebob->tx_stream_formations[6].pcm = 10;
+		bebob->tx_stream_formations[7].pcm = 2;
+		bebob->tx_stream_formations[8].pcm = 2;
+	}
+
+	if (bebob->out_dig_iface == 0x01) {
+		bebob->rx_stream_formations[2].pcm = 12;
+		bebob->rx_stream_formations[3].pcm = 12;
+		bebob->rx_stream_formations[4].pcm = 12;
+		bebob->rx_stream_formations[5].pcm = 18;
+		bebob->rx_stream_formations[6].pcm = 18;
+		bebob->rx_stream_formations[7].pcm = 4;
+		bebob->rx_stream_formations[8].pcm = 4;
+	} else {
+		bebob->rx_stream_formations[2].pcm = 6;
+		bebob->rx_stream_formations[3].pcm = 6;
+		bebob->rx_stream_formations[4].pcm = 6;
+		bebob->rx_stream_formations[5].pcm = 6;
+		bebob->rx_stream_formations[6].pcm = 6;
+		bebob->rx_stream_formations[7].pcm = 4;
+		bebob->rx_stream_formations[8].pcm = 4;
+	}
+
+	for (i = 2; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i++) {
+		bebob->tx_stream_formations[i].midi = 1;
+		bebob->rx_stream_formations[i].midi = 1;
+	}
+}
+
+static int
+special_discover(struct snd_bebob *bebob)
 {
 	int err;
 
@@ -450,8 +504,16 @@ static int fw1814_discover(struct snd_bebob *bebob)
 		dev_err(&bebob->unit->device,
 			"Failed to initialize digital interface\n");
 
-	return 0;
+	special_stream_formation_set(bebob);
+
+	/* TODO: ProjectMix has 2? */
+	bebob->midi_input_ports = 1;
+	bebob->midi_output_ports = 1;
+
+	return err;
 }
+
+/* Firewire 1814 specific controls */
 static char *fw1814_meter_labels[] = {
 	ANA_IN, ANA_IN, ANA_IN, ANA_IN,
 	DIG_IN,
@@ -459,7 +521,8 @@ static char *fw1814_meter_labels[] = {
 	HP_OUT, HP_OUT,
 	AUX_OUT
 };
-static int fw1814_meter_get(struct snd_bebob *bebob, u32 *target, int size)
+static int
+fw1814_meter_get(struct snd_bebob *bebob, u32 *target, int size)
 {
 	u16 *buf;
 	int i, c, err;
@@ -491,9 +554,6 @@ end:
 }
 
 /* ProjectMix I/O specific controls */
-static int projectmix_discover(struct snd_bebob *bebob) {
-	return 0;
-}
 static char *projectmix_meter_labels[] = {
 	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
 	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
@@ -501,7 +561,8 @@ static char *projectmix_meter_labels[] = {
 	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
 	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER
 };
-static int projectmix_meter_get(struct snd_bebob *bebob, u32 *target, int size)
+static int
+projectmix_meter_get(struct snd_bebob *bebob, u32 *target, int size)
 {
 	u16 *buf;
 	int c, channels, err;
@@ -533,7 +594,8 @@ end:
 static char *fw410_clock_labels[] = {
 	"Internal", "Digital Optical", "Digital Coaxial"
 };
-static int fw410_clock_get(struct snd_bebob *bebob, int *id)
+static int
+fw410_clock_get(struct snd_bebob *bebob, int *id)
 {
 	int err, unit, plugid;
 
@@ -550,7 +612,8 @@ static int fw410_clock_get(struct snd_bebob *bebob, int *id)
 end:
 	return err;
 }
-static int fw410_clock_set(struct snd_bebob *bebob, int id)
+static int
+fw410_clock_set(struct snd_bebob *bebob, int id)
 {
 	int unit, plugid;
 
@@ -570,11 +633,13 @@ static int fw410_clock_set(struct snd_bebob *bebob, int id)
 static char *fw410_dig_iface_labels[] = {
 	"S/PDIF Optical", "S/PDIF Coaxial"
 };
-static int fw410_dig_iface_get(struct snd_bebob *bebob, int *id)
+static int
+fw410_dig_iface_get(struct snd_bebob *bebob, int *id)
 {
 	return avc_audio_get_selector(bebob->unit, 0, 1, id);
 }
-static int fw410_dig_iface_set(struct snd_bebob *bebob, int id)
+static int
+fw410_dig_iface_set(struct snd_bebob *bebob, int id)
 {
 	return avc_audio_set_selector(bebob->unit, 0, 1, id);
 }
@@ -583,7 +648,8 @@ static char *fw410_meter_labels[] = {
 	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT, DIG_OUT,
 	HP_OUT
 };
-static int fw410_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+static int
+fw410_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 {
 
 	int c, channels, err;
@@ -608,7 +674,8 @@ end:
 static char *audiophile_clock_labels[] = {
 	"Internal", "Digital Coaxial"
 };
-static int audiophile_clock_get(struct snd_bebob *bebob, int *id)
+static int
+audiophile_clock_get(struct snd_bebob *bebob, int *id)
 {
 	int err, unit, plugid;
 
@@ -624,7 +691,8 @@ end:
 	return err;
 	return *id;
 }
-static int audiophile_clock_set(struct snd_bebob *bebob, int id)
+static int
+audiophile_clock_set(struct snd_bebob *bebob, int id)
 {
 	int unit, plugid;
 
@@ -643,7 +711,8 @@ static char *audiophile_meter_labels[] = {
 	ANA_OUT, ANA_OUT, DIG_OUT,
 	HP_OUT, AUX_OUT,
 };
-static int audiophile_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+static int
+audiophile_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 {
 	int c, channels, err;
 
@@ -667,7 +736,8 @@ end:
 static char *solo_clock_labels[] = {
 	"Internal", "Digital Coaxial"
 };
-static int solo_clock_get(struct snd_bebob *bebob, int *id)
+static int
+solo_clock_get(struct snd_bebob *bebob, int *id)
 {
 	int err, unit, plugid;
 
@@ -682,7 +752,8 @@ static int solo_clock_get(struct snd_bebob *bebob, int *id)
 end:
 	return err;
 }
-static int solo_clock_set(struct snd_bebob *bebob, int id)
+static int
+solo_clock_set(struct snd_bebob *bebob, int id)
 {
 	int unit, plugid;
 
@@ -701,7 +772,8 @@ static char *solo_meter_labels[] = {
 	STRM_IN, STRM_IN,
 	ANA_OUT, DIG_OUT
 };
-static int solo_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+static int
+solo_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 {
 	int c, err;
 	u32 tmp;
@@ -742,7 +814,8 @@ static char *ozonic_meter_labels[] = {
 	STRM_IN, STRM_IN,
 	ANA_OUT, ANA_OUT
 };
-static int ozonic_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+static int
+ozonic_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 {
 	int c, channels, err;
 
@@ -769,7 +842,8 @@ static char *nrv10_meter_labels[] = {
 	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT,
 	DIG_IN
 };
-static int nrv10_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+static int
+nrv10_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 {
 	int c, channels, err;
 
@@ -820,7 +894,8 @@ static struct snd_bebob_meter_spec fw1814_meter_spec = {
 };
 struct snd_bebob_spec maudio_fw1814_spec = {
 	.load		= NULL,
-	.discover	= &fw1814_discover,
+	.discover	= &special_discover,
+	.map   		= NULL,
 	.clock		= &special_clock_spec,
 	.dig_iface	= &special_dig_iface_spec,
 	.meter		= &fw1814_meter_spec
@@ -834,7 +909,8 @@ static struct snd_bebob_meter_spec projectmix_meter_spec = {
 };
 struct snd_bebob_spec maudio_projectmix_spec = {
 	.load		= NULL,
-	.discover	= &projectmix_discover,
+	.discover	= &special_discover,
+	.map		= NULL,
 	.clock		= &special_clock_spec,
 	.dig_iface	= &special_dig_iface_spec,
 	.meter		= &projectmix_meter_spec
@@ -860,7 +936,8 @@ static struct snd_bebob_meter_spec fw410_meter_spec = {
 };
 struct snd_bebob_spec maudio_fw410_spec = {
 	.load		= NULL,
-	.discover	= &snd_bebob_discover,
+	.discover	= &snd_bebob_stream_discover,
+	.map		= &snd_bebob_stream_map,
 	.clock		= &fw410_clock_spec,
 	.dig_iface	= &fw410_dig_iface_spec,
 	.meter		= &fw410_meter_spec
@@ -880,7 +957,8 @@ static struct snd_bebob_meter_spec audiophile_meter_spec = {
 };
 struct snd_bebob_spec maudio_audiophile_spec = {
 	.load		= &firmware_load,
-	.discover	= &snd_bebob_discover,
+	.discover	= &snd_bebob_stream_discover,
+	.map		= &snd_bebob_stream_map,
 	.clock		= &audiophile_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= &audiophile_meter_spec
@@ -900,7 +978,8 @@ static struct snd_bebob_meter_spec solo_meter_spec = {
 };
 struct snd_bebob_spec maudio_solo_spec = {
 	.load		= NULL,
-	.discover	= &snd_bebob_discover,
+	.discover	= &snd_bebob_stream_discover,
+	.map		= &snd_bebob_stream_map,
 	.clock		= &solo_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= &solo_meter_spec
@@ -914,7 +993,8 @@ static struct snd_bebob_meter_spec ozonic_meter_spec = {
 };
 struct snd_bebob_spec maudio_ozonic_spec = {
 	.load		= NULL,
-	.discover	= &snd_bebob_discover,
+	.discover	= &snd_bebob_stream_discover,
+	.map		= &snd_bebob_stream_map,
 	.clock		= NULL,
 	.dig_iface	= NULL,
 	.meter		= &ozonic_meter_spec
@@ -928,7 +1008,8 @@ static struct snd_bebob_meter_spec nrv10_meter_spec = {
 };
 struct snd_bebob_spec maudio_nrv10_spec = {
 	.load		= NULL,
-	.discover	= &snd_bebob_discover,
+	.discover	= &snd_bebob_stream_discover,
+	.map		= &snd_bebob_stream_map,
 	.clock		= NULL,
 	.dig_iface	= NULL,
 	.meter		= &nrv10_meter_spec

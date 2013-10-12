@@ -40,12 +40,10 @@
 /* defined later */
 struct snd_bebob;
 
-/* for caching entries of stream formation */
 #define SND_BEBOB_STREAM_FORMATION_ENTRIES	9
 struct snd_bebob_stream_formation {
 	unsigned int pcm;
 	unsigned int midi;
-	u8 entry[64];	/* '64' is arbitrary number but enough */
 };
 /* this is a lookup table for index of stream formations */
 extern unsigned int snd_bebob_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES];
@@ -71,6 +69,7 @@ struct snd_bebob_meter_spec {
 struct snd_bebob_spec {
 	int (*load)(struct snd_bebob *bebob);
 	int (*discover)(struct snd_bebob *bebob);
+	int (*map)(struct snd_bebob *bebob, struct amdtp_stream *stream);
 	struct snd_bebob_clock_spec *clock;
 	struct snd_bebob_dig_iface_spec *dig_iface;
 	struct snd_bebob_meter_spec *meter;
@@ -155,6 +154,9 @@ int avc_bridgeco_get_plug_stream_formation_entry(struct fw_unit *unit,
 				int direction, unsigned short plugid,
 				int entryid, u8 *buf, int *len);
 
+int snd_bebob_stream_discover(struct snd_bebob *bebob);
+int snd_bebob_stream_map(struct snd_bebob *bebob,
+			 struct amdtp_stream *stream);
 int snd_bebob_stream_init_duplex(struct snd_bebob *bebob);
 int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 				  struct amdtp_stream *stream,
@@ -170,8 +172,6 @@ int snd_bebob_create_control_devices(struct snd_bebob *bebob);
 int snd_bebob_create_midi_devices(struct snd_bebob *bebob);
 
 void snd_bebob_proc_init(struct snd_bebob *bebob);
-
-int snd_bebob_discover(struct snd_bebob *bebob);
 
 /* device specific operations */
 extern struct snd_bebob_spec maudio_bootloader_spec;
