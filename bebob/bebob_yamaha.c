@@ -43,7 +43,7 @@ end:
 	return err;
 }
 
-static char* clock_labels[] = {"Internal", "SPDIF"};
+static char *clock_labels[] = {"Internal", "SPDIF"};
 
 static int clock_set(struct snd_bebob *bebob, int id)
 {
@@ -83,7 +83,7 @@ static int clock_get(struct snd_bebob *bebob, int *id)
 }
 
 static struct snd_bebob_clock_spec clock_spec = {
-	.num	= sizeof(clock_labels),
+	.num	= ARRAY_SIZE(clock_labels),
 	.labels	= clock_labels,
 	.get	= clock_get,
 	.set	= clock_set
