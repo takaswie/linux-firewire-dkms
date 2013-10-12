@@ -297,50 +297,6 @@ end:
 	kfree(buf);
 	return err;
 }
-/*
- * dig_iface: 0x00:Optical, 0x01:Coaxial
- */
-static int
-set_dig_iface(struct snd_bebob *bebob, int in_dig_iface, int out_dig_iface)
-{
-	int err;
-	u8 *buf;
-
-	buf = kmalloc(12, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0]  = 0x00;			/* CONTROL */
-	buf[1]  = 0xff;			/* UNIT */
-	buf[2]  = 0x00;			/* vendor dependent */
-	buf[3]  = 0x04;
-	buf[4]  = 0x04;
-	buf[5]  = 0x10;
-	buf[6]  = 0x02;			/* has 2 parameters */
-	buf[7]  = 0xff & in_dig_iface;	/* input digital interface */
-	buf[8]  = 0xff & out_dig_iface;	/* output digital interface */
-	buf[9]  = 0x00;			/* padding */
-	buf[10] = 0x00;			/* padding */
-	buf[11] = 0x00;			/* padding */
-
-	err = fcp_avc_transaction(bebob->unit, buf, 12, buf, 12, 0);
-	if (err < 0)
-		goto end;
-	if ((err < 6) || (buf[0] != 0x09)) {
-		dev_err(&bebob->unit->device,
-			"failed to set digital interface\n");
-		err = -EIO;
-		goto end;
-	}
-
-	bebob->in_dig_iface = buf[7];
-	bebob->out_dig_iface = buf[8];
-	err = 0;
-
-end:
-	kfree(buf);
-	return err;
-}
 
 /* for special customized devices */
 static char *special_clock_labels[] = {
@@ -393,7 +349,7 @@ special_dig_iface_set(struct snd_bebob *bebob, int id)
 	if (err < 0)
 		goto end;
 
-	err = set_dig_iface(bebob, dig_iface, dig_iface);
+	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, dig_iface);
 end:
 	return err;
 }
@@ -459,7 +415,7 @@ special_discover(struct snd_bebob *bebob)
 		dev_err(&bebob->unit->device,
 			"Failed to initialize clock params\n");
 
-	err = set_dig_iface(bebob, 0x00, 0x00);
+	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, 0x00);
 	if (err < 0)
 		dev_err(&bebob->unit->device,
 			"Failed to initialize digital interface\n");
