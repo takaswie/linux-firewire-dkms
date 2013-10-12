@@ -51,35 +51,16 @@ static int clock_set(struct snd_bebob *bebob, int id)
 
 	if (id > 0) {
 		err = detect_dig_in(bebob, &detect);
-		if ((err < 0) || (detect == 0)) {
-			err = -EIO;
-			goto end;
-		}
+		if ((err < 0) || (detect == 0))
+			return -EIO;
 	}
 
-	spin_lock(&bebob->lock);
-	err = avc_audio_set_selector(bebob->unit, 0, 4, id);
-	/*
-	 * Yamaha BeBob returns 'IN TRANSITION' status just after returning to
-	 * internal clock
-	 */
-	if (id == 0)
-		msleep(1500);
-	spin_unlock(&bebob->lock);
-
-end:
-	return err;
+	return avc_audio_set_selector(bebob->unit, 0, 4, id);
 }
 
 static int clock_get(struct snd_bebob *bebob, int *id)
 {
-	int err;
-
-	spin_lock(&bebob->lock);
-	err = avc_audio_get_selector(bebob->unit, 0, 4, id);
-	spin_unlock(&bebob->lock);
-
-	return err;
+	return avc_audio_get_selector(bebob->unit, 0, 4, id);
 }
 
 static struct snd_bebob_clock_spec clock_spec = {

@@ -243,6 +243,79 @@ end:
 	return err;
 }
 
+int avc_ccm_get_signal_source(struct fw_unit *unit,
+		int *src_stype, int *src_sid, int *src_pid,
+		int dst_stype, int dst_sid, int dst_pid)
+{
+	int err;
+	u8 *buf;
+
+	buf = kmalloc(8, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0] = 0x01;	/* STATUS */
+	buf[1] = 0xff;	/* UNIT */
+	buf[2] = 0x1A;	/* SIGNAL SOURCE? */
+	buf[3] = 0x0f;
+	buf[4] = 0xff;
+	buf[5] = 0xfe;
+	buf[6] = (0xf8 & (dst_stype << 3)) | dst_sid;
+	buf[7] = 0xff & dst_pid;
+
+	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 0) || (buf[0] != 0x0c)) {
+		dev_err(&unit->device,
+			"failed to get signal status\n");
+		err = -EIO;
+		goto end;
+	}
+
+	*src_stype = buf[4] >> 3;
+	*src_sid = buf[4] & 0x07;
+	*src_pid = buf[5];
+end:
+	kfree(buf);
+	return err;
+}
+int avc_ccm_set_signal_source(struct fw_unit *unit,
+		int src_stype, int src_sid, int src_pid,
+		int dst_stype, int dst_sid, int dst_pid)
+{
+	int err;
+	u8 *buf;
+
+	buf = kmalloc(8, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0] = 0x00;	/* CONTROL */
+	buf[1] = 0xff;	/* UNIT */
+	buf[2] = 0x1A;	/* SIGNAL SOURCE? */
+	buf[3] = 0x0f;
+	buf[4] = (0xf8 & (src_stype << 3)) | src_sid;
+	buf[5] = 0xff & src_pid;
+	buf[6] = (0xf8 & (dst_stype << 3)) | dst_sid;
+	buf[7] = 0xff & dst_pid;
+
+	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 0) || ((buf[0] != 0x09) && (buf[0] != 0x0f))) {
+		dev_err(&unit->device,
+			"failed to set signal status\n");
+		err = -EIO;
+		goto end;
+	}
+
+	err = 0;
+end:
+	kfree(buf);
+	return err;
+}
+
 int avc_bridgeco_get_plug_type(struct fw_unit *unit, int direction,
 				    unsigned short plugid, int *type)
 {
@@ -408,7 +481,7 @@ int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit, int direction,
 		*type = buf[11];
 		err = 0;
 	}
-end:
+
 	return err;
 }
 

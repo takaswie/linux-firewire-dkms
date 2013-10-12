@@ -235,8 +235,10 @@ static int control_clock_source_get(struct snd_kcontrol *kctl,
 	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
 	int id;
 
+	mutex_lock(&bebob->mutex);
 	if (spec->get(bebob, &id) >= 0)
 		uval->value.enumerated.item[0] = id;
+	mutex_unlock(&bebob->mutex);
 
 	return 0;
 }
@@ -248,9 +250,15 @@ static int control_clock_source_put(struct snd_kcontrol *kctl,
 	int value, changed = 0;
 
 	value = uval->value.enumerated.item[0];
-	if (value < spec->num)
+
+	if (value < spec->num) {
+		mutex_lock(&bebob->mutex);
 		if (spec->set(bebob, value) >= 0)
 			changed = 1;
+		mutex_unlock(&bebob->mutex);
+	}
+
+	msleep(150);
 
 	return changed;
 }

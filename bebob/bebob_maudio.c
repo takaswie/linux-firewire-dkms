@@ -308,80 +308,6 @@ end:
 	return err;
 }
 
-/*
- * I guess this is SIGNAL SOURCE command in 'Connection and Compatibility
- * Management 1.0 (1394TA 199032)'.
- */
-static int
-get_signal_source(struct fw_unit *u, int *unit, int *plugid)
-{
-	int err;
-	u8 *buf;
-
-	buf = kmalloc(8, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0] = 0x01;	/* STATUS */
-	buf[1] = 0xff;	/* UNIT */
-	buf[2] = 0x1A;	/* SIGNAL SOURCE? */
-	buf[3] = 0x0f;
-	buf[4] = 0xff;
-	buf[5] = 0xfe;
-	buf[6] = 0x60;
-	buf[7] = 0x01;
-
-	err = fcp_avc_transaction(u, buf, 8, buf, 8, 0);
-	if (err < 0)
-		goto end;
-	if ((err < 0) || (buf[0] != 0x0c)) {
-		dev_err(&u->device,
-			"failed to get signal status\n");
-		err = -EIO;
-		goto end;
-	}
-
-	*unit = buf[4];
-	*plugid = buf[5];
-end:
-	kfree(buf);
-	return err;
-}
-static int
-set_signal_source(struct fw_unit *u, int unit, int plugid)
-{
-	int err;
-	u8 *buf;
-
-	buf = kmalloc(8, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0] = 0x00;	/* CONTROL */
-	buf[1] = 0xff;	/* UNIT */
-	buf[2] = 0x1A;	/* SIGNAL SOURCE? */
-	buf[3] = 0x0f;
-	buf[4] = 0xff & unit;
-	buf[5] = 0xff & plugid;
-	buf[6] = 0x60;
-	buf[7] = 0x01;
-
-	err = fcp_avc_transaction(u, buf, 8, buf, 8, 0);
-	if (err < 0)
-		goto end;
-	if ((err < 0) || ((buf[0] != 0x09) && (buf[0] != 0x0f))) {
-		dev_err(&u->device,
-			"failed to set signal status\n");
-		err = -EIO;
-		goto end;
-	}
-
-	err = 0;
-end:
-	kfree(buf);
-	return err;
-}
-
 /* for special customized devices */
 static char *special_clock_labels[] = {
 	"Interna1l with Digital Mute", "Digital",
@@ -597,38 +523,44 @@ static char *fw410_clock_labels[] = {
 static int
 fw410_clock_get(struct snd_bebob *bebob, int *id)
 {
-	int err, unit, plugid;
+	int err, stype, sid, pid;
 
-	err = get_signal_source(bebob->unit, &unit, &plugid);
+	err = avc_ccm_get_signal_source(bebob->unit,
+					&stype, &sid, &pid, 0x0c, 0x00, 0x01);
 	if (err < 0)
 		goto end;
 
-	if ((unit == 0xff) && (plugid == 0x82))
-		*id = 2;
-	else if ((unit == 0xff) && (plugid == 0x83))
-		*id = 1;
-	else
-		*id = 0;
+	*id = 0;
+	if ((stype == 0x1f) && (sid == 0x07)) {
+		if (pid == 0x82)
+			*id = 2;
+		else if (pid == 0x83)
+			*id = 1;
+	}
 end:
 	return err;
 }
 static int
 fw410_clock_set(struct snd_bebob *bebob, int id)
 {
-	int unit, plugid;
+	int stype, sid, pid;
 
 	if (id == 0) {
-		unit = 0x60;
-		plugid = 0x01;
+		stype = 0x0c;
+		sid = 0x00;
+		pid = 0x01;
 	} else if (id == 1) {
-		unit = 0xff;
-		plugid = 0x83;
+		stype = 0x1f;
+		sid = 0x07;
+		pid = 0x83;
 	} else {
-		unit = 0xff;
-		plugid = 0x82;
+		stype = 0x1f;
+		sid = 0x07;
+		pid = 0x82;
 	}
 
-	return set_signal_source(bebob->unit, unit, plugid);
+	return avc_ccm_set_signal_source(bebob->unit,
+					stype, sid, pid, 0x0c, 0x00, 0x01);
 }
 static char *fw410_dig_iface_labels[] = {
 	"S/PDIF Optical", "S/PDIF Coaxial"
@@ -677,34 +609,37 @@ static char *audiophile_clock_labels[] = {
 static int
 audiophile_clock_get(struct snd_bebob *bebob, int *id)
 {
-	int err, unit, plugid;
+	int err, stype, sid, pid;
 
-	err = get_signal_source(bebob->unit, &unit, &plugid);
+	err = avc_ccm_get_signal_source(bebob->unit,
+					&stype, &sid, &pid, 0x0c, 0x00, 0x01);
 	if (err < 0)
 		goto end;
 
-	if ((unit == 0xff) && (plugid == 0x82))
+	if ((stype == 0x1f) && (sid == 0x07) && (pid == 0x82))
 		*id = 1;
 	else
 		*id = 0;
 end:
 	return err;
-	return *id;
 }
 static int
 audiophile_clock_set(struct snd_bebob *bebob, int id)
 {
-	int unit, plugid;
+	int stype, sid, pid;
 
 	if (id == 0) {
-		unit = 0x60;
-		plugid = 0x01;
+		stype = 0x0c;
+		sid = 0x00;
+		pid = 0x01;
 	} else {
-		unit = 0xff;
-		plugid = 0x82;
+		stype = 0x1f;
+		sid = 0x07;
+		pid = 0x82;
 	}
 
-	return set_signal_source(bebob->unit, unit, plugid);
+	return avc_ccm_set_signal_source(bebob->unit,
+					 stype, sid, pid, 0x0c, 0x00, 0x01);
 }
 static char *audiophile_meter_labels[] = {
 	ANA_IN, DIG_IN,
@@ -739,13 +674,14 @@ static char *solo_clock_labels[] = {
 static int
 solo_clock_get(struct snd_bebob *bebob, int *id)
 {
-	int err, unit, plugid;
+	int err, stype, sid, pid;
 
-	err = get_signal_source(bebob->unit, &unit, &plugid);
+	err = avc_ccm_get_signal_source(bebob->unit,
+					&stype, &sid, &pid, 0x0c, 0x00, 0x01);
 	if (err < 0)
 		goto end;
 
-	if ((unit == 0xff) && (plugid == 0x81))
+	if ((stype == 0x1f) && (sid = 0x07) && (pid== 0x81))
 		*id = 1;
 	else
 		*id = 0;
@@ -755,17 +691,20 @@ end:
 static int
 solo_clock_set(struct snd_bebob *bebob, int id)
 {
-	int unit, plugid;
+	int stype, sid, pid;
 
 	if (id == 0) {
-		unit = 0x60;
-		plugid = 0x01;
+		stype = 0x0c;
+		sid = 0x00;
+		pid = 0x01;
 	} else {
-		unit = 0xff;
-		plugid = 0x81;
+		stype = 0x1f;
+		sid = 0x07;
+		pid = 0x81;
 	}
 
-	return set_signal_source(bebob->unit, unit, plugid);
+	return avc_ccm_set_signal_source(bebob->unit,
+					 stype, sid, pid, 0x0c, 0x00, 0x01);
 }
 static char *solo_meter_labels[] = {
 	ANA_IN, DIG_IN,

@@ -130,11 +130,13 @@ snd_bebob_read_quad(struct snd_bebob *bebob, u64 addr, void *buf, int size)
 
 int snd_bebob_get_formation_index(int sampling_rate);
 
+/* AV/C Audio Subunit Specification 1.0 (1394TA) */
 int avc_audio_set_selector(struct fw_unit *unit, int subunit_id,
 			   int fb_id, int number);
 int avc_audio_get_selector(struct fw_unit *unit, int subunit_id,
 			   int fb_id, int *number);
 
+/* AV/C Digital Interface Command Set General Specification 4.2 (1394TA) */
 int avc_generic_set_sampling_rate(struct fw_unit *unit, int rate,
 				int direction, unsigned short plug);
 int avc_generic_get_sampling_rate(struct fw_unit *unit, int *rate,
@@ -142,6 +144,16 @@ int avc_generic_get_sampling_rate(struct fw_unit *unit, int *rate,
 int avc_generic_get_plug_info(struct fw_unit *unit,
 				unsigned short bus_plugs[2],
 				unsigned short ext_plugs[2]);
+
+/* Connection and Compatibility Management 1.0 (1394TA) */
+int avc_ccm_get_signal_source(struct fw_unit *unit,
+		int *src_stype, int *src_sid, int *src_pid,
+		int dst_stype, int dst_sid, int dst_pid);
+int avc_ccm_set_signal_source(struct fw_unit *unit,
+		int src_stype, int src_sid, int src_pid,
+		int dst_stype, int dst_sid, int dst_pid);
+
+/* Additional AVC commands, AV/C Unit and Subunit, Revision 17 (BridgeCo.) */
 int avc_bridgeco_get_plug_channels(struct fw_unit *unit, int direction,
 				unsigned short plugid, int *channels);
 int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,

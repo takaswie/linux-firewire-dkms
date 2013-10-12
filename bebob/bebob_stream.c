@@ -187,7 +187,7 @@ stream_stop(struct snd_bebob *bebob, struct amdtp_stream *stream)
 		cmp_connection_break(&bebob->out_conn);
 	else
 		cmp_connection_break(&bebob->in_conn);
-end:
+
 	return;
 }
 
