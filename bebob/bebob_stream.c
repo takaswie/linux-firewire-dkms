@@ -59,9 +59,9 @@ int snd_bebob_stream_map(struct snd_bebob *bebob,
 	}
 
 	if (stream == &bebob->tx_stream)
-		dir = 1;
-	else
 		dir = 0;
+	else
+		dir = 1;
 
 	err = avc_bridgeco_get_plug_channel_position(bebob->unit, dir, 0, buf);
 	if (err < 0)
@@ -81,12 +81,11 @@ int snd_bebob_stream_map(struct snd_bebob *bebob,
 		buf++;
 		for (ch = 0; ch < channels; ch++) {
 			pos = *buf - 1;
-			buf++;
 			if (type != 0x0a)
 				stream->pcm_positions[pcm++] = pos;
 			else
 				stream->midi_positions[midi++] = pos;
-			buf++;
+			buf += 2;
 		}
 	}
 
