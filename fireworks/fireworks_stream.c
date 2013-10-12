@@ -102,7 +102,7 @@ stream_stop(struct snd_efw *efw, struct amdtp_stream *stream)
 		cmp_connection_break(&efw->out_conn);
 	else
 		cmp_connection_break(&efw->in_conn);
-end:
+
 	return;
 }
 
