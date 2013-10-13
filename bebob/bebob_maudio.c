@@ -21,11 +21,11 @@
  * NOTE:
  * For Firewire 410 and Firewire Audiophile, this module requests firmware
  * version 5058 or later. With former version, BeBoB chipset needs downloading
- * firmware and the driver should do this. To do this with ALSA, I examinate
- * whether it's OK or not to include firmware binary blob to alsa-firmware
- * package. With later version, the firmware is in ROM of chipset and the
- * driver just send a cue to load it when probing the device. This cue is sent
- * just once.
+ * firmware and the driver should do this. To do this with ALSA, I need to
+ * examinate whether it's OK or not to include firmware binary blob to
+ * alsa-firmware package. With later version, the firmware is in ROM of chipset
+ * and the driver just send a cue to load it when probing the device. This cue
+ * is sent just once.
  *
  * For streaming, both of output and input streams are needed for Firewire 410
  * and Ozonic. The single stream is OK for the other devices even if the clock
