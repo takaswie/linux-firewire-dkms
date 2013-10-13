@@ -84,7 +84,8 @@ struct snd_bebob_meter_spec {
 	int (*get)(struct snd_bebob *bebob, u32 *target, int size);
 };
 struct snd_bebob_spec {
-	int (*load)(struct snd_bebob *bebob);
+	int (*load)(struct fw_unit *unit,
+		    const struct ieee1394_device_id *entry);
 	int (*discover)(struct snd_bebob *bebob);
 	int (*map)(struct snd_bebob *bebob, struct amdtp_stream *stream);
 	struct snd_bebob_clock_spec *clock;

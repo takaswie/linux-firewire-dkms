@@ -182,7 +182,7 @@ run_a_transaction(struct fw_unit *unit, int tcode,
  * newly detected.
  */
 static int
-firmware_load(struct snd_bebob *bebob)
+firmware_load(struct fw_unit *unit, const struct ieee1394_device_id *entry)
 {
 	__be32 cues[3];
 
@@ -190,7 +190,7 @@ firmware_load(struct snd_bebob *bebob)
 	cues[1] = cpu_to_be32(MAUDIO_BOOTLOADER_CUE2);
 	cues[2] = cpu_to_be32(MAUDIO_BOOTLOADER_CUE3);
 
-	return run_a_transaction(bebob->unit, TCODE_WRITE_BLOCK_REQUEST,
+	return run_a_transaction(unit, TCODE_WRITE_BLOCK_REQUEST,
 				 BEBOB_ADDR_REG_REQ, cues, sizeof(cues));
 }
 

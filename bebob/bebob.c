@@ -124,11 +124,11 @@ snd_bebob_card_free(struct snd_card *card)
 }
 
 static bool
-check_audiophile_booted(struct snd_bebob *bebob)
+check_audiophile_booted(struct fw_unit *unit)
 {
 	char name[24] = {0};
 
-	if (fw_csr_string(bebob->unit->directory, CSR_MODEL, name, sizeof(name)) < 0)
+	if (fw_csr_string(unit->directory, CSR_MODEL, name, sizeof(name)) < 0)
 		return false;
 
 	if (strncmp(name, "FW Audiophile Bootloader", 15) == 0)
@@ -143,6 +143,7 @@ snd_bebob_probe(struct fw_unit *unit,
 {
 	struct snd_card *card;
 	struct snd_bebob *bebob;
+	const struct snd_bebob_spec *spec;
 	int card_index, err;
 
 	mutex_lock(&devices_mutex);
@@ -154,6 +155,19 @@ snd_bebob_probe(struct fw_unit *unit,
 	}
 	if (card_index >= SNDRV_CARDS) {
 		err = -ENOENT;
+		goto end;
+	}
+
+	/* if needed, load firmware and exit */
+	spec = (const struct snd_bebob_spec *)entry->driver_data;
+	if ((spec->load) &&
+	    ((entry->model_id != MODEL_MAUDIO_AUDIOPHILE_BOTH) ||
+	     (!check_audiophile_booted(unit)))) {
+		spec->load(unit, entry);
+		dev_info(&unit->device,
+			 "loading firmware for 0x%08X:0x%08X\n",
+			 entry->vendor_id, entry->model_id);
+		err = 0;
 		goto end;
 	}
 
@@ -170,27 +184,10 @@ snd_bebob_probe(struct fw_unit *unit,
 	bebob->device = fw_parent_device(unit);
 	bebob->unit = unit;
 	bebob->card_index = -1;
+	bebob->spec = spec;
 	mutex_init(&bebob->mutex);
 	spin_lock_init(&bebob->lock);
 
-	bebob->spec = (const struct snd_bebob_spec *)entry->driver_data;
-
-	/* try to load firmware if necessary */
-	if (!bebob->spec->load)
-		goto loaded;
-	/* MAudio Audiophile has the same id for both  */
-	else if ((entry->model_id == MODEL_MAUDIO_AUDIOPHILE_BOTH) &&
-	         check_audiophile_booted(bebob))
-		goto loaded;
-	else {
-		bebob->spec->load(bebob);
-		/* just do this */
-		err = 0;
-		snd_printk(KERN_INFO"loading firmware\n");
-		goto error;
-	}
-
-loaded:
 	if (!bebob->spec->discover)
 		goto error;
 	err = bebob->spec->discover(bebob);
