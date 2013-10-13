@@ -91,8 +91,10 @@ control_digital_interface_get(struct snd_kcontrol *kctl,
 	struct snd_bebob_dig_iface_spec *spec = bebob->spec->dig_iface;
 	int id;
 
+	mutex_lock(&bebob->mutex);
 	if (spec->get(bebob, &id) >= 0)
 		uval->value.enumerated.item[0] = id;
+	mutex_unlock(&bebob->mutex);
 
 	return 0;
 }
@@ -105,9 +107,13 @@ control_digital_interface_put(struct snd_kcontrol *kctl,
 	int value, changed = 0;
 
 	value = uval->value.enumerated.item[0];
-	if (value < spec->num)
+
+	if (value < spec->num) {
+		mutex_lock(&bebob->mutex);
 		if (spec->set(bebob, value) >= 0)
 			changed = 1;
+		mutex_unlock(&bebob->mutex);
+	}
 
 	return changed;
 }
@@ -160,7 +166,7 @@ control_sampling_rate_get(struct snd_kcontrol *kctl,
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
 	int i, in_rate, out_rate, index, err;
 
-	spin_lock(&bebob->lock);
+	mutex_lock(&bebob->mutex);
 
 	err = avc_generic_get_sampling_rate(bebob->unit, &out_rate, 0, 0);
 	if (err < 0)
@@ -183,7 +189,7 @@ control_sampling_rate_get(struct snd_kcontrol *kctl,
 			uval->value.enumerated.item[0]++;
 
 end:
-	spin_unlock(&bebob->lock);
+	mutex_unlock(&bebob->mutex);
 	return err;
 }
 static int
@@ -192,8 +198,6 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
 	int value, index, rate, err, changed = 0;
-
-	spin_lock(&bebob->lock);
 
 	/* get index from user value*/
 	value = uval->value.enumerated.item[0];
@@ -208,6 +212,8 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 	}
 
 	rate = snd_bebob_rate_table[index];
+
+	mutex_lock(&bebob->mutex);
 	err = avc_generic_set_sampling_rate(bebob->unit, rate, 0, 0);
 	if (err < 0)
 		goto end;
@@ -220,7 +226,7 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 	changed = 1;
 
 end:
-	spin_unlock(&bebob->lock);
+	mutex_unlock(&bebob->mutex);
 	return changed;
 }
 
