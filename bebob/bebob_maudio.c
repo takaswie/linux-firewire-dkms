@@ -321,27 +321,35 @@ static char *special_dig_iface_labels[] = {
 static int
 special_dig_iface_get(struct snd_bebob *bebob, int *id)
 {
+	int in_dig_iface, err;
+
+	err = avc_audio_get_selector(bebob->unit, 0x00, 0x04, &in_dig_iface);
+	if (err < 0)
+		goto end;
+
 	/* for simplicity, the same value for input/output */
-	*id = (0x01 & bebob->in_dig_fmt) | ((bebob->in_dig_iface & 0x01) << 1);
+	*id = (0x01 & bebob->in_dig_fmt) | ((in_dig_iface & 0x01) << 1);
 
 	/* normalizing */
 	if (*id > 0)
 		(*id)--;
-	return 0;
+
+end:
+	return err;
 }
 static int
 special_dig_iface_set(struct snd_bebob *bebob, int id)
 {
 	int err;
 	int dig_fmt;
-	int dig_iface;
+	int in_dig_iface;
 
 	/* normalizing */
 	if (id > 0)
 		id++;
 
 	dig_fmt = id & 0x01;
-	dig_iface = (id >> 1) & 0x01;
+	in_dig_iface = (id >> 1) & 0x01;
 
 	/* for simplicity, the same value for input/output */
 	err = set_clock_params(bebob, bebob->clk_src, dig_fmt, dig_fmt,
@@ -349,7 +357,7 @@ special_dig_iface_set(struct snd_bebob *bebob, int id)
 	if (err < 0)
 		goto end;
 
-	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, dig_iface);
+	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, in_dig_iface);
 end:
 	return err;
 }
@@ -362,7 +370,7 @@ special_stream_formation_set(struct snd_bebob *bebob)
 	/*
 	 * the stream formation is different depending on digital interface
 	 */
-	if (bebob->in_dig_iface == 0x01) {
+	if (bebob->in_dig_fmt== 0x01) {
 		bebob->tx_stream_formations[2].pcm = 16;
 		bebob->tx_stream_formations[3].pcm = 16;
 		bebob->tx_stream_formations[4].pcm = 16;
@@ -380,7 +388,7 @@ special_stream_formation_set(struct snd_bebob *bebob)
 		bebob->tx_stream_formations[8].pcm = 2;
 	}
 
-	if (bebob->out_dig_iface == 0x01) {
+	if (bebob->out_dig_fmt == 0x01) {
 		bebob->rx_stream_formations[2].pcm = 12;
 		bebob->rx_stream_formations[3].pcm = 12;
 		bebob->rx_stream_formations[4].pcm = 12;
@@ -414,11 +422,6 @@ special_discover(struct snd_bebob *bebob)
 	if (err < 0)
 		dev_err(&bebob->unit->device,
 			"Failed to initialize clock params\n");
-
-	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, 0x00);
-	if (err < 0)
-		dev_err(&bebob->unit->device,
-			"Failed to initialize digital interface\n");
 
 	special_stream_formation_set(bebob);
 

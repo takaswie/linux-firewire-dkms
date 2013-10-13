@@ -124,8 +124,6 @@ struct snd_bebob {
 	int clk_src;
 	int in_dig_fmt;
 	int out_dig_fmt;
-	int in_dig_iface;
-	int out_dig_iface;
 	int clk_lock;
 };
 
