@@ -389,8 +389,8 @@ special_stream_formation_set(struct snd_bebob *bebob)
 	if (bebob->out_dig_fmt == 0x01) {
 		bebob->rx_stream_formations[3].pcm = 12;
 		bebob->rx_stream_formations[4].pcm = 12;
-		bebob->rx_stream_formations[5].pcm = 18;
-		bebob->rx_stream_formations[6].pcm = 18;
+		bebob->rx_stream_formations[5].pcm = 8;
+		bebob->rx_stream_formations[6].pcm = 8;
 		bebob->rx_stream_formations[7].pcm = 4;
 		bebob->rx_stream_formations[8].pcm = 4;
 	} else {
