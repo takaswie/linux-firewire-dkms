@@ -123,7 +123,7 @@ proc_read_formation(struct snd_info_entry *entry,
 	struct snd_bebob_stream_formation *formation;
 	int i;
 
-	snd_iprintf(buffer, "Reveice Stream:\n");
+	snd_iprintf(buffer, "Output Stream from device:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
 	formation = bebob->tx_stream_formations;
 	for (i = 0; i < 9; i += 1) {
@@ -132,7 +132,7 @@ proc_read_formation(struct snd_info_entry *entry,
 			formation[i].pcm, formation[i].midi);
 	}
 
-	snd_iprintf(buffer, "Transmit Stream:\n");
+	snd_iprintf(buffer, "Input Stream to device:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
 	formation = bebob->rx_stream_formations;
 	for (i = 0; i < 9; i += 1) {
@@ -149,8 +149,7 @@ proc_read_clock(struct snd_info_entry *entry,
 		struct snd_info_buffer *buffer)
 {
 	struct snd_bebob *bebob = entry->private_data;
-	int err;
-	int rate;
+	int rate, err;
 
 	err= avc_generic_get_sampling_rate(bebob->unit, &rate, 0, 0);
 	if (err == 0)
