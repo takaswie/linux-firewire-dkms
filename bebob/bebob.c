@@ -317,7 +317,7 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	/* M-Audio, Firewire Audiophile, both of bootloader and firmware */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_AUDIOPHILE_BOTH,
 			    maudio_audiophile_spec),
-	/* Firewire Solo */
+	/* M-Audio, Firewire Solo */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010062, maudio_solo_spec),
 	/* Firewire 1814 */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010070, maudio_bootloader_spec),
