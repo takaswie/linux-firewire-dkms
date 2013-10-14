@@ -1,5 +1,5 @@
 /*
- * fireworks_command.c - driver for Firewire devices from Echo Digital Audio
+ * fireworks_command.c - a part of driver for Fireworks based devices
  *
  * Copyright (c) 2013 Takashi Sakamoto <o-takashi@sakmocchi.jp>
  *
@@ -16,7 +16,7 @@
  * along with this driver; if not, see <http://www.gnu.org/licenses/>.
  *
  * Mostly based on FFADO's souce, which is licensed under GPL version 2 (and
- * optionally version 3.
+ * optionally version 3).
  */
 
 #include "../lib.h"

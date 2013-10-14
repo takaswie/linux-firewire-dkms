@@ -1,5 +1,5 @@
 /*
- * fireworks_pcm.c - driver for Firewire devices from Echo Digital Audio
+ * fireworks_pcm.c - a part of driver for Fireworks based devices
  *
  * Copyright (c) 2009-2010 Clemens Ladisch
  * Copyright (c) 2013 Takashi Sakamoto

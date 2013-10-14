@@ -1,5 +1,5 @@
 /*
- * fireworks_stream.c - driver for Firewire devices from Echo Digital Audio
+ * fireworks_stream.c - a part of driver for Fireworks based devices
  *
  * Copyright (c) 2013 Takashi Sakamoto
  *

@@ -1,5 +1,5 @@
 /*
- * fireworks/control.c - driver for Firewire devices from Echo Digital Audio
+ * fireworks_control.c - a part of driver for Fireworks based devices
  *
  * Copyright (c) 2013 Takashi Sakamoto <o-takashi@sakamocchi.jp>
  *
