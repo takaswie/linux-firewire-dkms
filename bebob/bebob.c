@@ -309,22 +309,22 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000b, yamaha_go_spec),
 	/* YAMAHA, GO46 */
 	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000c, yamaha_go_spec),
-        /* M-Audio, Ozonic */
+	/* M-Audio, Ozonic */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x0000000a, maudio_ozonic_spec),
-        /* M-Audio, Firewire 410.  */
+	/* M-Audio, Firewire 410.  */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO2, 0x00010058, maudio_bootloader_spec),
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO2, 0x00010046, maudio_fw410_spec),
-        /* M-Audio, Firewire Audiophile, both of bootloader and firmware */
+	/* M-Audio, Firewire Audiophile, both of bootloader and firmware */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_AUDIOPHILE_BOTH,
 			    maudio_audiophile_spec),
-        /* Firewire Solo */
+	/* Firewire Solo */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010062, maudio_solo_spec),
-        /* Firewire 1814 */
+	/* Firewire 1814 */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010070, maudio_bootloader_spec),
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010071, maudio_fw1814_spec),
-        /* M-Audio NRV10 */
+	/* M-Audio NRV10 */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010081, maudio_nrv10_spec),
-        /* M-Audio ProjectMix */
+	/* M-Audio ProjectMix */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010091, maudio_projectmix_spec),
 	/* M-Audio, ProFireLightbridge */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x000100a1, spec_nothing),
