@@ -210,7 +210,15 @@ extern struct snd_bebob_spec maudio_fw410_spec;
 extern struct snd_bebob_spec maudio_audiophile_spec;
 extern struct snd_bebob_spec maudio_solo_spec;
 extern struct snd_bebob_spec maudio_ozonic_spec;
-
 extern struct snd_bebob_spec yamaha_go_spec;
+
+#define SND_BEBOB_DEV_ENTRY(vendor, model, private_data) \
+{ \
+	.match_flags	= IEEE1394_MATCH_VENDOR_ID | \
+			  IEEE1394_MATCH_MODEL_ID, \
+	.vendor_id	= vendor, \
+	.model_id	= model, \
+	.driver_data	= (kernel_ulong_t)&private_data \
+}
 
 #endif

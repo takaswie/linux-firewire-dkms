@@ -36,21 +36,22 @@ MODULE_PARM_DESC(enable, "enable BeBoB sound card");
 static DEFINE_MUTEX(devices_mutex);
 static unsigned int devices_used;
 
-#define VENDOR_MAUDIO1	0x00000d6c
-#define VENDOR_MAUDIO2	0x000007f5
-#define VENDOR_YAMAHA	0x0000a0de
-
-#define MODEL_YAMAHA_GO44			0x0010000b
-#define MODEL_YAMAHA_GO46			0x0010000c
-#define MODEL_MAUDIO_OZONIC			0x0000000a
-#define MODEL_MAUDIO_FW410_BOOTLOADER		0x00010058
-#define MODEL_MAUDIO_FW_410			0x00010046
-#define MODEL_MAUDIO_AUDIOPHILE_BOTH		0x00010060
-#define MODEL_MAUDIO_SOLO			0x00010062
-#define MODEL_MAUDIO_FW_1814_BOOTLOADER		0x00010070
-#define MODEL_MAUDIO_FW_1814			0x00010071
-#define MODEL_MAUDIO_NRV10			0x00010081
-#define MODEL_MAUDIO_PROJECTMIX			0x00010091
+#define VEN_YAMAHA	0x0000a0de
+#define VEN_MAUDIO1	0x00000d6c
+#define VEN_MAUDIO2	0x000007f5
+#define VEN_FOCUSRITE	0x0000130e
+#define VEN_EDIROL	0x000040ab
+#define VEN_PRESONUS	0x00000a92
+#define VEN_TERRATEK	0x00000aac
+#define VEN_BRIDGECO	0x000007f5
+#define VEN_MACKIE	0x0000000f
+#define VEN_TASCOM	0x0000022e
+#define VEN_BEHRINGER	0x00001564
+#define VEN_APOGEE	0x000003db
+#define VEN_ESI		0x00000f1b
+#define VEN_CME		0x0000000a
+#define VEN_PHONIC	0x00001496
+#define MODEL_MAUDIO_AUDIOPHILE_BOTH	0x00010060
 
 static int
 name_device(struct snd_bebob *bebob, int vendor_id)
@@ -63,12 +64,32 @@ name_device(struct snd_bebob *bebob, int vendor_id)
 	int err = 0;
 
 	/* get vendor name */
-	if ((vendor_id == VENDOR_MAUDIO1) || (vendor_id == VENDOR_MAUDIO2))
+	if ((vendor_id == VEN_MAUDIO1) || (vendor_id == VEN_MAUDIO2))
 		strcpy(vendor, "M-Audio");
-	else if (vendor_id == VENDOR_YAMAHA)
+	else if (vendor_id == VEN_YAMAHA)
 		strcpy(vendor, "YAMAHA");
-	else
-		strcpy(vendor, "Unknown");
+	else if (vendor_id == VEN_FOCUSRITE)
+		strcpy(vendor, "Focusrite");
+	else if (vendor_id == VEN_EDIROL)
+		strcpy(vendor, "Edirol");
+	else if (vendor_id == VEN_TERRATEK)
+		strcpy(vendor, "Terratek");
+	else if (vendor_id == VEN_PRESONUS)
+		strcpy(vendor, "Presonus");
+	else if (vendor_id == VEN_TASCOM)
+		strcpy(vendor, "Tacsom");
+	else if (vendor_id == VEN_BRIDGECO)
+		strcpy(vendor, "BridgeCo");
+	else if (vendor_id == VEN_BEHRINGER)
+		strcpy(vendor, "Behringer");
+	else if (vendor_id == VEN_APOGEE)
+		strcpy(vendor, "Apogee");
+	else if (vendor_id == VEN_ESI)
+		strcpy(vendor, "ESI");
+	else if (vendor_id == VEN_CME)
+		strcpy(vendor, "CME");
+	else if (vendor_id == VEN_PHONIC)
+		strcpy(vendor, "Phonic");
 
 	/* get model name */
 	err = fw_csr_string(bebob->unit->directory, CSR_MODEL,
@@ -274,91 +295,81 @@ end:
 	return;
 }
 
+static const struct snd_bebob_spec spec_nothing = {
+	.load		= NULL,
+	.discover	= &snd_bebob_stream_discover,
+	.map		= &snd_bebob_stream_map,
+	.clock		= NULL,
+	.dig_iface	= NULL,
+	.meter		= NULL
+};
+
 static const struct ieee1394_device_id snd_bebob_id_table[] = {
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_YAMAHA,
-		.model_id	= MODEL_YAMAHA_GO44,
-		.driver_data	= (kernel_ulong_t)&yamaha_go_spec
-	},
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_YAMAHA,
-		.model_id	= MODEL_YAMAHA_GO46,
-		.driver_data	= (kernel_ulong_t)&yamaha_go_spec
-	},
-	/* Ozonic has one ID, no bootloader */
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO1,
-		.model_id	= MODEL_MAUDIO_OZONIC,
-		.driver_data	= (kernel_ulong_t)&maudio_ozonic_spec
-	},
-	/* Firewire 410 has two IDs, for bootloader and itself */
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO2,
-		.model_id	= MODEL_MAUDIO_FW410_BOOTLOADER,
-		.driver_data	= (kernel_ulong_t)&maudio_bootloader_spec
-	},
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO2,
-		.model_id	= MODEL_MAUDIO_FW_410,
-		.driver_data	= (kernel_ulong_t)&maudio_fw410_spec
-	},
-	/* Firewire Audiophile has one ID for both bootloader and itself */
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO1,
-		.model_id	= MODEL_MAUDIO_AUDIOPHILE_BOTH,
-		.driver_data	= (kernel_ulong_t)&maudio_audiophile_spec
-	},
-	/* Firewire Solo has one ID, no bootloader */
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO1,
-		.model_id	= MODEL_MAUDIO_SOLO,
-		.driver_data	= (kernel_ulong_t)&maudio_solo_spec
-	},
-	/* Firewire 1814 has two IDs, for bootloader and itself */
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO1,
-		.model_id	= MODEL_MAUDIO_FW_1814_BOOTLOADER,
-		.driver_data	= (kernel_ulong_t)&maudio_bootloader_spec
-	},
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO1,
-		.model_id	= MODEL_MAUDIO_FW_1814,
-		.driver_data	= (kernel_ulong_t)&maudio_fw1814_spec
-	},
-	/* NRV10 is booted just after power on. */
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO1,
-		.model_id	= MODEL_MAUDIO_NRV10,
-		.driver_data	= (kernel_ulong_t)&maudio_nrv10_spec
-	},
-	/* ProjectMix is booted just after power on. */
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VENDOR_MAUDIO1,
-		.model_id	= MODEL_MAUDIO_PROJECTMIX,
-		.driver_data	= (kernel_ulong_t)&maudio_projectmix_spec
-	},
+	/* Yamaha, GO44 */
+	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000b, yamaha_go_spec),
+	/* YAMAHA, GO46 */
+	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000c, yamaha_go_spec),
+        /* M-Audio, Ozonic */
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x0000000a, maudio_ozonic_spec),
+        /* M-Audio, Firewire 410.  */
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO2, 0x00010058, maudio_bootloader_spec),
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO2, 0x00010046, maudio_fw410_spec),
+        /* M-Audio, Firewire Audiophile, both of bootloader and firmware */
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_AUDIOPHILE_BOTH,
+			    maudio_audiophile_spec),
+        /* Firewire Solo */
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010062, maudio_solo_spec),
+        /* Firewire 1814 */
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010070, maudio_bootloader_spec),
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010071, maudio_fw1814_spec),
+        /* M-Audio NRV10 */
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010081, maudio_nrv10_spec),
+        /* M-Audio ProjectMix */
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010091, maudio_projectmix_spec),
+	/* M-Audio, ProFireLightbridge */
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x000100a1, spec_nothing),
+	/* Focusrite, SaffirePro 26 I/O */
+	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000003, spec_nothing),
+	/* Focusrite, SaffirePro 10 I/O */
+	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000006, spec_nothing),
+	/* Focusrite, Saffire(LE) */
+	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000000, spec_nothing),
+	/* Edirol, FA-66 */
+	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010049, spec_nothing),
+	/* Edirol, FA-101 */
+	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010048, spec_nothing),
+	/* TerraTecElectronic GmbH, Phase88FW */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000003, spec_nothing),
+	/* TerraTecElectronic GmbH, PhaseX24FW (rev 4) */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000004, spec_nothing),
+	/* TerraTecElectronic GmbH, PhaseX24FW (rev 7) */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000007, spec_nothing),
+	/* Presonus, FireBox */
+	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010000, spec_nothing),
+	/* PreSonus FirePod */
+	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010066, spec_nothing),
+	/* BridgeCo, RDAudio1 */
+	SND_BEBOB_DEV_ENTRY(VEN_BRIDGECO, 0x00010048, spec_nothing),
+	/* BridgeCo, Audio5 */
+	SND_BEBOB_DEV_ENTRY(VEN_BRIDGECO, 0x00010049, spec_nothing),
+	/* Mackie, OnyxFirewire */
+	SND_BEBOB_DEV_ENTRY(VEN_MACKIE, 0x00010065, spec_nothing),
+	/* Mackie, OnyxFirewire */
+	SND_BEBOB_DEV_ENTRY(VEN_MACKIE, 0x00010067, spec_nothing),
+	/* Tascam, IF-FW/DM */
+	SND_BEBOB_DEV_ENTRY(VEN_TASCOM, 0x00010067, spec_nothing),
+	/* Behringer, X32 */
+	SND_BEBOB_DEV_ENTRY(VEN_BEHRINGER, 0x00000006, spec_nothing),
+	/* ApogeeElectronics, Rosetta200 */
+	SND_BEBOB_DEV_ENTRY(VEN_APOGEE, 0x00010048, spec_nothing),
+	/* ESI, Quatafire610 */
+	SND_BEBOB_DEV_ENTRY(VEN_ESI, 0x00010064, spec_nothing),
+	/* AcousticReality, eARMasterOne */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000002, spec_nothing),
+	/* CME, MatrixKFW */
+	SND_BEBOB_DEV_ENTRY(VEN_CME, 0x00030000, spec_nothing),
+	/* Phonic, HB24U */
+	SND_BEBOB_DEV_ENTRY(VEN_PHONIC, 0x00000000, spec_nothing),
 	{}
 };
 MODULE_DEVICE_TABLE(ieee1394, snd_bebob_id_table);
