@@ -38,7 +38,27 @@ MODULE_PARM_DESC(enable, "enable Fireworks sound card");
 static DEFINE_MUTEX(devices_mutex);
 static unsigned int devices_used;
 
-#define MAX_TRIES_AFTER_BUS_RESET 5
+#define VENDOR_ECHO_DIGITAL_AUDIO	0x001486
+#define MODEL_ECHO_AUDIOFIRE_2		0x000af2
+#define MODEL_ECHO_AUDIOFIRE_4		0x000af4
+#define MODEL_ECHO_AUDIOFIRE_8		0x000af8
+#define MODEL_ECHO_AUDIOFIRE_8A		0x000af9	// model as of July 2009
+#define MODEL_ECHO_AUDIOFIRE_PRE8	0x000af9	// the same ID
+#define MODEL_ECHO_AUDIOFIRE_12		0x00af12
+#define MODEL_ECHO_FIREWORKS_8		0x0000f8
+#define MODEL_ECHO_FIREWORKS_HDMI	0x00afd1
+
+#define SPECIFIER_1394TA		0x00a02d
+
+#define VENDOR_LOUD			0x000ff2
+#define  MODEL_MACKIE_400F		0x00400f
+#define  MODEL_MACKIE_1200F		0x01200f
+
+#define VENDOR_GIBSON			0x00075b
+#define  MODEL_GIBSON_RIP		0x00afb2
+/* #define  MODEL_GIBSON_GOLDTOP	0x?????? */
+
+#define MAX_TRIES_AFTER_BUS_RESET		5
 
 #define FLAG_DYNADDR_SUPPORTED			0
 #define FLAG_MIRRORING_SUPPORTED		1
@@ -446,26 +466,6 @@ static void snd_efw_remove(struct fw_unit *unit)
 
 	return;
 }
-
-#define VENDOR_GIBSON			0x00075b
-#define  MODEL_GIBSON_RIP		0x00afb2
-/* #define  MODEL_GIBSON_GOLDTOP	0x?????? */
-
-#define VENDOR_LOUD			0x000ff2
-#define  MODEL_MACKIE_400F		0x00400f
-#define  MODEL_MACKIE_1200F		0x01200f
-
-#define VENDOR_ECHO_DIGITAL_AUDIO	0x001486
-#define  MODEL_ECHO_AUDIOFIRE_2		0x000af2
-#define  MODEL_ECHO_AUDIOFIRE_4		0x000af4
-#define  MODEL_ECHO_AUDIOFIRE_8		0x000af8
-#define  MODEL_ECHO_AUDIOFIRE_8A	0x000af9	// model as of July 2009
-#define  MODEL_ECHO_AUDIOFIRE_PRE8	0x000af9	// the same ID
-#define  MODEL_ECHO_AUDIOFIRE_12	0x00af12
-#define  MODEL_ECHO_FIREWORKS_8		0x0000f8
-#define  MODEL_ECHO_FIREWORKS_HDMI	0x00afd1
-
-#define SPECIFIER_1394TA		0x00a02d
 
 static const struct ieee1394_device_id snd_efw_id_table[] = {
 	{
