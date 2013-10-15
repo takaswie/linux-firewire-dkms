@@ -71,6 +71,7 @@ struct snd_bebob_clock_spec {
 	char **labels;
 	int (*get)(struct snd_bebob *bebob, int *id);
 	int (*set)(struct snd_bebob *bebob, int id);
+	int (*synced)(struct snd_bebob *bebob, bool *synced);
 };
 struct snd_bebob_dig_iface_spec {
 	int num;

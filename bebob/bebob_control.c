@@ -286,6 +286,37 @@ static int control_clock_source_put(struct snd_kcontrol *kctl,
 	return changed;
 }
 
+/*
+ * Global Control: Clock Sync Status
+ */
+static int control_clock_sync_status_info(struct snd_kcontrol *kctl,
+					  struct snd_ctl_elem_info *einf)
+{
+	einf->type = SNDRV_CTL_ELEM_TYPE_BOOLEAN;
+	einf->count = 1;
+	einf->value.integer.min = 0;
+	einf->value.integer.max = 1;
+
+	return 0;
+}
+static int control_clock_sync_status_get(struct snd_kcontrol *kctl,
+					 struct snd_ctl_elem_value *uval)
+{
+	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
+	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
+	bool synced = 0;
+
+	mutex_lock(&bebob->mutex);
+	if (spec->synced(bebob, &synced) >= 0) {
+		if (synced == false)
+			uval->value.enumerated.item[0] = 0;
+		else
+			uval->value.enumerated.item[0] = 1;
+	}
+	mutex_unlock(&bebob->mutex);
+
+	return 0;
+}
 static struct snd_kcontrol_new global_clock_source_control = {
 	.name	= "Clock Source",
 	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
@@ -293,6 +324,14 @@ static struct snd_kcontrol_new global_clock_source_control = {
 	.info	= control_clock_source_info,
 	.get	= control_clock_source_get,
 	.put	= control_clock_source_put
+};
+
+static struct snd_kcontrol_new global_clock_sync_status = {
+	.name	= "Clock Sync Status",
+	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+	.access	= SNDRV_CTL_ELEM_ACCESS_READ,
+	.info	= control_clock_sync_status_info,
+	.get	= control_clock_sync_status_get,
 };
 
 static struct snd_kcontrol_new global_sampling_rate_control = {
@@ -325,6 +364,11 @@ int snd_bebob_create_control_devices(struct snd_bebob *bebob)
 
 	if (bebob->spec->clock != NULL) {
 		kctl = snd_ctl_new1(&global_clock_source_control, bebob);
+		err = snd_ctl_add(bebob->card, kctl);
+		if (err < 0)
+			goto end;
+
+		kctl = snd_ctl_new1(&global_clock_sync_status, bebob);
 		err = snd_ctl_add(bebob->card, kctl);
 		if (err < 0)
 			goto end;

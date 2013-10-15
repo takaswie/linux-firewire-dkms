@@ -50,8 +50,7 @@
 #define METER_OFFSET		0x00600000
 
 /* some device has sync info after metering data */
-#define METER_SIZE_FW1814	84	/* with sync info */
-#define METER_SIZE_PROJECTMIX	84	/* with sync info */
+#define METER_SIZE_SPECIAL	84	/* with sync info */
 #define METER_SIZE_FW410	76	/* with sync info */
 #define METER_SIZE_AUDIOPHILE	60	/* with sync info */
 #define METER_SIZE_SOLO		52	/* with sync info */
@@ -206,7 +205,7 @@ get_meter(struct snd_bebob *bebob, void *buf, int size)
  * BeBoB don't tell drivers to detect digital input, just show clock sync or not.
  */
 static int
-check_sync(struct snd_bebob *bebob, int size, int *sync)
+check_clock_sync(struct snd_bebob *bebob, int size, bool *sync)
 {
 	int err;
 	u8 *buf;
@@ -219,7 +218,8 @@ check_sync(struct snd_bebob *bebob, int size, int *sync)
 	if (err < 0)
 		goto end;
 
-	*sync = (buf[size - 3] != 0xff);
+	/* if synced, this value is the same of SFC of FDF in CIP header */
+	*sync = (buf[size - 2] != 0xff);
 	err = 0;
 end:
 	kfree(buf);
@@ -315,6 +315,12 @@ special_clock_set(struct snd_bebob *bebob, int id)
 				bebob->in_dig_fmt, bebob->out_dig_fmt,
 				bebob->clk_lock);
 }
+static int
+special_clock_synced(struct snd_bebob *bebob, bool *synced)
+{
+	return check_clock_sync(bebob, METER_SIZE_SPECIAL, synced);
+}
+
 static char *special_dig_iface_labels[] = {
 	"ADAT Optical", "S/PDIF Optical", "S/PDIF Coaxial"
 };
@@ -446,11 +452,11 @@ fw1814_meter_get(struct snd_bebob *bebob, u32 *target, int size)
 		return -EINVAL;
 
 	/* omit last 4 bytes because it's clock info. */
-	buf = kmalloc(METER_SIZE_FW1814, GFP_KERNEL);
+	buf = kmalloc(METER_SIZE_SPECIAL - 4, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
-	err = get_meter(bebob, (void *)buf, METER_SIZE_FW1814);
+	err = get_meter(bebob, (void *)buf, METER_SIZE_SPECIAL - 4);
 	if (err < 0)
 		goto end;
 
@@ -487,11 +493,11 @@ projectmix_meter_get(struct snd_bebob *bebob, u32 *target, int size)
 		return -EINVAL;
 
 	/* omit last 4 bytes because it's clock info. */
-	buf = kmalloc(METER_SIZE_PROJECTMIX, GFP_KERNEL);
+	buf = kmalloc(METER_SIZE_SPECIAL - 4, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
-	err = get_meter(bebob, (void *)buf, METER_SIZE_PROJECTMIX);
+	err = get_meter(bebob, (void *)buf, METER_SIZE_SPECIAL - 4);
 	if (err < 0)
 		goto end;
 
@@ -550,6 +556,11 @@ fw410_clock_set(struct snd_bebob *bebob, int id)
 
 	return avc_ccm_set_signal_source(bebob->unit,
 					stype, sid, pid, 0x0c, 0x00, 0x01);
+}
+static int
+fw410_clock_synced(struct snd_bebob *bebob, bool *synced)
+{
+	return check_clock_sync(bebob, METER_SIZE_FW410, synced);
 }
 static char *fw410_dig_iface_labels[] = {
 	"S/PDIF Optical", "S/PDIF Coaxial"
@@ -630,6 +641,11 @@ audiophile_clock_set(struct snd_bebob *bebob, int id)
 	return avc_ccm_set_signal_source(bebob->unit,
 					 stype, sid, pid, 0x0c, 0x00, 0x01);
 }
+static int
+audiophile_clock_synced(struct snd_bebob *bebob, bool *synced)
+{
+	return check_clock_sync(bebob, METER_SIZE_AUDIOPHILE, synced);
+}
 static char *audiophile_meter_labels[] = {
 	ANA_IN, DIG_IN,
 	ANA_OUT, ANA_OUT, DIG_OUT,
@@ -694,6 +710,11 @@ solo_clock_set(struct snd_bebob *bebob, int id)
 
 	return avc_ccm_set_signal_source(bebob->unit,
 					 stype, sid, pid, 0x0c, 0x00, 0x01);
+}
+static int
+solo_clock_synced(struct snd_bebob *bebob, bool *synced)
+{
+	return check_clock_sync(bebob, METER_SIZE_SOLO, synced);
 }
 static char *solo_meter_labels[] = {
 	ANA_IN, DIG_IN,
@@ -805,7 +826,8 @@ static struct snd_bebob_clock_spec special_clock_spec = {
 	.num	= ARRAY_SIZE(special_clock_labels),
 	.labels	= special_clock_labels,
 	.get	= &special_clock_get,
-	.set	= &special_clock_set
+	.set	= &special_clock_set,
+	.synced	= &special_clock_synced
 };
 static struct snd_bebob_dig_iface_spec special_dig_iface_spec = {
 	.num	= ARRAY_SIZE(special_dig_iface_labels),
@@ -849,7 +871,8 @@ static struct snd_bebob_clock_spec fw410_clock_spec = {
 	.num	= ARRAY_SIZE(fw410_clock_labels),
 	.labels	= fw410_clock_labels,
 	.get	= &fw410_clock_get,
-	.set	= &fw410_clock_set
+	.set	= &fw410_clock_set,
+	.synced	= &fw410_clock_synced
 };
 static struct snd_bebob_dig_iface_spec fw410_dig_iface_spec = {
 	.num	= ARRAY_SIZE(fw410_dig_iface_labels),
@@ -876,7 +899,8 @@ static struct snd_bebob_clock_spec audiophile_clock_spec = {
 	.num	= ARRAY_SIZE(audiophile_clock_labels),
 	.labels	= audiophile_clock_labels,
 	.get	= &audiophile_clock_get,
-	.set	= &audiophile_clock_set
+	.set	= &audiophile_clock_set,
+	.synced	= &audiophile_clock_synced
 };
 static struct snd_bebob_meter_spec audiophile_meter_spec = {
 	.num	= ARRAY_SIZE(audiophile_meter_labels),
@@ -897,7 +921,8 @@ static struct snd_bebob_clock_spec solo_clock_spec = {
 	.num	= ARRAY_SIZE(solo_clock_labels),
 	.labels	= solo_clock_labels,
 	.get	= &solo_clock_get,
-	.set	= &solo_clock_set
+	.set	= &solo_clock_set,
+	.synced	= &solo_clock_synced
 };
 static struct snd_bebob_meter_spec solo_meter_spec = {
 	.num	= ARRAY_SIZE(solo_meter_labels),
