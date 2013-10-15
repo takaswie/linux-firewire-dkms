@@ -52,6 +52,7 @@ static unsigned int devices_used;
 #define VEN_CME		0x0000000a
 #define VEN_PHONIC	0x00001496
 #define MODEL_MAUDIO_AUDIOPHILE_BOTH	0x00010060
+#define MODEL_FOCUSRITE_SAFFIRE_BOTH	0x00000000
 
 static int
 name_device(struct snd_bebob *bebob, int vendor_id)
@@ -158,6 +159,20 @@ check_audiophile_booted(struct fw_unit *unit)
 		return true;
 }
 
+static const struct snd_bebob_spec *
+get_saffire_spec(struct fw_unit *unit)
+{
+	char name[24] = {0};
+
+	if (fw_csr_string(unit->directory, CSR_MODEL, name, sizeof(name)) < 0)
+		return NULL;
+
+	if (strcmp(name, "SaffireLE") == 0)
+		return &saffire_le_spec;
+	else
+		return &saffire_spec;
+}
+
 static int
 snd_bebob_probe(struct fw_unit *unit,
 		const struct ieee1394_device_id *entry)
@@ -179,8 +194,17 @@ snd_bebob_probe(struct fw_unit *unit,
 		goto end;
 	}
 
+	if (entry->model_id == MODEL_FOCUSRITE_SAFFIRE_BOTH)
+		spec = get_saffire_spec(unit);
+	else
+		spec = (const struct snd_bebob_spec *)entry->driver_data;
+
+	if (spec == NULL) {
+		err = -EIO;
+		goto end;
+	}
+
 	/* if needed, load firmware and exit */
-	spec = (const struct snd_bebob_spec *)entry->driver_data;
 	if ((spec->load) &&
 	    ((entry->model_id != MODEL_MAUDIO_AUDIOPHILE_BOTH) ||
 	     (!check_audiophile_booted(unit)))) {
@@ -329,11 +353,12 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	/* M-Audio, ProFireLightbridge */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x000100a1, spec_nothing),
 	/* Focusrite, SaffirePro 26 I/O */
-	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000003, spec_nothing),
+	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000003, saffirepro_26_spec),
 	/* Focusrite, SaffirePro 10 I/O */
-	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000006, spec_nothing),
+	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000006, saffirepro_10_spec),
 	/* Focusrite, Saffire(LE) */
-	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000000, spec_nothing),
+	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, MODEL_FOCUSRITE_SAFFIRE_BOTH,
+			    saffire_spec),
 	/* Edirol, FA-66 */
 	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010049, spec_nothing),
 	/* Edirol, FA-101 */

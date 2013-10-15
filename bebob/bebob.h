@@ -212,6 +212,10 @@ extern struct snd_bebob_spec maudio_audiophile_spec;
 extern struct snd_bebob_spec maudio_solo_spec;
 extern struct snd_bebob_spec maudio_ozonic_spec;
 extern struct snd_bebob_spec yamaha_go_spec;
+extern struct snd_bebob_spec saffirepro_26_spec;
+extern struct snd_bebob_spec saffirepro_10_spec;
+extern struct snd_bebob_spec saffire_le_spec;
+extern struct snd_bebob_spec saffire_spec;
 
 #define SND_BEBOB_DEV_ENTRY(vendor, model, private_data) \
 { \
