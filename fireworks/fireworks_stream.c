@@ -95,8 +95,7 @@ end:
 static void
 stream_stop(struct snd_efw *efw, struct amdtp_stream *stream)
 {
-	if (amdtp_stream_running(stream))
-		amdtp_stream_stop(stream);
+	amdtp_stream_stop(stream);
 
 	if (stream == &efw->tx_stream)
 		cmp_connection_break(&efw->out_conn);

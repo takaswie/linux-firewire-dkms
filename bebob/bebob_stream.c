@@ -180,8 +180,7 @@ end:
 static void
 stream_stop(struct snd_bebob *bebob, struct amdtp_stream *stream)
 {
-	if (amdtp_stream_running(stream))
-		amdtp_stream_stop(stream);
+	amdtp_stream_stop(stream);
 
 	if (stream == &bebob->tx_stream)
 		cmp_connection_break(&bebob->out_conn);
