@@ -303,20 +303,33 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	if (!amdtp_stream_running(master)) {
 		amdtp_stream_set_sync(sync_mode, master, slave);
 		err = stream_start(bebob, master, sampling_rate);
-		if (err < 0)
+		if (err < 0) {
+			dev_err(&bebob->unit->device,
+				"fail to start AMDTP master stream:%d\n", err);
 			goto end;
+		}
 
-		err = amdtp_stream_wait_run(master);
-		if (err < 0)
+		if (!amdtp_stream_wait_run(master)) {
+			dev_err(&bebob->unit->device,
+				"AMDTP master stream wouldn't run\n");
+			err = -ETIMEDOUT;
 			goto end;
+		}
 	}
 
 	/* start slave if needed */
 	if (slave_flag && !amdtp_stream_running(slave)) {
 		err = stream_start(bebob, slave, sampling_rate);
-		if (err < 0)
+		if (err < 0) {
+			dev_err(&bebob->unit->device,
+				"fail to start AMDTP slave stream:%d\n", err);
 			goto end;
-		err = amdtp_stream_wait_run(slave);
+		}
+		if (!amdtp_stream_wait_run(slave)) {
+			dev_err(&bebob->unit->device,
+				"AMDTP slave stream wouldn't run\n");
+			err = -ETIMEDOUT;
+		}
 	}
 
 end:

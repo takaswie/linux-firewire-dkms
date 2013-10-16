@@ -220,20 +220,33 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 	if (!amdtp_stream_running(master)) {
 		amdtp_stream_set_sync(sync_mode, master, slave);
 		err = stream_start(efw, master, sampling_rate);
-		if (err < 0)
+		if (err < 0) {
+			dev_err(&efw->unit->device,
+				"fail to start AMDTP master stream:%d\n", err);
 			goto end;
+		}
 
-		err = amdtp_stream_wait_run(master);
-		if (err < 0)
+		if (!amdtp_stream_wait_run(master)) {
+			dev_err(&efw->unit->device,
+				"AMDTP master stream wouldn't run\n");
+			err = -ETIMEDOUT;
 			goto end;
+		}
 	}
 
 	/* start slave if needed */
 	if (slave_flag && !amdtp_stream_running(slave)) {
 		err = stream_start(efw, slave, sampling_rate);
-		if (err < 0)
+		if (err < 0) {
+			dev_err(&efw->unit->device,
+				"fail to start AMDTP slave stream:%d\n", err);
 			goto end;
-		err = amdtp_stream_wait_run(slave);
+		}
+		if (!amdtp_stream_wait_run(slave)) {
+			dev_err(&efw->unit->device,
+				"AMDTP slave stream wouldn't run\n");
+			err = -ETIMEDOUT;
+		}
 	}
 end:
 	return err;
