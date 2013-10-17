@@ -17,6 +17,8 @@
 
 #include "./bebob.h"
 
+#define BEBOB_COMMAND_MAX_TRIAL	3
+
 static int amdtp_sfc_table[] = {
 	[CIP_SFC_32000]	 = 32000,
 	[CIP_SFC_44100]	 = 44100,
@@ -405,7 +407,7 @@ int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,
 					unsigned short plugid, u8 *position)
 {
 	u8 *buf;
-	int err;
+	int trial, err;
 
 	/*
 	 * I cannot assume the length of return value of this command.
@@ -430,13 +432,27 @@ int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,
 	buf[8] = 0xff;			/* reserved */
 	buf[9] = 0x03;			/* channel position */
 
-	err = fcp_avc_transaction(unit, buf, 12, buf, 256, 0);
-	if (err < 0)
-		goto end;
-	/* IMPLEMENTED/STABLE is OK */
-	if ((err < 6) || (buf[0] != 0x0c)) {
-		err = -EIO;
-		goto end;
+	/*
+	 * NOTE:
+	 * M-Audio Firewire 410 returns 0x09 (ACCEPTED) just after changing
+	 * signal format even if this command asks STATE. This is not in
+	 * the specification.
+	 */
+	for (trial = 0; trial < BEBOB_COMMAND_MAX_TRIAL; trial++) {
+		err = fcp_avc_transaction(unit, buf, 12, buf, 256, 0);
+		if (err < 0)
+			goto end;
+		else if (err < 6) {
+			err = -EIO;
+			goto end;
+		} else if (buf[0] == 0x0c)
+			break;
+		else if (trial < BEBOB_COMMAND_MAX_TRIAL)
+			msleep(100);
+		else {
+			err = -EIO;
+			goto end;
+		}
 	}
 
 	/* TODO: length should be checked. */
