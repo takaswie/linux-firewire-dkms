@@ -48,18 +48,18 @@ detect_dig_in(struct snd_bebob *bebob, int *detect)
 		return -ENOMEM;
 
 	/* This is a vendor dependent command */
-	buf[0]  = 0x01;
-	buf[1]  = 0xff;
-	buf[2]  = 0x00;
-	buf[3]  = 0x00;
-	buf[4]  = 0x07;
-	buf[5]  = 0xf5;
-	buf[6]  = 0x00;
-	buf[7]  = 0x00;
-	buf[8]  = 0x01;
-	buf[9]  = 0x00;
-	buf[10] = 0x00;
-	buf[11] = 0x00;
+	buf[0]  = 0x01;	/* STATUS */
+	buf[1]  = 0xff;	/* UNIT */
+	buf[2]  = 0x00;	/* Vendor Dependent command */
+	buf[3]  = 0x00;	/* Company ID high */
+	buf[4]  = 0x07;	/* Company ID middle */
+	buf[5]  = 0xf5;	/* Company ID low */
+	buf[6]  = 0x00;	/* subfunction */
+	buf[7]  = 0x00;	/* Unknown */
+	buf[8]  = 0x01; /* Unknown */
+	buf[9]  = 0x00;	/* Unknown */
+	buf[10] = 0x00;	/* Unknown */
+	buf[11] = 0x00;	/* Unknown */
 
 	err = fcp_avc_transaction(bebob->unit, buf, 12, buf, 12, 0);
 	if (err < 0)

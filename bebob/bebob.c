@@ -363,12 +363,12 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010049, spec_nothing),
 	/* Edirol, FA-101 */
 	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010048, spec_nothing),
-	/* TerraTecElectronic GmbH, Phase88FW */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000003, spec_nothing),
-	/* TerraTecElectronic GmbH, PhaseX24FW (rev 4) */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000004, spec_nothing),
-	/* TerraTecElectronic GmbH, PhaseX24FW (rev 7) */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000007, spec_nothing),
+	/* TerraTecElectronic GmbH, PHASE 88 Rack FW */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000003, phase88_rack_spec),
+	/* TerraTecElectronic GmbH, PHASE 24 FW */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000004, phase24_series_spec),
+	/* TerraTecElectronic GmbH, Phase X24 FW */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000007, phase24_series_spec),
 	/* Presonus, FireBox */
 	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010000, spec_nothing),
 	/* PreSonus FirePod */

@@ -368,10 +368,12 @@ int snd_bebob_create_control_devices(struct snd_bebob *bebob)
 		if (err < 0)
 			goto end;
 
-		kctl = snd_ctl_new1(&global_clock_sync_status, bebob);
-		err = snd_ctl_add(bebob->card, kctl);
-		if (err < 0)
-			goto end;
+		if (bebob->spec->clock->synced != NULL) {
+			kctl = snd_ctl_new1(&global_clock_sync_status, bebob);
+			err = snd_ctl_add(bebob->card, kctl);
+			if (err < 0)
+				goto end;
+		}
 	}
 
 	if (bebob->spec->dig_iface != NULL) {
