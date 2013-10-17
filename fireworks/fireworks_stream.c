@@ -18,7 +18,7 @@
 #include "./fireworks.h"
 
 static int
-stream_init(struct snd_efw *efw, struct amdtp_stream *stream)
+init_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 {
 	struct cmp_connection *conn;
 	enum cmp_direction c_dir;
@@ -50,7 +50,7 @@ end:
 }
 
 static int
-stream_start(struct snd_efw *efw, struct amdtp_stream *stream,
+start_stream(struct snd_efw *efw, struct amdtp_stream *stream,
 	     unsigned int sampling_rate)
 {
 	struct cmp_connection *conn;
@@ -88,12 +88,19 @@ stream_start(struct snd_efw *efw, struct amdtp_stream *stream,
 	if (err < 0)
 		cmp_connection_break(conn);
 
+	/* wait first callback */
+	if (!amdtp_stream_wait_run(stream)) {
+		amdtp_stream_stop(stream);
+		cmp_connection_break(conn);
+		err = -ETIMEDOUT;
+		goto end;
+	}
 end:
 	return err;
 }
 
 static void
-stream_stop(struct snd_efw *efw, struct amdtp_stream *stream)
+stop_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 {
 	amdtp_stream_stop(stream);
 
@@ -106,7 +113,7 @@ stream_stop(struct snd_efw *efw, struct amdtp_stream *stream)
 }
 
 static void
-stream_update(struct snd_efw *efw, struct amdtp_stream *stream)
+update_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 {
 	struct cmp_connection *conn;
 
@@ -118,7 +125,7 @@ stream_update(struct snd_efw *efw, struct amdtp_stream *stream)
 	if (cmp_connection_update(conn) < 0) {
 		amdtp_stream_pcm_abort(stream);
 		mutex_lock(&efw->mutex);
-		stream_stop(efw, stream);
+		stop_stream(efw, stream);
 		mutex_unlock(&efw->mutex);
 		return;
 	}
@@ -126,9 +133,9 @@ stream_update(struct snd_efw *efw, struct amdtp_stream *stream)
 }
 
 static void
-stream_destroy(struct snd_efw *efw, struct amdtp_stream *stream)
+destroy_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 {
-	stream_stop(efw, stream);
+	stop_stream(efw, stream);
 
 	if (stream == &efw->tx_stream)
 		cmp_connection_destroy(&efw->out_conn);
@@ -164,11 +171,11 @@ int snd_efw_stream_init_duplex(struct snd_efw *efw)
 {
 	int err;
 
-	err = stream_init(efw, &efw->tx_stream);
+	err = init_stream(efw, &efw->tx_stream);
 	if (err < 0)
 		goto end;
 
-	err = stream_init(efw, &efw->rx_stream);
+	err = init_stream(efw, &efw->rx_stream);
 end:
 	return err;
 }
@@ -201,12 +208,12 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 		/* master is just for MIDI stream */
 		if (amdtp_stream_running(master) &&
 		    !amdtp_stream_pcm_running(master))
-			stream_stop(efw, master);
+			stop_stream(efw, master);
 
 		/* slave is just for MIDI stream */
 		if (amdtp_stream_running(slave) &&
 		    !amdtp_stream_pcm_running(slave))
-			stream_stop(efw, slave);
+			stop_stream(efw, slave);
 
 		err = snd_efw_command_set_sampling_rate(efw, sampling_rate);
 		if (err < 0)
@@ -218,33 +225,21 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 	/*  master should be always running */
 	if (!amdtp_stream_running(master)) {
 		amdtp_stream_set_sync(sync_mode, master, slave);
-		err = stream_start(efw, master, sampling_rate);
+		err = start_stream(efw, master, sampling_rate);
 		if (err < 0) {
 			dev_err(&efw->unit->device,
 				"fail to start AMDTP master stream:%d\n", err);
-			goto end;
-		}
-
-		if (!amdtp_stream_wait_run(master)) {
-			dev_err(&efw->unit->device,
-				"AMDTP master stream wouldn't run\n");
-			err = -ETIMEDOUT;
 			goto end;
 		}
 	}
 
 	/* start slave if needed */
 	if (slave_flag && !amdtp_stream_running(slave)) {
-		err = stream_start(efw, slave, sampling_rate);
+		err = start_stream(efw, slave, sampling_rate);
 		if (err < 0) {
 			dev_err(&efw->unit->device,
 				"fail to start AMDTP slave stream:%d\n", err);
 			goto end;
-		}
-		if (!amdtp_stream_wait_run(slave)) {
-			dev_err(&efw->unit->device,
-				"AMDTP slave stream wouldn't run\n");
-			err = -ETIMEDOUT;
 		}
 	}
 end:
@@ -265,11 +260,11 @@ int snd_efw_stream_stop_duplex(struct snd_efw *efw)
 	    amdtp_stream_midi_running(slave))
 		goto end;
 
-	stream_stop(efw, slave);
+	stop_stream(efw, slave);
 
 	if (!amdtp_stream_pcm_running(master) &&
 	    !amdtp_stream_midi_running(master))
-		stream_stop(efw, master);
+		stop_stream(efw, master);
 
 end:
 	return err;
@@ -287,8 +282,8 @@ void snd_efw_stream_update_duplex(struct snd_efw *efw)
 		slave = &efw->tx_stream;
 	}
 
-	stream_update(efw, master);
-	stream_update(efw, slave);
+	update_stream(efw, master);
+	update_stream(efw, slave);
 }
 
 void snd_efw_stream_destroy_duplex(struct snd_efw *efw)
@@ -298,6 +293,6 @@ void snd_efw_stream_destroy_duplex(struct snd_efw *efw)
 	if (amdtp_stream_pcm_running(&efw->rx_stream))
 		amdtp_stream_pcm_abort(&efw->rx_stream);
 
-	stream_destroy(efw, &efw->tx_stream);
-	stream_destroy(efw, &efw->rx_stream);
+	destroy_stream(efw, &efw->tx_stream);
+	destroy_stream(efw, &efw->rx_stream);
 }
