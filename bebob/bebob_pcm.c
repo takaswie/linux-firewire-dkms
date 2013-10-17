@@ -241,7 +241,7 @@ pcm_open(struct snd_pcm_substream *substream)
 
 	if (amdtp_stream_pcm_running(&bebob->tx_stream) ||
 	    amdtp_stream_pcm_running(&bebob->rx_stream)) {
-		err = avc_generic_get_sampling_rate(bebob->unit, &sampling_rate, 1, 0);
+		err = avc_generic_get_signal_format(bebob->unit, &sampling_rate, 1, 0);
 		if (err < 0)
 			goto end;
 

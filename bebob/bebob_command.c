@@ -108,7 +108,7 @@ end:
 }
 
 
-int avc_generic_set_sampling_rate(struct fw_unit *unit, int rate,
+int avc_generic_set_signal_format(struct fw_unit *unit, int rate,
 				  int direction, unsigned short plug)
 {
 	int sfc;
@@ -152,7 +152,7 @@ end:
 	return err;
 }
 
-int avc_generic_get_sampling_rate(struct fw_unit *unit, int *rate,
+int avc_generic_get_signal_format(struct fw_unit *unit, int *rate,
 				  int direction, unsigned short plug)
 {
 	int sfc, evt;
