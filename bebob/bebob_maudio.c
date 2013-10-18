@@ -300,7 +300,7 @@ end:
 
 /* for special customized devices */
 static char *special_clock_labels[] = {
-	"Interna1l with Digital Mute", "Digital",
+	"Internal with Digital Mute", "Digital",
 	"Word Clock", "Internal"};
 static int
 special_clock_get(struct snd_bebob *bebob, int *id)
