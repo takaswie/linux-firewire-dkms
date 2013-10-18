@@ -257,14 +257,6 @@ start_stream(struct snd_bebob *bebob, struct amdtp_stream *stream,
 				 conn->speed);
 	if (err < 0)
 		goto end;
-
-	/* wait first callback */
-	if (!amdtp_stream_wait_run(stream)) {
-		amdtp_stream_stop(stream);
-		cmp_connection_break(conn);
-		err = -ETIMEDOUT;
-		goto end;
-	}
 end:
 	return err;
 }
@@ -303,6 +295,8 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	int err, curr_rate;
 	bool slave_flag;
 
+	mutex_lock(&bebob->mutex);
+
 	err = get_roles(bebob, &sync_mode, &master, &slave);
 	if (err < 0)
 		goto end;
@@ -313,7 +307,10 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		slave_flag = false;
 
 	/* get current rate */
-	err = get_streams_rate(bebob, &curr_rate);
+	if (!bebob->maudio_special_quirk)
+		err = get_streams_rate(bebob, &curr_rate);
+	else
+		err = avc_generic_get_sig_fmt(bebob->unit, &curr_rate, 1, 0);
 	if (err < 0)
 		goto end;
 	if (rate == 0)
@@ -338,6 +335,11 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	if (!amdtp_stream_running(master)) {
 		amdtp_stream_set_sync(sync_mode, master, slave);
 
+		/*
+		 * NOTE:
+		 * If establishing connections at first, Yamaha GO46 (and maybe
+		 * TerraTek X24) don't generate sound.
+		 */
 		err = set_streams_rate(bebob, rate);
 		if (err < 0)
 			goto end;
@@ -350,6 +352,29 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		if (err < 0) {
 			dev_err(&bebob->unit->device,
 				"fail to run AMDTP master stream:%d\n", err);
+			break_both_connections(bebob);
+			goto end;
+		}
+
+		/*
+		 * NOTE:
+		 * The firmware customized by M-Audio uses this cue to start
+		 * transmit stream. This is not in specification.
+		 */
+		if (bebob->maudio_special_quirk) {
+			err = set_streams_rate(bebob, rate);
+			if (err < 0) {
+				amdtp_stream_stop(master);
+				break_both_connections(bebob);
+				goto end;
+			}
+		}
+
+		/* wait first callback */
+		if (!amdtp_stream_wait_run(master)) {
+			amdtp_stream_stop(master);
+			break_both_connections(bebob);
+			err = -ETIMEDOUT;
 			goto end;
 		}
 	}
@@ -360,10 +385,22 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		if (err < 0) {
 			dev_err(&bebob->unit->device,
 				"fail to run AMDTP slave stream:%d\n", err);
+			amdtp_stream_stop(master);
+			break_both_connections(bebob);
+			goto end;
+		}
+
+		/* wait first callback */
+		if (!amdtp_stream_wait_run(slave)) {
+			amdtp_stream_stop(slave);
+			amdtp_stream_stop(master);
+			break_both_connections(bebob);
+			err = -ETIMEDOUT;
 			goto end;
 		}
 	}
 end:
+	mutex_unlock(&bebob->mutex);
 	return err;
 }
 
@@ -372,6 +409,8 @@ int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
 	int err;
+
+	mutex_lock(&bebob->mutex);
 
 	err = get_roles(bebob, &sync_mode, &master, &slave);
 	if (err < 0)
@@ -390,6 +429,7 @@ int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
 	amdtp_stream_stop(master);
 	break_both_connections(bebob);
 end:
+	mutex_unlock(&bebob->mutex);
 	return err;
 }
 
@@ -410,6 +450,8 @@ void snd_bebob_stream_update_duplex(struct snd_bebob *bebob)
 
 void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
 {
+	mutex_lock(&bebob->mutex);
+
 	if (amdtp_stream_pcm_running(&bebob->rx_stream))
 		amdtp_stream_pcm_abort(&bebob->rx_stream);
 	if (amdtp_stream_pcm_running(&bebob->tx_stream))
@@ -418,6 +460,8 @@ void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
 	amdtp_stream_stop(&bebob->rx_stream);
 	amdtp_stream_stop(&bebob->tx_stream);
 	destroy_both_connections(bebob);
+
+	mutex_unlock(&bebob->mutex);
 }
 
 int snd_bebob_get_formation_index(int rate)

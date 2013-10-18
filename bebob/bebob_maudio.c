@@ -60,12 +60,16 @@
 /* labels for metering */
 #define ANA_IN		"Analog In"
 #define ANA_OUT		"Analog Out"
-#define DIG_IN		"Digital_in"
+#define DIG_IN		"Digital In"
+#define SPDIF_IN	"S/PDIF In"
+#define ADAT_IN		"ADAT In"
 #define DIG_OUT		"Digital Out"
+#define SPDIF_OUT	"S/PDIF Out"
+#define ADAT_OUT	"ADAT Out"
 #define STRM_IN		"Stream In"
 #define AUX_OUT		"Aux Out"
 #define HP_OUT		"HP Out"
-/* for ProjectMix and NRV */
+/* for NRV */
 #define UNKNOWN_METER	"Unknown"
 
 /*
@@ -74,26 +78,28 @@
  * write transaction so MUST remember the current values.
  */
 #define	MAUDIO_CONTROL_OFFSET	0x00700000
-
 /*
  * GAIN for inputs:
  * Write 32bit. upper 16bit for left chennal and lower 16bit for right.
  * The value is between 0x8000(low) to 0x0000(high) as the same as '10.3.1
  * Volume Control' in 'AV/C Audio Subunit Specification 1.0 (1394TA 1999008)'.
  */
-#define	GAIN_STM_12_IN	0x00
-#define	GAIN_STM_34_IN	0x04
-#define GAIN_ANA_12_OUT	0x08
-#define GAIN_ANA_34_OUT	0x0c
-#define GAIN_ANA_12_IN	0x10
-#define GAIN_ANA_34_IN	0x14
-#define GAIN_ANA_56_IN	0x18
-#define GAIN_ANA_78_IN	0x1c
-#define GAIN_DIG_12_IN	0x20
-/* Unknown or unused from 0x24 to 0x30 */
-#define GAIN_AUX_12_OUT	0x34
-#define GAIN_HP_12_OUT	0x38
-#define GAIN_HP_34_OUT	0x3c
+#define	GAIN_STM_12_IN		0x00
+#define	GAIN_STM_34_IN		0x04
+#define GAIN_ANA_12_OUT		0x08
+#define GAIN_ANA_34_OUT		0x0c
+#define GAIN_ANA_12_IN		0x10
+#define GAIN_ANA_34_IN		0x14
+#define GAIN_ANA_56_IN		0x18
+#define GAIN_ANA_78_IN		0x1c
+#define GAIN_SPDIF_12_IN	0x20
+#define GAIN_ADAT_12_IN		0x24
+#define GAIN_ADAT_34_IN		0x28
+#define GAIN_ADAT_56_IN		0x2c
+#define GAIN_ADAT_78_IN		0x30
+#define GAIN_AUX_12_OUT		0x34
+#define GAIN_HP_12_OUT		0x38
+#define GAIN_HP_34_OUT		0x3c
 /*
  * LR balance:
  * Write 32 bit, upper 16bit for left channel and lower 16bit for right.
@@ -104,8 +110,11 @@
 #define LR_ANA_34_IN	0x44
 #define LR_ANA_56_IN	0x48
 #define LR_ANA_78_IN	0x4c
-#define LR_DIG_12_IN	0x50
-/* Unknown or unused from 0x54 to 0x60 */
+#define LR_SPDIF_12_IN	0x50
+#define LR_ADAT_12_IN	0x54
+#define LR_ADAT_34_IN	0x58
+#define LR_ADAT_56_IN	0x5c
+#define LR_ADAT_78_IN	0x60
 /*
  * AUX inputs:
  * This is the same as 'gain' control above.
@@ -116,8 +125,11 @@
 #define AUX_ANA_34_IN	0x70
 #define AUX_ANA_56_IN	0x74
 #define AUX_ANA_78_IN	0x78
-#define AUX_DIG_12_IN	0x7c
-/* Unknown or unused from 0x80 to 0x8c */
+#define AUX_SPDIF_12_IN	0x7c
+#define AUX_ADAT_12_IN	0x80
+#define AUX_ADAT_34_IN	0x84
+#define AUX_ADAT_56_IN	0x88
+#define AUX_ADAT_78_IN	0x8c
 /*
  * MIXER inputs:
  * There are bit flags. If flag is 0x01, it means on.
@@ -253,8 +265,8 @@ reset_device(struct snd_bebob *bebob)
  * clk_lock: 0x00:unlock, 0x01:lock
  */
 static int
-set_clock_params(struct snd_bebob *bebob, int clk_src,
-		 int in_dig_fmt, int out_dig_fmt, int clk_lock)
+special_set_clock_params(struct snd_bebob *bebob, int clk_src,
+			 int in_dig_fmt, int out_dig_fmt, int clk_lock)
 {
 	int err;
 	u8 *buf;
@@ -297,77 +309,11 @@ end:
 	kfree(buf);
 	return err;
 }
-
-/* for special customized devices */
-static char *special_clock_labels[] = {
-	"Internal with Digital Mute", "Digital",
-	"Word Clock", "Internal"};
-static int
-special_clock_get(struct snd_bebob *bebob, int *id)
-{
-	*id = bebob->clk_src;
-	return 0;
-}
-static int
-special_clock_set(struct snd_bebob *bebob, int id)
-{
-	return set_clock_params(bebob, id,
-				bebob->in_dig_fmt, bebob->out_dig_fmt,
-				bebob->clk_lock);
-}
-static int
-special_clock_synced(struct snd_bebob *bebob, bool *synced)
-{
-	return check_clock_sync(bebob, METER_SIZE_SPECIAL, synced);
-}
-
-static char *special_dig_iface_labels[] = {
-	"ADAT Optical", "S/PDIF Optical", "S/PDIF Coaxial"
-};
-static int
-special_dig_iface_get(struct snd_bebob *bebob, int *id)
-{
-	int in_dig_iface, err;
-
-	err = avc_audio_get_selector(bebob->unit, 0x00, 0x04, &in_dig_iface);
-	if (err < 0)
-		goto end;
-
-	/* for simplicity, the same value for input/output */
-	*id = (0x01 & bebob->in_dig_fmt) | ((in_dig_iface & 0x01) << 1);
-
-	/* normalizing */
-	if (*id > 0)
-		(*id)--;
-
-end:
-	return err;
-}
-static int
-special_dig_iface_set(struct snd_bebob *bebob, int id)
-{
-	int err;
-	int dig_fmt;
-	int in_dig_iface;
-
-	/* normalizing */
-	if (id > 0)
-		id++;
-
-	dig_fmt = id & 0x01;
-	in_dig_iface = (id >> 1) & 0x01;
-
-	/* for simplicity, the same value for input/output */
-	err = set_clock_params(bebob, bebob->clk_src, dig_fmt, dig_fmt,
-			       bebob->clk_lock);
-	if (err < 0)
-		goto end;
-
-	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, in_dig_iface);
-end:
-	return err;
-}
-
+/*
+ * For special customized devices.
+ * The driver can't receive response from this firmware frequently.
+ * So need to reduce execution of command.
+ */
 static void
 special_stream_formation_set(struct snd_bebob *bebob)
 {
@@ -413,17 +359,25 @@ special_stream_formation_set(struct snd_bebob *bebob)
 		bebob->rx_stream_formations[i].midi = 1;
 	}
 }
-
 static int
 special_discover(struct snd_bebob *bebob)
 {
 	int err;
+	u32 buf;
 
 	/* initialize these parameters because doesn't allow driver to ask */
-	err = set_clock_params(bebob, 0x03, 0x00, 0x00, 0x00);
-	if (err < 0)
+	err = special_set_clock_params(bebob, 0x03, 0x00, 0x00, 0x00);
+	if (err < 0) {
 		dev_err(&bebob->unit->device,
-			"Failed to initialize clock params\n");
+			"failed to initialize clock params\n");
+	}
+
+	err = avc_audio_get_selector(bebob->unit, 0x00, 0x04,
+				     &bebob->in_dig_iface);
+	if (err < 0) {
+		dev_err(&bebob->unit->device,
+			"failed to get current dig iface.");
+	}
 
 	special_stream_formation_set(bebob);
 
@@ -431,68 +385,90 @@ special_discover(struct snd_bebob *bebob)
 	bebob->midi_input_ports = 1;
 	bebob->midi_output_ports = 1;
 
-	return err;
+	bebob->maudio_special_quirk = true;
+
+	return 0;
+}
+static char *special_clock_labels[] = {
+	"Internal with Digital Mute", "Digital",
+	"Word Clock", "Internal"};
+static int
+special_clock_get(struct snd_bebob *bebob, int *id)
+{
+	*id = bebob->clk_src;
+	return 0;
+}
+static int
+special_clock_set(struct snd_bebob *bebob, int id)
+{
+	return special_set_clock_params(bebob, id,
+					bebob->in_dig_fmt, bebob->out_dig_fmt,
+					bebob->clk_lock);
+}
+static int
+special_clock_synced(struct snd_bebob *bebob, bool *synced)
+{
+	return check_clock_sync(bebob, METER_SIZE_SPECIAL, synced);
 }
 
-/* Firewire 1814 specific controls */
-static char *fw1814_meter_labels[] = {
+static char *special_dig_iface_labels[] = {
+	"S/PDIF Optical", "S/PDIF Coaxial", "ADAT Optical" 
+};
+static int
+special_dig_iface_get(struct snd_bebob *bebob, int *id)
+{
+	/* for simplicity, the same value for input/output */
+	*id = (bebob->in_dig_fmt << 1) | (bebob->in_dig_iface & 0x01);
+
+	return 0;
+}
+static int
+special_dig_iface_set(struct snd_bebob *bebob, int id)
+{
+	int err;
+	int dig_fmt;
+	int in_dig_iface;
+
+	dig_fmt = (id >> 1) & 0x01;
+	in_dig_iface = id & 0x01;
+
+	/* for simplicity, the same value for input/output */
+	err = special_set_clock_params(bebob, bebob->clk_src, dig_fmt, dig_fmt,
+				       bebob->clk_lock);
+	if (err < 0)
+		goto end;
+
+	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, in_dig_iface);
+	if (err < 0)
+		goto end;
+
+	bebob->in_dig_iface = in_dig_iface;
+
+	special_stream_formation_set(bebob);
+end:
+	return err;
+}
+static char *special_meter_labels[] = {
 	ANA_IN, ANA_IN, ANA_IN, ANA_IN,
-	DIG_IN,
+	SPDIF_IN,
+	ADAT_IN, ADAT_IN, ADAT_IN, ADAT_IN,
 	ANA_OUT, ANA_OUT,
+	SPDIF_OUT,
+	ADAT_OUT, ADAT_OUT, ADAT_OUT, ADAT_OUT,
 	HP_OUT, HP_OUT,
 	AUX_OUT
 };
 static int
-fw1814_meter_get(struct snd_bebob *bebob, u32 *target, int size)
+special_meter_get(struct snd_bebob *bebob, u32 *target, int size)
 {
 	u16 *buf;
-	int i, c, err;
+	int i, c, channels, err;
 
-	if (size < ARRAY_SIZE(fw1814_meter_labels) * 2 * sizeof(u32))
-		return -EINVAL;
-
-	/* omit last 4 bytes because it's clock info. */
-	buf = kmalloc(METER_SIZE_SPECIAL - 4, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	err = get_meter(bebob, (void *)buf, METER_SIZE_SPECIAL - 4);
-	if (err < 0)
-		goto end;
-
-	/* some channels are not used and convert u16 to u32 */
-	c = 0;
-	for (i  = 2; i < 12; i++)
-		target[c++] = be16_to_cpu(buf[i]) << 8;
-	for (i = 20; i < 24; i++)
-		target[c++] = be16_to_cpu(buf[i]) << 8;
-	for (i = 34; i < 40; i++)
-		target[c++] = be16_to_cpu(buf[i]) << 8;
-
-end:
-	kfree(buf);
-	return err;
-}
-
-/* ProjectMix I/O specific controls */
-static char *projectmix_meter_labels[] = {
-	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
-	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
-	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
-	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER,
-	UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER, UNKNOWN_METER
-};
-static int
-projectmix_meter_get(struct snd_bebob *bebob, u32 *target, int size)
-{
-	u16 *buf;
-	int c, channels, err;
-
-	channels = ARRAY_SIZE(projectmix_meter_labels) * 2;
+	channels = ARRAY_SIZE(special_meter_labels) * 2;
 	if (size < channels * sizeof(u32))
 		return -EINVAL;
 
-	/* omit last 4 bytes because it's clock info. */
+	/* omit last 5 bytes because it's clock info. */
 	buf = kmalloc(METER_SIZE_SPECIAL - 4, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
@@ -502,10 +478,8 @@ projectmix_meter_get(struct snd_bebob *bebob, u32 *target, int size)
 		goto end;
 
 	/* some channels are not used and convert u16 to u32 */
-	/* TODO: breakdown */
-	for (c = 0; c < channels; c++)
-		target[c] = be32_to_cpu(buf[c]) << 8;
-
+	for (i = 0, c = 2; c < channels + 2; c++)
+		target[i++] = be16_to_cpu(buf[c]) << 8;
 end:
 	kfree(buf);
 	return err;
@@ -836,34 +810,19 @@ static struct snd_bebob_dig_iface_spec special_dig_iface_spec = {
 	.set	= &special_dig_iface_set
 };
 
-/* Firewire 1814 specification */
-static struct snd_bebob_meter_spec fw1814_meter_spec = {
-	.num	= ARRAY_SIZE(fw1814_meter_labels),
-	.labels	= fw1814_meter_labels,
-	.get	= &fw1814_meter_get
+/* Firewire 1814 and ProjectMix I/O specification */
+static struct snd_bebob_meter_spec special_meter_spec = {
+	.num	= ARRAY_SIZE(special_meter_labels),
+	.labels	= special_meter_labels,
+	.get	= &special_meter_get
 };
-struct snd_bebob_spec maudio_fw1814_spec = {
+struct snd_bebob_spec maudio_special_spec = {
 	.load		= NULL,
 	.discover	= &special_discover,
 	.map   		= NULL,
 	.clock		= &special_clock_spec,
 	.dig_iface	= &special_dig_iface_spec,
-	.meter		= &fw1814_meter_spec
-};
-
-/* ProjectMix specification */
-static struct snd_bebob_meter_spec projectmix_meter_spec = {
-	.num	= ARRAY_SIZE(projectmix_meter_labels),
-	.labels	= projectmix_meter_labels,
-	.get	= &projectmix_meter_get
-};
-struct snd_bebob_spec maudio_projectmix_spec = {
-	.load		= NULL,
-	.discover	= &special_discover,
-	.map		= NULL,
-	.clock		= &special_clock_spec,
-	.dig_iface	= &special_dig_iface_spec,
-	.meter		= &projectmix_meter_spec
+	.meter		= &special_meter_spec
 };
 
 /* Firewire 410 specification */

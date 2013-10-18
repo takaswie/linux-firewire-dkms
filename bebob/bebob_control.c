@@ -357,11 +357,12 @@ int snd_bebob_create_control_devices(struct snd_bebob *bebob)
 	int err;
 	struct snd_kcontrol *kctl;
 
+/*
 	kctl = snd_ctl_new1(&global_sampling_rate_control, bebob);
 	err = snd_ctl_add(bebob->card, kctl);
 	if (err < 0)
 		goto end;
-
+*/
 	if (bebob->spec->clock != NULL) {
 		kctl = snd_ctl_new1(&global_clock_source_control, bebob);
 		err = snd_ctl_add(bebob->card, kctl);

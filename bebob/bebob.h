@@ -122,11 +122,13 @@ struct snd_bebob {
 	struct snd_bebob_stream_formation
 		rx_stream_formations[SND_BEBOB_STREAM_FORMATION_ENTRIES];
 
-	/* MAudio specific */
+	/* for M-Audio special devices */
 	int clk_src;
 	int in_dig_fmt;
 	int out_dig_fmt;
+	int in_dig_iface;
 	int clk_lock;
+	bool maudio_special_quirk;
 };
 
 static inline int
@@ -204,8 +206,7 @@ void snd_bebob_proc_init(struct snd_bebob *bebob);
 
 /* device specific operations */
 extern struct snd_bebob_spec maudio_bootloader_spec;
-extern struct snd_bebob_spec maudio_projectmix_spec;
-extern struct snd_bebob_spec maudio_fw1814_spec;
+extern struct snd_bebob_spec maudio_special_spec;
 extern struct snd_bebob_spec maudio_nrv10_spec;
 extern struct snd_bebob_spec maudio_fw410_spec;
 extern struct snd_bebob_spec maudio_audiophile_spec;
