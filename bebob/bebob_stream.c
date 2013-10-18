@@ -63,11 +63,11 @@ get_streams_rate(struct snd_bebob *bebob, int *curr_rate)
 {
 	int err, tx_rate, rx_rate;
 
-	err = avc_generic_get_signal_format(bebob->unit, &rx_rate, 1, 0);
+	err = avc_generic_get_sig_fmt(bebob->unit, &rx_rate, 1, 0);
 	if (err < 0)
 		goto end;
 
-	err = avc_generic_get_signal_format(bebob->unit, &tx_rate, 0, 0);
+	err = avc_generic_get_sig_fmt(bebob->unit, &tx_rate, 0, 0);
 	if (err < 0)
 		goto end;
 
@@ -76,7 +76,7 @@ get_streams_rate(struct snd_bebob *bebob, int *curr_rate)
 		goto end;
 
 	/* synchronize receive stream rate to transmit stream rate */
-	err = avc_generic_set_signal_format(bebob->unit, tx_rate, 1, 0);
+	err = avc_generic_set_sig_fmt(bebob->unit, tx_rate, 1, 0);
 end:
 	return err;
 }
@@ -87,10 +87,10 @@ set_streams_rate(struct snd_bebob *bebob, int rate)
 	int err;
 
 	/* move to strem_start? */
-	err = avc_generic_set_signal_format(bebob->unit, rate, 1, 0);
+	err = avc_generic_set_sig_fmt(bebob->unit, rate, 1, 0);
 	if (err < 0)
 		goto end;
-	err = avc_generic_set_signal_format(bebob->unit, rate, 0, 0);
+	err = avc_generic_set_sig_fmt(bebob->unit, rate, 0, 0);
 	if (err < 0)
 		goto end;
 

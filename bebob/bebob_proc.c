@@ -151,11 +151,11 @@ proc_read_clock(struct snd_info_entry *entry,
 	struct snd_bebob *bebob = entry->private_data;
 	int rate, err;
 
-	err= avc_generic_get_signal_format(bebob->unit, &rate, 0, 0);
+	err= avc_generic_get_sig_fmt(bebob->unit, &rate, 0, 0);
 	if (err == 0)
 		snd_iprintf(buffer,
 			    "Output Plug 0: rate %d\n", rate);
-	err = avc_generic_get_signal_format(bebob->unit, &rate, 1, 0);
+	err = avc_generic_get_sig_fmt(bebob->unit, &rate, 1, 0);
 	if (err == 0)
 		snd_iprintf(buffer,
 			    "Input Plug 0: rate %d\n", rate);

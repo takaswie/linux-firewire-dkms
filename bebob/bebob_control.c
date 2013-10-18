@@ -168,10 +168,10 @@ control_sampling_rate_get(struct snd_kcontrol *kctl,
 
 	mutex_lock(&bebob->mutex);
 
-	err = avc_generic_get_signal_format(bebob->unit, &out_rate, 0, 0);
+	err = avc_generic_get_sig_fmt(bebob->unit, &out_rate, 0, 0);
 	if (err < 0)
 		goto end;
-	err = avc_generic_get_signal_format(bebob->unit, &in_rate, 1, 0);
+	err = avc_generic_get_sig_fmt(bebob->unit, &in_rate, 1, 0);
 	if (err < 0)
 		goto end;
 
@@ -214,10 +214,10 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 	rate = snd_bebob_rate_table[index];
 
 	mutex_lock(&bebob->mutex);
-	err = avc_generic_set_signal_format(bebob->unit, rate, 0, 0);
+	err = avc_generic_set_sig_fmt(bebob->unit, rate, 0, 0);
 	if (err < 0)
 		goto end;
-	err = avc_generic_set_signal_format(bebob->unit, rate, 1, 0);
+	err = avc_generic_set_sig_fmt(bebob->unit, rate, 1, 0);
 	if (err < 0)
 		goto end;
 	

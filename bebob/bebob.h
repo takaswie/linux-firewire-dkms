@@ -154,10 +154,10 @@ int avc_audio_get_selector(struct fw_unit *unit, int subunit_id,
 			   int fb_id, int *number);
 
 /* AV/C Digital Interface Command Set General Specification 4.2 (1394TA) */
-int avc_generic_set_signal_format(struct fw_unit *unit, int rate,
-				int direction, unsigned short plug);
-int avc_generic_get_signal_format(struct fw_unit *unit, int *rate,
-				int direction, unsigned short plug);
+int avc_generic_set_sig_fmt(struct fw_unit *unit, int rate,
+			    int direction, unsigned short plug);
+int avc_generic_get_sig_fmt(struct fw_unit *unit, int *rate,
+			    int direction, unsigned short plug);
 int avc_generic_get_plug_info(struct fw_unit *unit,
 				unsigned short bus_plugs[2],
 				unsigned short ext_plugs[2]);

@@ -108,8 +108,8 @@ end:
 }
 
 
-int avc_generic_set_signal_format(struct fw_unit *unit, int rate,
-				  int direction, unsigned short plug)
+int avc_generic_set_sig_fmt(struct fw_unit *unit, int rate,
+			    int direction, unsigned short plug)
 {
 	int sfc;
 	u8 *buf;
@@ -152,8 +152,8 @@ end:
 	return err;
 }
 
-int avc_generic_get_signal_format(struct fw_unit *unit, int *rate,
-				  int direction, unsigned short plug)
+int avc_generic_get_sig_fmt(struct fw_unit *unit, int *rate,
+			    int direction, unsigned short plug)
 {
 	int sfc, evt;
 	u8 *buf;
