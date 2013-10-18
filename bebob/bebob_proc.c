@@ -103,7 +103,7 @@ proc_read_meters(struct snd_info_entry *entry,
 		goto end;
 
 	for (i = 0, c = 1; i < channels; i++) {
-		snd_iprintf(buffer, "%s %d: %d\n",
+		snd_iprintf(buffer, "%s %d:\t%d\n",
 			    spec->labels[i / 2], c++, buf[i]);
 		if ((i + 1 < channels - 1) &&
 		    (strcmp(spec->labels[i / 2],
