@@ -668,9 +668,8 @@ static void handle_in_packet(struct amdtp_stream *s,
 	if (((cip_header[0] & CIP_EOH_MASK) == CIP_EOH) ||
 	    ((cip_header[1] & CIP_EOH_MASK) != CIP_EOH) ||
 	    ((cip_header[1] & CIP_FMT_MASK) != CIP_FMT_AM)) {
-		dev_err(&s->unit->device, "CIP header error: %08X:%08X\n",
-			cip_header[0], cip_header[1]);
-		amdtp_stream_pcm_abort(s);
+		dev_info(&s->unit->device, "invalid CIP header: %08X:%08X\n",
+			 cip_header[0], cip_header[1]);
 		return;
 	}
 
