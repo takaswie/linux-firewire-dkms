@@ -63,11 +63,11 @@ get_streams_rate(struct snd_bebob *bebob, int *curr_rate)
 {
 	int err, tx_rate, rx_rate;
 
-	err = avc_generic_get_sig_fmt(bebob->unit, &rx_rate, 1, 0);
+	err = avc_generic_get_sig_fmt(bebob->unit, &tx_rate, 0, 0);
 	if (err < 0)
 		goto end;
 
-	err = avc_generic_get_sig_fmt(bebob->unit, &tx_rate, 0, 0);
+	err = avc_generic_get_sig_fmt(bebob->unit, &rx_rate, 1, 0);
 	if (err < 0)
 		goto end;
 
@@ -76,7 +76,7 @@ get_streams_rate(struct snd_bebob *bebob, int *curr_rate)
 		goto end;
 
 	/* synchronize receive stream rate to transmit stream rate */
-	err = avc_generic_set_sig_fmt(bebob->unit, tx_rate, 1, 0);
+	err = avc_generic_set_sig_fmt(bebob->unit, rx_rate, 0, 0);
 end:
 	return err;
 }
@@ -87,10 +87,10 @@ set_streams_rate(struct snd_bebob *bebob, int rate)
 	int err;
 
 	/* move to strem_start? */
-	err = avc_generic_set_sig_fmt(bebob->unit, rate, 1, 0);
+	err = avc_generic_set_sig_fmt(bebob->unit, rate, 0, 0);
 	if (err < 0)
 		goto end;
-	err = avc_generic_set_sig_fmt(bebob->unit, rate, 0, 0);
+	err = avc_generic_set_sig_fmt(bebob->unit, rate, 1, 0);
 	if (err < 0)
 		goto end;
 
@@ -212,8 +212,8 @@ destroy_both_connections(struct snd_bebob *bebob)
 {
 	break_both_connections(bebob);
 
-	cmp_connection_destroy(&bebob->out_conn);
 	cmp_connection_destroy(&bebob->in_conn);
+	cmp_connection_destroy(&bebob->out_conn);
 }
 
 static int
@@ -410,10 +410,10 @@ void snd_bebob_stream_update_duplex(struct snd_bebob *bebob)
 
 void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
 {
-	if (amdtp_stream_pcm_running(&bebob->tx_stream))
-		amdtp_stream_pcm_abort(&bebob->tx_stream);
 	if (amdtp_stream_pcm_running(&bebob->rx_stream))
 		amdtp_stream_pcm_abort(&bebob->rx_stream);
+	if (amdtp_stream_pcm_running(&bebob->tx_stream))
+		amdtp_stream_pcm_abort(&bebob->tx_stream);
 
 	amdtp_stream_stop(&bebob->rx_stream);
 	amdtp_stream_stop(&bebob->tx_stream);
