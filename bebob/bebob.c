@@ -319,10 +319,15 @@ end:
 	return;
 }
 
+struct snd_bebob_freq_spec usual_freq_spec = {
+        .get    = &snd_bebob_stream_get_rate,
+        .set    = &snd_bebob_stream_set_rate
+};
 static const struct snd_bebob_spec spec_nothing = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &usual_freq_spec,
 	.clock		= NULL,
 	.dig_iface	= NULL,
 	.meter		= NULL
