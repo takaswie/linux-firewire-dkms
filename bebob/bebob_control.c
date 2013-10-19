@@ -164,22 +164,17 @@ control_sampling_rate_get(struct snd_kcontrol *kctl,
 			  struct snd_ctl_elem_value *uval)
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
-	int i, in_rate, out_rate, index, err;
+	struct snd_bebob_freq_spec *freq = bebob->spec->freq;
+	int i, sampling_rate, index, err;
 
 	mutex_lock(&bebob->mutex);
 
-	err = avc_generic_get_sig_fmt(bebob->unit, &out_rate, 0, 0);
+	err = freq->get(bebob, &sampling_rate);
 	if (err < 0)
-		goto end;
-	err = avc_generic_get_sig_fmt(bebob->unit, &in_rate, 1, 0);
-	if (err < 0)
-		goto end;
-
-	if (out_rate != in_rate)
 		goto end;
 
 	for (index = 0; index < ARRAY_SIZE(snd_bebob_rate_table); index++)
-		if (snd_bebob_rate_table[index] == out_rate)
+		if (snd_bebob_rate_table[index] == sampling_rate)
 			break;
 
 	uval->value.enumerated.item[0] = 0;
@@ -197,7 +192,8 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 			  struct snd_ctl_elem_value *uval)
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
-	int value, index, rate, err, changed = 0;
+	struct snd_bebob_freq_spec *freq = bebob->spec->freq;
+	int value, index, sampling_rate, err, changed = 0;
 
 	/* get index from user value*/
 	value = uval->value.enumerated.item[0];
@@ -211,16 +207,13 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 			value--;
 	}
 
-	rate = snd_bebob_rate_table[index];
+	sampling_rate = snd_bebob_rate_table[index];
 
 	mutex_lock(&bebob->mutex);
-	err = avc_generic_set_sig_fmt(bebob->unit, rate, 0, 0);
+	err = freq->set(bebob, sampling_rate);
 	if (err < 0)
 		goto end;
-	err = avc_generic_set_sig_fmt(bebob->unit, rate, 1, 0);
-	if (err < 0)
-		goto end;
-	
+
 	/* prevent from failure of getting command just after setting */
 	msleep(100);
 	changed = 1;
@@ -357,12 +350,11 @@ int snd_bebob_create_control_devices(struct snd_bebob *bebob)
 	int err;
 	struct snd_kcontrol *kctl;
 
-/*
 	kctl = snd_ctl_new1(&global_sampling_rate_control, bebob);
 	err = snd_ctl_add(bebob->card, kctl);
 	if (err < 0)
 		goto end;
-*/
+
 	if (bebob->spec->clock != NULL) {
 		kctl = snd_ctl_new1(&global_clock_source_control, bebob);
 		err = snd_ctl_add(bebob->card, kctl);

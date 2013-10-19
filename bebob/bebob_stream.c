@@ -58,8 +58,8 @@ get_formation_index(int rate)
 	return -1;
 }
 
-static int
-get_streams_rate(struct snd_bebob *bebob, int *curr_rate)
+int
+snd_bebob_stream_get_rate(struct snd_bebob *bebob, int *curr_rate)
 {
 	int err, tx_rate, rx_rate;
 
@@ -81,8 +81,8 @@ end:
 	return err;
 }
 
-static int
-set_streams_rate(struct snd_bebob *bebob, int rate)
+int
+snd_bebob_stream_set_rate(struct snd_bebob *bebob, int rate)
 {
 	int err;
 
@@ -290,6 +290,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 				  struct amdtp_stream *request,
 				  unsigned int rate)
 {
+	struct snd_bebob_freq_spec *freq = bebob->spec->freq;
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
 	int err, curr_rate;
@@ -307,10 +308,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		slave_flag = false;
 
 	/* get current rate */
-	if (!bebob->maudio_special_quirk)
-		err = get_streams_rate(bebob, &curr_rate);
-	else
-		err = avc_generic_get_sig_fmt(bebob->unit, &curr_rate, 1, 0);
+	err = freq->get(bebob, &curr_rate);
 	if (err < 0)
 		goto end;
 	if (rate == 0)
@@ -340,7 +338,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		 * If establishing connections at first, Yamaha GO46 (and maybe
 		 * TerraTek X24) don't generate sound.
 		 */
-		err = set_streams_rate(bebob, rate);
+		err = freq->set(bebob, rate);
 		if (err < 0)
 			goto end;
 
@@ -362,7 +360,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		 * transmit stream. This is not in specification.
 		 */
 		if (bebob->maudio_special_quirk) {
-			err = set_streams_rate(bebob, rate);
+			err = freq->set(bebob, rate);
 			if (err < 0) {
 				amdtp_stream_stop(master);
 				break_both_connections(bebob);

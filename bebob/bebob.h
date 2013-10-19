@@ -66,6 +66,10 @@ struct snd_bebob_stream_formation {
 extern unsigned int snd_bebob_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES];
 
 /* device specific operations */
+struct snd_bebob_freq_spec {
+	int (*get)(struct snd_bebob *bebob, int *rate);
+	int (*set)(struct snd_bebob *bebob, int rate);
+};
 struct snd_bebob_clock_spec {
 	int num;
 	char **labels;
@@ -89,6 +93,7 @@ struct snd_bebob_spec {
 		    const struct ieee1394_device_id *entry);
 	int (*discover)(struct snd_bebob *bebob);
 	int (*map)(struct snd_bebob *bebob, struct amdtp_stream *stream);
+	struct snd_bebob_freq_spec *freq;
 	struct snd_bebob_clock_spec *clock;
 	struct snd_bebob_dig_iface_spec *dig_iface;
 	struct snd_bebob_meter_spec *meter;
@@ -173,6 +178,8 @@ int avc_ccm_set_signal_source(struct fw_unit *unit,
 		int dst_stype, int dst_sid, int dst_pid);
 
 /* Additional AVC commands, AV/C Unit and Subunit, Revision 17 (BridgeCo.) */
+int get_sfc_from_rate(int rate);
+int get_rate_from_sfc(enum cip_sfc sfc);
 int avc_bridgeco_get_plug_channels(struct fw_unit *unit, int direction,
 				unsigned short plugid, int *channels);
 int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,
@@ -185,6 +192,8 @@ int avc_bridgeco_get_plug_stream_formation_entry(struct fw_unit *unit,
 				int direction, unsigned short plugid,
 				int entryid, u8 *buf, int *len);
 
+int snd_bebob_stream_get_rate(struct snd_bebob *bebob, int *rate);
+int snd_bebob_stream_set_rate(struct snd_bebob *bebob, int rate);
 int snd_bebob_stream_discover(struct snd_bebob *bebob);
 int snd_bebob_stream_map(struct snd_bebob *bebob,
 			 struct amdtp_stream *stream);

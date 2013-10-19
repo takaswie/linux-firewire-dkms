@@ -217,7 +217,7 @@ get_meter(struct snd_bebob *bebob, void *buf, int size)
  * BeBoB don't tell drivers to detect digital input, just show clock sync or not.
  */
 static int
-check_clock_sync(struct snd_bebob *bebob, int size, bool *sync)
+get_clock_freq(struct snd_bebob *bebob, int size, int *rate)
 {
 	int err;
 	u8 *buf;
@@ -231,8 +231,13 @@ check_clock_sync(struct snd_bebob *bebob, int size, bool *sync)
 		goto end;
 
 	/* if synced, this value is the same of SFC of FDF in CIP header */
-	*sync = (buf[size - 2] != 0xff);
-	err = 0;
+	if (buf[size - 2] == 0xff)
+		err = -EIO;
+
+	*rate = get_rate_from_sfc(buf[size - 2]);
+	if (*rate < 0)
+		err = *rate;
+
 end:
 	kfree(buf);
 	return err;
@@ -363,7 +368,6 @@ static int
 special_discover(struct snd_bebob *bebob)
 {
 	int err;
-	u32 buf;
 
 	/* initialize these parameters because doesn't allow driver to ask */
 	err = special_set_clock_params(bebob, 0x03, 0x00, 0x00, 0x00);
@@ -389,6 +393,12 @@ special_discover(struct snd_bebob *bebob)
 
 	return 0;
 }
+
+static int special_get_freq(struct snd_bebob *bebob, int *rate)
+{
+	return get_clock_freq(bebob, METER_SIZE_SPECIAL, rate);
+}
+
 static char *special_clock_labels[] = {
 	"Internal with Digital Mute", "Digital",
 	"Word Clock", "Internal"};
@@ -408,7 +418,10 @@ special_clock_set(struct snd_bebob *bebob, int id)
 static int
 special_clock_synced(struct snd_bebob *bebob, bool *synced)
 {
-	return check_clock_sync(bebob, METER_SIZE_SPECIAL, synced);
+	int rate, err;
+	err = get_clock_freq(bebob, METER_SIZE_SPECIAL, &rate);
+	*synced = !(err < 0);
+	return err;
 }
 
 static char *special_dig_iface_labels[] = {
@@ -534,7 +547,10 @@ fw410_clock_set(struct snd_bebob *bebob, int id)
 static int
 fw410_clock_synced(struct snd_bebob *bebob, bool *synced)
 {
-	return check_clock_sync(bebob, METER_SIZE_FW410, synced);
+	int rate, err;
+	err = get_clock_freq(bebob, METER_SIZE_FW410, &rate);
+	*synced = !(err < 0);
+	return err;
 }
 static char *fw410_dig_iface_labels[] = {
 	"S/PDIF Optical", "S/PDIF Coaxial"
@@ -618,7 +634,10 @@ audiophile_clock_set(struct snd_bebob *bebob, int id)
 static int
 audiophile_clock_synced(struct snd_bebob *bebob, bool *synced)
 {
-	return check_clock_sync(bebob, METER_SIZE_AUDIOPHILE, synced);
+	int rate, err;
+	err = get_clock_freq(bebob, METER_SIZE_AUDIOPHILE, &rate);
+	*synced = !(err < 0);
+	return err;
 }
 static char *audiophile_meter_labels[] = {
 	ANA_IN, DIG_IN,
@@ -688,7 +707,10 @@ solo_clock_set(struct snd_bebob *bebob, int id)
 static int
 solo_clock_synced(struct snd_bebob *bebob, bool *synced)
 {
-	return check_clock_sync(bebob, METER_SIZE_SOLO, synced);
+	int rate, err;
+	err = get_clock_freq(bebob, METER_SIZE_SOLO, &rate);
+	*synced = !(err < 0);
+	return err;
 }
 static char *solo_meter_labels[] = {
 	ANA_IN, DIG_IN,
@@ -796,6 +818,11 @@ struct snd_bebob_spec maudio_bootloader_spec = {
 };
 
 /* for special customized devices */
+static struct snd_bebob_freq_spec special_freq_spec = {
+	.get	= &special_get_freq,
+	/* Ssetting sampling rate don't wotk without streams perhaps... */
+	.set	= &snd_bebob_stream_set_rate
+};
 static struct snd_bebob_clock_spec special_clock_spec = {
 	.num	= ARRAY_SIZE(special_clock_labels),
 	.labels	= special_clock_labels,
@@ -809,8 +836,6 @@ static struct snd_bebob_dig_iface_spec special_dig_iface_spec = {
 	.get	= &special_dig_iface_get,
 	.set	= &special_dig_iface_set
 };
-
-/* Firewire 1814 and ProjectMix I/O specification */
 static struct snd_bebob_meter_spec special_meter_spec = {
 	.num	= ARRAY_SIZE(special_meter_labels),
 	.labels	= special_meter_labels,
@@ -820,9 +845,15 @@ struct snd_bebob_spec maudio_special_spec = {
 	.load		= NULL,
 	.discover	= &special_discover,
 	.map   		= NULL,
+	.freq		= &special_freq_spec,
 	.clock		= &special_clock_spec,
 	.dig_iface	= &special_dig_iface_spec,
 	.meter		= &special_meter_spec
+};
+
+struct snd_bebob_freq_spec normal_freq_spec = {
+	.get	= &snd_bebob_stream_get_rate,
+	.set	= &snd_bebob_stream_set_rate
 };
 
 /* Firewire 410 specification */
@@ -848,6 +879,7 @@ struct snd_bebob_spec maudio_fw410_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &normal_freq_spec,
 	.clock		= &fw410_clock_spec,
 	.dig_iface	= &fw410_dig_iface_spec,
 	.meter		= &fw410_meter_spec
@@ -870,6 +902,7 @@ struct snd_bebob_spec maudio_audiophile_spec = {
 	.load		= &firmware_load,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &normal_freq_spec,
 	.clock		= &audiophile_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= &audiophile_meter_spec
@@ -892,6 +925,7 @@ struct snd_bebob_spec maudio_solo_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &normal_freq_spec,
 	.clock		= &solo_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= &solo_meter_spec
@@ -907,6 +941,7 @@ struct snd_bebob_spec maudio_ozonic_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &normal_freq_spec,
 	.clock		= NULL,
 	.dig_iface	= NULL,
 	.meter		= &ozonic_meter_spec
@@ -922,6 +957,7 @@ struct snd_bebob_spec maudio_nrv10_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &normal_freq_spec,
 	.clock		= NULL,
 	.dig_iface	= NULL,
 	.meter		= &nrv10_meter_spec

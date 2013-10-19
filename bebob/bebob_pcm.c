@@ -233,6 +233,7 @@ static int
 pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
+	struct snd_bebob_freq_spec *freq = bebob->spec->freq;
 	int sampling_rate, err;
 
 	err = pcm_init_hw_params(bebob, substream);
@@ -241,7 +242,7 @@ pcm_open(struct snd_pcm_substream *substream)
 
 	if (amdtp_stream_pcm_running(&bebob->tx_stream) ||
 	    amdtp_stream_pcm_running(&bebob->rx_stream)) {
-		err = avc_generic_get_sig_fmt(bebob->unit, &sampling_rate, 1, 0);
+		err = freq->get(bebob, &sampling_rate);
 		if (err < 0)
 			goto end;
 

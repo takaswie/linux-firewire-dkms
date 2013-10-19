@@ -274,6 +274,12 @@ saffire_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 	return saffire_read_block(bebob, SAFFIRE_OFFSET_METER, buf, size);
 }
 
+/* TODO: need tester */
+static struct snd_bebob_freq_spec freq_spec = {
+	.get	= &snd_bebob_stream_get_rate,
+	.set	= &snd_bebob_stream_set_rate
+};
+
 /* Saffire Pro 26 I/O  */
 static struct snd_bebob_clock_spec saffirepro_26_clock_spec = {
 	.num	= ARRAY_SIZE(saffirepro_26_clock_labels),
@@ -286,6 +292,7 @@ struct snd_bebob_spec saffirepro_26_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &freq_spec,
 	.clock		= &saffirepro_26_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= NULL
@@ -304,6 +311,7 @@ struct snd_bebob_spec saffirepro_10_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &freq_spec,
 	.clock		= &saffirepro_10_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= NULL
@@ -327,6 +335,7 @@ struct snd_bebob_spec saffire_le_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &freq_spec,
 	.clock		= &saffire_both_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= &saffire_le_meter_spec
@@ -341,6 +350,7 @@ struct snd_bebob_spec saffire_spec ={
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &freq_spec,
 	.clock		= &saffire_both_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= &saffire_meter_spec

@@ -105,6 +105,11 @@ phase24_series_clock_set(struct snd_bebob *bebob, int id)
 	return avc_audio_set_selector(bebob->unit, 0, 4, id);
 }
 
+struct snd_bebob_freq_spec freq_spec = {
+	.get	= &snd_bebob_stream_get_rate,
+	.set	= &snd_bebob_stream_set_rate
+};
+
 /* PHASE 88 Rack FW */
 struct snd_bebob_clock_spec phase88_rack_clock = {
 	.num	= ARRAY_SIZE(phase88_rack_clock_labels),
@@ -117,6 +122,7 @@ struct snd_bebob_spec phase88_rack_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &freq_spec,
 	.clock		= &phase88_rack_clock,
 	.dig_iface	= NULL,
 	.meter		= NULL
@@ -134,6 +140,7 @@ struct snd_bebob_spec phase24_series_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &freq_spec,
 	.clock		= &phase24_series_clock,
 	.dig_iface	= NULL,
 	.meter		= NULL

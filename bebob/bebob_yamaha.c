@@ -162,6 +162,10 @@ clock_synced(struct snd_bebob *bebob, bool *synced)
 	return 0;
 }
 
+static struct snd_bebob_freq_spec freq_spec = {
+	.get	= &snd_bebob_stream_get_rate,
+	.set	= &snd_bebob_stream_set_rate
+};
 static struct snd_bebob_clock_spec clock_spec = {
 	.num	= ARRAY_SIZE(clock_labels),
 	.labels	= clock_labels,
@@ -173,6 +177,7 @@ struct snd_bebob_spec yamaha_go_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
+	.freq		= &freq_spec,
 	.clock		= &clock_spec,
 	.dig_iface	= NULL,
 	.meter		= NULL
