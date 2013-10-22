@@ -178,8 +178,6 @@ int avc_ccm_set_signal_source(struct fw_unit *unit,
 		int dst_stype, int dst_sid, int dst_pid);
 
 /* Additional AVC commands, AV/C Unit and Subunit, Revision 17 (BridgeCo.) */
-int get_sfc_from_rate(int rate);
-int get_rate_from_sfc(enum cip_sfc sfc);
 int avc_bridgeco_get_plug_channels(struct fw_unit *unit, int direction,
 				unsigned short plugid, int *channels);
 int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,

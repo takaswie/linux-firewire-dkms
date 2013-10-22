@@ -217,7 +217,7 @@ get_meter(struct snd_bebob *bebob, void *buf, int size)
  * BeBoB don't tell drivers to detect digital input, just show clock sync or not.
  */
 static int
-get_clock_freq(struct snd_bebob *bebob, int size, int *rate)
+check_clock_sync(struct snd_bebob *bebob, int size, bool *sync)
 {
 	int err;
 	u8 *buf;
@@ -231,13 +231,8 @@ get_clock_freq(struct snd_bebob *bebob, int size, int *rate)
 		goto end;
 
 	/* if synced, this value is the same of SFC of FDF in CIP header */
-	if (buf[size - 2] == 0xff)
-		err = -EIO;
-
-	*rate = get_rate_from_sfc(buf[size - 2]);
-	if (*rate < 0)
-		err = *rate;
-
+	*sync = (buf[size - 2] != 0xff);
+	err = 0;
 end:
 	kfree(buf);
 	return err;
@@ -393,12 +388,13 @@ special_discover(struct snd_bebob *bebob)
 
 	return 0;
 }
-
+/*
+ * Input plug shows actual rate. Output plug is needless for this purpose.
+ */
 static int special_get_freq(struct snd_bebob *bebob, int *rate)
 {
-	return get_clock_freq(bebob, METER_SIZE_SPECIAL, rate);
+	return avc_generic_get_sig_fmt(bebob->unit, rate, 1, 0);
 }
-
 static char *special_clock_labels[] = {
 	"Internal with Digital Mute", "Digital",
 	"Word Clock", "Internal"};
@@ -418,10 +414,7 @@ special_clock_set(struct snd_bebob *bebob, int id)
 static int
 special_clock_synced(struct snd_bebob *bebob, bool *synced)
 {
-	int rate, err;
-	err = get_clock_freq(bebob, METER_SIZE_SPECIAL, &rate);
-	*synced = !(err < 0);
-	return err;
+	return check_clock_sync(bebob, METER_SIZE_SPECIAL, synced);
 }
 
 static char *special_dig_iface_labels[] = {
@@ -547,10 +540,7 @@ fw410_clock_set(struct snd_bebob *bebob, int id)
 static int
 fw410_clock_synced(struct snd_bebob *bebob, bool *synced)
 {
-	int rate, err;
-	err = get_clock_freq(bebob, METER_SIZE_FW410, &rate);
-	*synced = !(err < 0);
-	return err;
+	return check_clock_sync(bebob, METER_SIZE_FW410, synced);
 }
 static char *fw410_dig_iface_labels[] = {
 	"S/PDIF Optical", "S/PDIF Coaxial"
@@ -634,10 +624,7 @@ audiophile_clock_set(struct snd_bebob *bebob, int id)
 static int
 audiophile_clock_synced(struct snd_bebob *bebob, bool *synced)
 {
-	int rate, err;
-	err = get_clock_freq(bebob, METER_SIZE_AUDIOPHILE, &rate);
-	*synced = !(err < 0);
-	return err;
+	return check_clock_sync(bebob, METER_SIZE_AUDIOPHILE, synced);
 }
 static char *audiophile_meter_labels[] = {
 	ANA_IN, DIG_IN,
@@ -707,10 +694,7 @@ solo_clock_set(struct snd_bebob *bebob, int id)
 static int
 solo_clock_synced(struct snd_bebob *bebob, bool *synced)
 {
-	int rate, err;
-	err = get_clock_freq(bebob, METER_SIZE_SOLO, &rate);
-	*synced = !(err < 0);
-	return err;
+	return check_clock_sync(bebob, METER_SIZE_SOLO, synced);
 }
 static char *solo_meter_labels[] = {
 	ANA_IN, DIG_IN,
@@ -820,7 +804,6 @@ struct snd_bebob_spec maudio_bootloader_spec = {
 /* for special customized devices */
 static struct snd_bebob_freq_spec special_freq_spec = {
 	.get	= &special_get_freq,
-	/* Ssetting sampling rate don't wotk without streams perhaps... */
 	.set	= &snd_bebob_stream_set_rate
 };
 static struct snd_bebob_clock_spec special_clock_spec = {

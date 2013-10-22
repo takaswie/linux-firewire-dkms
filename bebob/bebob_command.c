@@ -26,32 +26,7 @@ static int amdtp_sfc_table[] = {
 	[CIP_SFC_88200]	 = 88200,
 	[CIP_SFC_96000]	 = 96000,
 	[CIP_SFC_176400] = 176400,
-	[CIP_SFC_192000] = 192000,
-	[CIP_SFC_192000 + 1] = -1};
-
-
-int get_sfc_from_rate(int rate)
-{
-	int sfc;
-
-	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_sfc_table); sfc += 1)
-		if (amdtp_sfc_table[sfc] == rate)
-			break;
-
-	/* invalid */
-	if (sfc == ARRAY_SIZE(amdtp_sfc_table))
-		sfc = -1;
-
-	return sfc;
-}
-
-int get_rate_from_sfc(enum cip_sfc sfc)
-{
-	if (sfc > CIP_SFC_192000)
-		return -1;
-
-	return amdtp_sfc_table[sfc];
-}
+	[CIP_SFC_192000] = 192000};
 
 int avc_audio_set_selector(struct fw_unit *unit, int subunit_id,
 			   int fb_id, int number)
@@ -140,9 +115,9 @@ int avc_generic_set_sig_fmt(struct fw_unit *unit, int rate,
 	u8 *buf;
 	int err;
 
-	sfc = get_sfc_from_rate(rate);
-	if (sfc < 0)
-		return -EINVAL;
+	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_sfc_table); sfc += 1)
+		if (amdtp_sfc_table[sfc] == rate)
+			break;
 
 	buf = kmalloc(8, GFP_KERNEL);
 	if (!buf) {
@@ -220,10 +195,12 @@ int avc_generic_get_sig_fmt(struct fw_unit *unit, int *rate,
 
 	/* check sfc field */
 	sfc = 0x07 & buf[5];
-	*rate = get_rate_from_sfc(sfc);
-	if (*rate < 0)
+	if (sfc >= ARRAY_SIZE(amdtp_sfc_table)) {
 		err = -EINVAL;
+		goto end;
+	}
 
+	*rate = amdtp_sfc_table[sfc];
 	err = 0;
 end:
 	kfree(buf);
