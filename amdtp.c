@@ -93,8 +93,8 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	s->pcm = NULL;
 	s->blocks_for_midi = UINT_MAX;
 
-	init_waitqueue_head(&s->run_wait);
-	s->run = false;
+	init_waitqueue_head(&s->callback_wait);
+	s->callbacked = false;
 	s->sync_slave = ERR_PTR(-1);
 
 	s->sort_table = NULL;
@@ -110,7 +110,7 @@ EXPORT_SYMBOL(amdtp_stream_init);
  */
 void amdtp_stream_destroy(struct amdtp_stream *s)
 {
-	WARN_ON(!IS_ERR(s->context));
+	WARN_ON(amdtp_stream_running(s));
 	mutex_destroy(&s->mutex);
 	fw_unit_put(s->unit);
 }
@@ -145,7 +145,7 @@ void amdtp_stream_set_params(struct amdtp_stream *s,
 
 	unsigned int i, sfc;
 
-	if (WARN_ON(!IS_ERR(s->context)) |
+	if (WARN_ON(amdtp_stream_running(s)) |
 	    WARN_ON(pcm_channels > AMDTP_MAX_CHANNELS_FOR_PCM) |
 	    WARN_ON(midi_channels > AMDTP_MAX_CHANNELS_FOR_MIDI))
 		return;
@@ -775,8 +775,7 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 			/* Process sync slave stream */
 			if ((s->flags & CIP_BLOCKING) &&
 			    (s->flags & CIP_SYNC_TO_DEVICE) &&
-			    !IS_ERR(s->sync_slave) &&
-			    amdtp_stream_running(s->sync_slave)) {
+			    s->sync_slave->callbacked) {
 				syt = be32_to_cpu(buffer[1]) & AMDTP_SYT_MASK;
 				handle_out_packet(s->sync_slave, syt);
 			}
@@ -800,8 +799,7 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 
 	/* when sync to device, flush the packets for slave stream */
 	if ((s->flags & CIP_BLOCKING) &&
-	    (s->flags & CIP_SYNC_TO_DEVICE) &&
-	    !IS_ERR(s->sync_slave) && amdtp_stream_running(s->sync_slave))
+	    (s->flags & CIP_SYNC_TO_DEVICE) && s->sync_slave->callbacked)
 		fw_iso_context_queue_flush(s->sync_slave->context);
 
 	fw_iso_context_queue_flush(s->context);
@@ -822,7 +820,7 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
 {
 	struct amdtp_stream *s = private_data;
 
-	s->run = true;
+	s->callbacked = true;
 
 	if (s->direction == AMDTP_IN_STREAM)
 		context->callback.sc = in_stream_callback;
@@ -867,7 +865,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 
 	mutex_lock(&s->mutex);
 
-	if (WARN_ON(!IS_ERR(s->context) ||
+	if (WARN_ON(amdtp_stream_running(s) ||
 	    (s->data_block_quadlets < 1))) {
 		err = -EBADFD;
 		goto err_unlock;
@@ -908,7 +906,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
 					   type, channel, speed, header_size,
 					   amdtp_stream_callback, s);
-	if (!!IS_ERR(s->context)) {
+	if (!amdtp_stream_running(s)) {
 		err = PTR_ERR(s->context);
 		if (err == -EBUSY)
 			dev_err(&s->unit->device,
@@ -934,6 +932,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	 * "FW_ISO_CONTEXT_MATCH_TAG1" for receive but Fireworks outputs
 	 * NODATA packets with tag 0.
 	 */
+	s->callbacked = false;
 	err = fw_iso_context_start(s->context, -1, 0,
 			FW_ISO_CONTEXT_MATCH_TAG0 | FW_ISO_CONTEXT_MATCH_TAG1);
 	if (err < 0)
@@ -995,7 +994,7 @@ void amdtp_stream_stop(struct amdtp_stream *s)
 {
 	mutex_lock(&s->mutex);
 
-	if (!!IS_ERR(s->context)) {
+	if (!amdtp_stream_running(s)) {
 		mutex_unlock(&s->mutex);
 		return;
 	}
@@ -1011,7 +1010,7 @@ void amdtp_stream_stop(struct amdtp_stream *s)
 	if (s->left_packets != NULL)
 		kfree(s->left_packets);
 
-	s->run = false;
+	s->callbacked = false;
 
 	mutex_unlock(&s->mutex);
 }
@@ -1039,19 +1038,19 @@ void amdtp_stream_pcm_abort(struct amdtp_stream *s)
 EXPORT_SYMBOL(amdtp_stream_pcm_abort);
 
 /**
- * amdtp_stream_wait_run - block till stream running or timeout
+ * amdtp_stream_wait_callback - block till callbacked or timeout
  * @s: the AMDTP stream
  *
  * If this function return false, the AMDTP stream should be stopped.
  */
-bool amdtp_stream_wait_run(struct amdtp_stream *s)
+bool amdtp_stream_wait_callback(struct amdtp_stream *s)
 {
-	wait_event_timeout(s->run_wait,
-			   s->run == true,
+	wait_event_timeout(s->callback_wait,
+			   s->callbacked == true,
 			   msecs_to_jiffies(STREAM_TIMEOUT_MS));
-	return s->run;
+	return s->callbacked;
 }
-EXPORT_SYMBOL(amdtp_stream_wait_run);
+EXPORT_SYMBOL(amdtp_stream_wait_callback);
 
 /**
  * amdtp_stream_midi_add - add MIDI stream

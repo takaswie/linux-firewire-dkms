@@ -369,7 +369,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		}
 
 		/* wait first callback */
-		if (!amdtp_stream_wait_run(master)) {
+		if (!amdtp_stream_wait_callback(master)) {
 			amdtp_stream_stop(master);
 			break_both_connections(bebob);
 			err = -ETIMEDOUT;
@@ -389,7 +389,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		}
 
 		/* wait first callback */
-		if (!amdtp_stream_wait_run(slave)) {
+		if (!amdtp_stream_wait_callback(slave)) {
 			amdtp_stream_stop(slave);
 			amdtp_stream_stop(master);
 			break_both_connections(bebob);
