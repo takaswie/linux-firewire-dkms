@@ -69,6 +69,8 @@ extern unsigned int snd_bebob_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES];
 struct snd_bebob_freq_spec {
 	int (*get)(struct snd_bebob *bebob, int *rate);
 	int (*set)(struct snd_bebob *bebob, int rate);
+	/* private */
+	struct snd_ctl_elem_id *ctl_id;
 };
 struct snd_bebob_clock_spec {
 	int num;
@@ -76,6 +78,8 @@ struct snd_bebob_clock_spec {
 	int (*get)(struct snd_bebob *bebob, int *id);
 	int (*set)(struct snd_bebob *bebob, int id);
 	int (*synced)(struct snd_bebob *bebob, bool *synced);
+	/* private */
+	struct snd_ctl_elem_id *ctl_id;
 };
 struct snd_bebob_dig_iface_spec {
 	int num;

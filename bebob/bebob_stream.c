@@ -341,6 +341,8 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		err = freq->set(bebob, rate);
 		if (err < 0)
 			goto end;
+		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
+			       freq->ctl_id);
 
 		err = make_both_connections(bebob, rate);
 		if (err < 0)

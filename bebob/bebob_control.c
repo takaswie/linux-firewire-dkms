@@ -275,6 +275,9 @@ static int control_clock_source_put(struct snd_kcontrol *kctl,
 	}
 
 	msleep(150);
+	if (spec->ctl_id)
+		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
+			       spec->ctl_id);
 
 	return changed;
 }
@@ -354,6 +357,7 @@ int snd_bebob_create_control_devices(struct snd_bebob *bebob)
 	err = snd_ctl_add(bebob->card, kctl);
 	if (err < 0)
 		goto end;
+	bebob->spec->freq->ctl_id = &kctl->id;
 
 	if (bebob->spec->clock != NULL) {
 		kctl = snd_ctl_new1(&global_clock_source_control, bebob);
@@ -366,6 +370,7 @@ int snd_bebob_create_control_devices(struct snd_bebob *bebob)
 			err = snd_ctl_add(bebob->card, kctl);
 			if (err < 0)
 				goto end;
+			bebob->spec->clock->ctl_id = &kctl->id;
 		}
 	}
 
