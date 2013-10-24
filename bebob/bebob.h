@@ -218,7 +218,8 @@ void snd_bebob_proc_init(struct snd_bebob *bebob);
 
 /* device specific operations */
 extern struct snd_bebob_spec maudio_bootloader_spec;
-extern struct snd_bebob_spec maudio_special_spec;
+extern struct snd_bebob_spec maudio_fw1814_spec;
+extern struct snd_bebob_spec maudio_projectmix_spec;
 extern struct snd_bebob_spec maudio_nrv10_spec;
 extern struct snd_bebob_spec maudio_fw410_spec;
 extern struct snd_bebob_spec maudio_audiophile_spec;

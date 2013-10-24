@@ -327,15 +327,19 @@ special_stream_formation_set(struct snd_bebob *bebob)
 		bebob->tx_stream_formations[4].pcm = 16;
 		bebob->tx_stream_formations[5].pcm = 12;
 		bebob->tx_stream_formations[6].pcm = 12;
-		bebob->tx_stream_formations[7].pcm = 2;
-		bebob->tx_stream_formations[8].pcm = 2;
+		if (bebob->spec == &maudio_fw1814_spec) {
+			bebob->tx_stream_formations[7].pcm = 2;
+			bebob->tx_stream_formations[8].pcm = 2;
+		}
 	} else {
 		bebob->tx_stream_formations[3].pcm = 10;
 		bebob->tx_stream_formations[4].pcm = 10;
 		bebob->tx_stream_formations[5].pcm = 10;
 		bebob->tx_stream_formations[6].pcm = 10;
-		bebob->tx_stream_formations[7].pcm = 2;
-		bebob->tx_stream_formations[8].pcm = 2;
+		if (bebob->spec == &maudio_fw1814_spec) {
+			bebob->tx_stream_formations[7].pcm = 2;
+			bebob->tx_stream_formations[8].pcm = 2;
+		}
 	}
 
 	if (bebob->out_dig_fmt == 0x01) {
@@ -343,20 +347,26 @@ special_stream_formation_set(struct snd_bebob *bebob)
 		bebob->rx_stream_formations[4].pcm = 12;
 		bebob->rx_stream_formations[5].pcm = 8;
 		bebob->rx_stream_formations[6].pcm = 8;
-		bebob->rx_stream_formations[7].pcm = 4;
-		bebob->rx_stream_formations[8].pcm = 4;
+		if (bebob->spec == &maudio_fw1814_spec) {
+			bebob->rx_stream_formations[7].pcm = 4;
+			bebob->rx_stream_formations[8].pcm = 4;
+		}
 	} else {
 		bebob->rx_stream_formations[3].pcm = 6;
 		bebob->rx_stream_formations[4].pcm = 6;
 		bebob->rx_stream_formations[5].pcm = 6;
 		bebob->rx_stream_formations[6].pcm = 6;
-		bebob->rx_stream_formations[7].pcm = 4;
-		bebob->rx_stream_formations[8].pcm = 4;
+		if (bebob->spec == &maudio_fw1814_spec) {
+			bebob->rx_stream_formations[7].pcm = 4;
+			bebob->rx_stream_formations[8].pcm = 4;
+		}
 	}
 
 	for (i = 3; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i++) {
 		bebob->tx_stream_formations[i].midi = 1;
 		bebob->rx_stream_formations[i].midi = 1;
+		if ((i > 6) && (bebob->spec != &maudio_fw1814_spec))
+			break;
 	}
 }
 static int
@@ -380,9 +390,13 @@ special_discover(struct snd_bebob *bebob)
 
 	special_stream_formation_set(bebob);
 
-	/* TODO: ProjectMix has 2? */
-	bebob->midi_input_ports = 1;
-	bebob->midi_output_ports = 1;
+	if (bebob->spec == &maudio_fw1814_spec) {
+		bebob->midi_input_ports = 1;
+		bebob->midi_output_ports = 1;
+	} else {
+		bebob->midi_input_ports = 2;
+		bebob->midi_output_ports = 2;
+	}
 
 	bebob->maudio_special_quirk = true;
 
@@ -824,7 +838,17 @@ static struct snd_bebob_meter_spec special_meter_spec = {
 	.labels	= special_meter_labels,
 	.get	= &special_meter_get
 };
-struct snd_bebob_spec maudio_special_spec = {
+struct snd_bebob_spec maudio_fw1814_spec = {
+	.load		= NULL,
+	.discover	= &special_discover,
+	.map   		= NULL,
+	.freq		= &special_freq_spec,
+	.clock		= &special_clock_spec,
+	.dig_iface	= &special_dig_iface_spec,
+	.meter		= &special_meter_spec
+};
+
+struct snd_bebob_spec maudio_projectmix_spec= {
 	.load		= NULL,
 	.discover	= &special_discover,
 	.map   		= NULL,
