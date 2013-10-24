@@ -318,7 +318,8 @@ end:
 }
 
 int avc_bridgeco_get_plug_type(struct fw_unit *unit, int direction,
-				    unsigned short plugid, int *type)
+			       unsigned short p_type, unsigned short p_id,
+			       int *type)
 {
 	u8 *buf;
 	int err;
@@ -336,8 +337,11 @@ int avc_bridgeco_get_plug_type(struct fw_unit *unit, int direction,
 	else
 		buf[4] = 0x01;	/* output plug */
 	buf[5]  = 0x00;		/* address mode [0x00/0x01/0x02] */
-	buf[6]  = 0x00;		/* plug type [0x00/0x01/0x02]*/
-	buf[7]  = 0xff & plugid;	/* plug id */
+	if (p_type > 0)		/* plug type [0x00/0x01/0x02]*/
+		buf[6] = 0x01;	/* external Plug */
+	else
+		buf[6] = 0x00;	/* PCR */
+	buf[7]  = 0xff & p_id;	/* plug id */
 	buf[8]  = 0xff;		/* reserved */
 	buf[9]  = 0x00;		/* info type [0x00-0x07] */
 	buf[10] = 0x00;		/* plug type in response */

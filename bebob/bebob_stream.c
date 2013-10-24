@@ -607,7 +607,7 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 			goto end;
 		}
 
-		err = avc_bridgeco_get_plug_type(bebob->unit, i, 0, &type);
+		err = avc_bridgeco_get_plug_type(bebob->unit, i, 0, 0, &type);
 		if (err < 0)
 			goto end;
 		else if (type != 0x00) {
@@ -623,9 +623,27 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 			goto end;
 	}
 
-	/* TODO: count MIDI external plugs */
-	bebob->midi_input_ports = 1;
-	bebob->midi_output_ports = 1;
+	/* count external input plugs for MIDI */
+	bebob->midi_input_ports = 0;
+	for (i = 0; i < ext_plugs[0]; i++) {
+		err = avc_bridgeco_get_plug_type(bebob->unit, 1, 1, i, &type);
+		if (err < 0)
+			goto end;
+		else if (type == 0x02)
+			bebob->midi_input_ports++;
+		snd_printk(KERN_INFO"in: %d %d\n", i, type);
+	}
+
+	/* count external output plugs for MIDI */
+	bebob->midi_output_ports = 0;
+	for (i = 0; i < ext_plugs[1]; i++) {
+		err = avc_bridgeco_get_plug_type(bebob->unit, 0, 1, i, &type);
+		if (err < 0)
+			goto end;
+		else if (type == 0x02)
+			bebob->midi_output_ports++;
+		snd_printk(KERN_INFO"out: %d %d\n", i, type);
+	}
 
 	err = 0;
 
