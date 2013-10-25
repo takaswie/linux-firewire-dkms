@@ -239,28 +239,6 @@ end:
 }
 
 /*
- * FW1814 and ProjectMix cannot give a way to read its control. So drivers
- * should remember the value for each parameters. Windows driver, after loading
- * firmware, write all parameters just after flushing.
- */
-static int
-reset_device(struct snd_bebob *bebob)
-{
-	u8 buf[8];
-
-	buf[0] = 0x00;	/* control */
-	buf[1] = 0xff;	/* unit */
-	buf[2] = 0x00;	/* vendor dependent command */
-	buf[3] = 0x02;	/* unknown */
-	buf[4] = 0x00;	/* unknown */
-	buf[5] = 0x00;	/* unknown */
-	buf[6] = 0x00;	/* unknown */
-	buf[7] = 0x00;	/* unknown */
-
-	return fcp_avc_transaction(bebob->unit, buf, 8, buf, 8, 0);
-}
-
-/*
  * dig_fmt: 0x00:S/PDIF, 0x01:ADAT
  * clk_lock: 0x00:unlock, 0x01:lock
  */
@@ -362,7 +340,7 @@ special_stream_formation_set(struct snd_bebob *bebob)
 		}
 	}
 
-	for (i = 3; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i++) {
+	for (i = 3; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		bebob->tx_stream_formations[i].midi = 1;
 		bebob->rx_stream_formations[i].midi = 1;
 		if ((i > 6) && (bebob->spec != &maudio_fw1814_spec))
@@ -407,7 +385,8 @@ special_discover(struct snd_bebob *bebob)
  */
 static int special_get_freq(struct snd_bebob *bebob, int *rate)
 {
-	return avc_generic_get_sig_fmt(bebob->unit, rate, 1, 0);
+	return avc_general_get_sig_fmt(bebob->unit, rate,
+				       AVC_GENERAL_PLUG_DIR_IN, 0);
 }
 static char *special_clock_labels[] = {
 	"Internal with Digital Mute", "Digital",
@@ -514,8 +493,8 @@ fw410_clock_get(struct snd_bebob *bebob, int *id)
 {
 	int err, stype, sid, pid;
 
-	err = avc_ccm_get_signal_source(bebob->unit,
-					&stype, &sid, &pid, 0x0c, 0x00, 0x01);
+	err = avc_ccm_get_sig_src(bebob->unit,
+				  &stype, &sid, &pid, 0x0c, 0x00, 0x01);
 	if (err < 0)
 		goto end;
 
@@ -548,8 +527,8 @@ fw410_clock_set(struct snd_bebob *bebob, int id)
 		pid = 0x82;
 	}
 
-	return avc_ccm_set_signal_source(bebob->unit,
-					stype, sid, pid, 0x0c, 0x00, 0x01);
+	return avc_ccm_set_sig_src(bebob->unit,
+				   stype, sid, pid, 0x0c, 0x00, 0x01);
 }
 static int
 fw410_clock_synced(struct snd_bebob *bebob, bool *synced)
@@ -591,7 +570,6 @@ fw410_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 
 	for (c = 0; c < channels; c++)
 		buf[c] = be32_to_cpu(buf[c]);
-
 end:
 	return err;
 }
@@ -605,8 +583,8 @@ audiophile_clock_get(struct snd_bebob *bebob, int *id)
 {
 	int err, stype, sid, pid;
 
-	err = avc_ccm_get_signal_source(bebob->unit,
-					&stype, &sid, &pid, 0x0c, 0x00, 0x01);
+	err = avc_ccm_get_sig_src(bebob->unit,
+				  &stype, &sid, &pid, 0x0c, 0x00, 0x01);
 	if (err < 0)
 		goto end;
 
@@ -632,8 +610,8 @@ audiophile_clock_set(struct snd_bebob *bebob, int id)
 		pid = 0x82;
 	}
 
-	return avc_ccm_set_signal_source(bebob->unit,
-					 stype, sid, pid, 0x0c, 0x00, 0x01);
+	return avc_ccm_set_sig_src(bebob->unit,
+				   stype, sid, pid, 0x0c, 0x00, 0x01);
 }
 static int
 audiophile_clock_synced(struct snd_bebob *bebob, bool *synced)
@@ -661,7 +639,6 @@ audiophile_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 
 	for (c = 0; c < channels; c++)
 		buf[c] = be32_to_cpu(buf[c]);
-
 end:
 	return err;
 }
@@ -675,8 +652,8 @@ solo_clock_get(struct snd_bebob *bebob, int *id)
 {
 	int err, stype, sid, pid;
 
-	err = avc_ccm_get_signal_source(bebob->unit,
-					&stype, &sid, &pid, 0x0c, 0x00, 0x01);
+	err = avc_ccm_get_sig_src(bebob->unit,
+				  &stype, &sid, &pid, 0x0c, 0x00, 0x01);
 	if (err < 0)
 		goto end;
 
@@ -702,8 +679,8 @@ solo_clock_set(struct snd_bebob *bebob, int id)
 		pid = 0x81;
 	}
 
-	return avc_ccm_set_signal_source(bebob->unit,
-					 stype, sid, pid, 0x0c, 0x00, 0x01);
+	return avc_ccm_set_sig_src(bebob->unit,
+				   stype, sid, pid, 0x0c, 0x00, 0x01);
 }
 static int
 solo_clock_synced(struct snd_bebob *bebob, bool *synced)
@@ -746,7 +723,6 @@ solo_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 	do
 		buf[c] = be32_to_cpu(buf[c]);
 	while (++c < 12);
-
 end:
 	return err;
 }
@@ -772,14 +748,13 @@ ozonic_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 
 	for (c = 0; c < channels; c++)
 		buf[c] = be32_to_cpu(buf[c]);
-
 end:
 	return err;
 }
 
 /* NRV10 specific controls */
+/* TODO: need testers. this is based on my assumption */
 static char *nrv10_meter_labels[] = {
-	/* TODO: this is based on my assumption */
 	ANA_IN, ANA_IN, ANA_IN, ANA_IN,
 	DIG_IN,
 	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT,
@@ -794,14 +769,12 @@ nrv10_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 	if (size < channels * sizeof(u32))
 		return -EINVAL;
 
-	/* TODO: are there clock info or not? */
 	err = get_meter(bebob, (void *)buf, size);
 	if (err < 0)
 		goto end;
 
 	for (c = 0; c < channels; c++)
 		buf[c] = be32_to_cpu(buf[c]);
-
 end:
 	return err;
 }

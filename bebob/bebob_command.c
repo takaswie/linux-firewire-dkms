@@ -18,8 +18,9 @@
 #include "./bebob.h"
 
 #define BEBOB_COMMAND_MAX_TRIAL	3
+#define BEBOB_COMMAND_WAIT_MSEC	100
 
-static int amdtp_sfc_table[] = {
+static const int amdtp_sfc_table[] = {
 	[CIP_SFC_32000]	 = 32000,
 	[CIP_SFC_44100]	 = 44100,
 	[CIP_SFC_48000]	 = 48000,
@@ -29,119 +30,32 @@ static int amdtp_sfc_table[] = {
 	[CIP_SFC_192000] = 192000};
 
 int avc_audio_set_selector(struct fw_unit *unit, int subunit_id,
-			   int fb_id, int number)
+			   int fb_id, int num)
 {
 	u8 *buf;
 	int err;
 
-	buf = kmalloc(12, GFP_KERNEL);
+	buf = kzalloc(12, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
-	buf[0]  = 0x00;
-	buf[1]  = 0x08 | (0x07 & subunit_id);
-	buf[2]  = 0xb8;
-	buf[3]  = 0x80;
-	buf[4]  = 0xff & fb_id;
-	buf[5]  = 0x10;
-	buf[6]  = 0x02;
-	buf[7]  = 0xff & number;
-	buf[8]  = 0x01;
-	buf[9]  = 0x00;
-	buf[10] = 0x00;
-	buf[11] = 0x00;
+	buf[0]  = 0x00;		/* AV/C CONTROL */
+	buf[1]  = 0x08 | (0x07 & subunit_id);	/* AUDIO SUBUNIT ID */
+	buf[2]  = 0xb8;		/* FUNCTION BLOCK  */
+	buf[3]  = 0x80;		/* type is 'selector'*/
+	buf[4]  = 0xff & fb_id;	/* function block id */
+	buf[5]  = 0x10;		/* control attribute is CURRENT */
+	buf[6]  = 0x02;		/* selector length is 2 */
+	buf[7]  = 0xff & num;	/* input function block plug number */
+	buf[8]  = 0x01;		/* control selector is SELECTOR_CONTROL */
 
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
 	if (err < 0)
 		goto end;
 	if ((err < 6) || (buf[0] != 0x09)) {
 		dev_err(&unit->device,
-			"failed to set to selector %d: 0x%02X\n",
+			"failed to set selector %d: 0x%02X\n",
 			fb_id, buf[0]);
-		err = -EIO;
-		goto end;
-	}
-
-	err = 0;
-end:
-	return err;
-}
-
-int avc_audio_get_selector(struct fw_unit *unit, int subunit_id,
-			   int fb_id, int *number)
-{
-	u8 *buf;
-	int err;
-
-	buf = kmalloc(12, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0]  = 0x01;
-	buf[1]  = 0x08 | (0x07 & subunit_id);
-	buf[2]  = 0xb8;
-	buf[3]  = 0x80;
-	buf[4]  = 0xff & fb_id;
-	buf[5]  = 0x10;
-	buf[6]  = 0x02;
-	buf[7]  = 0x00;
-	buf[8]  = 0x01;
-	buf[9]  = 0x00;
-	buf[10] = 0x00;
-	buf[11] = 0x00;
-
-	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
-	if (err < 0)
-		goto end;
-	if ((err < 6) || (buf[0] != 0x0c)) {
-		dev_err(&unit->device,
-			"failed to get from selector %d: 0x%02X\n",
-			fb_id, buf[0]);
-		err = -EIO;
-		goto end;
-	}
-
-	*number = buf[7];
-	err = 0;
-end:
-	return err;
-}
-
-
-int avc_generic_set_sig_fmt(struct fw_unit *unit, int rate,
-			    int direction, unsigned short plug)
-{
-	int sfc;
-	u8 *buf;
-	int err;
-
-	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_sfc_table); sfc += 1)
-		if (amdtp_sfc_table[sfc] == rate)
-			break;
-
-	buf = kmalloc(8, GFP_KERNEL);
-	if (!buf) {
-		return -ENOMEM;
-	}
-
-	buf[0] = 0x00;		/* AV/C CONTROL */
-	buf[1] = 0xff;		/* unit */
-	if (direction > 0)
-		buf[2] = 0x19;	/* INPUT PLUG SIGNAL FORMAT */
-	else
-		buf[2] = 0x18;	/* OUTPUT PLUG SIGNAL FORMAT */
-	buf[3] = 0xff & plug;	/* plug */
-	buf[4] = 0x90;		/* EOH_1, Form_1, FMT means audio and music */
-	buf[5] = 0x00 | sfc;	/* FDF-hi */
-	buf[6] = 0xff;		/* FDF-mid */
-	buf[7] = 0xff;		/* FDF-low */
-
-	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
-	if (err < 0)
-		goto end;
-	/* ACCEPTED or INTERIM is OK */
-	if ((err < 6) || ((buf[0] != 0x0f) && (buf[0] != 0x09))) {
-		dev_err(&unit->device, "failed to set sampe rate\n");
 		err = -EIO;
 		goto end;
 	}
@@ -152,25 +66,114 @@ end:
 	return err;
 }
 
-int avc_generic_get_sig_fmt(struct fw_unit *unit, int *rate,
-			    int direction, unsigned short plug)
+int avc_audio_get_selector(struct fw_unit *unit, int subunit_id,
+			   int fb_id, int *num)
+{
+	u8 *buf;
+	int err;
+
+	buf = kzalloc(12, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0]  = 0x01;		/* AV/C STATUS */
+	buf[1]  = 0x08 | (0x07 & subunit_id);	/* AUDIO SUBUNIT ID */
+	buf[2]  = 0xb8;		/* FUNCTION BLOCK */
+	buf[3]  = 0x80;		/* type is 'selector'*/
+	buf[4]  = 0xff & fb_id;	/* function block id */
+	buf[5]  = 0x10;		/* control attribute is CURRENT */
+	buf[6]  = 0x02;		/* selector length is 2 */
+	buf[7]  = 0x00;		/* input function block plug number */
+	buf[8]  = 0x01;		/* control selector is SELECTOR_CONTROL */
+
+	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 6) || (buf[0] != 0x0c)) {
+		dev_err(&unit->device,
+			"failed to get selector %d: 0x%02X\n",
+			fb_id, buf[0]);
+		err = -EIO;
+		goto end;
+	}
+
+	*num = buf[7];
+	err = 0;
+end:
+	kfree(buf);
+	return err;
+}
+
+
+int avc_general_set_sig_fmt(struct fw_unit *unit, int rate,
+			    enum avc_general_plug_dir dir,
+			    unsigned short pid)
+{
+	int sfc, err;
+	u8 *buf;
+	bool flag;
+
+	flag = false;
+	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_sfc_table); sfc += 1) {
+		if (amdtp_sfc_table[sfc] == rate) {
+			flag = true;
+			break;
+		}
+	}
+	if (!flag)
+		return -EINVAL;
+
+	buf = kzalloc(8, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0] = 0x00;		/* AV/C CONTROL */
+	buf[1] = 0xff;		/* UNIT */
+	if (dir == AVC_GENERAL_PLUG_DIR_IN)
+		buf[2] = 0x19;	/* INPUT PLUG SIGNAL FORMAT */
+	else
+		buf[2] = 0x18;	/* OUTPUT PLUG SIGNAL FORMAT */
+	buf[3] = 0xff & pid;	/* plug id */
+	buf[4] = 0x90;		/* EOH_1, Form_1, FMT means audio and music */
+	buf[5] = 0x00 | sfc;	/* FDF-hi */
+	buf[6] = 0xff;		/* FDF-mid */
+	buf[7] = 0xff;		/* FDF-low */
+
+	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
+	if (err < 0)
+		goto end;
+	/* ACCEPTED or INTERIM is OK */
+	if ((err < 6) || ((buf[0] != 0x0f) && (buf[0] != 0x09))) {
+		dev_err(&unit->device, "failed to set sample rate\n");
+		err = -EIO;
+		goto end;
+	}
+
+	err = 0;
+end:
+	kfree(buf);
+	return err;
+}
+
+int avc_general_get_sig_fmt(struct fw_unit *unit, int *rate,
+			    enum avc_general_plug_dir dir,
+			    unsigned short pid)
 {
 	int sfc, evt;
 	u8 *buf;
 	int err;
 
-	buf = kmalloc(8, GFP_KERNEL);
-	if (!buf) {
+	buf = kzalloc(8, GFP_KERNEL);
+	if (buf == NULL)
 		return -ENOMEM;
-	}
 
 	buf[0] = 0x01;		/* AV/C STATUS */
-	buf[1] = 0xff;		/* unit */
-	if (direction > 0)
+	buf[1] = 0xff;		/* Unit */
+	if (dir == AVC_GENERAL_PLUG_DIR_IN)
 		buf[2] = 0x19;	/* INPUT PLUG SIGNAL FORMAT */
 	else
 		buf[2] = 0x18;	/* OUTPUT PLUG SIGNAL FORMAT */
-	buf[3] = 0xff & plug;	/* plug */
+	buf[3] = 0xff & pid;	/* plug id */
 	buf[4] = 0x90;		/* EOH_1, Form_1, FMT means audio and music */
 	buf[5] = 0xff;		/* FDF-hi */
 	buf[6] = 0xff;		/* FDF-mid */
@@ -181,7 +184,7 @@ int avc_generic_get_sig_fmt(struct fw_unit *unit, int *rate,
 		goto end;
 	/* IMPLEMENTED/STABLE is OK */
 	if ((err < 6) || (buf[0] != 0x0c)){
-		dev_err(&unit->device, "failed to get sampe rate\n");
+		dev_err(&unit->device, "failed to get sample rate\n");
 		err = -EIO;
 		goto end;
 	}
@@ -207,21 +210,20 @@ end:
 	return err;
 }
 
-int avc_generic_get_plug_info(struct fw_unit *unit,
+int avc_general_get_plug_info(struct fw_unit *unit,
 			unsigned short bus_plugs[2],
 			unsigned short ext_plugs[2])
 {
 	u8 *buf;
 	int err;
 
-	buf = kmalloc(8, GFP_KERNEL);
+	buf = kzalloc(8, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
-	memset(buf, 0xff, 8);
-	buf[0] = 0x01;
-	buf[1] = 0xff;
-	buf[2] = 0x02;
+	buf[0] = 0x01;	/* AV/C STATUS */
+	buf[1] = 0xff;	/* UNIT */
+	buf[2] = 0x02;	/* PLUG INFO */
 	buf[3] = 0x00;
 
 	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
@@ -239,25 +241,25 @@ int avc_generic_get_plug_info(struct fw_unit *unit,
 	ext_plugs[1] = buf[7];
 
 	err = 0;
-
 end:
+	kfree(buf);
 	return err;
 }
 
-int avc_ccm_get_signal_source(struct fw_unit *unit,
-		int *src_stype, int *src_sid, int *src_pid,
-		int dst_stype, int dst_sid, int dst_pid)
+int avc_ccm_get_sig_src(struct fw_unit *unit,
+			int *src_stype, int *src_sid, int *src_pid,
+			int dst_stype, int dst_sid, int dst_pid)
 {
 	int err;
 	u8 *buf;
 
-	buf = kmalloc(8, GFP_KERNEL);
+	buf = kzalloc(8, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
-	buf[0] = 0x01;	/* STATUS */
+	buf[0] = 0x01;	/* AV/C STATUS */
 	buf[1] = 0xff;	/* UNIT */
-	buf[2] = 0x1A;	/* SIGNAL SOURCE? */
+	buf[2] = 0x1A;	/* SIGNAL SOURCE */
 	buf[3] = 0x0f;
 	buf[4] = 0xff;
 	buf[5] = 0xfe;
@@ -281,20 +283,21 @@ end:
 	kfree(buf);
 	return err;
 }
-int avc_ccm_set_signal_source(struct fw_unit *unit,
-		int src_stype, int src_sid, int src_pid,
-		int dst_stype, int dst_sid, int dst_pid)
+
+int avc_ccm_set_sig_src(struct fw_unit *unit,
+			int src_stype, int src_sid, int src_pid,
+			int dst_stype, int dst_sid, int dst_pid)
 {
 	int err;
 	u8 *buf;
 
-	buf = kmalloc(8, GFP_KERNEL);
+	buf = kzalloc(8, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
-	buf[0] = 0x00;	/* CONTROL */
+	buf[0] = 0x00;	/* AV/C CONTROL */
 	buf[1] = 0xff;	/* UNIT */
-	buf[2] = 0x1A;	/* SIGNAL SOURCE? */
+	buf[2] = 0x1A;	/* SIGNAL SOURCE */
 	buf[3] = 0x0f;
 	buf[4] = (0xf8 & (src_stype << 3)) | src_sid;
 	buf[5] = 0xff & src_pid;
@@ -317,35 +320,30 @@ end:
 	return err;
 }
 
-int avc_bridgeco_get_plug_type(struct fw_unit *unit, int direction,
-			       unsigned short p_type, unsigned short p_id,
-			       int *type)
+int avc_bridgeco_get_plug_type(struct fw_unit *unit,
+			       enum snd_bebob_plug_dir pdir,
+			       enum snd_bebob_plug_unit punit,
+			       unsigned short pid,
+			       enum snd_bebob_plug_type *type)
 {
 	u8 *buf;
 	int err;
 
-	buf = kmalloc(12, GFP_KERNEL);
+	buf = kzalloc(12, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
 	buf[0] = 0x01;		/* AV/C STATUS */
-	buf[1] = 0xff;		/* unit */
-	buf[2] = 0x02;		/* opcode is PLUG INFO */
-	buf[3] = 0xC0;		/* sub function is extended for bridgeco */
-	if (direction > 0)	/* plug direction [0x00/0x01] */
-		buf[4] = 0x00;	/* input plug */
-	else
-		buf[4] = 0x01;	/* output plug */
-	buf[5]  = 0x00;		/* address mode [0x00/0x01/0x02] */
-	if (p_type > 0)		/* plug type [0x00/0x01/0x02]*/
-		buf[6] = 0x01;	/* external Plug */
-	else
-		buf[6] = 0x00;	/* PCR */
-	buf[7]  = 0xff & p_id;	/* plug id */
+	buf[1] = 0xff;		/* UNIT */
+	buf[2] = 0x02;		/* PLUG INFO */
+	buf[3] = 0xC0;		/* Extended Plug Info */
+	buf[4] = pdir;		/* plug direction */
+	buf[5] = 0x00;		/* address mode [0x00/0x01/0x02] */
+	buf[6] = punit;		/* plug unit type */
+	buf[7]  = 0xff & pid;	/* plug id */
 	buf[8]  = 0xff;		/* reserved */
 	buf[9]  = 0x00;		/* info type [0x00-0x07] */
 	buf[10] = 0x00;		/* plug type in response */
-	buf[11] = 0x00;		/* padding for quadlets */
 
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
 	if (err < 0)
@@ -364,83 +362,34 @@ end:
 	return err;
 }
 
-int avc_bridgeco_get_plug_channels(struct fw_unit *unit, int direction,
-				   unsigned short plugid, int *channels)
+int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
+				 enum snd_bebob_plug_dir pdir,
+				 unsigned short pid, u8 *buf, int len)
 {
-	u8 *buf;
-	int err;
+	int trial, err;
 
-	buf = kmalloc(12, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0] = 0x01;		/* AV/C STATUS */
-	buf[1] = 0xff;		/* unit */
-	buf[2] = 0x02;		/* opcode is PLUG INFO */
-	buf[3] = 0xC0;		/* sub function is extended for bridgeco */
-	if (direction > 0)	/* plug direction [0x00/0x01] */
-		buf[4] = 0x00;	/* input plug */
-	else
-		buf[4] = 0x01;	/* output plug */
-	buf[5] = 0x00;		/* address mode [0x00/0x01/0x02] */
-	buf[6] = 0x00;		/* plug type [0x00/0x01/0x02]*/
-	buf[7] = 0xff & plugid;	/* plug id */
-	buf[8] = 0xff;		/* reserved */
-	buf[9] = 0x02;		/* info type [0x00-0x07] */
-	buf[10] = 0x00;		/* number of channels in response */
-	buf[11] = 0x00;		/* padding for quadlets */
-
-	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
-	if (err < 0)
-		goto end;
-	/* IMPLEMENTED/STABLE is OK */
-	if ((err < 6) || (buf[0] != 0x0c)) {
-		err = -EIO;
+	/* check given buffer */
+	if ((buf == NULL) || (len < 256)) {
+		err = -EINVAL;
 		goto end;
 	}
 
-	*channels = buf[10];
-	err = 0;
-
-end:
-	kfree(buf);
-	return err;
-}
-
-int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,
-					unsigned short plugid, u8 *position)
-{
-	u8 *buf;
-	int trial, err;
-
-	/*
-	 * I cannot assume the length of return value of this command.
-	 * So here I keep the maximum length of FCP.
-	 */
-	buf = kmalloc(256, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	memset(buf, 0, 256);
-	buf[0] = 0x01;			/* AV/C STATUS */
-	buf[1] = 0xff;			/* unit */
-	buf[2] = 0x02;			/* opcode is PLUG INFO */
-	buf[3] = 0xC0;			/* sub function is extended for bridgeco */
-	if (direction > 0)	/* plug direction [0x00/0x01] */
-		buf[4] = 0x00;	/* input plug */
-	else
-		buf[4] = 0x01;	/* output plug */
-	buf[5] = 0x00;			/* address mode [0x00/0x01/0x02] */
-	buf[6] = 0x00;			/* plug type [0x00/0x01/0x02]*/
-	buf[7] = 0xff & plugid;		/* plug id */
-	buf[8] = 0xff;			/* reserved */
-	buf[9] = 0x03;			/* channel position */
+	buf[0] = 0x01;		/* AV/C STATUS */
+	buf[1] = 0xff;		/* Unit */
+	buf[2] = 0x02;		/* PLUG INFO */
+	buf[3] = 0xC0;		/* Extended Plug Info */
+	buf[4] = pdir;		/* plug direction */
+	buf[5] = 0x00;		/* address mode is 'Unit' */
+	buf[6] = 0x00;		/* plug unit type is 'ISOC'*/
+	buf[7] = 0xff & pid;	/* plug id */
+	buf[8] = 0xff;		/* reserved */
+	buf[9] = 0x03;		/* info type is 'channel position' */
 
 	/*
 	 * NOTE:
 	 * M-Audio Firewire 410 returns 0x09 (ACCEPTED) just after changing
 	 * signal format even if this command asks STATE. This is not in
-	 * the specification.
+	 * AV/C command specification.
 	 */
 	for (trial = 0; trial < BEBOB_COMMAND_MAX_TRIAL; trial++) {
 		err = fcp_avc_transaction(unit, buf, 12, buf, 256, 0);
@@ -452,66 +401,69 @@ int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,
 		} else if (buf[0] == 0x0c)
 			break;
 		else if (trial < BEBOB_COMMAND_MAX_TRIAL)
-			msleep(100);
+			msleep(BEBOB_COMMAND_WAIT_MSEC);
 		else {
 			err = -EIO;
 			goto end;
 		}
 	}
 
-	/* TODO: length should be checked. */
-	memcpy(position, buf + 10, err - 10);
+	/* strip command header */
+	memmove(buf, buf + 10, err - 10);
 	err = 0;
+end:
+	return err;
+}
 
+int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
+				       enum snd_bebob_plug_dir pdir,
+				       int pid, int cluster_id, u8 *type)
+{
+	u8 *buf;
+	int err;
+
+	/* cluster info includes characters but this module don't need it */
+	buf = kzalloc(12, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0] = 0x01;		/* AV/C STATUS */
+	buf[1] = 0xff;		/* UNIT */
+	buf[2] = 0x02;		/* PLUG INFO */
+	buf[3] = 0xc0;		/* Extended Plug Info */
+	buf[4] = pdir;		/* plug direction */
+	buf[5] = 0x00;		/* address mode is 'Unit' */
+	buf[6] = 0x00;		/* plug unit type is 'ISOC' */
+	buf[7] = 0xff & pid;	/* plug id */
+	buf[8] = 0xff;		/* reserved */
+	buf[9] = 0x07;		/* info type is 'cluster info' */
+	buf[10] = 0xff & (cluster_id + 1);	/* cluster id */
+	buf[11] = 0x00;		/* character length in response */
+
+	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
+	if (err < 0)
+		goto end;
+	else if ((err < 12) && (buf[0] != 0x0c)) {
+		err = -EIO;
+		goto end;
+	}
+
+	*type = buf[11];
+	err = 0;
 end:
 	kfree(buf);
 	return err;
 }
 
-int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit, int direction,
-				       int plugid, int cluster_id, u8 *type)
-{
-	/* cluster info includes characters for name but we don't need it */
-	u8 buf[12];
-	int err;
-
-	buf[0] = 0x01;
-	buf[1] = 0xff;
-	buf[2] = 0x02;
-	buf[3] = 0xc0;
-	if (direction > 0)	/* plug direction [0x00/0x01] */
-		buf[4] = 0x00;	/* input plug */
-	else
-		buf[4] = 0x01;	/* output plug */
-	buf[5] = 0x00;
-	buf[6] = 0x00;
-	buf[7] = 0xff & plugid;
-	buf[8] = 0xff;
-	buf[9] = 0x07;
-	buf[10] = 0xff & (cluster_id + 1);
-	buf[11] = 0x00;
-
-	err = fcp_avc_transaction(unit, buf, 12, buf, 12, 0);
-	if (err < 0)
-		; /* through */
-	else if ((err < 12) && (buf[0] != 0x0c))
-		err = -EIO;
-	else {
-		*type = buf[11];
-		err = 0;
-	}
-
-	return err;
-}
-
-int avc_bridgeco_get_plug_stream_formation_entry(struct fw_unit *unit,
-				int direction, unsigned short plugid,
-				int entryid, u8 *buf, int *len)
+int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
+				   enum snd_bebob_plug_dir pdir,
+				   unsigned short pid,
+				   int entryid, u8 *buf, int *len)
 {
 	int err;
 
-	/* check buffer parameters */
-	if ((buf == NULL) || (*len < 13)) {
+	/* check given buffer */
+	if ((buf == NULL) || (*len < 12)) {
 		err = -EINVAL;
 		goto end;
 	}
@@ -521,29 +473,38 @@ int avc_bridgeco_get_plug_stream_formation_entry(struct fw_unit *unit,
 	buf[1] = 0xff;			/* unit */
 	buf[2] = 0x2f;			/* opcode is STREAM FORMAT SUPPORT */
 	buf[3] = 0xc1;			/* COMMAND LIST, BridgeCo extension */
-	if (direction > 0)	/* plug direction [0x00/0x01] */
-		buf[4] = 0x00;	/* input plug */
-	else
-		buf[4] = 0x01;	/* output plug */
+	buf[4] = pdir;			/* plug direction */
 	buf[5] = 0x00;			/* address mode is 'Unit' */
-	buf[6] = 0x00;			/* plug type is 'PCR' */
-	buf[7] = 0xff & plugid;		/* plug ID */
+	buf[6] = 0x00;			/* plug unit type is 'ISOC' */
+	buf[7] = 0xff & pid;		/* plug ID */
 	buf[8] = 0xff;			/* reserved */
-	buf[9] = 0xff;			/* no meaning, just fill */
+	buf[9] = 0xff;			/* stream status, 0xff in request */
 	buf[10] = 0xff & entryid;	/* entry ID */
-	buf[11] = 0x00;			/* padding */
 
 	err = fcp_avc_transaction(unit, buf, 12, buf, *len, 0);
-	if ((err < 0) || (buf[0] != 0x0c))
+	if (err < 0)
 		goto end;
-	else if (err < 6) {
+	/* reach the end of entries */
+	else if (buf[0] == 0x0a) {
+		err = 0;
+		*len = 0;
+		goto end;
+	} else if (buf[0] != 0x0c) {
+		err = -EINVAL;
+		goto end;
+	/* the header of this command is 11 bytes */
+	} else if (err < 12) {
+		err = -EIO;
+		goto end;
+	} else if (buf[10] != entryid) {
 		err = -EIO;
 		goto end;
 	}
 
-	*len = err;
+	/* strip command header */
+	memmove(buf, buf + 11, err - 11);
+	*len = err - 11;
 	err = 0;
-
 end:
 	return err;
 }

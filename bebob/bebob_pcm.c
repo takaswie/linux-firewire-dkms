@@ -31,7 +31,7 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 	};
 	int i;
 
-	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
+	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i += 1) {
 		/* entry is invalid */
 		if (formations[i].pcm == 0)
 			continue;
@@ -61,7 +61,7 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 
 	int i;
 
-	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
+	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i += 1) {
 		/* entry is invalid */
 		if (formations[i].pcm == 0)
 			continue;
@@ -118,7 +118,7 @@ prepare_channels(struct snd_pcm_hardware *hw,
 {
 	int i;
 
-	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
+	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i += 1) {
 		/* entry has no PCM channels */
 		if (formations[i].pcm == 0)
 			continue;
@@ -136,7 +136,7 @@ prepare_rates(struct snd_pcm_hardware *hw,
 {
 	int i;
 
-	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
+	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i += 1) {
 		/* entry has no PCM channels */
 		if (formations[i].pcm == 0)
 			continue;

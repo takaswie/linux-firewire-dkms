@@ -57,13 +57,13 @@
 /* defined later */
 struct snd_bebob;
 
-#define SND_BEBOB_STREAM_FORMATION_ENTRIES	9
+#define SND_BEBOB_STRM_FMT_ENTRIES	9
 struct snd_bebob_stream_formation {
 	unsigned int pcm;
 	unsigned int midi;
 };
 /* this is a lookup table for index of stream formations */
-extern unsigned int snd_bebob_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES];
+extern const unsigned int snd_bebob_rate_table[SND_BEBOB_STRM_FMT_ENTRIES];
 
 /* device specific operations */
 struct snd_bebob_freq_spec {
@@ -127,9 +127,9 @@ struct snd_bebob {
 	bool loaded;
 
 	struct snd_bebob_stream_formation
-		tx_stream_formations[SND_BEBOB_STREAM_FORMATION_ENTRIES];
+		tx_stream_formations[SND_BEBOB_STRM_FMT_ENTRIES];
 	struct snd_bebob_stream_formation
-		rx_stream_formations[SND_BEBOB_STREAM_FORMATION_ENTRIES];
+		rx_stream_formations[SND_BEBOB_STRM_FMT_ENTRIES];
 
 	/* for M-Audio special devices */
 	int clk_src;
@@ -160,41 +160,67 @@ int snd_bebob_get_formation_index(int sampling_rate);
 
 /* AV/C Audio Subunit Specification 1.0 (1394TA) */
 int avc_audio_set_selector(struct fw_unit *unit, int subunit_id,
-			   int fb_id, int number);
+			   int fb_id, int num);
 int avc_audio_get_selector(struct fw_unit *unit, int subunit_id,
-			   int fb_id, int *number);
+			   int fb_id, int *num);
 
 /* AV/C Digital Interface Command Set General Specification 4.2 (1394TA) */
-int avc_generic_set_sig_fmt(struct fw_unit *unit, int rate,
-			    int direction, unsigned short plug);
-int avc_generic_get_sig_fmt(struct fw_unit *unit, int *rate,
-			    int direction, unsigned short plug);
-int avc_generic_get_plug_info(struct fw_unit *unit,
-				unsigned short bus_plugs[2],
-				unsigned short ext_plugs[2]);
+enum avc_general_plug_dir {
+	AVC_GENERAL_PLUG_DIR_IN		= 0,
+	AVC_GENERAL_PLUG_DIR_OUT	= 1,
+	AVC_GENERAL_PLUG_COUNT
+};
+int avc_general_set_sig_fmt(struct fw_unit *unit, int rate,
+			    enum avc_general_plug_dir dir,
+			    unsigned short plug);
+int avc_general_get_sig_fmt(struct fw_unit *unit, int *rate,
+			    enum avc_general_plug_dir dir,
+			    unsigned short plug);
+int avc_general_get_plug_info(struct fw_unit *unit,
+			      unsigned short bus_plugs[AVC_GENERAL_PLUG_COUNT],
+			      unsigned short ext_plugs[AVC_GENERAL_PLUG_COUNT]);
 
 /* Connection and Compatibility Management 1.0 (1394TA) */
-int avc_ccm_get_signal_source(struct fw_unit *unit,
-		int *src_stype, int *src_sid, int *src_pid,
-		int dst_stype, int dst_sid, int dst_pid);
-int avc_ccm_set_signal_source(struct fw_unit *unit,
-		int src_stype, int src_sid, int src_pid,
-		int dst_stype, int dst_sid, int dst_pid);
+int avc_ccm_get_sig_src(struct fw_unit *unit,
+			int *src_stype, int *src_sid, int *src_pid,
+			int dst_stype, int dst_sid, int dst_pid);
+int avc_ccm_set_sig_src(struct fw_unit *unit,
+			int src_stype, int src_sid, int src_pid,
+			int dst_stype, int dst_sid, int dst_pid);
 
 /* Additional AVC commands, AV/C Unit and Subunit, Revision 17 (BridgeCo.) */
-int avc_bridgeco_get_plug_channels(struct fw_unit *unit, int direction,
-				unsigned short plugid, int *channels);
-int avc_bridgeco_get_plug_channel_position(struct fw_unit *unit, int direction,
-				unsigned short plugid, u8 *position);
-int avc_bridgeco_get_plug_type(struct fw_unit *unit, int direction,
-			       unsigned short p_type, unsigned short p_id,
-			       int *type);
-int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit, int direction,
-				int plugid, int cluster_id, u8 *format);
-int avc_bridgeco_get_plug_stream_formation_entry(struct fw_unit *unit,
-				int direction, unsigned short plugid,
-				int entryid, u8 *buf, int *len);
-
+enum snd_bebob_plug_dir {
+	SND_BEBOB_PLUG_DIR_IN	= 0x00,
+	SND_BEBOB_PLUG_DIR_OUT	= 0x01
+};
+enum snd_bebob_plug_unit {
+	SND_BEBOB_PLUG_UNIT_ISOC	= 0x00,
+	SND_BEBOB_PLUG_UNIT_EXT		= 0x01,
+	SND_BEBOB_PLUG_UNIT_ASYNC	= 0x02
+};
+enum snd_bebob_plug_type {
+	SND_BEBOB_PLUG_TYPE_ISOC	= 0x00,
+	SND_BEBOB_PLUG_TYPE_ASYNC	= 0x01,
+	SND_BEBOB_PLUG_TYPE_MIDI	= 0x02,
+	SND_BEBOB_PLUG_TYPE_SYNC	= 0x03,
+	SND_BEBOB_PLUG_TYPE_ANA		= 0x04,
+	SND_BEBOB_PLUG_TYPE_DIG		= 0x05
+};
+int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
+				 enum snd_bebob_plug_dir pdir,
+				 unsigned short pid, u8 *buf, int len);
+int avc_bridgeco_get_plug_type(struct fw_unit *unit,
+			       enum snd_bebob_plug_dir pdir,
+			       enum snd_bebob_plug_unit punit,
+			       unsigned short p_id,
+			       enum snd_bebob_plug_type *type);
+int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
+				       enum snd_bebob_plug_dir pdir,
+				       int pid, int cluster_id, u8 *ctype);
+int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
+				   enum snd_bebob_plug_dir pdir,
+				   unsigned short pid,
+				   int entryid, u8 *buf, int *len);
 int snd_bebob_stream_get_rate(struct snd_bebob *bebob, int *rate);
 int snd_bebob_stream_set_rate(struct snd_bebob *bebob, int rate);
 int snd_bebob_stream_discover(struct snd_bebob *bebob);

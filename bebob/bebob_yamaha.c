@@ -81,8 +81,8 @@ end:
 }
 
 static char *clock_labels[] = {"Internal", "SPDIF"};
-
-static int clock_set(struct snd_bebob *bebob, int id)
+static int
+clock_set(struct snd_bebob *bebob, int id)
 {
 	int err, detect;
 
@@ -106,53 +106,10 @@ static int clock_set(struct snd_bebob *bebob, int id)
 end:
 	return err;
 }
-
-static int clock_get(struct snd_bebob *bebob, int *id)
+static int
+clock_get(struct snd_bebob *bebob, int *id)
 {
 	return avc_audio_get_selector(bebob->unit, 0, 4, id);
-}
-
-static int
-check_prepared(struct snd_bebob *bebob, bool *prepared)
-{
-	int err;
-	u8 *buf;
-
-	buf = kmalloc(8, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	/* NOTE: this command should be NOTIFY but use STATUS to be simple */
-	buf[0] = 0x01;	/* STATUS */
-	buf[1] = 0xFF;	/* UNIT */
-	buf[2] = 0x00;	/* Vendor Specific Command */
-	buf[3] = 0x01;
-	buf[4] = 0x02;
-	buf[5] = 0x03;
-	buf[6] = 0x21;
-	buf[7] = 0xff;	/* preparation status */
-
-	err = fcp_avc_transaction(bebob->unit, buf, 8, buf, 8, 0);
-	if (err < 0)
-		goto end;
-	/* TOOD: */
-	if ((err < 6) || (buf[0] != 0x0c)) {
-		dev_err(&bebob->unit->device,
-			"failed to get preparation status by Yamaha command");
-		err = -EIO;
-		goto end;
-	}
-
-	/*
-	 * Just after changing sampling rate or formation of stream, this value
-	 * becomes 0xff. When the device is prepared, this value bacomes 0x00.
-	 * Once stream starts, this value becomes 0x01 and keep till next
-	 * changing.
-	 */
-	*prepared = (buf[7] != 0xff);
-end:
-	kfree(buf);
-	return true;
 }
 static int
 clock_synced(struct snd_bebob *bebob, bool *synced)

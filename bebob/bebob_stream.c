@@ -31,10 +31,10 @@
  * 'M-Audio Firewire 410'.
  */
 
-/* 128 is an arbitrary number but it's enough */
-#define FORMATION_MAXIMUM_LENGTH 128
+/* 128 is an arbitrary length but it seems to be enough */
+#define FORMAT_MAXIMUM_LENGTH 128
 
-unsigned int snd_bebob_rate_table[SND_BEBOB_STREAM_FORMATION_ENTRIES] = {
+const unsigned int snd_bebob_rate_table[SND_BEBOB_STRM_FMT_ENTRIES] = {
 	[0] = 22050,
 	[1] = 24000,
 	[2] = 32000,
@@ -63,11 +63,13 @@ snd_bebob_stream_get_rate(struct snd_bebob *bebob, int *curr_rate)
 {
 	int err, tx_rate, rx_rate;
 
-	err = avc_generic_get_sig_fmt(bebob->unit, &tx_rate, 0, 0);
+	err = avc_general_get_sig_fmt(bebob->unit, &tx_rate, 
+				      AVC_GENERAL_PLUG_DIR_OUT, 0);
 	if (err < 0)
 		goto end;
 
-	err = avc_generic_get_sig_fmt(bebob->unit, &rx_rate, 1, 0);
+	err = avc_general_get_sig_fmt(bebob->unit, &rx_rate,
+				      AVC_GENERAL_PLUG_DIR_IN, 0);
 	if (err < 0)
 		goto end;
 
@@ -76,7 +78,8 @@ snd_bebob_stream_get_rate(struct snd_bebob *bebob, int *curr_rate)
 		goto end;
 
 	/* synchronize receive stream rate to transmit stream rate */
-	err = avc_generic_set_sig_fmt(bebob->unit, rx_rate, 0, 0);
+	err = avc_general_set_sig_fmt(bebob->unit, rx_rate,
+				      AVC_GENERAL_PLUG_DIR_IN, 0);
 end:
 	return err;
 }
@@ -87,14 +90,12 @@ snd_bebob_stream_set_rate(struct snd_bebob *bebob, int rate)
 	int err;
 
 	/* move to strem_start? */
-	err = avc_generic_set_sig_fmt(bebob->unit, rate, 0, 0);
+	err = avc_general_set_sig_fmt(bebob->unit, rate,
+				      AVC_GENERAL_PLUG_DIR_OUT, 0);
 	if (err < 0)
 		goto end;
-	err = avc_generic_set_sig_fmt(bebob->unit, rate, 1, 0);
-	if (err < 0)
-		goto end;
-
-	/* TODO: notify */
+	err = avc_general_set_sig_fmt(bebob->unit, rate,
+				      AVC_GENERAL_PLUG_DIR_IN, 0);
 end:
 	return err;
 }
@@ -103,10 +104,14 @@ int snd_bebob_stream_map(struct snd_bebob *bebob,
 			 struct amdtp_stream *stream)
 {
 	unsigned int cl, ch, clusters, channels, pos, pcm, midi;
-	u8 *buf, type;
-	int dir, err;
+	u8 *buf, ctype;
+	enum snd_bebob_plug_dir dir;
+	int err;
 
-	/* maybe 256 is enough... */
+	/*
+	 * The length of return value of this command cannot be assumed. Here
+	 * keep the maximum length of AV/C command which defined specification.
+	 */
 	buf = kzalloc(256, GFP_KERNEL);
 	if (buf == NULL) {
 		err = -ENOMEM;
@@ -114,12 +119,11 @@ int snd_bebob_stream_map(struct snd_bebob *bebob,
 	}
 
 	if (stream == &bebob->tx_stream)
-		dir = 0;
+		dir = SND_BEBOB_PLUG_DIR_OUT;
 	else
-		dir = 1;
+		dir = SND_BEBOB_PLUG_DIR_IN;
 
-	err = avc_bridgeco_get_plug_channel_position(bebob->unit,
-						     dir, 0, buf);
+	err = avc_bridgeco_get_plug_ch_pos(bebob->unit, dir, 0, buf, 256);
 	if (err < 0)
 		goto end;
 
@@ -129,7 +133,7 @@ int snd_bebob_stream_map(struct snd_bebob *bebob,
 	midi = 0;
 	for (cl = 0; cl < clusters; cl++) {
 		err = avc_bridgeco_get_plug_cluster_type(bebob->unit, dir, 0,
-							 cl, &type);
+							 cl, &ctype);
 		if (err < 0)
 			goto end;
 
@@ -137,7 +141,7 @@ int snd_bebob_stream_map(struct snd_bebob *bebob,
 		buf++;
 		for (ch = 0; ch < channels; ch++) {
 			pos = *buf - 1;
-			if (type != 0x0a)
+			if (ctype != 0x0a)
 				stream->pcm_positions[pcm++] = pos;
 			else
 				stream->midi_positions[midi++] = pos;
@@ -190,11 +194,8 @@ make_both_connections(struct snd_bebob *bebob, int rate)
 		goto end;
 	err = cmp_connection_establish(&bebob->in_conn,
 				amdtp_stream_get_max_payload(&bebob->rx_stream));
-	if (err < 0) {
+	if (err < 0)
 		cmp_connection_break(&bebob->out_conn);
-		goto end;
-	}
-
 end:
 	return err;
 }
@@ -468,7 +469,7 @@ int snd_bebob_get_formation_index(int rate)
 {
 	int i;
 
-	for (i = 0; i < SND_BEBOB_STREAM_FORMATION_ENTRIES; i += 1) {
+	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i += 1) {
 		if (snd_bebob_rate_table[i] == rate)
 			return i;
 	}
@@ -479,25 +480,24 @@ static void
 set_stream_formation(u8 *buf, int len,
 		     struct snd_bebob_stream_formation *formation)
 {
-	int channels, format;
-	int e;
+	int e, channels, format;
 
-	for (e = 0; e < buf[4]; e += 1) {
-		channels = buf[5 + e * 2];
-		format = buf[6 + e * 2];
+	for (e = 0; e < buf[3]; e += 1) {
+		channels = buf[4 + e * 2];
+		format = buf[5 + e * 2];
 
 		switch (format) {
 		/* PCM for IEC 60958-3 */
 		case 0x00:
-		/* PCM for IEC 61883-3 to 7 */
+		/* PCM for IEC 61937-3 to 7 */
 		case 0x01:
 		case 0x02:
 		case 0x03:
 		case 0x04:
 		case 0x05:
 		/* PCM for Multi bit linear audio */
-		case 0x06:
-		case 0x07:
+		case 0x06:	/* raw */
+		case 0x07:	/* DVD-Audio */
 			formation->pcm += channels;
 			break;
 		/* MIDI comformant (MMA/AMEI RP-027) */
@@ -513,10 +513,10 @@ set_stream_formation(u8 *buf, int len,
 }
 
 static int
-fill_stream_formations(struct snd_bebob *bebob,
-		       int direction, unsigned short plugid)
+fill_stream_formations(struct snd_bebob *bebob, enum snd_bebob_plug_dir dir,
+		       unsigned short pid)
 {
-	int freq_table[] = {
+	static const unsigned int freq_table[] = {
 		[0x00] = 0,	/*  22050 */
 		[0x01] = 1,	/*  24000 */
 		[0x02] = 2,	/*  32000 */
@@ -530,55 +530,49 @@ fill_stream_formations(struct snd_bebob *bebob,
 
 	u8 *buf;
 	struct snd_bebob_stream_formation *formations;
-	int index;
-	int len;
-	int e, i;
-	int err;
+	int i, index, len, eid, err;
 
-	buf = kmalloc(FORMATION_MAXIMUM_LENGTH, GFP_KERNEL);
+	buf = kmalloc(FORMAT_MAXIMUM_LENGTH, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
-	if (direction > 0)
+	if (dir > 0)
 		formations = bebob->rx_stream_formations;
 	else
 		formations = bebob->tx_stream_formations;
 
-	for (e = 0, index = 0; e < 9; e += 1) {
-		len = FORMATION_MAXIMUM_LENGTH;
-		/* get entry */
+	for (eid = 0, index = 0; eid < SND_BEBOB_STRM_FMT_ENTRIES; eid++) {
+		len = FORMAT_MAXIMUM_LENGTH;
+
 		memset(buf, 0, len);
-		err = avc_bridgeco_get_plug_stream_formation_entry(bebob->unit, direction, plugid, e, buf, &len);
+		err = avc_bridgeco_get_plug_strm_fmt(bebob->unit, dir, pid,
+						     eid, buf, &len);
 		if (err < 0)
 			goto end;
-		/* reach the end of entries */
-		else if (buf[0] != 0x0c)
+		else if (len < 3)
 			break;
 		/*
 		 * this module can support a hierarchy combination that:
 		 *  Root:	Audio and Music (0x90)
 		 *  Level 1:	AM824 Compound  (0x40)
 		 */
-		else if ((buf[11] != 0x90) || (buf[12] != 0x40))
-			break;
-		/* check formation length */
-		else if (len < 1)
+		else if ((buf[0] != 0x90) || (buf[1] != 0x40))
 			break;
 
-		/* formation information includes own value for sampling rate. */
-		if ((buf[13] > 0x07) && (buf[13] != 0x0a))
-			break;
+		/* check sampling rate */
+		index = -1;
 		for (i = 0; i < sizeof(freq_table); i += 1) {
-			if (i == buf[13])
+			if (i == buf[2])
 				index = freq_table[i];
 		}
+		if (index < 0)
+			break;
 
 		/* parse and set stream formation */
-		set_stream_formation(buf + 11, len - 11, &formations[index]);
-	};
+		set_stream_formation(buf, len, &formations[index]);
+	}
 
 	err = 0;
-
 end:
 	kfree(buf);
 	return err;
@@ -588,33 +582,48 @@ end:
 int snd_bebob_stream_discover(struct snd_bebob *bebob)
 {
 	/* the number of plugs for input and output */
-	unsigned short bus_plugs[2];
-	unsigned short ext_plugs[2];
-	int type, i;
-	int err;
+	unsigned short bus_plugs[AVC_GENERAL_PLUG_COUNT];
+	unsigned short ext_plugs[AVC_GENERAL_PLUG_COUNT];
+	enum snd_bebob_plug_type type;
+	int i, err;
 
-	err = avc_generic_get_plug_info(bebob->unit, bus_plugs, ext_plugs);
+	err = avc_general_get_plug_info(bebob->unit, bus_plugs, ext_plugs);
 	if (err < 0)
 		goto end;
 
 	/*
-	 * This module supports one PCR input plug and one PCR output plug
+	 * This module supports one ISOC input plug and one ISOC output plug
 	 * then ignores the others.
 	 */
-	for (i = 0; i < 2; i += 1) {
-		if (bus_plugs[i]  == 0) {
-			err = -EIO;
-			goto end;
-		}
-
-		err = avc_bridgeco_get_plug_type(bebob->unit, i, 0, 0, &type);
-		if (err < 0)
-			goto end;
-		else if (type != 0x00) {
-			err = -EIO;
-			goto end;
-		}
+	if (bus_plugs[AVC_GENERAL_PLUG_DIR_IN] == 0) {
+		err = -EIO;
+		goto end;
 	}
+	err = avc_bridgeco_get_plug_type(bebob->unit,
+					 SND_BEBOB_PLUG_DIR_IN,
+					 SND_BEBOB_PLUG_UNIT_ISOC,
+					 0, &type);
+	if (err < 0)
+		goto end;
+	else if (type != SND_BEBOB_PLUG_TYPE_ISOC) {
+		err = -EIO;
+		goto end;
+	}
+
+	if (bus_plugs[AVC_GENERAL_PLUG_DIR_OUT] == 0) {
+		err = -EIO;
+		goto end;
+	}
+	err = avc_bridgeco_get_plug_type(bebob->unit,
+					 SND_BEBOB_PLUG_DIR_OUT,
+					 SND_BEBOB_PLUG_UNIT_ISOC,
+					 0, &type);
+	if (err < 0)
+		goto end;
+	else if (type != SND_BEBOB_PLUG_TYPE_ISOC) {
+		err = -EIO;
+		goto end;
+	}	
 
 	/* store formations */
 	for (i = 0; i < 2; i += 1) {
@@ -626,23 +635,27 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 	/* count external input plugs for MIDI */
 	bebob->midi_input_ports = 0;
 	for (i = 0; i < ext_plugs[0]; i++) {
-		err = avc_bridgeco_get_plug_type(bebob->unit, 1, 1, i, &type);
+		err = avc_bridgeco_get_plug_type(bebob->unit,
+						 SND_BEBOB_PLUG_DIR_IN,
+						 SND_BEBOB_PLUG_UNIT_EXT,
+						 i, &type);
 		if (err < 0)
 			goto end;
-		else if (type == 0x02)
+		else if (type == SND_BEBOB_PLUG_TYPE_MIDI)
 			bebob->midi_input_ports++;
-		snd_printk(KERN_INFO"in: %d %d\n", i, type);
 	}
 
 	/* count external output plugs for MIDI */
 	bebob->midi_output_ports = 0;
 	for (i = 0; i < ext_plugs[1]; i++) {
-		err = avc_bridgeco_get_plug_type(bebob->unit, 0, 1, i, &type);
+		err = avc_bridgeco_get_plug_type(bebob->unit,
+						 SND_BEBOB_PLUG_DIR_OUT,
+						 SND_BEBOB_PLUG_UNIT_EXT,
+						 i, &type);
 		if (err < 0)
 			goto end;
-		else if (type == 0x02)
+		else if (type == SND_BEBOB_PLUG_TYPE_MIDI)
 			bebob->midi_output_ports++;
-		snd_printk(KERN_INFO"out: %d %d\n", i, type);
 	}
 
 	err = 0;
