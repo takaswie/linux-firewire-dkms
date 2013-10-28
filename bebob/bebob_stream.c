@@ -482,9 +482,9 @@ set_stream_formation(u8 *buf, int len,
 {
 	int e, channels, format;
 
-	for (e = 0; e < buf[3]; e += 1) {
-		channels = buf[4 + e * 2];
-		format = buf[5 + e * 2];
+	for (e = 0; e < buf[4]; e += 1) {
+		channels = buf[5 + e * 2];
+		format = buf[6 + e * 2];
 
 		switch (format) {
 		/* PCM for IEC 60958-3 */
@@ -536,7 +536,7 @@ fill_stream_formations(struct snd_bebob *bebob, enum snd_bebob_plug_dir dir,
 	if (buf == NULL)
 		return -ENOMEM;
 
-	if (dir > 0)
+	if (dir == SND_BEBOB_PLUG_DIR_IN)
 		formations = bebob->rx_stream_formations;
 	else
 		formations = bebob->tx_stream_formations;
