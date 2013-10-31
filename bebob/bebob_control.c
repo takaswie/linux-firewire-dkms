@@ -218,6 +218,9 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 	msleep(100);
 	changed = 1;
 
+	if (bebob->spec->clock->ctl_id)
+		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
+			       bebob->spec->clock->ctl_id);
 end:
 	mutex_unlock(&bebob->mutex);
 	return changed;

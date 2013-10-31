@@ -20,10 +20,10 @@
 /*
  * NOTE:
  * Yamaha GO44 is not considered to be used as stand-alone mixer. So any streams
- * should be accompanied. If changing the state, a LED on the device starts to
- * blink and sound nothins even if streaming. There seems to be one way to
- * revocer this state, just power-off. GO46 is better for this purpose,
- * stand-alone mixer.
+ * must be accompanied. If changing the state, a LED on the device starts to
+ * blink and its sync status is false. In this state, the device sounds nothing
+ * even if streaming. To start streaming at the current sampling rate is only
+ * way to revocer this state. GO46 is better for stand-alone mixer.
  *
  * Both of them have a capability to change its sampling rate up to 192.0kHz.
  * At 192.0kHz, the device reports 4 PCM-in, 1 MIDI-in, 6 PCM-out, 1 MIDI-out.
@@ -54,7 +54,7 @@ detect_dig_in(struct snd_bebob *bebob, int *detect)
 	buf[3]  = 0x00;	/* Company ID high */
 	buf[4]  = 0x07;	/* Company ID middle */
 	buf[5]  = 0xf5;	/* Company ID low */
-	buf[6]  = 0x00;	/* subfunction */
+	buf[6]  = 0x00;	/* unknown subfunction */
 	buf[7]  = 0x00;	/* Unknown */
 	buf[8]  = 0x01; /* Unknown */
 	buf[9]  = 0x00;	/* Unknown */
@@ -77,6 +77,43 @@ detect_dig_in(struct snd_bebob *bebob, int *detect)
 	*detect = (buf[9] > 0);
 	err = 0;
 end:
+	return err;
+}
+
+static int
+get_sync_status(struct snd_bebob *bebob, bool *sync)
+{
+	u8 *buf;
+	int err;
+
+	buf = kmalloc(8, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0] = 0x01;  /* AV/C STATUS */
+	buf[1] = 0xFF;  /* UNIT */
+	buf[2] = 0x00;  /* Vendor Specific Command */
+	buf[3] = 0x01;	/* Company ID high */
+	buf[4] = 0x02;	/* Company ID middle */
+	buf[5] = 0x03;	/* Company ID low */
+	buf[6] = 0x21;	/* unknown subfunction */
+	buf[7] = 0xff;  /* status */
+
+	err = fcp_avc_transaction(bebob->unit, buf, 8, buf, 8, 0);
+	if (err < 0)
+		goto end;
+	if ((err < 6) || (buf[0] != 0x0c)) {
+		dev_err(&bebob->unit->device,
+			"failed to get sync status\n");
+		err = -EIO;
+		goto end;
+	}
+
+	/* 0x00 if losing sync */
+	*sync = (buf[7] != 0x00);
+	err = 0;
+end:
+	kfree(buf);
 	return err;
 }
 
@@ -114,9 +151,7 @@ clock_get(struct snd_bebob *bebob, int *id)
 static int
 clock_synced(struct snd_bebob *bebob, bool *synced)
 {
-	/* because the clock is changable when detecting digital input */
-	*synced = true;
-	return 0;
+	return get_sync_status(bebob, synced);
 }
 
 static struct snd_bebob_freq_spec freq_spec = {
