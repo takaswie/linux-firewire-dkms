@@ -50,7 +50,7 @@
  * of commands. Please see FFADO if you want to see whole commands.
  */
 
-struct efc_fields {
+struct efc_header {
 	u32 length;
 	u32 version;
 	u32 seqnum;
@@ -157,7 +157,7 @@ efc(struct snd_efw *efw, unsigned int category,
 
 	unsigned int cmdbuf_bytes;
 	__be32 *cmdbuf;
-	struct efc_fields *efc_fields;
+	struct efc_header *header;
 	u32 seqnum;
 	unsigned int i;
 
@@ -180,17 +180,17 @@ efc(struct snd_efw *efw, unsigned int category,
 	spin_unlock(&efw->lock);
 
 	/* fill efc fields */
-	efc_fields		= (struct efc_fields *)cmdbuf;
-	efc_fields->length	= EFC_HEADER_QUADLETS + param_count;
-	efc_fields->version	= 1;
-	efc_fields->seqnum	= seqnum;
-	efc_fields->category	= category;
-	efc_fields->command	= command;
-	efc_fields->retval	= 0;
+	header			= (struct efc_header *)cmdbuf;
+	header->length		= EFC_HEADER_QUADLETS + param_count;
+	header->version		= 1;
+	header->seqnum		= seqnum;
+	header->category	= category;
+	header->command		= command;
+	header->retval		= 0;
 
 	/* fill EFC parameters */
 	for (i = 0; i < param_count; i++)
-		efc_fields->params[i] = params[i];
+		header->params[i] = params[i];
 
 	/* for endian-ness*/
 	for (i = 0; i < (cmdbuf_bytes / 4); i++)
@@ -207,13 +207,13 @@ efc(struct snd_efw *efw, unsigned int category,
 		cmdbuf[i] = be32_to_cpu(cmdbuf[i]);
 
 	/* check EFC response fields */
-	if ((efc_fields->version < 1) ||
-	    (efc_fields->category != category) ||
-	    (efc_fields->command != command) ||
-	    (efc_fields->retval != EFC_RETVAL_OK)) {
+	if ((header->version < 1) ||
+	    (header->category != category) ||
+	    (header->command != command) ||
+	    (header->retval != EFC_RETVAL_OK)) {
 		dev_err(&efw->unit->device, "EFC failed [%u/%u]: %s\n",
-			efc_fields->category, efc_fields->command,
-			efc_retval_names[efc_fields->retval]);
+			header->category, header->command,
+			efc_retval_names[header->retval]);
 		err = -EIO;
 		goto end;
 	}
@@ -221,8 +221,8 @@ efc(struct snd_efw *efw, unsigned int category,
 	/* fill response buffer */
 	if (response != NULL) {
 		memset(response, 0, response_quadlets * 4);
-		response_quadlets = min(response_quadlets, efc_fields->length);
-		memcpy(response, efc_fields->params, response_quadlets * 4);
+		response_quadlets = min(response_quadlets, header->length);
+		memcpy(response, header->params, response_quadlets * 4);
 	}
 
 	err = 0;
@@ -527,12 +527,19 @@ efc_response(struct fw_card *card, struct fw_request *request,
 {
 	struct efc_transaction *t;
 	unsigned long flags;
+	int rcode;
 	u32 seqnum;
 
-	if (length < 1)
-		return;
+	rcode = -1;
+	if (length < sizeof(struct efc_header)) {
+		rcode = RCODE_DATA_ERROR;
+		goto end;
+	} else if (offset != INITIAL_MEMORY_SPACE_EFC_RESPONSE) {
+		rcode = RCODE_ADDRESS_ERROR;
+		goto end;
+	}
 
-	seqnum = be32_to_cpu(((struct efc_fields *)data)->seqnum);
+	seqnum = be32_to_cpu(((struct efc_header *)data)->seqnum);
 
 	spin_lock_irqsave(&transactions_lock, flags);
 	list_for_each_entry(t, &transactions, list) {
@@ -549,9 +556,16 @@ efc_response(struct fw_card *card, struct fw_request *request,
 			t->size = min((unsigned int)length, t->size);
 			memcpy(t->buffer, data, t->size);
 			wake_up(&t->wait);
+			rcode = RCODE_COMPLETE;
 		}
 	}
 	spin_unlock_irqrestore(&transactions_lock, flags);
+
+	/* invalid transaction */
+	if (rcode < 0)
+		rcode = RCODE_TYPE_ERROR;
+end:
+	fw_send_response(card, request, rcode);
 }
 
 void snd_efw_command_bus_reset(struct fw_unit *unit)
