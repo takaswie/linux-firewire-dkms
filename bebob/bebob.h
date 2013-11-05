@@ -145,7 +145,7 @@ snd_bebob_read_block(struct snd_bebob *bebob, u64 addr, void *buf, int size)
 {
 	return snd_fw_transaction(bebob->unit, TCODE_READ_BLOCK_REQUEST,
 				  BEBOB_ADDR_REG_INFO + addr,
-				  buf, size);
+				  buf, size, 0);
 }
 
 static inline int
@@ -153,7 +153,7 @@ snd_bebob_read_quad(struct snd_bebob *bebob, u64 addr, void *buf, int size)
 {
 	return snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
 				  BEBOB_ADDR_REG_INFO + addr,
-				  buf, size);
+				  buf, size, 0);
 }
 
 int snd_bebob_get_formation_index(int sampling_rate);

@@ -58,7 +58,7 @@ saffire_read_block(struct snd_bebob *bebob, u64 offset, u32 *buf, int size)
 
 	err =  snd_fw_transaction(bebob->unit, TCODE_READ_BLOCK_REQUEST,
 				  SAFFIRE_ADDRESS_BASE + offset,
-				  tmp, size);
+				  tmp, size, 0);
 	if (err < 0)
 		goto end;
 
@@ -76,7 +76,7 @@ saffire_read_quad(struct snd_bebob *bebob, u64 offset, u32 *value)
 
 	err = snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
 				 SAFFIRE_ADDRESS_BASE + offset,
-				 &tmp, sizeof(u32));
+				 &tmp, sizeof(u32), 0);
 	if (err < 0)
 		goto end;
 
@@ -92,7 +92,7 @@ saffire_write_quad(struct snd_bebob *bebob, u64 offset, u32 value)
 
 	return snd_fw_transaction(bebob->unit, TCODE_WRITE_QUADLET_REQUEST,
 				  SAFFIRE_ADDRESS_BASE + offset,
-				  &value, sizeof(u32));
+				  &value, sizeof(u32), 0);
 }
 
 static char *saffirepro_26_clock_labels[] = {

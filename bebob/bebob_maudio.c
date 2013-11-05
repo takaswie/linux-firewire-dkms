@@ -210,7 +210,7 @@ get_meter(struct snd_bebob *bebob, void *buf, int size)
 {
 	return snd_fw_transaction(bebob->unit, TCODE_READ_BLOCK_REQUEST,
 				  MAUDIO_SPECIFIC_ADDRESS + METER_OFFSET,
-				  buf, size);
+				  buf, size, 0);
 }
 
 /*

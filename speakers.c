@@ -188,7 +188,7 @@ static int fwspk_close(struct snd_pcm_substream *substream)
 
 static void fwspk_stop_stream(struct fwspk *fwspk)
 {
-	if (fwspk->stream_running) {
+	if (amdtp_stream_running(&fwspk->stream)) {
 		amdtp_stream_stop(&fwspk->stream);
 		cmp_connection_break(&fwspk->connection);
 		fwspk->stream_running = false;
@@ -246,11 +246,13 @@ static int fwspk_hw_params(struct snd_pcm_substream *substream,
 	if (err < 0)
 		goto error;
 
-	amdtp_stream_set_params(&fwspk->stream, params_rate(hw_params),
-				params_channels(hw_params), 0);
+	amdtp_stream_set_parameters(&fwspk->stream,
+				    params_rate(hw_params),
+				    params_channels(hw_params),
+				    0);
 
 	amdtp_stream_set_pcm_format(&fwspk->stream,
-					params_format(hw_params));
+				    params_format(hw_params));
 
 	err = fwspk_set_rate(fwspk, fwspk->stream.sfc);
 	if (err < 0)
@@ -285,15 +287,15 @@ static int fwspk_prepare(struct snd_pcm_substream *substream)
 	if (amdtp_streaming_error(&fwspk->stream))
 		fwspk_stop_stream(fwspk);
 
-	if (!fwspk->stream_running) {
+	if (!amdtp_stream_running(&fwspk->stream)) {
 		err = cmp_connection_establish(&fwspk->connection,
 			amdtp_stream_get_max_payload(&fwspk->stream));
 		if (err < 0)
 			goto err_mutex;
 
 		err = amdtp_stream_start(&fwspk->stream,
-					fwspk->connection.resources.channel,
-					fwspk->connection.speed);
+					 fwspk->connection.resources.channel,
+					 fwspk->connection.speed);
 		if (err < 0)
 			goto err_connection;
 
@@ -363,7 +365,6 @@ static int fwspk_create_pcm(struct fwspk *fwspk)
 	pcm->private_data = fwspk;
 	strcpy(pcm->name, fwspk->device_info->short_name);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &ops);
-
 	return 0;
 }
 
@@ -648,7 +649,7 @@ static u32 fwspk_read_firmware_version(struct fw_unit *unit)
 	int err;
 
 	err = snd_fw_transaction(unit, TCODE_READ_QUADLET_REQUEST,
-				 OXFORD_FIRMWARE_ID_ADDRESS, &data, 4);
+				 OXFORD_FIRMWARE_ID_ADDRESS, &data, 4, 0);
 	return err >= 0 ? be32_to_cpu(data) : 0;
 }
 
