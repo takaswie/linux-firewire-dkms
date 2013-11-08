@@ -232,6 +232,7 @@ snd_bebob_probe(struct fw_unit *unit,
 	bebob->spec = spec;
 	mutex_init(&bebob->mutex);
 	spin_lock_init(&bebob->lock);
+	init_waitqueue_head(&bebob->hwdep_wait);
 
 	if (!bebob->spec->discover)
 		goto error;
@@ -262,6 +263,10 @@ snd_bebob_probe(struct fw_unit *unit,
 		if (err < 0)
 			goto error;
 	}
+
+	err = snd_bebob_create_hwdep_device(bebob);
+	if (err < 0)
+		goto error;
 
 	err = snd_bebob_stream_init_duplex(bebob);
 	if (err < 0)

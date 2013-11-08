@@ -334,6 +334,7 @@ static int snd_efw_probe(struct fw_unit *unit,
 	efw->card_index = -1;
 	mutex_init(&efw->mutex);
 	spin_lock_init(&efw->lock);
+	init_waitqueue_head(&efw->hwdep_wait);
 
 	/* get hardware information */
 	err = get_hardware_info(efw);
@@ -364,6 +365,10 @@ static int snd_efw_probe(struct fw_unit *unit,
 		if (err < 0)
 			goto error;
 	}
+
+	err = snd_efw_create_hwdep_device(efw);
+	if (err < 0)
+		goto error;
 
 	err = snd_efw_stream_init_duplex(efw);
 	if (err < 0)

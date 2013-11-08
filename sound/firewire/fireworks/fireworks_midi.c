@@ -26,16 +26,26 @@
 static int midi_capture_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw *efw = substream->rmidi->private_data;
+	int err;
+
+	err = snd_efw_stream_lock_try(efw);
+	if (err < 0)
+		goto end;
 
 	snd_efw_stream_start_duplex(efw, &efw->tx_stream, 0);
 	amdtp_stream_midi_add(&efw->tx_stream, substream);
-
-	return 0;
+end:
+	return err;
 }
 
 static int midi_playback_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw *efw = substream->rmidi->private_data;
+	int err;
+
+	err = snd_efw_stream_lock_try(efw);
+	if (err < 0)
+		goto end;
 
 	snd_efw_stream_start_duplex(efw, &efw->rx_stream, 0);
 	amdtp_stream_midi_add(&efw->rx_stream, substream);
@@ -44,8 +54,8 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 	 * in an AMDTP packet.
 	 */
 	efw->rx_stream.blocks_for_midi = 8;
-
-	return 0;
+end:
+	return err;
 }
 
 static int midi_capture_close(struct snd_rawmidi_substream *substream)
@@ -54,6 +64,7 @@ static int midi_capture_close(struct snd_rawmidi_substream *substream)
 
 	amdtp_stream_midi_remove(&efw->tx_stream, substream);
 	snd_efw_stream_stop_duplex(efw);
+	snd_efw_stream_lock_release(efw);
 
 	return 0;
 }
@@ -64,6 +75,7 @@ static int midi_playback_close(struct snd_rawmidi_substream *substream)
 
 	amdtp_stream_midi_remove(&efw->rx_stream, substream);
 	snd_efw_stream_stop_duplex(efw);
+	snd_efw_stream_lock_release(efw);
 
 	return 0;
 }

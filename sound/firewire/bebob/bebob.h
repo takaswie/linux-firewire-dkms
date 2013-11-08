@@ -18,6 +18,7 @@
 #ifndef SOUND_BEBOB_H_INCLUDED
 #define SOUND_BEBOB_H_INCLUDED
 
+#include <linux/compat.h>
 #include <linux/device.h>
 #include <linux/firewire.h>
 #include <linux/firewire-constants.h>
@@ -26,12 +27,17 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 
+/* TODO: when mering to upstream, this path should be changed. */
+#include "../../../include/uapi/sound/asound.h"
+#include "../../../include/uapi/sound/firewire.h"
+
 #include <sound/core.h>
 #include <sound/initval.h>
 #include <sound/control.h>
 #include <sound/rawmidi.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
+#include <sound/hwdep.h>
 #include <sound/info.h>
 #include <sound/tlv.h>
 
@@ -138,6 +144,11 @@ struct snd_bebob {
 	int in_dig_iface;
 	int clk_lock;
 	bool maudio_special_quirk;
+
+	/* for uapi */
+	int dev_lock_count;
+	bool dev_lock_changed;
+	wait_queue_head_t hwdep_wait;
 };
 
 static inline int
@@ -233,6 +244,12 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob);
 void snd_bebob_stream_update_duplex(struct snd_bebob *bebob);
 void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob);
+void snd_bebob_stream_lock_changed(struct snd_bebob *bebob);
+int snd_bebob_stream_lock_try(struct snd_bebob *bebob);
+void snd_bebob_stream_lock_release(struct snd_bebob *bebob);
+
+/* for hwdep component */
+int snd_bebob_create_hwdep_device(struct snd_bebob *bebob);
 
 int snd_bebob_create_pcm_devices(struct snd_bebob *bebob);
 

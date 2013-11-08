@@ -24,26 +24,31 @@
 static int midi_capture_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_bebob *bebob = substream->rmidi->private_data;
+	int err;
+
+	err = snd_bebob_stream_lock_try(bebob);
+	if (err < 0)
+		goto end;
 
 	snd_bebob_stream_start_duplex(bebob, &bebob->tx_stream, 0);
 	amdtp_stream_midi_add(&bebob->tx_stream, substream);
-
-	return 0;
+end:
+	return err;
 }
 
 static int midi_playback_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_bebob *bebob = substream->rmidi->private_data;
+	int err;
+
+	err = snd_bebob_stream_lock_try(bebob);
+	if (err < 0)
+		goto end;
 
 	snd_bebob_stream_start_duplex(bebob, &bebob->rx_stream, 0);
 	amdtp_stream_midi_add(&bebob->rx_stream, substream);
-	/*
-	 * Fireworks ignores MIDI messages in greater than first 8 data blocks
-	 * in an AMDTP packet.
-	 */
-	bebob->rx_stream.blocks_for_midi = 8;
-
-	return 0;
+end:
+	return err;
 }
 
 static int midi_capture_close(struct snd_rawmidi_substream *substream)
@@ -52,6 +57,7 @@ static int midi_capture_close(struct snd_rawmidi_substream *substream)
 
 	amdtp_stream_midi_remove(&bebob->tx_stream, substream);
 	snd_bebob_stream_stop_duplex(bebob);
+	snd_bebob_stream_lock_release(bebob);
 
 	return 0;
 }
@@ -62,6 +68,7 @@ static int midi_playback_close(struct snd_rawmidi_substream *substream)
 
 	amdtp_stream_midi_remove(&bebob->rx_stream, substream);
 	snd_bebob_stream_stop_duplex(bebob);
+	snd_bebob_stream_lock_release(bebob);
 
 	return 0;
 }

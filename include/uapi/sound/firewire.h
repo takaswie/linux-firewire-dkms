@@ -34,6 +34,8 @@ union snd_firewire_event {
 #define SNDRV_FIREWIRE_IOCTL_UNLOCK    _IO('H', 0xfa)
 
 #define SNDRV_FIREWIRE_TYPE_DICE	1
+#define SNDRV_FIREWIRE_TYPE_FIREWORKS	2
+#define SNDRV_FIREWIRE_TYPE_BEBOB	3
 /* Fireworks, AV/C, RME, MOTU, ... */
 
 struct snd_firewire_get_info {

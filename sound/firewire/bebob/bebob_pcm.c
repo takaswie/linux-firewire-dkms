@@ -236,15 +236,19 @@ pcm_open(struct snd_pcm_substream *substream)
 	struct snd_bebob_freq_spec *freq = bebob->spec->freq;
 	int sampling_rate, err;
 
-	err = pcm_init_hw_params(bebob, substream);
+	err = snd_bebob_stream_lock_try(bebob);
 	if (err < 0)
 		goto end;
+
+	err = pcm_init_hw_params(bebob, substream);
+	if (err < 0)
+		goto err_locked;
 
 	if (amdtp_stream_pcm_running(&bebob->tx_stream) ||
 	    amdtp_stream_pcm_running(&bebob->rx_stream)) {
 		err = freq->get(bebob, &sampling_rate);
 		if (err < 0)
-			goto end;
+			goto err_locked;
 
 		substream->runtime->hw.rate_min = sampling_rate;
 		substream->runtime->hw.rate_max = sampling_rate;
@@ -254,11 +258,16 @@ pcm_open(struct snd_pcm_substream *substream)
 
 end:
 	return err;
+err_locked:
+	snd_bebob_stream_lock_release(bebob);
+	return err;
 }
 
 static int
 pcm_close(struct snd_pcm_substream *substream)
 {
+	struct snd_bebob *bebob = substream->private_data;
+	snd_bebob_stream_lock_release(bebob);
 	return 0;
 }
 

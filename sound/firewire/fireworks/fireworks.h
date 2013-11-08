@@ -23,6 +23,7 @@
 #ifndef SOUND_FIREWORKS_H_INCLUDED
 #define SOUND_FIREWORKS_H_INCLUDED
 
+#include <linux/compat.h>
 #include <linux/device.h>
 #include <linux/firewire.h>
 #include <linux/firewire-constants.h>
@@ -31,12 +32,17 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 
+/* TODO: when mering to upstream, this path should be changed. */
+#include "../../../include/uapi/sound/asound.h"
+#include "../../../include/uapi/sound/firewire.h"
+
 #include <sound/core.h>
 #include <sound/initval.h>
 #include <sound/control.h>
 #include <sound/rawmidi.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
+#include <sound/hwdep.h>
 #include <sound/info.h>
 #include <sound/tlv.h>
 
@@ -121,6 +127,11 @@ struct snd_efw {
 	/* Fireworks has only two plugs */
 	struct cmp_connection out_conn;
 	struct cmp_connection in_conn;
+
+	/* for uapi */
+	int dev_lock_count;
+	bool dev_lock_changed;
+	wait_queue_head_t hwdep_wait;
 };
 
 struct snd_efw_hwinfo {
@@ -227,6 +238,12 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 int snd_efw_stream_stop_duplex(struct snd_efw *efw);
 void snd_efw_stream_update_duplex(struct snd_efw *efw);
 void snd_efw_stream_destroy_duplex(struct snd_efw *efw);
+void snd_efw_stream_lock_changed(struct snd_efw *efw);
+int snd_efw_stream_lock_try(struct snd_efw *efw);
+void snd_efw_stream_lock_release(struct snd_efw *efw);
+
+/* for hwdep component */
+int snd_efw_create_hwdep_device(struct snd_efw *efw);
 
 /* for procfs subsystem */
 void snd_efw_proc_init(struct snd_efw *efw);
