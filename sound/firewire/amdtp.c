@@ -343,9 +343,9 @@ static unsigned int calculate_syt(struct amdtp_stream *s,
 		syt = (cycle + syt_offset / TICKS_PER_CYCLE) << 12;
 		syt += syt_offset % TICKS_PER_CYCLE;
 
-		return syt & 0xffff;
+		return syt & AMDTP_SYT_MASK;
 	} else {
-		return 0xffff; /* no info */
+		return CIP_SYT_NO_INFO; /* no info */
 	}
 }
 
@@ -810,6 +810,15 @@ static void out_stream_callback(struct fw_iso_context *context, u32 cycle,
 	fw_iso_context_queue_flush(s->context);
 }
 
+static inline void add_transfer_delay(struct amdtp_stream *s, unsigned int *syt)
+{
+	if (*syt != CIP_SYT_NO_INFO) {
+		*syt += (s->transfer_delay / TICKS_PER_CYCLE) << 12;
+		*syt += s->transfer_delay % TICKS_PER_CYCLE;
+		*syt &= AMDTP_SYT_MASK;
+	}
+}
+
 static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 			       size_t header_length, void *header,
 			       void *private_data)
@@ -860,6 +869,7 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 			    (s->flags & CIP_SYNC_TO_DEVICE) &&
 			    s->sync_slave->callbacked) {
 				syt = be32_to_cpu(buffer[1]) & AMDTP_SYT_MASK;
+				add_transfer_delay(s, &syt);
 				handle_out_packet(s->sync_slave, syt);
 			}
 			handle_in_packet(s, tbl[i].payload_size / 4, buffer);
