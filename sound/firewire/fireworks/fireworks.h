@@ -58,18 +58,8 @@
 #define HWINFO_NAME_SIZE_BYTES 32
 #define HWINFO_MAX_CAPS_GROUPS 8
 
-/* for physical metering */
-enum snd_efw_channel_type {
-	SND_EFW_CHANNEL_TYPE_ANALOG		= 0,
-	SND_EFW_CHANNEL_TYPE_SPDIF		= 1,
-	SND_EFW_CHANNEL_TYPE_ADAT		= 2,
-	SND_EFW_CHANNEL_TYPE_SPDIF_OR_ADAT	= 3,
-	SND_EFW_CHANNEL_TYPE_ANALOG_MIRRORING	= 4,
-	SND_EFW_CHANNEL_TYPE_HEADPHONES		= 5,
-	SND_EFW_CHANNEL_TYPE_I2S		= 6
-};
 struct snd_efw_phys_group {
-	u8 type;	/* enum snd_efw_channel_type */
+	u8 type;	/* see enum snd_efw_ch_type */
 	u8 count;
 } __packed;
 
@@ -198,6 +188,22 @@ enum snd_efw_digital_interface {
 enum snd_efw_iec60958_format {
 	SND_EFW_IEC60958_FORMAT_CONSUMER	= 0,
 	SND_EFW_IEC60958_FORMAT_PROFESSIONAL	= 1
+};
+
+/* channel type of physical in/out */
+enum snd_efw_ch_type {
+	SND_EFW_CH_TYPE_ANALOG		= 0,
+	SND_EFW_CH_TYPE_SPDIF,
+	SND_EFW_CH_TYPE_ADAT,
+	SND_EFW_CH_TYPE_SPDIF_OR_ADAT,
+	SND_EFW_CH_TYPE_ANALOG_MIRRORING,
+	SND_EFW_CH_TYPE_HEADPHONES,
+	SND_EFW_CH_TYPE_I2S,
+	SND_EFW_CH_TYPE_GUITAR,
+	SND_EFW_CH_TYPE_PIEZO_GUITAR,
+	SND_EFW_CH_TYPE_GUITAR_STRING,
+	SND_EFW_CH_TYPE_VIRTUAL		= 0x10000,
+	SND_EFW_CH_TYPE_DUMMY
 };
 
 /* Echo Fireworks Command functions */

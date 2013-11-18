@@ -47,46 +47,45 @@ proc_read_hwinfo(struct snd_info_entry *entry, struct snd_info_buffer *buffer)
 	snd_iprintf(buffer, "supported_clock: 0x%X\n",
 		    hwinfo.supported_clocks);
 
-	snd_iprintf(buffer, "nb_phys_audio_out: 0x%X\n",
+	snd_iprintf(buffer, "num_phys_audio_out: 0x%X\n",
 		    hwinfo.nb_phys_audio_out);
-	snd_iprintf(buffer, "nb_phys_audio_in: 0x%X\n",
+	snd_iprintf(buffer, "num_phys_audio_in: 0x%X\n",
 		    hwinfo.nb_phys_audio_in);
 
-	snd_iprintf(buffer, "nb_in_groups: 0x%X\n", hwinfo.nb_in_groups);
+	snd_iprintf(buffer, "num_phys_in_groups: 0x%X\n", hwinfo.nb_in_groups);
 	for (i = 0; i < hwinfo.nb_in_groups; i++) {
-		snd_iprintf(buffer, "in_group[0x%d]: type 0x%d, count 0x%d\n",
+		snd_iprintf(buffer, "phys_in_group[0x%d]: type 0x%d, count 0x%d\n",
 			    i, hwinfo.out_groups[i].type,
 			    hwinfo.out_groups[i].count);
 	}
 
-	snd_iprintf(buffer, "nb_out_groups: 0x%X\n", hwinfo.nb_out_groups);
+	snd_iprintf(buffer, "num_phys_out_groups: 0x%X\n", hwinfo.nb_out_groups);
 	for (i = 0; i < hwinfo.nb_out_groups; i++) {
-		snd_iprintf(buffer, "out_group[0x%d]: type 0x%d, count 0x%d\n",
+		snd_iprintf(buffer, "phys_out_group[0x%d]: type 0x%d, count 0x%d\n",
 			    i, hwinfo.out_groups[i].type,
 			    hwinfo.out_groups[i].count);
 	}
 
-	snd_iprintf(buffer, "nb_1394_playback_channels: 0x%X\n",
+	snd_iprintf(buffer, "num_1394_playback_channels_1x: 0x%X\n",
 		    hwinfo.nb_1394_playback_channels);
-	snd_iprintf(buffer, "nb_1394_capture_channels: 0x%X\n",
+	snd_iprintf(buffer, "num_1394_capture_channels_1x: 0x%X\n",
 		    hwinfo.nb_1394_capture_channels);
-	snd_iprintf(buffer, "nb_1394_playback_channels_2x: 0x%X\n",
+	snd_iprintf(buffer, "num_1394_playback_channels_2x: 0x%X\n",
 		    hwinfo.nb_1394_playback_channels_2x);
-	snd_iprintf(buffer, "nb_1394_capture_channels_2x: 0x%X\n",
+	snd_iprintf(buffer, "num_1394_capture_channels_2x: 0x%X\n",
 		    hwinfo.nb_1394_capture_channels_2x);
-	snd_iprintf(buffer, "nb_1394_playback_channels_4x: 0x%X\n",
+	snd_iprintf(buffer, "num_1394_playback_channels_4x: 0x%X\n",
 		    hwinfo.nb_1394_playback_channels_4x);
-	snd_iprintf(buffer, "nb_1394_capture_channels_4x: 0x%X\n",
+	snd_iprintf(buffer, "num_1394_capture_channels_4x: 0x%X\n",
 		    hwinfo.nb_1394_capture_channels_4x);
 
-	snd_iprintf(buffer, "nb_midi_out: 0x%X\n", hwinfo.nb_midi_out);
-	snd_iprintf(buffer, "nb_midi_in: 0x%X\n", hwinfo.nb_midi_in);
+	snd_iprintf(buffer, "num_midi_out: 0x%X\n", hwinfo.nb_midi_out);
+	snd_iprintf(buffer, "num_midi_in: 0x%X\n", hwinfo.nb_midi_in);
 
-	snd_iprintf(buffer, "mixer_playback_channels: 0x%X\n",
+	snd_iprintf(buffer, "num mixer_playback_channels: 0x%X\n",
 		    hwinfo.mixer_playback_channels);
-	snd_iprintf(buffer, "mixer_capture_channels: 0x%X\n",
+	snd_iprintf(buffer, "num mixer_capture_channels: 0x%X\n",
 		    hwinfo.mixer_capture_channels);
-
 end:
 	return;
 }
@@ -118,7 +117,8 @@ proc_read_phys_meters(struct snd_info_entry *entry,
 	struct snd_efw *efw = entry->private_data;
 
 	char const *descs[] = {"Analog", "S/PDIF", "ADAT", "S/PDIF or ADAT",
-			       "Analog Mirroring", "Headphones", "I2S"};
+			       "Analog Mirroring", "Headphones", "I2S"
+			       "Guitar", "Piezo Guitar", "Guitar String"};
 
 	struct snd_efw_phys_meters *meters;
 	int i, g, c;
@@ -144,10 +144,10 @@ proc_read_phys_meters(struct snd_info_entry *entry,
 			g++;
 			c = 0;
 		}
-		snd_iprintf(buffer, "\t%s [%d]: %d\n",
-			descs[efw->input_groups[g].type], c,
-			meters->values[efw->output_meter_counts + i]);
-		c++;
+		if (efw->input_groups[g].type < ARRAY_SIZE(descs))
+			snd_iprintf(buffer, "\t%s [%d]: %d\n",
+				descs[efw->input_groups[g].type], c++,
+				meters->values[efw->output_meter_counts + i]);
 	}
 
 	snd_iprintf(buffer, " %d Outputs:\n", efw->output_meter_counts);
@@ -158,10 +158,10 @@ proc_read_phys_meters(struct snd_info_entry *entry,
 			g++;
 			c = 0;
 		}
-		snd_iprintf(buffer, "\t%s [%d]: %d\n",
-			descs[efw->output_groups[g].type], c,
-			meters->values[i]);
-		c++;
+		if (efw->output_groups[g].type < ARRAY_SIZE(descs))
+			snd_iprintf(buffer, "\t%s [%d]: %d\n",
+				descs[efw->output_groups[g].type], c++,
+				meters->values[i]);
 	}
 
 end:
