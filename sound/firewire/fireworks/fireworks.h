@@ -258,5 +258,12 @@ int snd_efw_create_midi_devices(struct snd_efw *efw);
 int snd_efw_create_pcm_devices(struct snd_efw *efw);
 int snd_efw_get_multiplier_mode(int sampling_rate);
 
+#define SND_EFW_DEV_ENTRY(vendor, model) \
+{ \
+	.match_flags	= IEEE1394_MATCH_VENDOR_ID | \
+			  IEEE1394_MATCH_MODEL_ID, \
+	.vendor_id	= vendor,\
+	.model_id	= model \
+}
 
 #endif

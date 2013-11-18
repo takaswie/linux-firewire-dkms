@@ -38,25 +38,29 @@ MODULE_PARM_DESC(enable, "enable Fireworks sound card");
 static DEFINE_MUTEX(devices_mutex);
 static unsigned int devices_used;
 
-#define VENDOR_ECHO_DIGITAL_AUDIO	0x001486
-#define MODEL_ECHO_AUDIOFIRE_2		0x000af2
-#define MODEL_ECHO_AUDIOFIRE_4		0x000af4
-#define MODEL_ECHO_AUDIOFIRE_8		0x000af8
-#define MODEL_ECHO_AUDIOFIRE_8A		0x000af9	// model as of July 2009
-#define MODEL_ECHO_AUDIOFIRE_PRE8	0x000af9	// the same ID
-#define MODEL_ECHO_AUDIOFIRE_12		0x00af12
-#define MODEL_ECHO_FIREWORKS_8		0x0000f8
-#define MODEL_ECHO_FIREWORKS_HDMI	0x00afd1
-
-#define SPECIFIER_1394TA		0x00a02d
-
 #define VENDOR_LOUD			0x000ff2
 #define  MODEL_MACKIE_400F		0x00400f
 #define  MODEL_MACKIE_1200F		0x01200f
 
+#define VENDOR_ECHO			0x001486
+#define  MODEL_ECHO_AUDIOFIRE_12	0x00af12
+#define  MODEL_ECHO_AUDIOFIRE_12HD	0x0af12d
+#define  MODEL_ECHO_AUDIOFIRE_12_APPLE	0x0af12a
+/* This is applied for AudioFire8 (until 2009 July) */
+#define  MODEL_ECHO_AUDIOFIRE_8		0x000af8
+#define  MODEL_ECHO_AUDIOFIRE_2		0x000af2
+#define  MODEL_ECHO_AUDIOFIRE_4		0x000af4
+/* AudioFire9 is applied for AudioFire8(since 2009 July) and AudioFirePre8 */
+#define  MODEL_ECHO_AUDIOFIRE_9		0x000af9
+/* unknown as product */
+#define  MODEL_ECHO_FIREWORKS_8		0x0000f8
+#define  MODEL_ECHO_FIREWORKS_HDMI	0x00afd1
+
 #define VENDOR_GIBSON			0x00075b
+/* for Robot Interface Pack of Dark Fire, Dusk Tiger, Les Paul Standard 2010 */
 #define  MODEL_GIBSON_RIP		0x00afb2
-/* #define  MODEL_GIBSON_GOLDTOP	0x?????? */
+/* unknown as product */
+#define  MODEL_GIBSON_GOLDTOP		0x00afb9
 
 #define MAX_TRIES_AFTER_BUS_RESET		5
 
@@ -245,37 +249,6 @@ end:
 	return err;
 }
 
-static bool match_fireworks_device_name(struct fw_unit *unit)
-{
-	static const char *const models[] = {
-		/* Echo Digital Audio */
-		"AudioFire2",
-		"AudioFire4",
-		"AudioFire8",
-		"AudioFire8a",
-		"AudioFirePre8",
-		"AudioFire12",
-		"Fireworks8",
-		"Fireworks HDMI",
-		/* Mackie */
-		"Onyx 400F",
-		"Onyx 1200F",
-		/* Gibson */
-		"RIP",
-		"Audiopunk",
-		"Goldtop",
-	};
-	char name[16];
-	unsigned int i;
-
-	if (fw_csr_string(unit->directory, CSR_MODEL, name, sizeof(name)) < 0)
-		return false;
-	for (i = 0; i < ARRAY_SIZE(models); i++)
-		if (!strcasecmp(name, models[i]))
-			return true;
-	return false;
-}
-
 static void
 snd_efw_card_free(struct snd_card *card)
 {
@@ -305,10 +278,6 @@ static int snd_efw_probe(struct fw_unit *unit,
 	int card_index, err;
 
 	mutex_lock(&devices_mutex);
-
-	/* check device name */
-	if (!match_fireworks_device_name(unit))
-		return -ENODEV;
 
 	/* check registered cards */
 	for (card_index = 0; card_index < SNDRV_CARDS; ++card_index)
@@ -473,30 +442,19 @@ static void snd_efw_remove(struct fw_unit *unit)
 }
 
 static const struct ieee1394_device_id snd_efw_id_table[] = {
-	{
-		.match_flags = IEEE1394_MATCH_VENDOR_ID |
-			       IEEE1394_MATCH_SPECIFIER_ID,
-		.vendor_id = VENDOR_ECHO_DIGITAL_AUDIO,
-		.specifier_id = SPECIFIER_1394TA,
-	},
-	{
-		.match_flags = IEEE1394_MATCH_VENDOR_ID |
-			       IEEE1394_MATCH_SPECIFIER_ID,
-		.vendor_id = VENDOR_GIBSON,
-		.specifier_id = SPECIFIER_1394TA,
-	},
-	{
-		.match_flags = IEEE1394_MATCH_VENDOR_ID |
-			       IEEE1394_MATCH_MODEL_ID,
-		.vendor_id = VENDOR_LOUD,
-		.model_id = MODEL_MACKIE_400F,
-	},
-	{
-		.match_flags = IEEE1394_MATCH_VENDOR_ID |
-			       IEEE1394_MATCH_MODEL_ID,
-		.vendor_id = VENDOR_LOUD,
-		.model_id = MODEL_MACKIE_1200F,
-	},
+	SND_EFW_DEV_ENTRY(VENDOR_LOUD, MODEL_MACKIE_400F),
+	SND_EFW_DEV_ENTRY(VENDOR_LOUD, MODEL_MACKIE_1200F),
+	SND_EFW_DEV_ENTRY(VENDOR_ECHO, MODEL_ECHO_AUDIOFIRE_8),
+	SND_EFW_DEV_ENTRY(VENDOR_ECHO, MODEL_ECHO_AUDIOFIRE_12),
+	SND_EFW_DEV_ENTRY(VENDOR_ECHO, MODEL_ECHO_AUDIOFIRE_12HD),
+	SND_EFW_DEV_ENTRY(VENDOR_ECHO, MODEL_ECHO_AUDIOFIRE_12_APPLE),
+	SND_EFW_DEV_ENTRY(VENDOR_ECHO, MODEL_ECHO_AUDIOFIRE_2),
+	SND_EFW_DEV_ENTRY(VENDOR_ECHO, MODEL_ECHO_AUDIOFIRE_4),
+	SND_EFW_DEV_ENTRY(VENDOR_ECHO, MODEL_ECHO_AUDIOFIRE_9),
+	SND_EFW_DEV_ENTRY(VENDOR_ECHO, MODEL_ECHO_FIREWORKS_8),
+	SND_EFW_DEV_ENTRY(VENDOR_ECHO, MODEL_ECHO_FIREWORKS_HDMI),
+	SND_EFW_DEV_ENTRY(VENDOR_GIBSON, MODEL_GIBSON_RIP),
+	SND_EFW_DEV_ENTRY(VENDOR_GIBSON, MODEL_GIBSON_GOLDTOP),
 	{}
 };
 MODULE_DEVICE_TABLE(ieee1394, snd_efw_id_table);
