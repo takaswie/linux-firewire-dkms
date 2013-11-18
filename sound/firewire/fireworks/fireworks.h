@@ -205,6 +205,9 @@ int snd_efw_command_register(void);
 void snd_efw_command_unregister(void);
 void snd_efw_command_bus_reset(struct fw_unit *unit);
 int snd_efw_command_identify(struct snd_efw *efw);
+int snd_efw_command_set_resp_addr(struct snd_efw *efw,
+				  u16 addr_high, u32 addr_low);
+int snd_efw_command_set_tx_mode(struct snd_efw *efw, int mode);
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 			       struct snd_efw_hwinfo *hwinfo);
 int snd_efw_command_get_phys_meters(struct snd_efw *efw,

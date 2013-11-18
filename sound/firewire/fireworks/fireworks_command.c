@@ -71,15 +71,21 @@ struct efc_clock {
 
 /* command categories */
 enum efc_category {
-	EFC_CAT_HWINFO			= 0,
-	EFC_CAT_HWCTL			= 3,
-	EFC_CAT_IOCONF			= 9,
+	EFC_CAT_HWINFO		= 0,
+	EFC_CAT_TRANSPORT	= 2,
+	EFC_CAT_HWCTL		= 3,
+	EFC_CAT_IOCONF		= 9,
 };
 
 /* hardware info category commands */
 enum efc_cmd_hwinfo {
-	EFC_CMD_HWINFO_GET_CAPS			= 0,
-	EFC_CMD_HWINFO_GET_POLLED		= 1,
+	EFC_CMD_HWINFO_GET_CAPS		= 0,
+	EFC_CMD_HWINFO_GET_POLLED	= 1,
+	EFC_CMD_HWINFO_SET_RESP_ADDR	= 2
+};
+
+enum efc_cmd_transport {
+	EFC_CMD_TRANSPORT_SET_TX_MODE	= 0
 };
 
 /* hardware control category commands */
@@ -236,6 +242,35 @@ int snd_efw_command_identify(struct snd_efw *efw)
 {
 	return efc(efw, EFC_CAT_HWCTL, EFC_CMD_HWCTL_IDENTIFY,
 		   NULL, 0, NULL, 0);
+}
+
+/*
+ * The address in host system for EFC response is changable when the device
+ * supports. struct hwinfo.flags includes its flag. The default is
+ * INITIAL_MEMORY_SPACE_EFC_RESPONSE
+ */
+int snd_efw_command_set_resp_addr(struct snd_efw *efw,
+				  u16 addr_high, u32 addr_low)
+{
+	u32 addr[2] = {addr_high, addr_low};
+
+	return efc(efw, EFC_CAT_HWCTL, EFC_CMD_HWINFO_SET_RESP_ADDR,
+		   addr, 2, NULL, 0);
+}
+
+/*
+ * mode == 0: Windows mode
+ * mode >= 1: IEC61883-1 compliant mode
+ *
+ * This is for timestamp processing. In Windows mode, all 32bit fields of second
+ * CIP header in AMDTP transmit packet is used as 'presentation timestamp'. The
+ * value of this field is 0x90ffffff in NODATA packet.
+ */
+int snd_efw_command_set_tx_mode(struct snd_efw *efw, int mode)
+{
+	u32 param = mode;
+	return efc(efw, EFC_CAT_TRANSPORT, EFC_CMD_TRANSPORT_SET_TX_MODE,
+		   &param, 1, NULL, 0);
 }
 
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,

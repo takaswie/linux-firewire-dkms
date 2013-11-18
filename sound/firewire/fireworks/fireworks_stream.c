@@ -176,6 +176,11 @@ int snd_efw_stream_init_duplex(struct snd_efw *efw)
 		goto end;
 
 	err = init_stream(efw, &efw->rx_stream);
+	if (err < 0)
+		goto end;
+
+	/* set IEC61883-1/6 compliant mode */
+	err = snd_efw_command_set_tx_mode(efw, 1);
 end:
 	return err;
 }
