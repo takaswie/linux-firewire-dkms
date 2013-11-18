@@ -85,16 +85,11 @@ struct snd_efw {
 	/* for EFC */
 	u32 seqnum;
 
-	/* capabilities */
+	/* part of capabilities */
+	unsigned int cmd_resp_addr_changable;
 	unsigned int supported_sampling_rate;
 	unsigned int supported_clock_source;
 	unsigned int supported_digital_interface;
-	unsigned int has_phantom;
-	unsigned int has_dsp_mixer;
-	unsigned int has_fpga;
-	unsigned int aes_ebu_xlr_support;
-	unsigned int mirroring_support;
-	unsigned int dynaddr_support;
 
 	/* physical metering */
 	unsigned int input_group_counts;
@@ -194,7 +189,7 @@ enum snd_efw_clock_source {
 /* digital interface parameters */
 enum snd_efw_digital_interface {
 	SND_EFW_DIGITAL_INTERFACE_SPDIF_COAXIAL	= 0,
-	SND_EFW_DIGITAL_INTERFACE_ADAT_COAXIAL	= 1,
+	SND_EFW_DIGITAL_INTERFACE_AESEBU_XLR	= 1,
 	SND_EFW_DIGITAL_INTERFACE_SPDIF_OPTICAL	= 2,
 	SND_EFW_DIGITAL_INTERFACE_ADAT_OPTICAL	= 3
 };

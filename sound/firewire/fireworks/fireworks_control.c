@@ -91,7 +91,7 @@ struct snd_kcontrol_new physical_metering = {
  * S/PDIF or ADAT, Coaxial or Optical
  * snd_efw_hwinfo.flags include a flag for this control.
  */
-static char *digital_iface_descs[] = {"S/PDIF Coaxial", "ADAT Coaxial",
+static char *digital_iface_descs[] = {"S/PDIF Coaxial", "AES/EBU XLR",
 					  "S/PDIF Optical", "ADAT Optical"};
 static int
 control_digital_interface_info(struct snd_kcontrol *kctl,

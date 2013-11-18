@@ -62,17 +62,25 @@ static unsigned int devices_used;
 /* unknown as product */
 #define  MODEL_GIBSON_GOLDTOP		0x00afb9
 
-#define MAX_TRIES_AFTER_BUS_RESET		5
+#define MAX_TRIES_AFTER_BUS_RESET	5
 
-#define FLAG_DYNADDR_SUPPORTED			0
-#define FLAG_MIRRORING_SUPPORTED		1
-#define FLAG_HAS_OPTICAL_INTERFACE		2
-#define FLAG_SPDIF_AES_EBU_XLR_SUPPORTED	3
-#define FLAG_HAS_DSP_MIXER			4
-#define FLAG_HAS_FPGA				5
-#define FLAG_HAS_PHANTOM			6
-#define FLAG_HAS_PLAYBACK_ROUTING		7
-/* other flags exist but unknown... */
+/* hardware capability flags */
+#define FLAG_CMD_RESP_ADDR_CHANGABLE	0
+#define FLAG_MIRRORING_SUPPORTED	1
+#define FLAG_HAS_SPDIF_COAXIAL		2
+#define FLAG_HAS_AESEBU_XLR		3
+#define FLAG_HAS_DSP_MIXER		4
+#define FLAG_HAS_FPGA			5
+#define FLAG_HAS_PHANTOM		6
+#define FLAG_HAS_PLAYBACK_ROUTING	7
+#define FLAG_HAS_INPUT_GAIN_ADJUSTABLE	8
+#define FLAG_HAS_SPDIF_OPTICAL		9
+#define FLAG_HAS_ADAT_OPTICAL		10
+#define FLAG_HAS_NOMINAL_INPUT		11
+#define FLAG_HAS_NOMINAL_OUTPUT		12
+#define FLAG_HAS_GUITAR_HEX_CAPTURE	13
+#define FLAG_HAS_GUITAR_CHARGING	14
+#define FLAG_HAS_SOFT_CLIP		15
 
 static int
 get_hardware_info(struct snd_efw *efw)
@@ -93,25 +101,16 @@ get_hardware_info(struct snd_efw *efw)
 		goto end;
 
 	/* capabilities */
-	if (hwinfo->flags & BIT(FLAG_DYNADDR_SUPPORTED))
-		efw->dynaddr_support = 1;
-	if (hwinfo->flags & BIT(FLAG_MIRRORING_SUPPORTED))
-		efw->mirroring_support = 1;
-	if (hwinfo->flags & BIT(FLAG_SPDIF_AES_EBU_XLR_SUPPORTED))
-		efw->aes_ebu_xlr_support = 1;
-	if (hwinfo->flags & BIT(FLAG_HAS_DSP_MIXER))
-		efw->has_dsp_mixer = 1;
-	if (hwinfo->flags & BIT(FLAG_HAS_FPGA))
-		efw->has_fpga = 1;
-	if (hwinfo->flags & BIT(FLAG_HAS_PHANTOM))
-		efw->has_phantom = 1;
-	if (strcmp(hwinfo->vendor_name, "Gibson") != 0) {
-		/* all models except for Gibson's have coaxial interface */
-		efw->supported_digital_interface = BIT(0);
-
-		if (hwinfo->flags & BIT(FLAG_HAS_OPTICAL_INTERFACE))
-			efw->supported_digital_interface |= BIT(2) | BIT(3);
-	}
+	if (hwinfo->flags & BIT(FLAG_CMD_RESP_ADDR_CHANGABLE))
+		efw->cmd_resp_addr_changable = 1;
+	if (hwinfo->flags & BIT(FLAG_HAS_SPDIF_COAXIAL))
+		efw->supported_digital_interface |= BIT(0);
+	if (hwinfo->flags & BIT(FLAG_HAS_AESEBU_XLR))
+		efw->supported_digital_interface |= BIT(1);
+	if (hwinfo->flags & BIT(FLAG_HAS_SPDIF_OPTICAL))
+		efw->supported_digital_interface |= BIT(2);
+	if (hwinfo->flags & BIT(FLAG_HAS_ADAT_OPTICAL))
+		efw->supported_digital_interface |= BIT(3);
 
 	/* for input physical metering */
 	if (hwinfo->nb_out_groups > 0) {
