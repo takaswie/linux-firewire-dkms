@@ -512,7 +512,7 @@ static void amdtp_read_s32(struct amdtp_stream *s,
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < s->pcm_channels; ++c) {
 			*dst = be32_to_cpu(buffer[s->pcm_positions[c]]) << 8;
-			dst += 1;
+			dst++;
 		}
 		buffer += s->data_block_quadlets;
 		if (--remaining_frames == 0)
@@ -535,7 +535,7 @@ static void amdtp_read_s16(struct amdtp_stream *s,
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < s->pcm_channels; ++c) {
 			*dst = be32_to_cpu(buffer[s->pcm_positions[c]]) << 8;
-			dst += 1;
+			dst++;
 		}
 		buffer +=s->data_block_quadlets;
 		if (--remaining_frames == 0)

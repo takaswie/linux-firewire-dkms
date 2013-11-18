@@ -114,7 +114,7 @@ int avc_general_set_sig_fmt(struct fw_unit *unit, int rate,
 	bool flag;
 
 	flag = false;
-	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_sfc_table); sfc += 1) {
+	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_sfc_table); sfc++) {
 		if (amdtp_sfc_table[sfc] == rate) {
 			flag = true;
 			break;

@@ -185,7 +185,7 @@ snd_bebob_probe(struct fw_unit *unit,
 	mutex_lock(&devices_mutex);
 
 	/* check registered cards */
-	for (card_index = 0; card_index < SNDRV_CARDS; card_index += 1) {
+	for (card_index = 0; card_index < SNDRV_CARDS; card_index++) {
 		if (!(devices_used & BIT(card_index)) && enable[card_index])
 			break;
 	}

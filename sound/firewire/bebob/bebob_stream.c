@@ -51,7 +51,7 @@ get_formation_index(int rate)
 {
         int i;
 
-        for (i = 0; i < sizeof(snd_bebob_rate_table); i += 1) {
+        for (i = 0; i < sizeof(snd_bebob_rate_table); i++) {
                 if (snd_bebob_rate_table[i] == rate)
                         return i;
 	}
@@ -469,7 +469,7 @@ int snd_bebob_get_formation_index(int rate)
 {
 	int i;
 
-	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i += 1) {
+	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		if (snd_bebob_rate_table[i] == rate)
 			return i;
 	}
@@ -482,7 +482,7 @@ set_stream_formation(u8 *buf, int len,
 {
 	int e, channels, format;
 
-	for (e = 0; e < buf[4]; e += 1) {
+	for (e = 0; e < buf[4]; e++) {
 		channels = buf[5 + e * 2];
 		format = buf[6 + e * 2];
 
@@ -561,7 +561,7 @@ fill_stream_formations(struct snd_bebob *bebob, enum snd_bebob_plug_dir dir,
 
 		/* check sampling rate */
 		index = -1;
-		for (i = 0; i < sizeof(freq_table); i += 1) {
+		for (i = 0; i < sizeof(freq_table); i++) {
 			if (i == buf[2])
 				index = freq_table[i];
 		}
@@ -626,7 +626,7 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 	}	
 
 	/* store formations */
-	for (i = 0; i < 2; i += 1) {
+	for (i = 0; i < 2; i++) {
 		err = fill_stream_formations(bebob, i, 0);
 		if (err < 0)
 			goto end;

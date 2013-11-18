@@ -203,7 +203,7 @@ efc(struct snd_efw *efw, unsigned int category,
 		goto end;
 
 	/* for endian-ness */
-	for (i = 0; i < (err / 4); i += 1)
+	for (i = 0; i < (err / 4); i++)
 		cmdbuf[i] = be32_to_cpu(cmdbuf[i]);
 
 	/* check EFC response fields */
@@ -253,18 +253,18 @@ int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 	/* arrangement for endianness */
 	count = HWINFO_NAME_SIZE_BYTES / 4;
 	tmp = (u32 *)&hwinfo->vendor_name;
-	for (i = 0; i < count; i += 1)
+	for (i = 0; i < count; i++)
 		tmp[i] = cpu_to_be32(tmp[i]);
 	tmp = (u32 *)&hwinfo->model_name;
-	for (i = 0; i < count; i += 1)
+	for (i = 0; i < count; i++)
 		tmp[i] = cpu_to_be32(tmp[i]);
 
 	count = sizeof(struct snd_efw_phys_group) * HWINFO_MAX_CAPS_GROUPS / 4;
 	tmp = (u32 *)&hwinfo->out_groups;
-	for (i = 0; i < count; i += 1)
+	for (i = 0; i < count; i++)
 		tmp[i] = cpu_to_be32(tmp[i]);
 	tmp = (u32 *)&hwinfo->in_groups;
-	for (i = 0; i < count; i += 1)
+	for (i = 0; i < count; i++)
 		tmp[i] = cpu_to_be32(tmp[i]);
 
 	/* ensure terminated */

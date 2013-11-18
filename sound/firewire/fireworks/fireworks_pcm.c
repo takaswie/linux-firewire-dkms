@@ -61,7 +61,7 @@ get_multiplier_mode_with_index(int index)
 int snd_efw_get_multiplier_mode(int sampling_rate)
 {
 	int i;
-	for (i = 0; i < sizeof(freq_table); i += 1)
+	for (i = 0; i < sizeof(freq_table); i++)
 		if (freq_table[i] == sampling_rate)
 			return get_multiplier_mode_with_index(i);
 
@@ -83,7 +83,7 @@ hw_rule_rate(struct snd_pcm_hw_params *params,
 	unsigned int rate_bit;
 	int mode, i;
 
-	for (i = 0; i < ARRAY_SIZE(freq_table); i += 1) {
+	for (i = 0; i < ARRAY_SIZE(freq_table); i++) {
 		/* skip unsupported sampling rate */
 		rate_bit = snd_pcm_rate_to_rate_bit(freq_table[i]);
 		if (!(efw->supported_sampling_rate & rate_bit))
@@ -117,7 +117,7 @@ hw_rule_channels(struct snd_pcm_hw_params *params,
 	unsigned int rate_bit;
 	int mode, i;
 
-	for (i = 0; i < ARRAY_SIZE(freq_table); i += 1) {
+	for (i = 0; i < ARRAY_SIZE(freq_table); i++) {
 		/* skip unsupported sampling rate */
 		rate_bit = snd_pcm_rate_to_rate_bit(freq_table[i]);
 		if (!(efw->supported_sampling_rate & rate_bit))
@@ -236,7 +236,7 @@ pcm_init_hw_params(struct snd_efw *efw,
 	snd_pcm_limit_hw_rates(substream->runtime);
 
 	/* preparing the number of channels */
-	for (i = 0; i < ARRAY_SIZE(freq_table); i += 1) {
+	for (i = 0; i < ARRAY_SIZE(freq_table); i++) {
 		/* skip unsupported sampling rate */
 		rate_bit = snd_pcm_rate_to_rate_bit(freq_table[i]);
 		if (!(efw->supported_sampling_rate & rate_bit))

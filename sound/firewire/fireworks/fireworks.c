@@ -124,7 +124,7 @@ get_hardware_info(struct snd_efw *efw)
 		}
 
 		efw->output_group_counts = hwinfo->nb_out_groups;
-		for (i = 0; i < efw->output_group_counts; i += 1) {
+		for (i = 0; i < efw->output_group_counts; i++) {
 			efw->output_groups[i].type  =
 						hwinfo->out_groups[i].type;
 			efw->output_groups[i].count =
@@ -143,7 +143,7 @@ get_hardware_info(struct snd_efw *efw)
 		}
 
 		efw->input_group_counts = hwinfo->nb_out_groups;
-		for (i = 0; i < efw->input_group_counts; i += 1) {
+		for (i = 0; i < efw->input_group_counts; i++) {
 			efw->input_groups[i].type =
 						hwinfo->in_groups[i].type;
 			efw->input_groups[i].count =

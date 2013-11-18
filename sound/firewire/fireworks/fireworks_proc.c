@@ -53,14 +53,14 @@ proc_read_hwinfo(struct snd_info_entry *entry, struct snd_info_buffer *buffer)
 		    hwinfo.nb_phys_audio_in);
 
 	snd_iprintf(buffer, "nb_in_groups: 0x%X\n", hwinfo.nb_in_groups);
-	for (i = 0; i < hwinfo.nb_in_groups; i += 1) {
+	for (i = 0; i < hwinfo.nb_in_groups; i++) {
 		snd_iprintf(buffer, "in_group[0x%d]: type 0x%d, count 0x%d\n",
 			    i, hwinfo.out_groups[i].type,
 			    hwinfo.out_groups[i].count);
 	}
 
 	snd_iprintf(buffer, "nb_out_groups: 0x%X\n", hwinfo.nb_out_groups);
-	for (i = 0; i < hwinfo.nb_out_groups; i += 1) {
+	for (i = 0; i < hwinfo.nb_out_groups; i++) {
 		snd_iprintf(buffer, "out_group[0x%d]: type 0x%d, count 0x%d\n",
 			    i, hwinfo.out_groups[i].type,
 			    hwinfo.out_groups[i].count);
@@ -139,29 +139,29 @@ proc_read_phys_meters(struct snd_info_entry *entry,
 	snd_iprintf(buffer, " %d Inputs:\n", efw->input_meter_counts);
 	g = 0;
 	c = 0;
-	for (i = 0; i < efw->input_meter_counts; i += 1) {
+	for (i = 0; i < efw->input_meter_counts; i++) {
 		if (c == efw->input_groups[g].count) {
-			g += 1;
+			g++;
 			c = 0;
 		}
 		snd_iprintf(buffer, "\t%s [%d]: %d\n",
 			descs[efw->input_groups[g].type], c,
 			meters->values[efw->output_meter_counts + i]);
-		c += 1;
+		c++;
 	}
 
 	snd_iprintf(buffer, " %d Outputs:\n", efw->output_meter_counts);
 	g = 0;
 	c = 0;
-	for (i = 0; i < efw->output_meter_counts; i += 1) {
+	for (i = 0; i < efw->output_meter_counts; i++) {
 		if (c == efw->output_groups[g].count) {
-			g += 1;
+			g++;
 			c = 0;
 		}
 		snd_iprintf(buffer, "\t%s [%d]: %d\n",
 			descs[efw->output_groups[g].type], c,
 			meters->values[i]);
-		c += 1;
+		c++;
 	}
 
 end:
