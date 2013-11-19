@@ -73,7 +73,10 @@ phase88_rack_clock_synced(struct snd_bebob *bebob, bool *synced)
 	buf[6]  = 0x21;	/* subfunction */
 	buf[7]  = 0xff;	/* the state */
 
-	err = fcp_avc_transaction(bebob->unit, buf, 8, buf, 8, 0);
+	/* do transaction and check buf[1-6] are the same against command */
+	err = fcp_avc_transaction(bebob->unit, buf, 8, buf, 8,
+				  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
+				  BIT(5) | BIT(6));
 	if (err < 0)
 		goto end;
 	/* IMPLEMENTED/STABLE is OK */

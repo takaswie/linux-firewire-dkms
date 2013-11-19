@@ -54,14 +54,17 @@ detect_dig_in(struct snd_bebob *bebob, int *detect)
 	buf[3]  = 0x00;	/* Company ID high */
 	buf[4]  = 0x07;	/* Company ID middle */
 	buf[5]  = 0xf5;	/* Company ID low */
-	buf[6]  = 0x00;	/* unknown subfunction */
+	buf[6]  = 0x00;	/* Unknown Subfunction*/
 	buf[7]  = 0x00;	/* Unknown */
 	buf[8]  = 0x01; /* Unknown */
 	buf[9]  = 0x00;	/* Unknown */
 	buf[10] = 0x00;	/* Unknown */
 	buf[11] = 0x00;	/* Unknown */
 
-	err = fcp_avc_transaction(bebob->unit, buf, 12, buf, 12, 0);
+	/* do transaction and check buf[1-6] are the same against command */
+	err = fcp_avc_transaction(bebob->unit, buf, 12, buf, 12,
+				  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
+				  BIT(5) | BIT(6));
 	if (err < 0)
 		goto end;
 	/* IMPLEMENTED/STABLE is OK */
@@ -99,7 +102,9 @@ get_sync_status(struct snd_bebob *bebob, bool *sync)
 	buf[6] = 0x21;	/* unknown subfunction */
 	buf[7] = 0xff;  /* status */
 
-	err = fcp_avc_transaction(bebob->unit, buf, 8, buf, 8, 0);
+	err = fcp_avc_transaction(bebob->unit, buf, 8, buf, 8,
+				  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
+				  BIT(5) | BIT(6));
 	if (err < 0)
 		goto end;
 	if ((err < 6) || (buf[0] != 0x0c)) {

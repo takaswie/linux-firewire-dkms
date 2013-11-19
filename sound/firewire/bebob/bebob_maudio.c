@@ -256,9 +256,9 @@ special_set_clock_params(struct snd_bebob *bebob, int clk_src,
 	buf[0]  = 0x00;		/* CONTROL */
 	buf[1]  = 0xff;		/* UNIT */
 	buf[2]  = 0x00;		/* vendor dependent */
-	buf[3]  = 0x04;
-	buf[4]  = 0x00;
-	buf[5]  = 0x04;			/* has 4 parameters */
+	buf[3]  = 0x04;		/* company ID high */
+	buf[4]  = 0x00;		/* company ID middle */
+	buf[5]  = 0x04;		/* company ID low */
 	buf[6]  = 0xff & clk_src;	/* clock source */
 	buf[7]  = 0xff & in_dig_fmt;	/* input digital format */
 	buf[8]  = 0xff & out_dig_fmt;	/* output digital format */
@@ -266,7 +266,11 @@ special_set_clock_params(struct snd_bebob *bebob, int clk_src,
 	buf[10] = 0x00;		/* padding  */
 	buf[11] = 0x00;		/* padding */
 
-	err = fcp_avc_transaction(bebob->unit, buf, 12, buf, 12, 0);
+	/* do transaction and check buf[1-9] are the same against command */
+	err = fcp_avc_transaction(bebob->unit, buf, 12, buf, 12,
+				  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
+				  BIT(5) | BIT(6) | BIT(7) | BIT(8) |
+				  BIT(9));
 	if (err < 0)
 		goto end;
 	if ((err < 6) || (buf[0] != 0x09)) {
