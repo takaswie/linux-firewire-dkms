@@ -46,6 +46,19 @@
 /* S/PDIF, ADAT1, ADAT2 is enabled or not. three quadlets */
 #define SAFFIREPRO_ENABLE_DIG_IFACES		0x0000000001a4
 
+/* saffirepro has its own parameter for sampling frequency */
+#define SAFFIREPRO_RATE_NOREBOOT		0x0000000001cc
+/* index is the value for this register */
+const static unsigned int rates[] = {
+	[0] = 0,
+	[1] = 44100,
+	[2] = 48000,
+	[3] = 88200,
+	[4] = 96000,
+	[5] = 176400,
+	[6] = 192000
+};
+
 /* saffire(no label)/saffire LE has metering */
 #define SAFFIRE_OFFSET_METER			0x000000000100
 #define SAFFIRE_LE_OFFSET_METER			0x000000000168
@@ -102,6 +115,40 @@ static char *saffirepro_26_clock_labels[] = {
 static char *saffirepro_10_clock_labels[] = {
 	"Internal", "S/PDIF", "Word Clock"
 };
+static int
+saffirepro_both_freq_get(struct snd_bebob *bebob, int *rate)
+{
+	u32 id;
+	int err;
+
+	err = saffire_read_quad(bebob, SAFFIREPRO_RATE_NOREBOOT, &id);
+	if (err < 0)
+		goto end;
+	if (id >= ARRAY_SIZE(rates)) {
+		err = -EIO;
+		goto end;
+	}
+
+	*rate = rates[id];
+end:
+	return err;
+}
+static int
+saffirepro_both_freq_set(struct snd_bebob *bebob, int rate)
+{
+	u32 id;
+	bool flag;
+
+	flag = false;
+	for (id = 0; id < ARRAY_SIZE(rates); id++) {
+		if (rates[id] == rate)
+			flag = true;
+	}
+	if (!flag)
+		return -EINVAL;
+
+	return saffire_write_quad(bebob, SAFFIREPRO_RATE_NOREBOOT, id);
+}
 static int
 saffirepro_both_clock_get(struct snd_bebob *bebob, int *id)
 {
@@ -275,9 +322,9 @@ saffire_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
 }
 
 /* TODO: need tester */
-static struct snd_bebob_freq_spec freq_spec = {
-	.get	= &snd_bebob_stream_get_rate,
-	.set	= &snd_bebob_stream_set_rate
+static struct snd_bebob_freq_spec saffirepro_both_freq_spec = {
+	.get	= &saffirepro_both_freq_get,
+	.set	= &saffirepro_both_freq_set
 };
 
 /* Saffire Pro 26 I/O  */
@@ -292,7 +339,7 @@ struct snd_bebob_spec saffirepro_26_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
-	.freq		= &freq_spec,
+	.freq		= &saffirepro_both_freq_spec,
 	.clock		= &saffirepro_26_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= NULL
@@ -311,10 +358,15 @@ struct snd_bebob_spec saffirepro_10_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
-	.freq		= &freq_spec,
+	.freq		= &saffirepro_both_freq_spec,
 	.clock		= &saffirepro_10_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= NULL
+};
+
+static struct snd_bebob_freq_spec saffire_both_freq_spec = {
+	.get	= &snd_bebob_stream_get_rate,
+	.set	= &snd_bebob_stream_set_rate
 };
 
 struct snd_bebob_clock_spec saffire_both_clock_spec= {
@@ -335,7 +387,7 @@ struct snd_bebob_spec saffire_le_spec = {
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
-	.freq		= &freq_spec,
+	.freq		= &saffire_both_freq_spec,
 	.clock		= &saffire_both_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= &saffire_le_meter_spec
@@ -350,7 +402,7 @@ struct snd_bebob_spec saffire_spec ={
 	.load		= NULL,
 	.discover	= &snd_bebob_stream_discover,
 	.map		= &snd_bebob_stream_map,
-	.freq		= &freq_spec,
+	.freq		= &saffire_both_freq_spec,
 	.clock		= &saffire_both_clock_spec,
 	.dig_iface	= NULL,
 	.meter		= &saffire_meter_spec
