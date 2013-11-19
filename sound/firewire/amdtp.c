@@ -118,6 +118,17 @@ const unsigned int amdtp_syt_intervals[CIP_SFC_COUNT] = {
 };
 EXPORT_SYMBOL(amdtp_syt_intervals);
 
+const unsigned int amdtp_rate_table[CIP_SFC_COUNT] = {
+	[CIP_SFC_32000]  =  32000,
+	[CIP_SFC_44100]  =  44100,
+	[CIP_SFC_48000]  =  48000,
+	[CIP_SFC_88200]  =  88200,
+	[CIP_SFC_96000]  =  96000,
+	[CIP_SFC_176400] = 176400,
+	[CIP_SFC_192000] = 192000
+};
+EXPORT_SYMBOL(amdtp_rate_table);
+
 /**
  * amdtp_stream_set_parameters - set stream parameters
  * @s: the AMDTP output stream to configure
@@ -134,15 +145,6 @@ void amdtp_stream_set_parameters(struct amdtp_stream *s,
 				 unsigned int pcm_channels,
 				 unsigned int midi_ports)
 {
-	unsigned int rates[] = {
-		[CIP_SFC_32000]  =  32000,
-		[CIP_SFC_44100]  =  44100,
-		[CIP_SFC_48000]  =  48000,
-		[CIP_SFC_88200]  =  88200,
-		[CIP_SFC_96000]  =  96000,
-		[CIP_SFC_176400] = 176400,
-		[CIP_SFC_192000] = 192000
-	};
 	unsigned int i, sfc, midi_channels;
 
 	midi_channels = DIV_ROUND_UP(midi_ports, 8);
@@ -151,8 +153,8 @@ void amdtp_stream_set_parameters(struct amdtp_stream *s,
 	    WARN_ON(midi_channels > AMDTP_MAX_CHANNELS_FOR_MIDI))
 		return;
 
-	for (sfc = 0; sfc < sizeof(rates); ++sfc)
-		if (rates[sfc] == rate)
+	for (sfc = 0; sfc < sizeof(amdtp_rate_table); ++sfc)
+		if (amdtp_rate_table[sfc] == rate)
 			goto sfc_found;
 	WARN_ON(1);
 	return;

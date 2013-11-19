@@ -175,22 +175,6 @@ int avc_audio_set_selector(struct fw_unit *unit, int subunit_id,
 int avc_audio_get_selector(struct fw_unit *unit, int subunit_id,
 			   int fb_id, int *num);
 
-/* AV/C Digital Interface Command Set General Specification 4.2 (1394TA) */
-enum avc_general_plug_dir {
-	AVC_GENERAL_PLUG_DIR_IN		= 0,
-	AVC_GENERAL_PLUG_DIR_OUT	= 1,
-	AVC_GENERAL_PLUG_COUNT
-};
-int avc_general_set_sig_fmt(struct fw_unit *unit, int rate,
-			    enum avc_general_plug_dir dir,
-			    unsigned short plug);
-int avc_general_get_sig_fmt(struct fw_unit *unit, int *rate,
-			    enum avc_general_plug_dir dir,
-			    unsigned short plug);
-int avc_general_get_plug_info(struct fw_unit *unit,
-			      unsigned short bus_plugs[AVC_GENERAL_PLUG_COUNT],
-			      unsigned short ext_plugs[AVC_GENERAL_PLUG_COUNT]);
-
 /* Connection and Compatibility Management 1.0 (1394TA) */
 int avc_ccm_get_sig_src(struct fw_unit *unit,
 			int *src_stype, int *src_sid, int *src_pid,
@@ -232,6 +216,12 @@ int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 				   enum snd_bebob_plug_dir pdir,
 				   unsigned short pid,
 				   int entryid, u8 *buf, int *len);
+
+int snd_bebob_get_rate(struct snd_bebob *bebob, int *rate,
+                       enum avc_general_plug_dir dir);
+int snd_bebob_set_rate(struct snd_bebob *bebob, int rate,
+                       enum avc_general_plug_dir dir);
+
 int snd_bebob_stream_get_rate(struct snd_bebob *bebob, int *rate);
 int snd_bebob_stream_set_rate(struct snd_bebob *bebob, int rate);
 int snd_bebob_stream_discover(struct snd_bebob *bebob);

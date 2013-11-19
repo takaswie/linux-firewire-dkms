@@ -63,13 +63,11 @@ snd_bebob_stream_get_rate(struct snd_bebob *bebob, int *curr_rate)
 {
 	int err, tx_rate, rx_rate;
 
-	err = avc_general_get_sig_fmt(bebob->unit, &tx_rate, 
-				      AVC_GENERAL_PLUG_DIR_OUT, 0);
+	err = snd_bebob_get_rate(bebob, &tx_rate, AVC_GENERAL_PLUG_DIR_OUT);
 	if (err < 0)
 		goto end;
 
-	err = avc_general_get_sig_fmt(bebob->unit, &rx_rate,
-				      AVC_GENERAL_PLUG_DIR_IN, 0);
+	err = snd_bebob_get_rate(bebob, &rx_rate, AVC_GENERAL_PLUG_DIR_IN);
 	if (err < 0)
 		goto end;
 
@@ -78,8 +76,7 @@ snd_bebob_stream_get_rate(struct snd_bebob *bebob, int *curr_rate)
 		goto end;
 
 	/* synchronize receive stream rate to transmit stream rate */
-	err = avc_general_set_sig_fmt(bebob->unit, rx_rate,
-				      AVC_GENERAL_PLUG_DIR_IN, 0);
+	err = snd_bebob_set_rate(bebob, rx_rate, AVC_GENERAL_PLUG_DIR_IN);
 end:
 	return err;
 }
@@ -89,13 +86,12 @@ snd_bebob_stream_set_rate(struct snd_bebob *bebob, int rate)
 {
 	int err;
 
-	/* move to strem_start? */
-	err = avc_general_set_sig_fmt(bebob->unit, rate,
-				      AVC_GENERAL_PLUG_DIR_OUT, 0);
+	/* TODO: move to strem_start? */
+	err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_OUT);
 	if (err < 0)
 		goto end;
-	err = avc_general_set_sig_fmt(bebob->unit, rate,
-				      AVC_GENERAL_PLUG_DIR_IN, 0);
+
+	err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN);
 end:
 	return err;
 }
@@ -582,8 +578,8 @@ end:
 int snd_bebob_stream_discover(struct snd_bebob *bebob)
 {
 	/* the number of plugs for input and output */
-	unsigned short bus_plugs[AVC_GENERAL_PLUG_COUNT];
-	unsigned short ext_plugs[AVC_GENERAL_PLUG_COUNT];
+	unsigned short bus_plugs[AVC_GENERAL_PLUG_DIR_COUNT];
+	unsigned short ext_plugs[AVC_GENERAL_PLUG_DIR_COUNT];
 	enum snd_bebob_plug_type type;
 	int i, err;
 

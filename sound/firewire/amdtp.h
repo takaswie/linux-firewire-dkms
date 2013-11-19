@@ -4,6 +4,7 @@
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/mutex.h>
+#include <sound/asound.h>
 #include "packets-buffer.h"
 
 /**
@@ -61,6 +62,7 @@ enum cip_sfc {
 struct fw_unit;
 struct fw_iso_context;
 struct snd_pcm_substream;
+struct snd_rawmidi_substream;
 
 enum amdtp_stream_direction {
 	AMDTP_IN_STREAM= 0,
@@ -144,6 +146,7 @@ void amdtp_stream_pcm_abort(struct amdtp_stream *s);
 bool amdtp_stream_wait_callback(struct amdtp_stream *s);
 
 extern const unsigned int amdtp_syt_intervals[CIP_SFC_COUNT];
+extern const unsigned int amdtp_rate_table[CIP_SFC_COUNT];
 
 void amdtp_stream_midi_add(struct amdtp_stream *s,
 			   struct snd_rawmidi_substream *substream);

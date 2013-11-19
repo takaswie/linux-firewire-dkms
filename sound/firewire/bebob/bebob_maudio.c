@@ -385,8 +385,7 @@ special_discover(struct snd_bebob *bebob)
  */
 static int special_get_freq(struct snd_bebob *bebob, int *rate)
 {
-	return avc_general_get_sig_fmt(bebob->unit, rate,
-				       AVC_GENERAL_PLUG_DIR_IN, 0);
+	return snd_bebob_get_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN);
 }
 static char *special_clock_labels[] = {
 	"Internal with Digital Mute", "Digital",

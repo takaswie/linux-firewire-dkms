@@ -104,148 +104,6 @@ end:
 	return err;
 }
 
-
-int avc_general_set_sig_fmt(struct fw_unit *unit, int rate,
-			    enum avc_general_plug_dir dir,
-			    unsigned short pid)
-{
-	int sfc, err;
-	u8 *buf;
-	bool flag;
-
-	flag = false;
-	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_sfc_table); sfc++) {
-		if (amdtp_sfc_table[sfc] == rate) {
-			flag = true;
-			break;
-		}
-	}
-	if (!flag)
-		return -EINVAL;
-
-	buf = kzalloc(8, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0] = 0x00;		/* AV/C CONTROL */
-	buf[1] = 0xff;		/* UNIT */
-	if (dir == AVC_GENERAL_PLUG_DIR_IN)
-		buf[2] = 0x19;	/* INPUT PLUG SIGNAL FORMAT */
-	else
-		buf[2] = 0x18;	/* OUTPUT PLUG SIGNAL FORMAT */
-	buf[3] = 0xff & pid;	/* plug id */
-	buf[4] = 0x90;		/* EOH_1, Form_1, FMT means audio and music */
-	buf[5] = 0x00 | sfc;	/* FDF-hi */
-	buf[6] = 0xff;		/* FDF-mid */
-	buf[7] = 0xff;		/* FDF-low */
-
-	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
-	if (err < 0)
-		goto end;
-	/* ACCEPTED or INTERIM is OK */
-	if ((err < 6) || ((buf[0] != 0x0f) && (buf[0] != 0x09))) {
-		dev_err(&unit->device, "failed to set sample rate\n");
-		err = -EIO;
-		goto end;
-	}
-
-	err = 0;
-end:
-	kfree(buf);
-	return err;
-}
-
-int avc_general_get_sig_fmt(struct fw_unit *unit, int *rate,
-			    enum avc_general_plug_dir dir,
-			    unsigned short pid)
-{
-	int sfc, evt;
-	u8 *buf;
-	int err;
-
-	buf = kzalloc(8, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0] = 0x01;		/* AV/C STATUS */
-	buf[1] = 0xff;		/* Unit */
-	if (dir == AVC_GENERAL_PLUG_DIR_IN)
-		buf[2] = 0x19;	/* INPUT PLUG SIGNAL FORMAT */
-	else
-		buf[2] = 0x18;	/* OUTPUT PLUG SIGNAL FORMAT */
-	buf[3] = 0xff & pid;	/* plug id */
-	buf[4] = 0x90;		/* EOH_1, Form_1, FMT means audio and music */
-	buf[5] = 0xff;		/* FDF-hi */
-	buf[6] = 0xff;		/* FDF-mid */
-	buf[7] = 0xff;		/* FDF-low */
-
-	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
-	if (err < 0)
-		goto end;
-	/* IMPLEMENTED/STABLE is OK */
-	if ((err < 6) || (buf[0] != 0x0c)){
-		dev_err(&unit->device, "failed to get sample rate\n");
-		err = -EIO;
-		goto end;
-	}
-
-	/* check EVT field */
-	evt = (0x30 & buf[5]) >> 4;
-	if (evt != 0) {	/* not AM824 */
-		err = -EINVAL;
-		goto end;
-	}
-
-	/* check sfc field */
-	sfc = 0x07 & buf[5];
-	if (sfc >= ARRAY_SIZE(amdtp_sfc_table)) {
-		err = -EINVAL;
-		goto end;
-	}
-
-	*rate = amdtp_sfc_table[sfc];
-	err = 0;
-end:
-	kfree(buf);
-	return err;
-}
-
-int avc_general_get_plug_info(struct fw_unit *unit,
-			unsigned short bus_plugs[2],
-			unsigned short ext_plugs[2])
-{
-	u8 *buf;
-	int err;
-
-	buf = kzalloc(8, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0] = 0x01;	/* AV/C STATUS */
-	buf[1] = 0xff;	/* UNIT */
-	buf[2] = 0x02;	/* PLUG INFO */
-	buf[3] = 0x00;
-
-	err = fcp_avc_transaction(unit, buf, 8, buf, 8, 0);
-	if (err < 0)
-		goto end;
-	/* IMPLEMENTED/STABLE is OK */
-	else if ((err < 6) || (buf[0] != 0x0c)) {
-		err = -EIO;
-		goto end;
-	}
-
-	bus_plugs[0] = buf[4];
-	bus_plugs[1] = buf[5];
-	ext_plugs[0] = buf[6];
-	ext_plugs[1] = buf[7];
-
-	err = 0;
-end:
-	kfree(buf);
-	return err;
-}
-
 int avc_ccm_get_sig_src(struct fw_unit *unit,
 			int *src_stype, int *src_sid, int *src_pid,
 			int dst_stype, int dst_sid, int dst_pid)
@@ -505,6 +363,44 @@ int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 	memmove(buf, buf + 11, err - 11);
 	*len = err - 11;
 	err = 0;
+end:
+	return err;
+}
+
+int snd_bebob_get_rate(struct snd_bebob *bebob, int *rate,
+		       enum avc_general_plug_dir dir)
+{
+	int err;
+
+	err = avc_general_get_sig_fmt(bebob->unit, rate, dir, 0);
+	if (err < 0)
+		goto end;
+
+	/* IMPLEMENTED/STABLE is OK */
+	if (err != 0x0c) {
+		dev_err(&bebob->unit->device,
+			"failed to get sampling rate\n");
+		err = -EIO;
+	}
+end:
+	return err;
+}
+
+int snd_bebob_set_rate(struct snd_bebob *bebob, int rate,
+		       enum avc_general_plug_dir dir)
+{
+	int err;
+
+	err = avc_general_set_sig_fmt(bebob->unit, rate, dir, 0);
+	if (err < 0)
+		goto end;
+
+	/* ACCEPTED or INTERIM is OK */
+	if ((err != 0x0f) && (err != 0x09)) {
+		dev_err(&bebob->unit->device,
+			"failed to set sampling rate\n");
+		err = -EIO;
+	}
 end:
 	return err;
 }
