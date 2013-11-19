@@ -62,31 +62,48 @@ config SND_SCS1X
 	  will be called snd-scs1x.
 
 config SND_FIREWORKS
-        tristate "Echo Fireworks chipset support"
+        tristate "Echo Fireworks board support"
         select SND_PCM
         select SND_RAWMIDI
+	select SND_HWDEP
 	select SND_FIREWIRE_LIB
         help
           Say Y here to include support for FireWire devices based
-          on Echo Digital Audio's Fireworks architecture:
-          * Echo AudioFire 2/4/8/8a/Pre8/12
-          * Echo Fireworks 8/HDMI
-          * Gibson Goldtop/RIP
+          on Echo Digital Audio Fireworks board:
           * Mackie Onyx 400F/1200F
+	  * Echo AudioFire8(until 2009 July)/AudioFire12
+          * Echo AudioFire2/4/8(since 2009 July)/Pre8
+          * Echo Fireworks 8/HDMI
+          * Gibson RIP/GoldTop
 
           To compile this driver as a module, choose M here: the module
           will be called snd-fireworks.
 
 config SND_BEBOB
-	tristate "Bridge Co. BeBoB chipset support"
+	tristate "BridgeCo BeBoB chipset support"
         select SND_PCM
         select SND_RAWMIDI
+	select SND_HWDEP
 	select SND_FIREWIRE_LIB
         help
-          Say Y here to include support for FireWire devices based
-          on Bridge Co.'s BeBoB architecture:
-          * M-Audio Firewire 410/1814/Solo/AudioPhile
-	  * M-Audio Ozonic
+	 Say Y here to include support for FireWire devices based
+	 on BridgeCo BeBoB chipset:
+	  * M-Audio Firewire410/AudioPhile/Solo/Ozonic/NRV10
+	  * M-Audio Firewire1814/ProjectMix IO/ProfireLightBridge
+	  * PreSonus FIREBOX/FirePod
+	  * Yamaha GO44/GO46
+	  * TerraTec PHASE 24 FW/PHASE X24 FW/PHASE 88 Rack FW
+	  * Edirol FA-66/FA-101
+	  * Focusrite Saffire/Saffire LE/SaffirePro10 IO/SaffirePro26 IO
+	  * Mackie OnyxFirewire
+	  * Tascam  IF-FW/DM
+	  * Behringer X32
+	  * Apogee Rosetta200
+	  * ESI Quotafire610
+	  * AcousticReality eARMasterOne
+	  * CME MatrixKFW
+	  * Phonic HB24U
+	  * BridgeCo RDAudio1/Audio5
 
           To compile this driver as a module, choose M here: the module
           will be called snd-fireworks.
