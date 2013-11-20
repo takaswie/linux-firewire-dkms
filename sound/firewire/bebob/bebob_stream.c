@@ -168,6 +168,25 @@ end:
 }
 
 static int
+check_connection_used_by_others(struct snd_bebob *bebob,
+				struct amdtp_stream *s, bool *used)
+{
+	struct cmp_connection *conn;
+	int err;
+
+	if (s == &bebob->tx_stream)
+		conn = &bebob->out_conn;
+	else
+		conn = &bebob->in_conn;
+
+	err = cmp_connection_check_used(conn, used);
+	if (err >= 0)
+		*used = (*used && !amdtp_stream_running(s));
+
+	return err;
+}
+
+static int
 make_both_connections(struct snd_bebob *bebob, int rate)
 {
 	int index, pcm_channels, midi_channels, err;
@@ -291,7 +310,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
 	int err, curr_rate;
-	bool slave_flag;
+	bool slave_flag, used;
 
 	mutex_lock(&bebob->mutex);
 
@@ -303,6 +322,21 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		slave_flag = true;
 	else
 		slave_flag = false;
+
+	/*
+	 * Considering JACK/FFADO streaming:
+	 * TODO: This can be removed hwdep functionality becomes popular.
+	 */
+	err = check_connection_used_by_others(bebob, master, &used);
+	if (err < 0)
+		goto end;
+	if (used) {
+		dev_err(&bebob->unit->device,
+			"connections established by others: %d\n",
+			used);
+		err = -EBUSY;
+		goto end;
+	}
 
 	/* get current rate */
 	err = freq->get(bebob, &curr_rate);

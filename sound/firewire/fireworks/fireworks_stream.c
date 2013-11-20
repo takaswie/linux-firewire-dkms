@@ -167,6 +167,25 @@ end:
 	return err;
 }
 
+static int
+check_connection_used_by_others(struct snd_efw *efw,
+				struct amdtp_stream *s, bool *used)
+{
+	struct cmp_connection *conn;
+	int err;
+
+	if (s == &efw->tx_stream)
+		conn = &efw->out_conn;
+	else
+		conn = &efw->in_conn;
+
+	err = cmp_connection_check_used(conn, used);
+	if (err >= 0)
+		*used = (*used && !amdtp_stream_running(s));
+
+	return err;
+}
+
 int snd_efw_stream_init_duplex(struct snd_efw *efw)
 {
 	int err;
@@ -192,7 +211,7 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
 	int err, curr_rate;
-	bool slave_flag;
+	bool slave_flag, used;
 
 	err = get_roles(efw, &sync_mode, &master, &slave);
 	if (err < 0)
@@ -202,6 +221,21 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 		slave_flag = true;
 	else
 		slave_flag = false;
+
+	/*
+	 * Considering JACK/FFADO streaming:
+	 * TODO: This can be removed hwdep functionality becomes popular.
+	 */
+	err = check_connection_used_by_others(efw, master, &used);
+	if (err < 0)
+		goto end;
+	if (used) {
+		dev_err(&efw->unit->device,
+			"connections established by others: %d\n",
+			used);
+		err = -EBUSY;
+		goto end;
+	}
 
 	/* change sampling rate if possible */
 	err = snd_efw_command_get_sampling_rate(efw, &curr_rate);
