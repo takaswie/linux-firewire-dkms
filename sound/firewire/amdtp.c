@@ -1,7 +1,6 @@
 /*
  * Audio and Music Data Transmission Protocol (IEC 61883-6) streams
- * with Common Isochronous Packet (IEC 61883-1) headers and MIDI comformant
- * data according to MMA/AMEI RP-027.
+ * with Common Isochronous Packet (IEC 61883-1) headers
  *
  * Copyright (c) Clemens Ladisch <clemens@ladisch.de>
  * Licensed under the terms of the GNU General Public License, version 2.
@@ -31,28 +30,29 @@
 #define CIP_EOH			(1u << 31)
 #define CIP_EOH_MASK		0x80000000
 #define CIP_FMT_AM		(0x10 << 24)
-#define CIP_FMT_MASK		0x3F000000
-#define	CIP_SYT_NO_INFO		0xFFFF
+#define CIP_FMT_MASK		0x3f000000
+#define CIP_SYT_MASK		0x0000ffff
+#define CIP_SYT_NO_INFO		0xffff
+#define CIP_FDF_MASK		0x00ff0000
+#define CIP_FDF_SFC_SHIFT	16
 
-/* Audio and Music transfer protocol specific parameters */
-#define AMDTP_FDF_MASK		0x00FF0000
-#define AMDTP_FDF_SFC_SHIFT	16
-#define AMDTP_FDF_NO_DATA	(0xFF << AMDTP_FDF_SFC_SHIFT)
-/* only "Clock-based rate controll mode" is supported */
-#define AMDTP_FDF_AM824		(0 << (AMDTP_FDF_SFC_SHIFT + 3))
-#define AMDTP_SYT_MASK		0x0000FFFF
-#define AMDTP_DBS_MASK		0x00FF0000
+/*
+ * Audio and Music transfer protocol specific parameters
+ * only "Clock-based rate controll mode" is supported
+ */
+#define AMDTP_FDF_AM824		(0 << (CIP_FDF_SFC_SHIFT + 3))
+#define AMDTP_DBS_MASK		0x00ff0000
 #define AMDTP_DBS_SHIFT		16
-#define AMDTP_DBC_MASK		0x000000FF
-#define DBC_THREADSHOULD	(AMDTP_DBC_MASK / 2)
+#define AMDTP_DBC_MASK		0x000000ff
+#define DBC_THREADSHOULD        (AMDTP_DBC_MASK / 2)
 
 /* TODO: make these configurable */
 #define INTERRUPT_INTERVAL	16
 #define QUEUE_LENGTH		48
 #define CALLBACK_TIMEOUT_MS	100
 
-#define IN_PACKET_HEADER_SIZE	4
-#define OUT_PACKET_HEADER_SIZE	0
+#define TRANSMIT_PACKET_HEADER_SIZE	4
+#define RECEIVE_PACKET_HEADER_SIZE	0
 
 /* for re-ordering receive packets */
 struct sort_table {
@@ -67,22 +67,19 @@ static void pcm_period_tasklet(unsigned long data);
  * amdtp_stream_init - initialize an AMDTP stream structure
  * @s: the AMDTP stream to initialize
  * @unit: the target of the stream
+ * @dir: the direction of stream
  * @flags: the packet transmission method to use
  */
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
-		      enum amdtp_stream_direction direction,
-		      enum cip_flags flags)
+		      enum amdtp_stream_direction dir, enum cip_flags flags)
 {
 	s->unit = fw_unit_get(unit);
-	s->direction = direction;
+	s->direction = dir;
 	s->flags = flags;
 	s->context = ERR_PTR(-1);
 	mutex_init(&s->mutex);
 	tasklet_init(&s->period_tasklet, pcm_period_tasklet, (unsigned long)s);
 	s->packet_index = 0;
-
-	s->pcm = NULL;
-	s->blocks_for_midi = UINT_MAX;
 
 	init_waitqueue_head(&s->callback_wait);
 	s->callbacked = false;
@@ -90,6 +87,8 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 
 	s->sort_table = NULL;
 	s->left_packets = NULL;
+
+	s->blocks_for_midi = UINT_MAX;
 
 	return 0;
 }
@@ -118,20 +117,20 @@ const unsigned int amdtp_syt_intervals[CIP_SFC_COUNT] = {
 };
 EXPORT_SYMBOL(amdtp_syt_intervals);
 
-const unsigned int amdtp_rate_table[CIP_SFC_COUNT] = {
+const unsigned int amdtp_rate_table[] = {
 	[CIP_SFC_32000]  =  32000,
 	[CIP_SFC_44100]  =  44100,
 	[CIP_SFC_48000]  =  48000,
 	[CIP_SFC_88200]  =  88200,
 	[CIP_SFC_96000]  =  96000,
 	[CIP_SFC_176400] = 176400,
-	[CIP_SFC_192000] = 192000
+	[CIP_SFC_192000] = 192000,
 };
 EXPORT_SYMBOL(amdtp_rate_table);
 
 /**
  * amdtp_stream_set_parameters - set stream parameters
- * @s: the AMDTP output stream to configure
+ * @s: the AMDTP stream to configure
  * @rate: the sample rate
  * @pcm_channels: the number of PCM samples in each data block, to be encoded
  *                as AM824 multi-bit linear audio
@@ -169,8 +168,11 @@ sfc_found:
 		s->sfc = sfc;
 		s->pcm_channels = pcm_channels;
 	}
+	s->sfc = sfc;
+	s->pcm_channels = pcm_channels;
 	s->midi_channels = midi_channels;
 	s->data_block_quadlets = s->pcm_channels + s->midi_channels;
+
 	s->syt_interval = amdtp_syt_intervals[s->sfc];
 
 	/* default buffering in the device */
@@ -183,7 +185,7 @@ sfc_found:
 	for (i = 0; i < pcm_channels; i++)
 		s->pcm_positions[i] = i;
 	for (i = 0; i < midi_channels; i++)
-		s->midi_positions[i] = pcm_channels + i;
+		s->midi_positions[i] = s->pcm_channels + i;
 }
 EXPORT_SYMBOL(amdtp_stream_set_parameters);
 
@@ -192,7 +194,7 @@ EXPORT_SYMBOL(amdtp_stream_set_parameters);
  * @s: the AMDTP stream
  *
  * This function must not be called before the stream has been configured
- * with amdtp_stream_set_params().
+ * with amdtp_stream_set_parameters().
  */
 unsigned int amdtp_stream_get_max_payload(struct amdtp_stream *s)
 {
@@ -231,18 +233,21 @@ static void amdtp_read_s32_dualwire(struct amdtp_stream *s,
  * @format: the format of the ALSA PCM device
  *
  * The sample format must be set after the other paramters (rate/PCM channels/
- * MIDI) and before the pcm stream is started, and must not be changed while the
+ * MIDI) and before the stream is started, and must not be changed while the
  * stream is running.
  */
 void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
 				 snd_pcm_format_t format)
 {
+	if (WARN_ON(amdtp_stream_pcm_running(s)))
+		return;
+
 	switch (format) {
 	default:
 		WARN_ON(1);
 		/* fall through */
 	case SNDRV_PCM_FORMAT_S16:
-		if (s->direction == AMDTP_IN_STREAM) {
+		if (s->direction == AMDTP_TRANSMIT_STREAM) {
 			if (s->dual_wire)
 				s->transfer_samples = amdtp_read_s16_dualwire;
 			else
@@ -253,7 +258,7 @@ void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
 			s->transfer_samples = amdtp_write_s16;
 		break;
 	case SNDRV_PCM_FORMAT_S32:
-		if (s->direction == AMDTP_IN_STREAM) {
+		if (s->direction == AMDTP_TRANSMIT_STREAM) {
 			if (s->dual_wire)
 				s->transfer_samples = amdtp_read_s32_dualwire;
 			else
@@ -288,10 +293,10 @@ static unsigned int calculate_data_blocks(struct amdtp_stream *s)
 
 	if (s->flags & CIP_BLOCKING)
 		data_blocks = s->syt_interval;
-	else if (!cip_sfc_is_base_44100(s->sfc))
+	else if (!cip_sfc_is_base_44100(s->sfc)) {
 		/* Sample_rate / 8000 is an integer, and precomputed. */
 		data_blocks = s->data_block_state;
-	else {
+	} else {
 		phase = s->data_block_state;
 
 		/*
@@ -333,7 +338,6 @@ static unsigned int calculate_syt(struct amdtp_stream *s,
 		 * elements is about 1386.23.  Rounding the results of this
 		 * formula to the SYT precision results in a sequence of
 		 * differences that begins with:
-
 		 *   1386 1386 1387 1386 1386 1386 1387 1386 1386 1386 1387 ...
 		 * This code generates _exactly_ the same sequence.
 		 */
@@ -355,48 +359,10 @@ static unsigned int calculate_syt(struct amdtp_stream *s,
 		syt = (cycle + syt_offset / TICKS_PER_CYCLE) << 12;
 		syt += syt_offset % TICKS_PER_CYCLE;
 
-		return syt & AMDTP_SYT_MASK;
+		return syt & CIP_SYT_MASK;
 	} else {
 		return CIP_SYT_NO_INFO; /* no info */
 	}
-}
-
-#define SWAP(tbl, m, n) \
-	t = tbl[n].id; \
-	tbl[n].id = tbl[m].id; \
-	tbl[m].id = t; \
-	t = tbl[n].dbc; \
-	tbl[n].dbc = tbl[m].dbc; \
-	tbl[m].dbc = t; \
-	t = tbl[n].payload_size; \
-	tbl[n].payload_size = tbl[m].payload_size; \
-	tbl[m].payload_size = t;
-static void packet_sort(struct sort_table *tbl, unsigned int len)
-{
-	unsigned int i, j, k, t;
-
-	i = 0;
-	do {
-		for (j = i + 1; j < len; j++) {
-			if (((tbl[i].dbc > tbl[j].dbc) &&
-			     (tbl[i].dbc - tbl[j].dbc < DBC_THREADSHOULD))) {
-				SWAP(tbl, i, j);
-			} else if ((tbl[j].dbc > tbl[i].dbc) &&
-			           (tbl[j].dbc - tbl[i].dbc >
-							DBC_THREADSHOULD)) {
-				for (k = i; k > 0; k--) {
-					if ((tbl[k].dbc > tbl[j].dbc) ||
-					    (tbl[j].dbc - tbl[k].dbc >
-							DBC_THREADSHOULD)) {
-						SWAP(tbl, j, k);
-					}
-					break;
-				}
-			}
-			break;
-		}
-		i = j;
-	} while (i < len);
 }
 
 static void amdtp_write_s32(struct amdtp_stream *s,
@@ -629,6 +595,21 @@ static void amdtp_fill_pcm_silence(struct amdtp_stream *s,
 	}
 }
 
+static void amdtp_fill_pcm_silence_dualwire(struct amdtp_stream *s,
+					   __be32 *buffer, unsigned int frames)
+{
+	unsigned int i, c, channels;
+
+	channels = s->pcm_channels /2;
+	for (i = 0; i < frames; ++i) {
+		for (c = 0; c < channels; ++c) {
+			buffer[s->pcm_positions[c] * 2] =
+			buffer[s->pcm_positions[c] * 2 + 1] =
+						cpu_to_be32(0x40000000);
+		}
+		buffer += s->data_block_quadlets;
+	}
+}
 static void amdtp_fill_midi(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
@@ -643,6 +624,11 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 			b[1] = 0x00;
 			len = 0;
 
+			/*
+			 * NOTE:
+			 * Fireworks ignores midi messages in more than first 8
+			 * data blocks in an packet.
+			 */
 			port = c * 8 + m;
 			if ((f < s->blocks_for_midi) &&
 			    (s->midi[port] != NULL) &&
@@ -669,8 +655,6 @@ static void amdtp_pull_midi(struct amdtp_stream *s,
 	u8 *b;
 
 	for (f = 0; f < frames; f++) {
-		buffer += s->pcm_channels;
-
 		m = (s->data_block_counter + f) % 8;
 		for (c = 0; c < s->midi_channels; c++) {
 			b = (u8 *)&buffer[s->midi_positions[c]];
@@ -748,58 +732,50 @@ end:
 static inline int queue_out_packet(struct amdtp_stream *s,
 				   unsigned int payload_length, bool skip)
 {
-	return queue_packet(s, OUT_PACKET_HEADER_SIZE,
+	return queue_packet(s, RECEIVE_PACKET_HEADER_SIZE,
 			    payload_length, skip);
 }
 
 static inline int queue_in_packet(struct amdtp_stream *s)
 {
-	return queue_packet(s, IN_PACKET_HEADER_SIZE,
+	return queue_packet(s, TRANSMIT_PACKET_HEADER_SIZE,
 			    amdtp_stream_get_max_payload(s), false);
 }
 
 static void handle_out_packet(struct amdtp_stream *s, unsigned int syt)
 {
 	__be32 *buffer;
-	unsigned int fdf, data_blocks, payload_length;
+	unsigned int data_blocks, payload_length;
 	struct snd_pcm_substream *pcm = NULL;
 
 	if (s->packet_index < 0)
 		return;
 
+	/* this module generate empty CIP packet for 'no data' */
 	if (!(s->flags & CIP_BLOCKING) || (syt != CIP_SYT_NO_INFO))
 		data_blocks = calculate_data_blocks(s);
-	else {
-		syt = CIP_SYT_NO_INFO;
+	else
 		data_blocks = 0;
-	}
-
-	/*
-	 * In blocking mode, even if it's "nodata" packet, BeBoB needs FDF to
-	 * indicate sanpling rate.
-	 */
-	fdf = s->sfc << AMDTP_FDF_SFC_SHIFT;
 
 	buffer = s->buffer.packets[s->packet_index].buffer;
 	buffer[0] = cpu_to_be32(ACCESS_ONCE(s->source_node_id_field) |
 				(s->data_block_quadlets << AMDTP_DBS_SHIFT) |
 				s->data_block_counter);
 	buffer[1] = cpu_to_be32(CIP_EOH | CIP_FMT_AM | AMDTP_FDF_AM824 |
-				fdf | syt);
+				(s->sfc << CIP_FDF_SFC_SHIFT) | syt);
 	buffer += 2;
 
-	if (data_blocks > 0) {
-		pcm = ACCESS_ONCE(s->pcm);
-		if (pcm)
-			s->transfer_samples(s, pcm, buffer, data_blocks);
-		else
-			amdtp_fill_pcm_silence(s, buffer, data_blocks);
+	pcm = ACCESS_ONCE(s->pcm);
+	if (pcm)
+		s->transfer_samples(s, pcm, buffer, data_blocks);
+	else if (s->dual_wire)
+		amdtp_fill_pcm_silence_dualwire(s, buffer, data_blocks);
+	else
+		amdtp_fill_pcm_silence(s, buffer, data_blocks);
+	if (s->midi_channels)
+		amdtp_fill_midi(s, buffer, data_blocks);
 
-		if (s->midi_channels > 0)
-			amdtp_fill_midi(s, buffer, data_blocks);
-
-		s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
-	}
+	s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
 
 	payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
 	if (queue_out_packet(s, payload_length, false) < 0) {
@@ -816,7 +792,7 @@ static void handle_in_packet(struct amdtp_stream *s,
 			     __be32 *buffer)
 {
 	u32 cip_header[2];
-	unsigned int data_blocks = 0;
+	unsigned int data_blocks;
 	struct snd_pcm_substream *pcm;
 
 	cip_header[0] = be32_to_cpu(buffer[0]);
@@ -830,15 +806,14 @@ static void handle_in_packet(struct amdtp_stream *s,
 	    ((cip_header[1] & CIP_EOH_MASK) != CIP_EOH) ||
 	    ((cip_header[1] & CIP_FMT_MASK) != CIP_FMT_AM)) {
 		dev_info(&s->unit->device,
-			 "invalid CIP header: %08X:%08X\n",
+			 "Invalid CIP header for AMDTP: %08X:%08X\n",
 			 cip_header[0], cip_header[1]);
 		return;
 	}
 
 	if ((payload_quadlets < 3) ||
-	    ((cip_header[1] & AMDTP_FDF_MASK) == AMDTP_FDF_NO_DATA) ||
 	     ((s->flags & CIP_BLOCKING) &&
-	      ((cip_header[1] & AMDTP_SYT_MASK) == CIP_SYT_NO_INFO)))
+	      ((cip_header[1] & CIP_SYT_MASK) == CIP_SYT_NO_INFO)))
 		return;
 
 	/*
@@ -858,14 +833,61 @@ static void handle_in_packet(struct amdtp_stream *s,
 	pcm = ACCESS_ONCE(s->pcm);
 	if (pcm)
 		s->transfer_samples(s, pcm, buffer, data_blocks);
-	if (s->midi_channels > 0)
+
+	if (s->midi_channels)
 		amdtp_pull_midi(s, buffer, data_blocks);
 
 	if (pcm)
 		check_pcm_pointer(s, pcm, data_blocks);
 }
 
-/* This function is for the device which synchronizes to this module. */
+#define SWAP(tbl, m, n) \
+	t = tbl[n].id; \
+	tbl[n].id = tbl[m].id; \
+	tbl[m].id = t; \
+	t = tbl[n].dbc; \
+	tbl[n].dbc = tbl[m].dbc; \
+	tbl[m].dbc = t; \
+	t = tbl[n].payload_size; \
+	tbl[n].payload_size = tbl[m].payload_size; \
+	tbl[m].payload_size = t;
+static void packet_sort(struct sort_table *tbl, unsigned int len)
+{
+	unsigned int i, j, k, t;
+
+	i = 0;
+	do {
+		for (j = i + 1; j < len; j++) {
+			if (((tbl[i].dbc > tbl[j].dbc) &&
+			     (tbl[i].dbc - tbl[j].dbc < DBC_THREADSHOULD))) {
+				SWAP(tbl, i, j);
+			} else if ((tbl[j].dbc > tbl[i].dbc) &&
+			           (tbl[j].dbc - tbl[i].dbc >
+							DBC_THREADSHOULD)) {
+				for (k = i; k > 0; k--) {
+					if ((tbl[k].dbc > tbl[j].dbc) ||
+					    (tbl[j].dbc - tbl[k].dbc >
+							DBC_THREADSHOULD)) {
+						SWAP(tbl, j, k);
+					}
+					break;
+				}
+			}
+			break;
+		}
+		i = j;
+	} while (i < len);
+}
+
+static inline void add_transfer_delay(struct amdtp_stream *s, unsigned int *syt)
+{
+	if (*syt != CIP_SYT_NO_INFO) {
+		*syt += (s->transfer_delay / TICKS_PER_CYCLE) << 12;
+		*syt += s->transfer_delay % TICKS_PER_CYCLE;
+		*syt &= CIP_SYT_MASK;
+	}
+}
+
 static void out_stream_callback(struct fw_iso_context *context, u32 cycle,
 				size_t header_length, void *header,
 				void *private_data)
@@ -887,26 +909,17 @@ static void out_stream_callback(struct fw_iso_context *context, u32 cycle,
 	fw_iso_context_queue_flush(s->context);
 }
 
-static inline void add_transfer_delay(struct amdtp_stream *s, unsigned int *syt)
-{
-	if (*syt != CIP_SYT_NO_INFO) {
-		*syt += (s->transfer_delay / TICKS_PER_CYCLE) << 12;
-		*syt += s->transfer_delay % TICKS_PER_CYCLE;
-		*syt &= AMDTP_SYT_MASK;
-	}
-}
-
 static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 			       size_t header_length, void *header,
 			       void *private_data)
 {
 	struct amdtp_stream *s = private_data;
 	struct sort_table *entry, *tbl = s->sort_table;
-	unsigned int i, j, k, packets, index, syt, remain_packets;
+	unsigned int i, j, k, index, packets, syt, remain_packets;
 	__be32 *buffer, *headers = header;
 
 	/* The number of packets in buffer */
-	packets = header_length / IN_PACKET_HEADER_SIZE;
+	packets = header_length / TRANSMIT_PACKET_HEADER_SIZE;
 
 	/* Store into sort table and sort. */
 	for (i = 0; i < packets; i++) {
@@ -945,7 +958,7 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 			if ((s->flags & CIP_BLOCKING) &&
 			    (s->flags & CIP_SYNC_TO_DEVICE) &&
 			    s->sync_slave->callbacked) {
-				syt = be32_to_cpu(buffer[1]) & AMDTP_SYT_MASK;
+				syt = be32_to_cpu(buffer[1]) & CIP_SYT_MASK;
 				add_transfer_delay(s, &syt);
 				handle_out_packet(s->sync_slave, syt);
 			}
@@ -992,7 +1005,7 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
 
 	s->callbacked = true;
 
-	if (s->direction == AMDTP_IN_STREAM)
+	if (s->direction == AMDTP_TRANSMIT_STREAM)
 		context->callback.sc = in_stream_callback;
 	else if (!(s->flags & CIP_SYNC_TO_DEVICE))
 		context->callback.sc = out_stream_callback;
@@ -1011,12 +1024,11 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
  * @speed: firewire speed code
  *
  * The stream cannot be started until it has been configured with
- * amdtp_stream_set_params()  and it must be started before any
- * PCM or MIDI device can be started.
+ * amdtp_stream_set_parameters() and amdtp_stream_set_pcm_format(),
+ * and it must be started before any PCM or MIDI device can be started.
  */
 int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 {
-
 	static const struct {
 		unsigned int data_block;
 		unsigned int syt_offset;
@@ -1027,7 +1039,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		[CIP_SFC_192000] = { 24, 1024 },
 		[CIP_SFC_44100]  = {  0,   67 },
 		[CIP_SFC_88200]  = {  0,   67 },
-		[CIP_SFC_176400] = {  0,   67 }
+		[CIP_SFC_176400] = {  0,   67 },
 	};
 	unsigned int header_size;
 	enum dma_data_direction dir;
@@ -1036,7 +1048,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	mutex_lock(&s->mutex);
 
 	if (WARN_ON(amdtp_stream_running(s) ||
-	    (s->data_block_quadlets < 1))) {
+		    (s->data_block_quadlets < 1))) {
 		err = -EBADFD;
 		goto err_unlock;
 	}
@@ -1046,22 +1058,22 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	s->last_syt_offset = TICKS_PER_CYCLE;
 
 	/* initialize packet buffer */
-	if (s->direction == AMDTP_IN_STREAM) {
+	if (s->direction == AMDTP_TRANSMIT_STREAM) {
 		dir = DMA_FROM_DEVICE;
 		type = FW_ISO_CONTEXT_RECEIVE;
-		header_size = IN_PACKET_HEADER_SIZE;
+		header_size = TRANSMIT_PACKET_HEADER_SIZE;
 	} else {
 		dir = DMA_TO_DEVICE;
 		type = FW_ISO_CONTEXT_TRANSMIT;
-		header_size = OUT_PACKET_HEADER_SIZE;
+		header_size = RECEIVE_PACKET_HEADER_SIZE;
 	}
 	err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
 				      amdtp_stream_get_max_payload(s), dir);
 	if (err < 0)
 		goto err_unlock;
 
-	/* to sort receive packets */
-	if (s->direction == AMDTP_IN_STREAM) {
+	/* for sorting transmitted packets */
+	if (s->direction == AMDTP_TRANSMIT_STREAM) {
 		s->remain_packets = 0;
 		s->sort_table = kzalloc(sizeof(struct sort_table) *
 					QUEUE_LENGTH, GFP_KERNEL);
@@ -1071,7 +1083,6 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 					  QUEUE_LENGTH / 4, GFP_KERNEL);
 	}
 
-	/* NOTE: this callback is overwritten later */
 	s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
 					   type, channel, speed, header_size,
 					   amdtp_stream_callback, s);
@@ -1087,7 +1098,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 
 	s->packet_index = 0;
 	do {
-		if (s->direction == AMDTP_IN_STREAM)
+		if (s->direction == AMDTP_TRANSMIT_STREAM)
 			err = queue_in_packet(s);
 		else
 			err = queue_out_packet(s, 0, true);
@@ -1096,10 +1107,8 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	} while (s->packet_index > 0);
 
 	/*
-	 * NOTE:
-	 * The fourth argument is effective for receive context and should be.
-	 * "FW_ISO_CONTEXT_MATCH_TAG1" for receive but Fireworks outputs
-	 * NODATA packets with tag 0.
+	 * NOTE: TAG1 matches CIP. This just affects in stream.
+	 * Fireworks transmits NODATA packets with TAG0.
 	 */
 	s->data_block_counter = 0;
 	s->callbacked = false;
