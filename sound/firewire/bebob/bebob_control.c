@@ -71,7 +71,7 @@ control_sampling_rate_info(struct snd_kcontrol *kctl,
 			   struct snd_ctl_elem_info *einf)
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
-	int i, value;
+	unsigned int i, value;
 
 	/* maximum value for user */
 	einf->value.enumerated.items = 0;
@@ -108,7 +108,8 @@ control_sampling_rate_get(struct snd_kcontrol *kctl,
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
 	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
-	int i, sampling_rate, index, err;
+	unsigned int i, sampling_rate, index;
+	int err;
 
 	mutex_lock(&bebob->mutex);
 
@@ -136,7 +137,8 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
 	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
-	int value, index, sampling_rate, err, changed = 0;
+	unsigned int index, sampling_rate;
+	int value, changed = 0;
 
 	/* get index from user value*/
 	value = uval->value.enumerated.item[0];
@@ -153,8 +155,7 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 	sampling_rate = snd_bebob_rate_table[index];
 
 	mutex_lock(&bebob->mutex);
-	err = spec->set_freq(bebob, sampling_rate);
-	if (err < 0)
+	if (spec->set_freq(bebob, sampling_rate) < 0)
 		goto end;
 
 	/* prevent from failure of getting command just after setting */
@@ -195,7 +196,7 @@ static int control_clock_source_get(struct snd_kcontrol *kctl,
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
 	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
-	int id;
+	unsigned int id;
 
 	mutex_lock(&bebob->mutex);
 	if (spec->get_src(bebob, &id) >= 0)

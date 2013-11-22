@@ -57,14 +57,14 @@ static unsigned int devices_used;
 #define MODEL_FOCUSRITE_SAFFIRE_BOTH	0x00000000
 
 static int
-name_device(struct snd_bebob *bebob, int vendor_id)
+name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 {
 	char vendor[24] = {};
 	char model[24] = {};
 	u32 id;
 	u32 data[2] = {};
 	u32 revision;
-	int err = 0;
+	int err;
 
 	/* get vendor name */
 	if ((vendor_id == VEN_MAUDIO1) || (vendor_id == VEN_MAUDIO2))
@@ -182,7 +182,8 @@ snd_bebob_probe(struct fw_unit *unit,
 	struct snd_card *card;
 	struct snd_bebob *bebob;
 	const struct snd_bebob_spec *spec;
-	int card_index, err;
+	unsigned int card_index;
+	int err;
 
 	mutex_lock(&devices_mutex);
 

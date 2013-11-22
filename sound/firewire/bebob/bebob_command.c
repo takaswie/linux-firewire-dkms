@@ -20,17 +20,8 @@
 #define BEBOB_COMMAND_MAX_TRIAL	3
 #define BEBOB_COMMAND_WAIT_MSEC	100
 
-static const int amdtp_sfc_table[] = {
-	[CIP_SFC_32000]	 = 32000,
-	[CIP_SFC_44100]	 = 44100,
-	[CIP_SFC_48000]	 = 48000,
-	[CIP_SFC_88200]	 = 88200,
-	[CIP_SFC_96000]	 = 96000,
-	[CIP_SFC_176400] = 176400,
-	[CIP_SFC_192000] = 192000};
-
-int avc_audio_set_selector(struct fw_unit *unit, int subunit_id,
-			   int fb_id, int num)
+int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
+			   unsigned int fb_id, unsigned int num)
 {
 	u8 *buf;
 	int err;
@@ -69,8 +60,8 @@ end:
 	return err;
 }
 
-int avc_audio_get_selector(struct fw_unit *unit, int subunit_id,
-			   int fb_id, int *num)
+int avc_audio_get_selector(struct fw_unit *unit, unsigned int subunit_id,
+			   unsigned int fb_id, unsigned int *num)
 {
 	u8 *buf;
 	int err;
@@ -111,8 +102,8 @@ end:
 }
 
 int avc_ccm_get_sig_src(struct fw_unit *unit,
-			int *src_stype, int *src_sid, int *src_pid,
-			int dst_stype, int dst_sid, int dst_pid)
+	unsigned int *src_stype, unsigned int *src_sid, unsigned int *src_pid,
+	unsigned int dst_stype, unsigned int dst_sid, unsigned int dst_pid)
 {
 	int err;
 	u8 *buf;
@@ -151,8 +142,8 @@ end:
 }
 
 int avc_ccm_set_sig_src(struct fw_unit *unit,
-			int src_stype, int src_sid, int src_pid,
-			int dst_stype, int dst_sid, int dst_pid)
+	unsigned int src_stype, unsigned int src_sid, unsigned int src_pid,
+	unsigned int dst_stype, unsigned int dst_sid, unsigned int dst_pid)
 {
 	int err;
 	u8 *buf;
@@ -236,9 +227,10 @@ end:
 
 int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
 				 enum snd_bebob_plug_dir pdir,
-				 unsigned short pid, u8 *buf, int len)
+				 unsigned short pid, u8 *buf, unsigned int len)
 {
-	int trial, err;
+	unsigned int trial;
+	int err;
 
 	/* check given buffer */
 	if ((buf == NULL) || (len < 256)) {
@@ -292,7 +284,8 @@ end:
 
 int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
 				       enum snd_bebob_plug_dir pdir,
-				       int pid, int cluster_id, u8 *type)
+				       unsigned int pid, unsigned int cluster_id,
+				       u8 *type)
 {
 	u8 *buf;
 	int err;
@@ -336,7 +329,8 @@ end:
 int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 				   enum snd_bebob_plug_dir pdir,
 				   unsigned short pid,
-				   int entryid, u8 *buf, int *len)
+				   unsigned int entryid, u8 *buf,
+				   unsigned int *len)
 {
 	int err;
 

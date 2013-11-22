@@ -29,7 +29,7 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 	struct snd_interval t = {
 		.min = UINT_MAX, .max = 0, .integer = 1
 	};
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		/* entry is invalid */
@@ -59,7 +59,7 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 		.min = UINT_MAX, .max = 0, .integer = 1
 	};
 
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		/* entry is invalid */
@@ -116,7 +116,7 @@ static void
 prepare_channels(struct snd_pcm_hardware *hw,
 	  struct snd_bebob_stream_formation *formations)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		/* entry has no PCM channels */
@@ -134,7 +134,7 @@ static void
 prepare_rates(struct snd_pcm_hardware *hw,
 	  struct snd_bebob_stream_formation *formations)
 {
-	int i;
+	unsigned int i;
 
 	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		/* entry has no PCM channels */
@@ -153,9 +153,9 @@ static int
 pcm_init_hw_params(struct snd_bebob *bebob,
 			struct snd_pcm_substream *substream)
 {
-	int err = 0;
+	int err;
 
-	struct snd_pcm_hardware hw = {
+	static const struct snd_pcm_hardware hw = {
 		.info = SNDRV_PCM_INFO_MMAP |
 			SNDRV_PCM_INFO_BATCH |
 			SNDRV_PCM_INFO_INTERLEAVED |
@@ -224,7 +224,6 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 		goto end;
 
 	err = 0;
-
 end:
 	return err;
 }
@@ -234,7 +233,8 @@ pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
 	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
-	int sampling_rate, err;
+	unsigned int sampling_rate;
+	int err;
 
 	err = snd_bebob_stream_lock_try(bebob);
 	if (err < 0)

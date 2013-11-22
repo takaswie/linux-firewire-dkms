@@ -22,12 +22,11 @@
  * For BeBoB streams, Both of input and output CMP connection is important.
  *
  * [Communication with Windows driver] According to logs of IEEE1394 packets,
- * all models which use BeBoB chipset seem to make both of connections when
- * booting.
+ * all models seem to make both of connections when booting.
  *
  * [Actual behavior] In some devices, one CMP connection starts to
  * transmit/receive a corresponding stream. But in the others, both of CMP
- * connection needs to start transmitting stream. A example of the latter is
+ * connection needs to start transmitting stream. An example of the latter is
  * 'M-Audio Firewire 410'.
  */
 
@@ -46,14 +45,14 @@ const unsigned int snd_bebob_rate_table[SND_BEBOB_STRM_FMT_ENTRIES] = {
 	[8] = 192000,
 };
 
-static int
-get_formation_index(int rate)
+static unsigned int
+get_formation_index(unsigned int rate)
 {
-        int i;
+	unsigned int i;
 
-        for (i = 0; i < sizeof(snd_bebob_rate_table); i++) {
-                if (snd_bebob_rate_table[i] == rate)
-                        return i;
+	for (i = 0; i < sizeof(snd_bebob_rate_table); i++) {
+		if (snd_bebob_rate_table[i] == rate)
+			return i;
 	}
 	return -1;
 }
@@ -188,7 +187,7 @@ check_connection_used_by_others(struct snd_bebob *bebob,
 }
 
 static int
-make_both_connections(struct snd_bebob *bebob, int rate)
+make_both_connections(struct snd_bebob *bebob, unsigned int rate)
 {
 	int index, pcm_channels, midi_channels, err;
 
@@ -308,8 +307,9 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
-	int err, curr_rate;
+	unsigned int curr_rate;
 	bool slave_flag, used;
+	int err;
 
 	mutex_lock(&bebob->mutex);
 
@@ -494,22 +494,11 @@ void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
 	mutex_unlock(&bebob->mutex);
 }
 
-int snd_bebob_get_formation_index(int rate)
-{
-	int i;
-
-	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
-		if (snd_bebob_rate_table[i] == rate)
-			return i;
-	}
-	return -1;
-}
-
 static void
-set_stream_formation(u8 *buf, int len,
+set_stream_formation(u8 *buf, unsigned int len,
 		     struct snd_bebob_stream_formation *formation)
 {
-	int e, channels, format;
+	unsigned int e, channels, format;
 
 	for (e = 0; e < buf[4]; e++) {
 		channels = buf[5 + e * 2];
@@ -559,7 +548,8 @@ fill_stream_formations(struct snd_bebob *bebob, enum snd_bebob_plug_dir dir,
 
 	u8 *buf;
 	struct snd_bebob_stream_formation *formations;
-	int i, index, len, eid, err;
+	unsigned int i, index, len, eid;
+	int err;
 
 	buf = kmalloc(FORMAT_MAXIMUM_LENGTH, GFP_KERNEL);
 	if (buf == NULL)
@@ -614,7 +604,8 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 	unsigned short bus_plugs[AVC_GENERAL_PLUG_DIR_COUNT];
 	unsigned short ext_plugs[AVC_GENERAL_PLUG_DIR_COUNT];
 	enum snd_bebob_plug_type type;
-	int i, err;
+	unsigned int i;
+	int err;
 
 	err = avc_general_get_plug_info(bebob->unit, bus_plugs, ext_plugs);
 	if (err < 0)

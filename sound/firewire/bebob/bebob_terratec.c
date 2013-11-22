@@ -23,7 +23,8 @@ static char *phase88_rack_clk_src_labels[] = {
 static int
 phase88_rack_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
-	unsigned int enable_ext, enable_word, err;
+	unsigned int enable_ext, enable_word;
+	int err;
 
 	err = avc_audio_get_selector(bebob->unit, 0, 0, &enable_ext);
 	if (err < 0)
@@ -39,7 +40,8 @@ end:
 static int
 phase88_rack_clk_src_set(struct snd_bebob *bebob, unsigned int id)
 {
-	unsigned int enable_ext, enable_word, err;
+	unsigned int enable_ext, enable_word;
+	int err;
 
 	enable_ext = id & 0x01;
 	enable_word = (id >> 1) & 0x01;

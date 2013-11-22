@@ -87,7 +87,8 @@ proc_read_meters(struct snd_info_entry *entry,
 	struct snd_bebob *bebob = entry->private_data;
 	struct snd_bebob_meter_spec *spec = bebob->spec->meter;
 	u32 *buf;
-	int i, c, channels, size, err;
+	unsigned int i, c, channels, size;
+	int err;
 
 	if (spec == NULL)
 		return;
@@ -121,7 +122,7 @@ proc_read_formation(struct snd_info_entry *entry,
 {
 	struct snd_bebob *bebob = entry->private_data;
 	struct snd_bebob_stream_formation *formation;
-	int i;
+	unsigned int i;
 
 	snd_iprintf(buffer, "Output Stream from device:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");

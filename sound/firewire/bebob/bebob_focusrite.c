@@ -67,7 +67,8 @@ static inline int
 saffire_read_block(struct snd_bebob *bebob, u64 offset,
 		   u32 *buf, unsigned int size)
 {
-	int i, err;
+	unsigned int i;
+	int err;
 	__be32 *tmp = (__be32 *)buf;
 
 	err =  snd_fw_transaction(bebob->unit, TCODE_READ_BLOCK_REQUEST,
@@ -202,8 +203,9 @@ end:
 static int
 saffirepro_both_clk_synced(struct snd_bebob *bebob, bool *synced)
 {
-	int clock, err;
+	unsigned int clock;
 	u32 value;
+	int err;
 
 	err = saffirepro_both_clk_src_get(bebob, &clock);
 	if (err < 0)

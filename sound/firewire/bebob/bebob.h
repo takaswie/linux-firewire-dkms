@@ -157,21 +157,19 @@ snd_bebob_read_quad(struct snd_bebob *bebob, u64 addr, void *buf, int size)
 				  buf, size, 0);
 }
 
-int snd_bebob_get_formation_index(int sampling_rate);
-
 /* AV/C Audio Subunit Specification 1.0 (1394TA) */
-int avc_audio_set_selector(struct fw_unit *unit, int subunit_id,
-			   int fb_id, int num);
-int avc_audio_get_selector(struct fw_unit *unit, int subunit_id,
-			   int fb_id, int *num);
+int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
+			   unsigned int fb_id, unsigned int num);
+int avc_audio_get_selector(struct fw_unit *unit,unsigned  int subunit_id,
+			   unsigned int fb_id, unsigned int *num);
 
 /* Connection and Compatibility Management 1.0 (1394TA) */
 int avc_ccm_get_sig_src(struct fw_unit *unit,
-			int *src_stype, int *src_sid, int *src_pid,
-			int dst_stype, int dst_sid, int dst_pid);
+	unsigned int *src_stype, unsigned int *src_sid, unsigned int *src_pid,
+	unsigned int dst_stype, unsigned int dst_sid, unsigned int dst_pid);
 int avc_ccm_set_sig_src(struct fw_unit *unit,
-			int src_stype, int src_sid, int src_pid,
-			int dst_stype, int dst_sid, int dst_pid);
+	unsigned int src_stype, unsigned int src_sid, unsigned int src_pid,
+	unsigned int dst_stype, unsigned int dst_sid, unsigned int dst_pid);
 
 /* Additional AVC commands, AV/C Unit and Subunit, Revision 17 (BridgeCo.) */
 enum snd_bebob_plug_dir {
@@ -193,7 +191,7 @@ enum snd_bebob_plug_type {
 };
 int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
 				 enum snd_bebob_plug_dir pdir,
-				 unsigned short pid, u8 *buf, int len);
+				 unsigned short pid, u8 *buf, unsigned int len);
 int avc_bridgeco_get_plug_type(struct fw_unit *unit,
 			       enum snd_bebob_plug_dir pdir,
 			       enum snd_bebob_plug_unit punit,
@@ -201,11 +199,13 @@ int avc_bridgeco_get_plug_type(struct fw_unit *unit,
 			       enum snd_bebob_plug_type *type);
 int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
 				       enum snd_bebob_plug_dir pdir,
-				       int pid, int cluster_id, u8 *ctype);
+				       unsigned int pid, unsigned int cluster_id,
+				       u8 *ctype);
 int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 				   enum snd_bebob_plug_dir pdir,
 				   unsigned short pid,
-				   int entryid, u8 *buf, int *len);
+				   unsigned int entryid, u8 *buf,
+				   unsigned int *len);
 
 int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
                        enum avc_general_plug_dir dir);
