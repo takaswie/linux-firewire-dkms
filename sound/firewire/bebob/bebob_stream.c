@@ -59,9 +59,10 @@ get_formation_index(int rate)
 }
 
 int
-snd_bebob_stream_get_rate(struct snd_bebob *bebob, int *curr_rate)
+snd_bebob_stream_get_rate(struct snd_bebob *bebob, unsigned int *curr_rate)
 {
-	int err, tx_rate, rx_rate;
+	unsigned int tx_rate, rx_rate;
+	int err;
 
 	err = snd_bebob_get_rate(bebob, &tx_rate, AVC_GENERAL_PLUG_DIR_OUT);
 	if (err < 0)
@@ -82,7 +83,7 @@ end:
 }
 
 int
-snd_bebob_stream_set_rate(struct snd_bebob *bebob, int rate)
+snd_bebob_stream_set_rate(struct snd_bebob *bebob, unsigned int rate)
 {
 	int err;
 
@@ -261,8 +262,8 @@ start_stream(struct snd_bebob *bebob, struct amdtp_stream *stream,
 		conn = &bebob->out_conn;
 
 	/* channel mapping */
-	if (bebob->spec->map != NULL) {
-		err = bebob->spec->map(bebob, stream);
+	if (!bebob->maudio_special_quirk) {
+		err = snd_bebob_stream_map(bebob, stream);
 		if (err < 0)
 			goto end;
 	}
@@ -271,8 +272,6 @@ start_stream(struct snd_bebob *bebob, struct amdtp_stream *stream,
 	err = amdtp_stream_start(stream,
 				 conn->resources.channel,
 				 conn->speed);
-	if (err < 0)
-		goto end;
 end:
 	return err;
 }
@@ -306,7 +305,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 				  struct amdtp_stream *request,
 				  unsigned int rate)
 {
-	struct snd_bebob_freq_spec *freq = bebob->spec->freq;
+	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
 	int err, curr_rate;
@@ -339,7 +338,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	}
 
 	/* get current rate */
-	err = freq->get(bebob, &curr_rate);
+	err = spec->get_freq(bebob, &curr_rate);
 	if (err < 0)
 		goto end;
 	if (rate == 0)
@@ -369,11 +368,11 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		 * If establishing connections at first, Yamaha GO46 (and maybe
 		 * TerraTek X24) don't generate sound.
 		 */
-		err = freq->set(bebob, rate);
+		err = spec->set_freq(bebob, rate);
 		if (err < 0)
 			goto end;
 		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
-			       freq->ctl_id);
+			       spec->ctl_id_freq);
 
 		err = make_both_connections(bebob, rate);
 		if (err < 0)
@@ -393,7 +392,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		 * transmit stream. This is not in specification.
 		 */
 		if (bebob->maudio_special_quirk) {
-			err = freq->set(bebob, rate);
+			err = spec->set_freq(bebob, rate);
 			if (err < 0) {
 				amdtp_stream_stop(master);
 				break_both_connections(bebob);

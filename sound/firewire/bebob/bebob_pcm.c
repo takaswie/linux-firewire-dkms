@@ -233,7 +233,7 @@ static int
 pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
-	struct snd_bebob_freq_spec *freq = bebob->spec->freq;
+	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
 	int sampling_rate, err;
 
 	err = snd_bebob_stream_lock_try(bebob);
@@ -246,7 +246,7 @@ pcm_open(struct snd_pcm_substream *substream)
 
 	if (amdtp_stream_pcm_running(&bebob->tx_stream) ||
 	    amdtp_stream_pcm_running(&bebob->rx_stream)) {
-		err = freq->get(bebob, &sampling_rate);
+		err = spec->get_freq(bebob, &sampling_rate);
 		if (err < 0)
 			goto err_locked;
 

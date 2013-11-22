@@ -72,40 +72,29 @@ struct snd_bebob_stream_formation {
 extern const unsigned int snd_bebob_rate_table[SND_BEBOB_STRM_FMT_ENTRIES];
 
 /* device specific operations */
-struct snd_bebob_freq_spec {
-	int (*get)(struct snd_bebob *bebob, int *rate);
-	int (*set)(struct snd_bebob *bebob, int rate);
-	/* private */
-	struct snd_ctl_elem_id *ctl_id;
-};
+#define SND_BEBOB_CLOCK_INTERNAL	"Internal"
 struct snd_bebob_clock_spec {
-	int num;
+	unsigned int num;
 	char **labels;
-	int (*get)(struct snd_bebob *bebob, int *id);
-	int (*set)(struct snd_bebob *bebob, int id);
+	int (*get_src)(struct snd_bebob *bebob, unsigned int *id);
+	int (*set_src)(struct snd_bebob *bebob, unsigned int id);
+	int (*get_freq)(struct snd_bebob *bebob, unsigned int *rate);
+	int (*set_freq)(struct snd_bebob *bebob, unsigned int rate);
 	int (*synced)(struct snd_bebob *bebob, bool *synced);
 	/* private */
-	struct snd_ctl_elem_id *ctl_id;
-};
-struct snd_bebob_dig_iface_spec {
-	int num;
-	char **labels;
-	int (*get)(struct snd_bebob *bebob, int *id);
-	int (*set)(struct snd_bebob *bebob, int id);
+	struct snd_ctl_elem_id *ctl_id_src;
+	struct snd_ctl_elem_id *ctl_id_freq;
+	struct snd_ctl_elem_id *ctl_id_synced;
 };
 struct snd_bebob_meter_spec {
-	int num;
+	unsigned int num;
 	char **labels;
-	int (*get)(struct snd_bebob *bebob, u32 *target, int size);
+	int (*get)(struct snd_bebob *bebob, u32 *target, unsigned int size);
 };
 struct snd_bebob_spec {
 	int (*load)(struct fw_unit *unit,
 		    const struct ieee1394_device_id *entry);
-	int (*discover)(struct snd_bebob *bebob);
-	int (*map)(struct snd_bebob *bebob, struct amdtp_stream *stream);
-	struct snd_bebob_freq_spec *freq;
 	struct snd_bebob_clock_spec *clock;
-	struct snd_bebob_dig_iface_spec *dig_iface;
 	struct snd_bebob_meter_spec *meter;
 };
 
@@ -138,12 +127,13 @@ struct snd_bebob {
 		rx_stream_formations[SND_BEBOB_STRM_FMT_ENTRIES];
 
 	/* for M-Audio special devices */
-	int clk_src;
-	int in_dig_fmt;
-	int out_dig_fmt;
-	int in_dig_iface;
-	int clk_lock;
 	bool maudio_special_quirk;
+	bool maudio_is1814;
+	unsigned int clk_src;
+	unsigned int dig_in_iface;
+	unsigned int dig_in_fmt;
+	unsigned int dig_out_fmt;
+	unsigned int clk_lock;
 
 	/* for uapi */
 	int dev_lock_count;
@@ -217,13 +207,13 @@ int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 				   unsigned short pid,
 				   int entryid, u8 *buf, int *len);
 
-int snd_bebob_get_rate(struct snd_bebob *bebob, int *rate,
+int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
                        enum avc_general_plug_dir dir);
-int snd_bebob_set_rate(struct snd_bebob *bebob, int rate,
+int snd_bebob_set_rate(struct snd_bebob *bebob, unsigned int rate,
                        enum avc_general_plug_dir dir);
 
-int snd_bebob_stream_get_rate(struct snd_bebob *bebob, int *rate);
-int snd_bebob_stream_set_rate(struct snd_bebob *bebob, int rate);
+int snd_bebob_stream_get_rate(struct snd_bebob *bebob, unsigned int *rate);
+int snd_bebob_stream_set_rate(struct snd_bebob *bebob, unsigned int rate);
 int snd_bebob_stream_discover(struct snd_bebob *bebob);
 int snd_bebob_stream_map(struct snd_bebob *bebob,
 			 struct amdtp_stream *stream);
@@ -250,9 +240,11 @@ int snd_bebob_create_midi_devices(struct snd_bebob *bebob);
 void snd_bebob_proc_init(struct snd_bebob *bebob);
 
 /* device specific operations */
+int snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814);
+int snd_bebob_maudio_special_add_controls(struct snd_bebob *bebob);
+
 extern struct snd_bebob_spec maudio_bootloader_spec;
-extern struct snd_bebob_spec maudio_fw1814_spec;
-extern struct snd_bebob_spec maudio_projectmix_spec;
+extern struct snd_bebob_spec maudio_special_spec;
 extern struct snd_bebob_spec maudio_nrv10_spec;
 extern struct snd_bebob_spec maudio_fw410_spec;
 extern struct snd_bebob_spec maudio_audiophile_spec;

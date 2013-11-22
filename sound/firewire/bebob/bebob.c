@@ -52,6 +52,8 @@ static unsigned int devices_used;
 #define VEN_CME		0x0000000a
 #define VEN_PHONIC	0x00001496
 #define MODEL_MAUDIO_AUDIOPHILE_BOTH	0x00010060
+#define MODEL_MAUDIO_FW1814		0x00010071
+#define MODEL_MAUDIO_PROJECTMIX		0x00010091
 #define MODEL_FOCUSRITE_SAFFIRE_BOTH	0x00000000
 
 static int
@@ -234,9 +236,13 @@ snd_bebob_probe(struct fw_unit *unit,
 	spin_lock_init(&bebob->lock);
 	init_waitqueue_head(&bebob->hwdep_wait);
 
-	if (!bebob->spec->discover)
-		goto error;
-	err = bebob->spec->discover(bebob);
+	/* discover */
+	if (entry->model_id == MODEL_MAUDIO_FW1814)
+		err = snd_bebob_maudio_special_discover(bebob, true);
+	else if (entry->model_id == MODEL_MAUDIO_PROJECTMIX)
+		err = snd_bebob_maudio_special_discover(bebob, false);
+	else
+		err = snd_bebob_stream_discover(bebob);
 	if (err < 0)
 		goto error;
 
@@ -327,17 +333,13 @@ end:
 	return;
 }
 
-struct snd_bebob_freq_spec usual_freq_spec = {
-        .get    = &snd_bebob_stream_get_rate,
-        .set    = &snd_bebob_stream_set_rate
+struct snd_bebob_clock_spec usual_clk_spec = {
+	.get_freq	= &snd_bebob_stream_get_rate,
+	.set_freq	= &snd_bebob_stream_set_rate
 };
 static const struct snd_bebob_spec spec_nothing = {
 	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &usual_freq_spec,
-	.clock		= NULL,
-	.dig_iface	= NULL,
+	.clock		= &usual_clk_spec,
 	.meter		= NULL
 };
 
@@ -353,16 +355,18 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO2, 0x00010046, maudio_fw410_spec),
 	/* M-Audio, Firewire Audiophile, both of bootloader and firmware */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_AUDIOPHILE_BOTH,
-			    maudio_audiophile_spec),
+						maudio_audiophile_spec),
 	/* M-Audio, Firewire Solo */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010062, maudio_solo_spec),
-	/* Firewire 1814 */
-	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010070, maudio_bootloader_spec),
-	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010071, maudio_fw1814_spec),
 	/* M-Audio NRV10 */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010081, maudio_nrv10_spec),
+	/* Firewire 1814 */
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010070, maudio_bootloader_spec),
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_FW1814,
+						maudio_special_spec),
 	/* M-Audio ProjectMix */
-	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010091, maudio_projectmix_spec),
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_PROJECTMIX,
+						maudio_special_spec),
 	/* M-Audio, ProFireLightbridge */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x000100a1, spec_nothing),
 	/* Focusrite, SaffirePro 26 I/O */

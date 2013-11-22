@@ -62,63 +62,6 @@ struct snd_kcontrol_new physical_metering = {
 };
 
 /*
- * Global Control:  Digital capture and playback mode
- */
-static int
-control_digital_interface_info(struct snd_kcontrol *kctl,
-			       struct snd_ctl_elem_info *einf)
-{
-	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
-	struct snd_bebob_dig_iface_spec *spec = bebob->spec->dig_iface;
-
-	einf->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
-	einf->count = 1;
-	einf->value.enumerated.items = spec->num;
-
-	if (einf->value.enumerated.item >= einf->value.enumerated.items)
-		einf->value.enumerated.item = einf->value.enumerated.items - 1;
-
-	strcpy(einf->value.enumerated.name,
-	       spec->labels[einf->value.enumerated.item]);
-
-	return 0;
-}
-static int
-control_digital_interface_get(struct snd_kcontrol *kctl,
-			      struct snd_ctl_elem_value *uval)
-{
-	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
-	struct snd_bebob_dig_iface_spec *spec = bebob->spec->dig_iface;
-	int id;
-
-	mutex_lock(&bebob->mutex);
-	if (spec->get(bebob, &id) >= 0)
-		uval->value.enumerated.item[0] = id;
-	mutex_unlock(&bebob->mutex);
-
-	return 0;
-}
-static int
-control_digital_interface_put(struct snd_kcontrol *kctl,
-			      struct snd_ctl_elem_value *uval)
-{
-	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
-	struct snd_bebob_dig_iface_spec *spec = bebob->spec->dig_iface;
-	int value, changed = 0;
-
-	value = uval->value.enumerated.item[0];
-
-	if (value < spec->num) {
-		mutex_lock(&bebob->mutex);
-		if (spec->set(bebob, value) >= 0)
-			changed = 1;
-		mutex_unlock(&bebob->mutex);
-	}
-
-	return changed;
-}
-
-/*
  * Global Control: Sampling Rate Control
  *
  * refer to snd_bebob_rate_table.
@@ -164,12 +107,12 @@ control_sampling_rate_get(struct snd_kcontrol *kctl,
 			  struct snd_ctl_elem_value *uval)
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
-	struct snd_bebob_freq_spec *freq = bebob->spec->freq;
+	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
 	int i, sampling_rate, index, err;
 
 	mutex_lock(&bebob->mutex);
 
-	err = freq->get(bebob, &sampling_rate);
+	err = spec->get_freq(bebob, &sampling_rate);
 	if (err < 0)
 		goto end;
 
@@ -192,7 +135,7 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 			  struct snd_ctl_elem_value *uval)
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
-	struct snd_bebob_freq_spec *freq = bebob->spec->freq;
+	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
 	int value, index, sampling_rate, err, changed = 0;
 
 	/* get index from user value*/
@@ -210,7 +153,7 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 	sampling_rate = snd_bebob_rate_table[index];
 
 	mutex_lock(&bebob->mutex);
-	err = freq->set(bebob, sampling_rate);
+	err = spec->set_freq(bebob, sampling_rate);
 	if (err < 0)
 		goto end;
 
@@ -218,9 +161,9 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 	msleep(100);
 	changed = 1;
 
-	if (bebob->spec->clock->ctl_id)
+	if (spec->ctl_id_freq)
 		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
-			       bebob->spec->clock->ctl_id);
+			       spec->ctl_id_freq);
 end:
 	mutex_unlock(&bebob->mutex);
 	return changed;
@@ -255,7 +198,7 @@ static int control_clock_source_get(struct snd_kcontrol *kctl,
 	int id;
 
 	mutex_lock(&bebob->mutex);
-	if (spec->get(bebob, &id) >= 0)
+	if (spec->get_src(bebob, &id) >= 0)
 		uval->value.enumerated.item[0] = id;
 	mutex_unlock(&bebob->mutex);
 
@@ -272,15 +215,15 @@ static int control_clock_source_put(struct snd_kcontrol *kctl,
 
 	if (value < spec->num) {
 		mutex_lock(&bebob->mutex);
-		if (spec->set(bebob, value) >= 0)
+		if (spec->set_src(bebob, value) >= 0)
 			changed = 1;
 		mutex_unlock(&bebob->mutex);
 	}
 
 	msleep(150);
-	if (spec->ctl_id)
+	if (spec->ctl_id_src)
 		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
-			       spec->ctl_id);
+			       spec->ctl_id_src);
 
 	return changed;
 }
@@ -342,55 +285,46 @@ static struct snd_kcontrol_new global_sampling_rate_control = {
 	.put	= control_sampling_rate_put
 };
 
-static struct snd_kcontrol_new global_digital_interface_control = {
-	.name	= "Digital Mode",
-	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
-	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
-	.info	= control_digital_interface_info,
-	.get	= control_digital_interface_get,
-	.put	= control_digital_interface_put
-};
-
 int snd_bebob_create_control_devices(struct snd_bebob *bebob)
 {
-	int err;
+	int err = 0;
 	struct snd_kcontrol *kctl;
+	struct snd_bebob_clock_spec *clk = bebob->spec->clock;
+	struct snd_bebob_meter_spec *meter = bebob->spec->meter;
 
-	kctl = snd_ctl_new1(&global_sampling_rate_control, bebob);
-	err = snd_ctl_add(bebob->card, kctl);
-	if (err < 0)
-		goto end;
-	bebob->spec->freq->ctl_id = &kctl->id;
+	if (clk->get_freq != NULL) {
+		kctl = snd_ctl_new1(&global_sampling_rate_control, bebob);
+		err = snd_ctl_add(bebob->card, kctl);
+		if (err < 0)
+			goto end;
+		clk->ctl_id_freq = &kctl->id;
+	}
 
-	if (bebob->spec->clock != NULL) {
+	if (clk->get_src != NULL) {
 		kctl = snd_ctl_new1(&global_clock_source_control, bebob);
 		err = snd_ctl_add(bebob->card, kctl);
 		if (err < 0)
 			goto end;
-
-		if (bebob->spec->clock->synced != NULL) {
-			kctl = snd_ctl_new1(&global_clock_sync_status, bebob);
-			err = snd_ctl_add(bebob->card, kctl);
-			if (err < 0)
-				goto end;
-			bebob->spec->clock->ctl_id = &kctl->id;
-		}
+		clk->ctl_id_src = &kctl->id;
 	}
 
-	if (bebob->spec->dig_iface != NULL) {
-		kctl = snd_ctl_new1(&global_digital_interface_control, bebob);
+	if (clk->synced != NULL) {
+		kctl = snd_ctl_new1(&global_clock_sync_status, bebob);
 		err = snd_ctl_add(bebob->card, kctl);
 		if (err < 0)
 			goto end;
+		clk->ctl_id_synced = &kctl->id;
 	}
 
-	if (bebob->spec->meter != NULL) {
+	if (meter != NULL) {
 		kctl = snd_ctl_new1(&physical_metering, bebob);
 		err = snd_ctl_add(bebob->card, kctl);
 		if (err < 0)
 			goto end;
 	}
 
+	if (bebob->maudio_special_quirk)
+		err = snd_bebob_maudio_special_add_controls(bebob);
 end:
 	return err;
 }

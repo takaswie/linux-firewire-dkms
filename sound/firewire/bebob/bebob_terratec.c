@@ -17,13 +17,13 @@
 
 #include "./bebob.h"
 
-static char *phase88_rack_clock_labels[] = {
-	"Internal", "Digital In", "Word Clock"
+static char *phase88_rack_clk_src_labels[] = {
+	SND_BEBOB_CLOCK_INTERNAL, "Digital In", "Word Clock"
 };
 static int
-phase88_rack_clock_get(struct snd_bebob *bebob, int *id)
+phase88_rack_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
-	int enable_ext, enable_word, err;
+	unsigned int enable_ext, enable_word, err;
 
 	err = avc_audio_get_selector(bebob->unit, 0, 0, &enable_ext);
 	if (err < 0)
@@ -37,9 +37,9 @@ end:
 	return err;
 }
 static int
-phase88_rack_clock_set(struct snd_bebob *bebob, int id)
+phase88_rack_clk_src_set(struct snd_bebob *bebob, unsigned int id)
 {
-	int enable_ext, enable_word, err;
+	unsigned int enable_ext, enable_word, err;
 
 	enable_ext = id & 0x01;
 	enable_word = (id >> 1) & 0x01;
@@ -55,7 +55,7 @@ end:
 }
 
 static int
-phase88_rack_clock_synced(struct snd_bebob *bebob, bool *synced)
+phase88_rack_clk_synced(struct snd_bebob *bebob, bool *synced)
 {
 	int err;
 	u8 *buf;
@@ -94,57 +94,48 @@ end:
 	return err;
 }
 
-static char *phase24_series_clock_labels[] = {
-	"Internal", "Digital In"
+static char *phase24_series_clk_src_labels[] = {
+	SND_BEBOB_CLOCK_INTERNAL, "Digital In"
 };
 static int
-phase24_series_clock_get(struct snd_bebob *bebob, int *id)
+phase24_series_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
 	return avc_audio_get_selector(bebob->unit, 0, 4, id);
 }
 static int
-phase24_series_clock_set(struct snd_bebob *bebob, int id)
+phase24_series_clk_src_set(struct snd_bebob *bebob, unsigned int id)
 {
 	return avc_audio_set_selector(bebob->unit, 0, 4, id);
 }
 
-struct snd_bebob_freq_spec freq_spec = {
-	.get	= &snd_bebob_stream_get_rate,
-	.set	= &snd_bebob_stream_set_rate
-};
-
 /* PHASE 88 Rack FW */
-struct snd_bebob_clock_spec phase88_rack_clock = {
-	.num	= ARRAY_SIZE(phase88_rack_clock_labels),
-	.labels	= phase88_rack_clock_labels,
-	.get	= &phase88_rack_clock_get,
-	.set	= &phase88_rack_clock_set,
-	.synced	= &phase88_rack_clock_synced
+struct snd_bebob_clock_spec phase88_rack_clk = {
+	.num		= ARRAY_SIZE(phase88_rack_clk_src_labels),
+	.labels		= phase88_rack_clk_src_labels,
+	.get_src	= &phase88_rack_clk_src_get,
+	.set_src	= &phase88_rack_clk_src_set,
+	.get_freq	= &snd_bebob_stream_get_rate,
+	.set_freq	= &snd_bebob_stream_set_rate,
+	.synced		= &phase88_rack_clk_synced
 };
 struct snd_bebob_spec phase88_rack_spec = {
-	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &freq_spec,
-	.clock		= &phase88_rack_clock,
-	.dig_iface	= NULL,
-	.meter		= NULL
+	.load	= NULL,
+	.clock	= &phase88_rack_clk,
+	.meter	= NULL
 };
 
 /* 'PHASE 24 FW' and 'PHASE X24 FW' */
-struct snd_bebob_clock_spec phase24_series_clock = {
-	.num	= ARRAY_SIZE(phase24_series_clock_labels),
-	.labels	= phase24_series_clock_labels,
-	.get	= &phase24_series_clock_get,
-	.set	= &phase24_series_clock_set,
-	.synced	= NULL
+struct snd_bebob_clock_spec phase24_series_clk = {
+	.num		= ARRAY_SIZE(phase24_series_clk_src_labels),
+	.labels		= phase24_series_clk_src_labels,
+	.get_src	= &phase24_series_clk_src_get,
+	.set_src	= &phase24_series_clk_src_set,
+	.get_freq	= &snd_bebob_stream_get_rate,
+	.set_freq	= &snd_bebob_stream_set_rate,
+	.synced		= NULL
 };
 struct snd_bebob_spec phase24_series_spec = {
-	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &freq_spec,
-	.clock		= &phase24_series_clock,
-	.dig_iface	= NULL,
-	.meter		= NULL
+	.load	= NULL,
+	.clock	= &phase24_series_clk,
+	.meter	= NULL
 };

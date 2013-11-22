@@ -206,7 +206,7 @@ firmware_load(struct fw_unit *unit, const struct ieee1394_device_id *entry)
 }
 
 static inline int
-get_meter(struct snd_bebob *bebob, void *buf, int size)
+get_meter(struct snd_bebob *bebob, void *buf, unsigned int size)
 {
 	return snd_fw_transaction(bebob->unit, TCODE_READ_BLOCK_REQUEST,
 				  MAUDIO_SPECIFIC_ADDRESS + METER_OFFSET,
@@ -217,7 +217,7 @@ get_meter(struct snd_bebob *bebob, void *buf, int size)
  * BeBoB don't tell drivers to detect digital input, just show clock sync or not.
  */
 static int
-check_clock_sync(struct snd_bebob *bebob, int size, bool *sync)
+check_clk_sync(struct snd_bebob *bebob, unsigned int size, bool *sync)
 {
 	int err;
 	u8 *buf;
@@ -243,8 +243,9 @@ end:
  * clk_lock: 0x00:unlock, 0x01:lock
  */
 static int
-special_set_clock_params(struct snd_bebob *bebob, int clk_src,
-			 int in_dig_fmt, int out_dig_fmt, int clk_lock)
+special_clk_set_params(struct snd_bebob *bebob, unsigned int clk_src,
+		       unsigned int dig_in_fmt, unsigned int dig_out_fmt,
+		       unsigned int clk_lock)
 {
 	int err;
 	u8 *buf;
@@ -260,8 +261,8 @@ special_set_clock_params(struct snd_bebob *bebob, int clk_src,
 	buf[4]  = 0x00;		/* company ID middle */
 	buf[5]  = 0x04;		/* company ID low */
 	buf[6]  = 0xff & clk_src;	/* clock source */
-	buf[7]  = 0xff & in_dig_fmt;	/* input digital format */
-	buf[8]  = 0xff & out_dig_fmt;	/* output digital format */
+	buf[7]  = 0xff & dig_in_fmt;	/* input digital format */
+	buf[8]  = 0xff & dig_out_fmt;	/* output digital format */
 	buf[9]  = 0xff & clk_lock;	/* lock these settings */
 	buf[10] = 0x00;		/* padding  */
 	buf[11] = 0x00;		/* padding */
@@ -282,8 +283,8 @@ special_set_clock_params(struct snd_bebob *bebob, int clk_src,
 
 	bebob->clk_src		= buf[6];
 	/* handle both of input and output in this member */
-	bebob->in_dig_fmt	= buf[7];
-	bebob->out_dig_fmt	= buf[8];
+	bebob->dig_in_fmt	= buf[7];
+	bebob->dig_out_fmt	= buf[8];
 	bebob->clk_lock		= buf[9];
 
 	err = 0;
@@ -299,17 +300,17 @@ end:
 static void
 special_stream_formation_set(struct snd_bebob *bebob)
 {
-	int i;
+	unsigned int i;
 
 	/*
 	 * the stream formation is different depending on digital interface
 	 */
-	if (bebob->in_dig_fmt== 0x01) {
+	if (bebob->dig_in_fmt== 0x01) {
 		bebob->tx_stream_formations[3].pcm = 16;
 		bebob->tx_stream_formations[4].pcm = 16;
 		bebob->tx_stream_formations[5].pcm = 12;
 		bebob->tx_stream_formations[6].pcm = 12;
-		if (bebob->spec == &maudio_fw1814_spec) {
+		if (bebob->maudio_is1814) {
 			bebob->tx_stream_formations[7].pcm = 2;
 			bebob->tx_stream_formations[8].pcm = 2;
 		}
@@ -318,18 +319,18 @@ special_stream_formation_set(struct snd_bebob *bebob)
 		bebob->tx_stream_formations[4].pcm = 10;
 		bebob->tx_stream_formations[5].pcm = 10;
 		bebob->tx_stream_formations[6].pcm = 10;
-		if (bebob->spec == &maudio_fw1814_spec) {
+		if (bebob->maudio_is1814) {
 			bebob->tx_stream_formations[7].pcm = 2;
 			bebob->tx_stream_formations[8].pcm = 2;
 		}
 	}
 
-	if (bebob->out_dig_fmt == 0x01) {
+	if (bebob->dig_out_fmt == 0x01) {
 		bebob->rx_stream_formations[3].pcm = 12;
 		bebob->rx_stream_formations[4].pcm = 12;
 		bebob->rx_stream_formations[5].pcm = 8;
 		bebob->rx_stream_formations[6].pcm = 8;
-		if (bebob->spec == &maudio_fw1814_spec) {
+		if (bebob->maudio_is1814) {
 			bebob->rx_stream_formations[7].pcm = 4;
 			bebob->rx_stream_formations[8].pcm = 4;
 		}
@@ -338,7 +339,7 @@ special_stream_formation_set(struct snd_bebob *bebob)
 		bebob->rx_stream_formations[4].pcm = 6;
 		bebob->rx_stream_formations[5].pcm = 6;
 		bebob->rx_stream_formations[6].pcm = 6;
-		if (bebob->spec == &maudio_fw1814_spec) {
+		if (bebob->maudio_is1814) {
 			bebob->rx_stream_formations[7].pcm = 4;
 			bebob->rx_stream_formations[8].pcm = 4;
 		}
@@ -347,24 +348,27 @@ special_stream_formation_set(struct snd_bebob *bebob)
 	for (i = 3; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		bebob->tx_stream_formations[i].midi = 1;
 		bebob->rx_stream_formations[i].midi = 1;
-		if ((i > 6) && (bebob->spec != &maudio_fw1814_spec))
+		if ((i > 7) && (bebob->maudio_is1814))
 			break;
 	}
 }
-static int
-special_discover(struct snd_bebob *bebob)
+
+int
+snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 {
 	int err;
 
+	bebob->maudio_is1814 = is1814;
+
 	/* initialize these parameters because doesn't allow driver to ask */
-	err = special_set_clock_params(bebob, 0x03, 0x00, 0x00, 0x00);
+	err = special_clk_set_params(bebob, 0x03, 0x00, 0x00, 0x00);
 	if (err < 0) {
 		dev_err(&bebob->unit->device,
 			"failed to initialize clock params\n");
 	}
 
 	err = avc_audio_get_selector(bebob->unit, 0x00, 0x04,
-				     &bebob->in_dig_iface);
+				     &bebob->dig_in_iface);
 	if (err < 0) {
 		dev_err(&bebob->unit->device,
 			"failed to get current dig iface.");
@@ -372,7 +376,7 @@ special_discover(struct snd_bebob *bebob)
 
 	special_stream_formation_set(bebob);
 
-	if (bebob->spec == &maudio_fw1814_spec) {
+	if (bebob->maudio_is1814) {
 		bebob->midi_input_ports = 1;
 		bebob->midi_output_ports = 1;
 	} else {
@@ -387,69 +391,32 @@ special_discover(struct snd_bebob *bebob)
 /*
  * Input plug shows actual rate. Output plug is needless for this purpose.
  */
-static int special_get_freq(struct snd_bebob *bebob, int *rate)
+static int special_clk_get_freq(struct snd_bebob *bebob, unsigned int *rate)
 {
 	return snd_bebob_get_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN);
 }
-static char *special_clock_labels[] = {
-	"Internal with Digital Mute", "Digital",
-	"Word Clock", "Internal"};
+static char *special_clk_src_labels[] = {
+	SND_BEBOB_CLOCK_INTERNAL " with Digital Mute", "Digital",
+	"Word Clock", SND_BEBOB_CLOCK_INTERNAL};
 static int
-special_clock_get(struct snd_bebob *bebob, int *id)
+special_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
 	*id = bebob->clk_src;
 	return 0;
 }
 static int
-special_clock_set(struct snd_bebob *bebob, int id)
+special_clk_src_set(struct snd_bebob *bebob, unsigned int id)
 {
-	return special_set_clock_params(bebob, id,
-					bebob->in_dig_fmt, bebob->out_dig_fmt,
-					bebob->clk_lock);
+	return special_clk_set_params(bebob, id,
+				      bebob->dig_in_fmt, bebob->dig_out_fmt,
+				      bebob->clk_lock);
 }
 static int
-special_clock_synced(struct snd_bebob *bebob, bool *synced)
+special_clk_synced(struct snd_bebob *bebob, bool *synced)
 {
-	return check_clock_sync(bebob, METER_SIZE_SPECIAL, synced);
+	return check_clk_sync(bebob, METER_SIZE_SPECIAL, synced);
 }
 
-static char *special_dig_iface_labels[] = {
-	"S/PDIF Optical", "S/PDIF Coaxial", "ADAT Optical" 
-};
-static int
-special_dig_iface_get(struct snd_bebob *bebob, int *id)
-{
-	/* for simplicity, the same value for input/output */
-	*id = (bebob->in_dig_fmt << 1) | (bebob->in_dig_iface & 0x01);
-
-	return 0;
-}
-static int
-special_dig_iface_set(struct snd_bebob *bebob, int id)
-{
-	int err;
-	int dig_fmt;
-	int in_dig_iface;
-
-	dig_fmt = (id >> 1) & 0x01;
-	in_dig_iface = id & 0x01;
-
-	/* for simplicity, the same value for input/output */
-	err = special_set_clock_params(bebob, bebob->clk_src, dig_fmt, dig_fmt,
-				       bebob->clk_lock);
-	if (err < 0)
-		goto end;
-
-	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, in_dig_iface);
-	if (err < 0)
-		goto end;
-
-	bebob->in_dig_iface = in_dig_iface;
-
-	special_stream_formation_set(bebob);
-end:
-	return err;
-}
 static char *special_meter_labels[] = {
 	ANA_IN, ANA_IN, ANA_IN, ANA_IN,
 	SPDIF_IN,
@@ -461,10 +428,10 @@ static char *special_meter_labels[] = {
 	AUX_OUT
 };
 static int
-special_meter_get(struct snd_bebob *bebob, u32 *target, int size)
+special_meter_get(struct snd_bebob *bebob, u32 *target, unsigned int size)
 {
 	u16 *buf;
-	int i, c, channels, err;
+	unsigned int i, c, channels, err;
 
 	channels = ARRAY_SIZE(special_meter_labels) * 2;
 	if (size < channels * sizeof(u32))
@@ -487,14 +454,145 @@ end:
 	return err;
 }
 
+static char *special_dig_iface_labels[] = {
+	"""S/PDIF Optical", "S/PDIF Coaxial", "ADAT Optical" 
+};
+static int special_dig_in_iface_info(struct snd_kcontrol *kctl,
+				      struct snd_ctl_elem_info *einf)
+{
+	einf->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	einf->count = 1;
+	einf->value.enumerated.items = ARRAY_SIZE(special_dig_iface_labels);
+
+	if (einf->value.enumerated.item >= einf->value.enumerated.items)
+		einf->value.enumerated.item = einf->value.enumerated.items - 1;
+
+	strcpy(einf->value.enumerated.name,
+	       special_dig_iface_labels[einf->value.enumerated.item]);
+
+	return 0;
+}
+static int special_dig_in_iface_get(struct snd_kcontrol *kctl,
+				     struct snd_ctl_elem_value *uval)
+{
+	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
+
+	/* encoded id for user value */
+	uval->value.enumerated.item[0] =
+		(bebob->dig_in_fmt << 1) | (bebob->dig_in_iface & 0x01);
+
+	return 0;
+}
+static int special_dig_in_iface_set(struct snd_kcontrol *kctl,
+				     struct snd_ctl_elem_value *uval)
+{
+	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
+	unsigned int id, dig_in_fmt, dig_in_iface;
+	int err;
+
+	id = uval->value.enumerated.item[0];
+
+	/* decode user value */
+	dig_in_fmt = (id >> 1) & 0x01;
+	dig_in_iface = id & 0x01;
+
+	err = special_clk_set_params(bebob, bebob->clk_src, dig_in_fmt,
+				     bebob->dig_out_fmt, bebob->clk_lock);
+	if ((err < 0) || (bebob->dig_in_fmt > 0)) /* ADAT */
+		goto end;
+
+	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, dig_in_iface);
+	if (err < 0)
+		goto end;
+
+	bebob->dig_in_iface = dig_in_iface;
+end:
+	special_stream_formation_set(bebob);
+	return err;
+}
+static struct snd_kcontrol_new special_dig_in_iface = {
+	.name	= "Digital Input Interface",
+	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
+	.info	= special_dig_in_iface_info,
+	.get	= special_dig_in_iface_get,
+	.put	= special_dig_in_iface_set
+};
+
+static int special_dig_out_iface_info(struct snd_kcontrol *kctl,
+				      struct snd_ctl_elem_info *einf)
+{
+	einf->type = SNDRV_CTL_ELEM_TYPE_ENUMERATED;
+	einf->count = 1;
+	einf->value.enumerated.items = ARRAY_SIZE(special_dig_iface_labels) - 1;
+
+	if (einf->value.enumerated.item >= einf->value.enumerated.items)
+		einf->value.enumerated.item = einf->value.enumerated.items - 1;
+
+	strcpy(einf->value.enumerated.name,
+	       special_dig_iface_labels[einf->value.enumerated.item + 1]);
+
+	return 0;
+}
+static int special_dig_out_iface_get(struct snd_kcontrol *kctl,
+				     struct snd_ctl_elem_value *uval)
+{
+	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
+	uval->value.enumerated.item[0] = bebob->dig_out_fmt;
+	return 0;
+}
+static int special_dig_out_iface_set(struct snd_kcontrol *kctl,
+				     struct snd_ctl_elem_value *uval)
+{
+	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
+	unsigned int id;
+	int err;
+
+	id = uval->value.enumerated.item[0];
+
+	err = special_clk_set_params(bebob, bebob->clk_src, bebob->dig_in_fmt,
+				     id, bebob->clk_lock);
+	if (err < 0)
+		goto end;
+
+	special_stream_formation_set(bebob);
+end:
+	return err;
+}
+static struct snd_kcontrol_new special_dig_out_iface = {
+	.name	= "Digital Output Interface",
+	.iface	= SNDRV_CTL_ELEM_IFACE_MIXER,
+	.access	= SNDRV_CTL_ELEM_ACCESS_READWRITE,
+	.info	= special_dig_out_iface_info,
+	.get	= special_dig_out_iface_get,
+	.put	= special_dig_out_iface_set
+};
+
+int snd_bebob_maudio_special_add_controls(struct snd_bebob *bebob)
+{
+	struct snd_kcontrol *kctl;
+	int err;
+
+	kctl = snd_ctl_new1(&special_dig_in_iface, bebob);
+	err = snd_ctl_add(bebob->card, kctl);
+	if (err < 0)
+		goto end;
+
+	kctl = snd_ctl_new1(&special_dig_out_iface, bebob);
+	err = snd_ctl_add(bebob->card, kctl);
+end:
+	return err;
+}
+
 /* Firewire 410 specific controls */
-static char *fw410_clock_labels[] = {
-	"Internal", "Digital Optical", "Digital Coaxial"
+static char *fw410_clk_src_labels[] = {
+	SND_BEBOB_CLOCK_INTERNAL, "Digital Optical", "Digital Coaxial"
 };
 static int
-fw410_clock_get(struct snd_bebob *bebob, int *id)
+fw410_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
-	int err, stype, sid, pid;
+	int err;
+	unsigned int stype, sid, pid;
 
 	err = avc_ccm_get_sig_src(bebob->unit,
 				  &stype, &sid, &pid, 0x0c, 0x00, 0x01);
@@ -512,9 +610,9 @@ end:
 	return err;
 }
 static int
-fw410_clock_set(struct snd_bebob *bebob, int id)
+fw410_clk_src_set(struct snd_bebob *bebob, unsigned int id)
 {
-	int stype, sid, pid;
+	unsigned int stype, sid, pid;
 
 	if (id == 0) {
 		stype = 0x0c;
@@ -534,22 +632,9 @@ fw410_clock_set(struct snd_bebob *bebob, int id)
 				   stype, sid, pid, 0x0c, 0x00, 0x01);
 }
 static int
-fw410_clock_synced(struct snd_bebob *bebob, bool *synced)
+fw410_clk_synced(struct snd_bebob *bebob, bool *synced)
 {
-	return check_clock_sync(bebob, METER_SIZE_FW410, synced);
-}
-static char *fw410_dig_iface_labels[] = {
-	"S/PDIF Optical", "S/PDIF Coaxial"
-};
-static int
-fw410_dig_iface_get(struct snd_bebob *bebob, int *id)
-{
-	return avc_audio_get_selector(bebob->unit, 0, 1, id);
-}
-static int
-fw410_dig_iface_set(struct snd_bebob *bebob, int id)
-{
-	return avc_audio_set_selector(bebob->unit, 0, 1, id);
+	return check_clk_sync(bebob, METER_SIZE_FW410, synced);
 }
 static char *fw410_meter_labels[] = {
 	ANA_IN, DIG_IN,
@@ -557,10 +642,11 @@ static char *fw410_meter_labels[] = {
 	HP_OUT
 };
 static int
-fw410_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+fw410_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 {
 
-	int c, channels, err;
+	unsigned int c, channels;
+	int err;
 
 	channels = ARRAY_SIZE(fw410_meter_labels) * 2;
 	if (size < channels * sizeof(u32))
@@ -578,13 +664,14 @@ end:
 }
 
 /* Firewire Audiophile specific controls */
-static char *audiophile_clock_labels[] = {
-	"Internal", "Digital Coaxial"
+static char *audiophile_clk_src_labels[] = {
+	SND_BEBOB_CLOCK_INTERNAL, "Digital Coaxial"
 };
 static int
-audiophile_clock_get(struct snd_bebob *bebob, int *id)
+audiophile_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
-	int err, stype, sid, pid;
+	unsigned int stype, sid, pid;
+	int err;
 
 	err = avc_ccm_get_sig_src(bebob->unit,
 				  &stype, &sid, &pid, 0x0c, 0x00, 0x01);
@@ -599,9 +686,9 @@ end:
 	return err;
 }
 static int
-audiophile_clock_set(struct snd_bebob *bebob, int id)
+audiophile_clk_src_set(struct snd_bebob *bebob, unsigned int id)
 {
-	int stype, sid, pid;
+	unsigned int stype, sid, pid;
 
 	if (id == 0) {
 		stype = 0x0c;
@@ -617,9 +704,9 @@ audiophile_clock_set(struct snd_bebob *bebob, int id)
 				   stype, sid, pid, 0x0c, 0x00, 0x01);
 }
 static int
-audiophile_clock_synced(struct snd_bebob *bebob, bool *synced)
+audiophile_clk_synced(struct snd_bebob *bebob, bool *synced)
 {
-	return check_clock_sync(bebob, METER_SIZE_AUDIOPHILE, synced);
+	return check_clk_sync(bebob, METER_SIZE_AUDIOPHILE, synced);
 }
 static char *audiophile_meter_labels[] = {
 	ANA_IN, DIG_IN,
@@ -627,9 +714,10 @@ static char *audiophile_meter_labels[] = {
 	HP_OUT, AUX_OUT,
 };
 static int
-audiophile_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+audiophile_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 {
-	int c, channels, err;
+	unsigned int c, channels;
+	int err;
 
 	channels = ARRAY_SIZE(audiophile_meter_labels) * 2;
 	if (size < channels * sizeof(u32))
@@ -647,13 +735,14 @@ end:
 }
 
 /* Firewire Solo specific controls */
-static char *solo_clock_labels[] = {
-	"Internal", "Digital Coaxial"
+static char *solo_clk_src_labels[] = {
+	SND_BEBOB_CLOCK_INTERNAL, "Digital Coaxial"
 };
 static int
-solo_clock_get(struct snd_bebob *bebob, int *id)
+solo_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
-	int err, stype, sid, pid;
+	unsigned int stype, sid, pid;
+	int err;
 
 	err = avc_ccm_get_sig_src(bebob->unit,
 				  &stype, &sid, &pid, 0x0c, 0x00, 0x01);
@@ -668,9 +757,9 @@ end:
 	return err;
 }
 static int
-solo_clock_set(struct snd_bebob *bebob, int id)
+solo_clk_src_set(struct snd_bebob *bebob, unsigned int id)
 {
-	int stype, sid, pid;
+	unsigned int stype, sid, pid;
 
 	if (id == 0) {
 		stype = 0x0c;
@@ -686,9 +775,9 @@ solo_clock_set(struct snd_bebob *bebob, int id)
 				   stype, sid, pid, 0x0c, 0x00, 0x01);
 }
 static int
-solo_clock_synced(struct snd_bebob *bebob, bool *synced)
+solo_clk_synced(struct snd_bebob *bebob, bool *synced)
 {
-	return check_clock_sync(bebob, METER_SIZE_SOLO, synced);
+	return check_clk_sync(bebob, METER_SIZE_SOLO, synced);
 }
 static char *solo_meter_labels[] = {
 	ANA_IN, DIG_IN,
@@ -696,9 +785,10 @@ static char *solo_meter_labels[] = {
 	ANA_OUT, DIG_OUT
 };
 static int
-solo_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+solo_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 {
-	int c, err;
+	unsigned int c;
+	int err;
 	u32 tmp;
 
 	if (size < ARRAY_SIZE(solo_meter_labels) * 2 * sizeof(u32))
@@ -737,9 +827,10 @@ static char *ozonic_meter_labels[] = {
 	ANA_OUT, ANA_OUT
 };
 static int
-ozonic_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+ozonic_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 {
-	int c, channels, err;
+	unsigned int c, channels;
+	int err;
 
 	channels = ARRAY_SIZE(ozonic_meter_labels) * 2;
 	if (size < channels * sizeof(u32))
@@ -764,9 +855,10 @@ static char *nrv10_meter_labels[] = {
 	DIG_IN
 };
 static int
-nrv10_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+nrv10_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 {
-	int c, channels, err;
+	unsigned int c, channels;
+	int err;
 
 	channels = ARRAY_SIZE(nrv10_meter_labels) * 2;
 	if (size < channels * sizeof(u32))
@@ -786,72 +878,39 @@ end:
 /* BeBoB bootloader specification */
 struct snd_bebob_spec maudio_bootloader_spec = {
 	.load		= &firmware_load,
-	.discover	= NULL,
 	.clock		= NULL,
-	.dig_iface	= NULL
 };
 
 /* for special customized devices */
-static struct snd_bebob_freq_spec special_freq_spec = {
-	.get	= &special_get_freq,
-	.set	= &snd_bebob_stream_set_rate
-};
-static struct snd_bebob_clock_spec special_clock_spec = {
-	.num	= ARRAY_SIZE(special_clock_labels),
-	.labels	= special_clock_labels,
-	.get	= &special_clock_get,
-	.set	= &special_clock_set,
-	.synced	= &special_clock_synced
-};
-static struct snd_bebob_dig_iface_spec special_dig_iface_spec = {
-	.num	= ARRAY_SIZE(special_dig_iface_labels),
-	.labels	= special_dig_iface_labels,
-	.get	= &special_dig_iface_get,
-	.set	= &special_dig_iface_set
+static struct snd_bebob_clock_spec special_clk_spec = {
+	.num		= ARRAY_SIZE(special_clk_src_labels),
+	.labels		= special_clk_src_labels,
+	.get_src	= &special_clk_src_get,
+	.set_src	= &special_clk_src_set,
+	.get_freq	= &special_clk_get_freq,
+	.set_freq	= &snd_bebob_stream_set_rate,
+	.synced		= &special_clk_synced
 };
 static struct snd_bebob_meter_spec special_meter_spec = {
 	.num	= ARRAY_SIZE(special_meter_labels),
 	.labels	= special_meter_labels,
 	.get	= &special_meter_get
 };
-struct snd_bebob_spec maudio_fw1814_spec = {
+struct snd_bebob_spec maudio_special_spec = {
 	.load		= NULL,
-	.discover	= &special_discover,
-	.map   		= NULL,
-	.freq		= &special_freq_spec,
-	.clock		= &special_clock_spec,
-	.dig_iface	= &special_dig_iface_spec,
+	.clock		= &special_clk_spec,
 	.meter		= &special_meter_spec
-};
-
-struct snd_bebob_spec maudio_projectmix_spec= {
-	.load		= NULL,
-	.discover	= &special_discover,
-	.map   		= NULL,
-	.freq		= &special_freq_spec,
-	.clock		= &special_clock_spec,
-	.dig_iface	= &special_dig_iface_spec,
-	.meter		= &special_meter_spec
-};
-
-struct snd_bebob_freq_spec normal_freq_spec = {
-	.get	= &snd_bebob_stream_get_rate,
-	.set	= &snd_bebob_stream_set_rate
 };
 
 /* Firewire 410 specification */
-static struct snd_bebob_clock_spec fw410_clock_spec = {
-	.num	= ARRAY_SIZE(fw410_clock_labels),
-	.labels	= fw410_clock_labels,
-	.get	= &fw410_clock_get,
-	.set	= &fw410_clock_set,
-	.synced	= &fw410_clock_synced
-};
-static struct snd_bebob_dig_iface_spec fw410_dig_iface_spec = {
-	.num	= ARRAY_SIZE(fw410_dig_iface_labels),
-	.labels	= fw410_dig_iface_labels,
-	.get	= &fw410_dig_iface_get,
-	.set	= &fw410_dig_iface_set
+static struct snd_bebob_clock_spec fw410_clk_spec = {
+	.num		= ARRAY_SIZE(fw410_clk_src_labels),
+	.labels		= fw410_clk_src_labels,
+	.get_src	= &fw410_clk_src_get,
+	.set_src	= &fw410_clk_src_set,
+	.get_freq	= &snd_bebob_stream_get_rate,
+	.set_freq	= &snd_bebob_stream_set_rate,
+	.synced		= &fw410_clk_synced
 };
 static struct snd_bebob_meter_spec fw410_meter_spec = {
 	.num	= ARRAY_SIZE(fw410_meter_labels),
@@ -859,22 +918,20 @@ static struct snd_bebob_meter_spec fw410_meter_spec = {
 	.get	= &fw410_meter_get
 };
 struct snd_bebob_spec maudio_fw410_spec = {
-	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &normal_freq_spec,
-	.clock		= &fw410_clock_spec,
-	.dig_iface	= &fw410_dig_iface_spec,
-	.meter		= &fw410_meter_spec
+	.load	= NULL,
+	.clock	= &fw410_clk_spec,
+	.meter	= &fw410_meter_spec
 };
 
 /* Firewire Audiophile specification */
-static struct snd_bebob_clock_spec audiophile_clock_spec = {
-	.num	= ARRAY_SIZE(audiophile_clock_labels),
-	.labels	= audiophile_clock_labels,
-	.get	= &audiophile_clock_get,
-	.set	= &audiophile_clock_set,
-	.synced	= &audiophile_clock_synced
+static struct snd_bebob_clock_spec audiophile_clk_spec = {
+	.num		= ARRAY_SIZE(audiophile_clk_src_labels),
+	.labels		= audiophile_clk_src_labels,
+	.get_src	= &audiophile_clk_src_get,
+	.set_src	= &audiophile_clk_src_set,
+	.get_freq	= &snd_bebob_stream_get_rate,
+	.set_freq	= &snd_bebob_stream_set_rate,
+	.synced		= &audiophile_clk_synced
 };
 static struct snd_bebob_meter_spec audiophile_meter_spec = {
 	.num	= ARRAY_SIZE(audiophile_meter_labels),
@@ -882,22 +939,20 @@ static struct snd_bebob_meter_spec audiophile_meter_spec = {
 	.get	= &audiophile_meter_get
 };
 struct snd_bebob_spec maudio_audiophile_spec = {
-	.load		= &firmware_load,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &normal_freq_spec,
-	.clock		= &audiophile_clock_spec,
-	.dig_iface	= NULL,
-	.meter		= &audiophile_meter_spec
+	.load	= &firmware_load,
+	.clock	= &audiophile_clk_spec,
+	.meter	= &audiophile_meter_spec
 };
 
 /* Firewire Solo specification */
-static struct snd_bebob_clock_spec solo_clock_spec = {
-	.num	= ARRAY_SIZE(solo_clock_labels),
-	.labels	= solo_clock_labels,
-	.get	= &solo_clock_get,
-	.set	= &solo_clock_set,
-	.synced	= &solo_clock_synced
+static struct snd_bebob_clock_spec solo_clk_spec = {
+	.num		= ARRAY_SIZE(solo_clk_src_labels),
+	.labels		= solo_clk_src_labels,
+	.get_src	= &solo_clk_src_get,
+	.set_src	= &solo_clk_src_set,
+	.get_freq	= &snd_bebob_stream_get_rate,
+	.set_freq	= &snd_bebob_stream_set_rate,
+	.synced		= &solo_clk_synced
 };
 static struct snd_bebob_meter_spec solo_meter_spec = {
 	.num	= ARRAY_SIZE(solo_meter_labels),
@@ -905,29 +960,25 @@ static struct snd_bebob_meter_spec solo_meter_spec = {
 	.get	= &solo_meter_get
 };
 struct snd_bebob_spec maudio_solo_spec = {
-	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &normal_freq_spec,
-	.clock		= &solo_clock_spec,
-	.dig_iface	= NULL,
-	.meter		= &solo_meter_spec
+	.load	= NULL,
+	.clock	= &solo_clk_spec,
+	.meter	= &solo_meter_spec
 };
 
 /* Ozonic specification */
+struct snd_bebob_clock_spec normal_clk_spec = {
+	.get_freq	= &snd_bebob_stream_get_rate,
+	.set_freq	= &snd_bebob_stream_set_rate
+};
 static struct snd_bebob_meter_spec ozonic_meter_spec = {
 	.num	= ARRAY_SIZE(ozonic_meter_labels),
 	.labels	= ozonic_meter_labels,
 	.get	= &ozonic_meter_get
 };
 struct snd_bebob_spec maudio_ozonic_spec = {
-	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &normal_freq_spec,
-	.clock		= NULL,
-	.dig_iface	= NULL,
-	.meter		= &ozonic_meter_spec
+	.load	= NULL,
+	.clock	= &normal_clk_spec,
+	.meter	= &ozonic_meter_spec
 };
 
 /* NRV10 specification */
@@ -937,12 +988,7 @@ static struct snd_bebob_meter_spec nrv10_meter_spec = {
 	.get	= &nrv10_meter_get
 };
 struct snd_bebob_spec maudio_nrv10_spec = {
-	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &normal_freq_spec,
-	.clock		= NULL,
-	.dig_iface	= NULL,
-	.meter		= &nrv10_meter_spec
+	.load	= NULL,
+	.clock	= &normal_clk_spec,
+	.meter	= &nrv10_meter_spec
 };
-

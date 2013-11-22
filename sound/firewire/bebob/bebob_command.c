@@ -390,7 +390,7 @@ end:
 	return err;
 }
 
-int snd_bebob_get_rate(struct snd_bebob *bebob, int *rate,
+int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
 		       enum avc_general_plug_dir dir)
 {
 	int err;
@@ -409,7 +409,7 @@ end:
 	return err;
 }
 
-int snd_bebob_set_rate(struct snd_bebob *bebob, int rate,
+int snd_bebob_set_rate(struct snd_bebob *bebob, unsigned int rate,
 		       enum avc_general_plug_dir dir)
 {
 	int err;

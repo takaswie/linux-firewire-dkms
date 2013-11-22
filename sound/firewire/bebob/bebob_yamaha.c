@@ -38,7 +38,7 @@
  */
 
 static int
-detect_dig_in(struct snd_bebob *bebob, int *detect)
+detect_dig_in(struct snd_bebob *bebob, unsigned int *detect)
 {
 	int err;
 	u8 *buf;
@@ -122,11 +122,12 @@ end:
 	return err;
 }
 
-static char *clock_labels[] = {"Internal", "SPDIF"};
+static char *clk_src_labels[] = {SND_BEBOB_CLOCK_INTERNAL, "SPDIF"};
 static int
-clock_set(struct snd_bebob *bebob, int id)
+clk_src_set(struct snd_bebob *bebob, unsigned int id)
 {
-	int err, detect;
+	int err;
+	unsigned int detect;
 
 	if (id > 0) {
 		err = detect_dig_in(bebob, &detect);
@@ -149,33 +150,27 @@ end:
 	return err;
 }
 static int
-clock_get(struct snd_bebob *bebob, int *id)
+clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
 	return avc_audio_get_selector(bebob->unit, 0, 4, id);
 }
 static int
-clock_synced(struct snd_bebob *bebob, bool *synced)
+clk_synced(struct snd_bebob *bebob, bool *synced)
 {
 	return get_sync_status(bebob, synced);
 }
 
-static struct snd_bebob_freq_spec freq_spec = {
-	.get	= &snd_bebob_stream_get_rate,
-	.set	= &snd_bebob_stream_set_rate
-};
 static struct snd_bebob_clock_spec clock_spec = {
-	.num	= ARRAY_SIZE(clock_labels),
-	.labels	= clock_labels,
-	.get	= &clock_get,
-	.set	= &clock_set,
-	.synced	= &clock_synced
+	.num		= ARRAY_SIZE(clk_src_labels),
+	.labels		= clk_src_labels,
+	.get_src	= &clk_src_get,
+	.set_src	= &clk_src_set,
+	.get_freq	= &snd_bebob_stream_get_rate,
+	.set_freq	= &snd_bebob_stream_set_rate,
+	.synced		= &clk_synced
 };
 struct snd_bebob_spec yamaha_go_spec = {
-	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &freq_spec,
-	.clock		= &clock_spec,
-	.dig_iface	= NULL,
-	.meter		= NULL
+	.load	= NULL,
+	.clock	= &clock_spec,
+	.meter	= NULL
 };

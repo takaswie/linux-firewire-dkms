@@ -64,7 +64,8 @@ const static unsigned int rates[] = {
 #define SAFFIRE_LE_OFFSET_METER			0x000000000168
 
 static inline int
-saffire_read_block(struct snd_bebob *bebob, u64 offset, u32 *buf, int size)
+saffire_read_block(struct snd_bebob *bebob, u64 offset,
+		   u32 *buf, unsigned int size)
 {
 	int i, err;
 	__be32 *tmp = (__be32 *)buf;
@@ -108,15 +109,15 @@ saffire_write_quad(struct snd_bebob *bebob, u64 offset, u32 value)
 				  &value, sizeof(u32), 0);
 }
 
-static char *saffirepro_26_clock_labels[] = {
-	"Internal", "S/PDIF", "ADAT1", "ADAT2", "Word Clock"
+static char *saffirepro_26_clk_src_labels[] = {
+	SND_BEBOB_CLOCK_INTERNAL, "S/PDIF", "ADAT1", "ADAT2", "Word Clock"
 };
 
-static char *saffirepro_10_clock_labels[] = {
-	"Internal", "S/PDIF", "Word Clock"
+static char *saffirepro_10_clk_src_labels[] = {
+	SND_BEBOB_CLOCK_INTERNAL, "S/PDIF", "Word Clock"
 };
 static int
-saffirepro_both_freq_get(struct snd_bebob *bebob, int *rate)
+saffirepro_both_clk_freq_get(struct snd_bebob *bebob, unsigned int *rate)
 {
 	u32 id;
 	int err;
@@ -134,7 +135,7 @@ end:
 	return err;
 }
 static int
-saffirepro_both_freq_set(struct snd_bebob *bebob, int rate)
+saffirepro_both_clk_freq_set(struct snd_bebob *bebob, unsigned int rate)
 {
 	u32 id;
 	bool flag;
@@ -150,7 +151,7 @@ saffirepro_both_freq_set(struct snd_bebob *bebob, int rate)
 	return saffire_write_quad(bebob, SAFFIREPRO_RATE_NOREBOOT, id);
 }
 static int
-saffirepro_both_clock_get(struct snd_bebob *bebob, int *id)
+saffirepro_both_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
 	int err;
 	u32 value;
@@ -159,7 +160,7 @@ saffirepro_both_clock_get(struct snd_bebob *bebob, int *id)
 	if (err < 0)
 		goto end;
 
-	if (bebob->spec->clock->labels == saffirepro_10_clock_labels) {
+	if (bebob->spec->clock->labels == saffirepro_10_clk_src_labels) {
 		if (value == SAFFIREPRO_CLOCK_SOURCE_WORDCLOCK)
 			*id = 2;
 		else if (value == SAFFIREPRO_CLOCK_SOURCE_SPDIF)
@@ -170,12 +171,12 @@ end:
 	return err;
 }
 static int
-saffirepro_both_clock_set(struct snd_bebob *bebob, int id)
+saffirepro_both_clk_src_set(struct snd_bebob *bebob, unsigned int id)
 {
 	int err;
 	u32 values[3];
 
-	if (bebob->spec->clock->labels == saffirepro_10_clock_labels) {
+	if (bebob->spec->clock->labels == saffirepro_10_clk_src_labels) {
 		if (id == 2)
 			id = 5;
 		else if (id == 1)
@@ -199,12 +200,12 @@ end:
 	return err;
 }
 static int
-saffirepro_both_clock_synced(struct snd_bebob *bebob, bool *synced)
+saffirepro_both_clk_synced(struct snd_bebob *bebob, bool *synced)
 {
 	int clock, err;
 	u32 value;
 
-	err = saffirepro_both_clock_get(bebob, &clock);
+	err = saffirepro_both_clk_src_get(bebob, &clock);
 	if (err < 0)
 		goto end;
 	/* internal */
@@ -224,11 +225,11 @@ end:
 }
 
 struct snd_bebob_spec saffire_le_spec;
-static char *saffire_both_clock_labels[] = {
-	"Internal", "S/PDIF"
+static char *saffire_both_clk_src_labels[] = {
+	SND_BEBOB_CLOCK_INTERNAL, "S/PDIF"
 };
 static int
-saffire_both_clock_get(struct snd_bebob *bebob, int *id)
+saffire_both_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
 	int err;
 	u32 value;
@@ -242,18 +243,18 @@ end:
 	return err;
 };
 static int
-saffire_both_clock_set(struct snd_bebob *bebob, int id)
+saffire_both_clk_src_set(struct snd_bebob *bebob, unsigned int id)
 {
 	return saffire_write_quad(bebob, SAFFIRE_OFFSET_CLOCK_SOURCE, id);
 };
 static int
-saffire_both_clock_synced(struct snd_bebob *bebob, bool *synced)
+saffire_both_clk_synced(struct snd_bebob *bebob, bool *synced)
 {
 	int err;
 	u64 offset;
 	u32 value;
 
-	err = saffire_both_clock_get(bebob, &value);
+	err = saffire_both_clk_src_get(bebob, &value);
 	if (err < 0)
 		goto end;
 	/* internal */
@@ -285,7 +286,7 @@ static char *saffire_le_meter_labels[] = {
 	a = b; \
 	b = tmp
 static int
-saffire_le_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+saffire_le_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 {
 	int err;
 	u32 tmp;
@@ -316,65 +317,51 @@ static char *saffire_meter_labels[] = {
 	STM_IN, STM_IN, STM_IN, STM_IN, STM_IN,
 };
 static int
-saffire_meter_get(struct snd_bebob *bebob, u32 *buf, int size)
+saffire_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 {
 	return saffire_read_block(bebob, SAFFIRE_OFFSET_METER, buf, size);
 }
 
-/* TODO: need tester */
-static struct snd_bebob_freq_spec saffirepro_both_freq_spec = {
-	.get	= &saffirepro_both_freq_get,
-	.set	= &saffirepro_both_freq_set
-};
-
 /* Saffire Pro 26 I/O  */
-static struct snd_bebob_clock_spec saffirepro_26_clock_spec = {
-	.num	= ARRAY_SIZE(saffirepro_26_clock_labels),
-	.labels	= saffirepro_26_clock_labels,
-	.get	= &saffirepro_both_clock_get,
-	.set	= &saffirepro_both_clock_set,
-	.synced	= &saffirepro_both_clock_synced
+static struct snd_bebob_clock_spec saffirepro_26_clk_spec = {
+	.num		= ARRAY_SIZE(saffirepro_26_clk_src_labels),
+	.labels		= saffirepro_26_clk_src_labels,
+	.get_src	= &saffirepro_both_clk_src_get,
+	.set_src	= &saffirepro_both_clk_src_set,
+	.get_freq	= &saffirepro_both_clk_freq_get,
+	.set_freq	= &saffirepro_both_clk_freq_set,
+	.synced		= &saffirepro_both_clk_synced
 };
 struct snd_bebob_spec saffirepro_26_spec = {
-	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &saffirepro_both_freq_spec,
-	.clock		= &saffirepro_26_clock_spec,
-	.dig_iface	= NULL,
-	.meter		= NULL
-
+	.load	= NULL,
+	.clock	= &saffirepro_26_clk_spec,
+	.meter	= NULL
 };
 
 /* Saffire Pro 10 I/O */
-static struct snd_bebob_clock_spec saffirepro_10_clock_spec = {
-	.num	= ARRAY_SIZE(saffirepro_10_clock_labels),
-	.labels	= saffirepro_10_clock_labels,
-	.get	= &saffirepro_both_clock_get,
-	.set	= &saffirepro_both_clock_set,
-	.synced	= &saffirepro_both_clock_synced
+static struct snd_bebob_clock_spec saffirepro_10_clk_spec = {
+	.num		= ARRAY_SIZE(saffirepro_10_clk_src_labels),
+	.labels		= saffirepro_10_clk_src_labels,
+	.get_src	= &saffirepro_both_clk_src_get,
+	.set_src	= &saffirepro_both_clk_src_set,
+	.get_freq	= &saffirepro_both_clk_freq_get,
+	.set_freq	= &saffirepro_both_clk_freq_set,
+	.synced		= &saffirepro_both_clk_synced
 };
 struct snd_bebob_spec saffirepro_10_spec = {
-	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &saffirepro_both_freq_spec,
-	.clock		= &saffirepro_10_clock_spec,
-	.dig_iface	= NULL,
-	.meter		= NULL
+	.load	= NULL,
+	.clock	= &saffirepro_10_clk_spec,
+	.meter	= NULL
 };
 
-static struct snd_bebob_freq_spec saffire_both_freq_spec = {
-	.get	= &snd_bebob_stream_get_rate,
-	.set	= &snd_bebob_stream_set_rate
-};
-
-struct snd_bebob_clock_spec saffire_both_clock_spec= {
-	.num	= ARRAY_SIZE(saffire_both_clock_labels),
-	.labels	= saffire_both_clock_labels,
-	.get	= &saffire_both_clock_get,
-	.set	= &saffire_both_clock_set,
-	.synced	= &saffire_both_clock_synced
+struct snd_bebob_clock_spec saffire_both_clk_spec= {
+	.num		= ARRAY_SIZE(saffire_both_clk_src_labels),
+	.labels		= saffire_both_clk_src_labels,
+	.get_src	= &saffire_both_clk_src_get,
+	.set_src	= &saffire_both_clk_src_set,
+	.get_freq	= &snd_bebob_stream_get_rate,
+	.set_freq	= &snd_bebob_stream_set_rate,
+	.synced		= &saffire_both_clk_synced
 };
 
 /* Saffire LE */
@@ -384,13 +371,9 @@ struct snd_bebob_meter_spec saffire_le_meter_spec = {
 	.get	= &saffire_le_meter_get,
 };
 struct snd_bebob_spec saffire_le_spec = {
-	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &saffire_both_freq_spec,
-	.clock		= &saffire_both_clock_spec,
-	.dig_iface	= NULL,
-	.meter		= &saffire_le_meter_spec
+	.load	= NULL,
+	.clock	= &saffire_both_clk_spec,
+	.meter	= &saffire_le_meter_spec
 };
 /* Saffire */
 struct snd_bebob_meter_spec saffire_meter_spec = {
@@ -399,11 +382,7 @@ struct snd_bebob_meter_spec saffire_meter_spec = {
 	.get	= &saffire_meter_get,
 };
 struct snd_bebob_spec saffire_spec ={
-	.load		= NULL,
-	.discover	= &snd_bebob_stream_discover,
-	.map		= &snd_bebob_stream_map,
-	.freq		= &saffire_both_freq_spec,
-	.clock		= &saffire_both_clock_spec,
-	.dig_iface	= NULL,
-	.meter		= &saffire_meter_spec
+	.load	= NULL,
+	.clock	= &saffire_both_clk_spec,
+	.meter	= &saffire_meter_spec
 };
