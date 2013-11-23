@@ -46,11 +46,12 @@ physical_metering_get(struct snd_kcontrol *ctl,
 {
 	struct snd_efw *efw = ctl->private_data;
 	struct snd_efw_phys_meters *meters;
-	int base = sizeof(struct snd_efw_phys_meters);
-	int count = efw->input_meter_counts + efw->output_meter_counts;
+	unsigned int i, count, base;
 	u32 *dst, *src;
-	int i, err;
+	int err;
 
+	base = sizeof(struct snd_efw_phys_meters);
+	count = efw->input_meter_counts + efw->output_meter_counts;
 	meters = kzalloc(base + count * 4, GFP_KERNEL);
 	if (meters == NULL)
 		return -ENOMEM;
@@ -98,7 +99,8 @@ control_digital_interface_info(struct snd_kcontrol *kctl,
 			       struct snd_ctl_elem_info *einf)
 {
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
-	int value, i;
+	unsigned int i;
+	int value;
 
 	einf->value.enumerated.items = 0;
 	for (i = 0; i < ARRAY_SIZE(digital_iface_descs); i++) {
@@ -131,11 +133,10 @@ static int
 control_digital_interface_get(struct snd_kcontrol *kctl,
 			      struct snd_ctl_elem_value *uval)
 {
-	int err = 0;
-
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	enum snd_efw_digital_interface digital_interface;
-	int i;
+	unsigned int i;
+	int err;
 
 	/* get current index */
 	err = snd_efw_command_get_digital_interface(efw, &digital_interface);
@@ -161,7 +162,7 @@ static int
 control_digital_interface_put(struct snd_kcontrol *kctl,
 			      struct snd_ctl_elem_value *uval)
 {
-	int changed = 0;
+	int changed;
 
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	int index, value;
@@ -179,6 +180,7 @@ control_digital_interface_put(struct snd_kcontrol *kctl,
 	}
 
 	/* set clock */
+	changed = 0;
 	if (snd_efw_command_set_digital_interface(efw, index) < 0)
 		goto end;
 
@@ -218,13 +220,10 @@ static int
 control_spdif_format_get(struct snd_kcontrol *kctl,
 			 struct snd_ctl_elem_value *uvalue)
 {
-	int err = 0;
-
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	enum snd_efw_iec60958_format format;
 
-	err = snd_efw_command_get_iec60958_format(efw, &format);
-	if (err >= 0)
+	if (snd_efw_command_get_iec60958_format(efw, &format) >= 0)
 		uvalue->value.enumerated.item[0] = format;
 
 	return 0;
@@ -233,17 +232,17 @@ static int
 control_spdif_format_put(struct snd_kcontrol *kctl,
 			 struct snd_ctl_elem_value *uval)
 {
-	int changed = 0;
-
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
-	int value = uval->value.enumerated.item[0];
+	int value, changed = 0;
 
-	if (value < ARRAY_SIZE(spdif_format_descs)) {
-		if (snd_efw_command_set_iec60958_format(efw, value) < 0)
-			goto end;
-		changed = 1;
-	}
+	value = uval->value.enumerated.item[0];
+	if (value >= ARRAY_SIZE(spdif_format_descs))
+		goto end;
 
+	if (snd_efw_command_set_iec60958_format(efw, value) < 0)
+		goto end;
+
+	changed = 1;
 end:
 	return changed;
 }
@@ -260,14 +259,17 @@ end:
  * But I note that as a result of changing the number of channels, if payload
  * size of AMDTP packet is changed, the streaming is broken.
  */
-static int sampling_rates[] = {5512, 8000, 11025, 16000, 22500, 32000, 44100,
-			       48000, 64000, 88200, 96000, 176400, 192000};
+static unsigned int sampling_rates[] = {
+	5512, 8000, 11025, 16000, 22500, 32000, 44100,
+	48000, 64000, 88200, 96000, 176400, 192000
+};
 static int
 control_sampling_rate_info(struct snd_kcontrol *kctl,
 			   struct snd_ctl_elem_info *einf)
 {
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
-	int value, i;
+	unsigned int i;
+	int value;
 
 	/* maximum value for user */
 	einf->value.enumerated.items = 0;
@@ -300,20 +302,18 @@ static int
 control_sampling_rate_get(struct snd_kcontrol *kctl,
 			  struct snd_ctl_elem_value *uval)
 {
-	int err = 0;
-
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
-	int sampling_rate;
-	int index, i;
+	unsigned int i, index, rate;
+	int err;
 
 	/* get current sampling rate */
-	err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
+	err = snd_efw_command_get_sampling_rate(efw, &rate);
 	if (err < 0)
 		goto end;
 
 	/* get index */
 	for (index = 0; index < ARRAY_SIZE(sampling_rates); index++) {
-		if (sampling_rates[index] == sampling_rate)
+		if (sampling_rates[index] == rate)
 			break;
 	}
 
@@ -323,7 +323,6 @@ control_sampling_rate_get(struct snd_kcontrol *kctl,
 		if (BIT(i) & efw->supported_sampling_rate)
 			uval->value.enumerated.item[0]++;
 	}
-
 end:
 	return err;
 }
@@ -331,10 +330,9 @@ static int
 control_sampling_rate_put(struct snd_kcontrol *kctl,
 			  struct snd_ctl_elem_value *uval)
 {
-	int changed = 0;
-
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
-	int index, value;
+	unsigned int index;
+	int value, changed;
 
 	/* get index from user value */
 	value = uval->value.enumerated.item[0];
@@ -349,11 +347,11 @@ control_sampling_rate_put(struct snd_kcontrol *kctl,
 	}
 
 	/* set sampling rate */
+	changed = 0;
 	if (snd_efw_command_set_sampling_rate(efw, sampling_rates[index]) < 0)
 		goto end;
 
 	changed = 1;
-
 end:
 	return changed;
 }
@@ -371,7 +369,8 @@ static int control_clock_source_info(struct snd_kcontrol *kctl,
 				     struct snd_ctl_elem_info *einf)
 {
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
-	int value, i;
+	unsigned int i;
+	int value;
 
 	/* skip unsupported clock source */
 	einf->value.enumerated.items = 0;
@@ -404,11 +403,10 @@ static int control_clock_source_info(struct snd_kcontrol *kctl,
 static int control_clock_source_get(struct snd_kcontrol *kctl,
 				    struct snd_ctl_elem_value *uval)
 {
-	int err = 0;
-
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
 	enum snd_efw_clock_source clock_source;
-	int i;
+	unsigned int i;
+	int err;
 
 	/* get current index */
 	err = snd_efw_command_get_clock_source(efw, &clock_source);
@@ -425,7 +423,6 @@ static int control_clock_source_get(struct snd_kcontrol *kctl,
 		if (BIT(i) & efw->supported_clock_source)
 			uval->value.enumerated.item[0]++;
 	}
-
 end:
 	return err;
 }
@@ -433,9 +430,10 @@ static bool check_clock_input(struct snd_efw *efw,
 			      enum snd_efw_clock_source source)
 {
 	struct snd_efw_phys_meters *meters;
-	int len = sizeof(struct snd_efw_phys_meters);
+	unsigned int len;
 	bool result;
 
+	len = sizeof(struct snd_efw_phys_meters);
 	meters = kzalloc(len, GFP_KERNEL);
 	if (meters == NULL)
 		return false;
@@ -453,10 +451,9 @@ end:
 static int control_clock_source_put(struct snd_kcontrol *kctl,
 				    struct snd_ctl_elem_value *uval)
 {
-	int changed = 0;
-
 	struct snd_efw *efw = snd_kcontrol_chip(kctl);
-	int index, value;
+	unsigned int index;
+	int value, changed;
 
 	/* get index from user value */
 	value = uval->value.enumerated.item[0];
@@ -474,11 +471,11 @@ static int control_clock_source_put(struct snd_kcontrol *kctl,
 		return 0;
 
 	/* set clock */
+	changed = 0;
 	if (snd_efw_command_set_clock_source(efw, index) < 0)
 		goto end;
 
 	changed = 1;
-
 end:
 	return changed;
 }
@@ -521,8 +518,9 @@ static struct snd_kcontrol_new global_iec60958_format_control = {
 
 int snd_efw_create_control_devices(struct snd_efw *efw)
 {
-	int i, count, err;
 	struct snd_kcontrol *kctl;
+	unsigned int i, count;
+	int err;
 
 	kctl = snd_ctl_new1(&physical_metering, efw);
 	err = snd_ctl_add(efw->card, kctl);
@@ -559,8 +557,6 @@ int snd_efw_create_control_devices(struct snd_efw *efw)
 		if (err < 0)
 			goto end;
 	}
-
-	err = 0;
 end:
 	return err;
 }

@@ -22,6 +22,7 @@
  * 1.get firewire node reference
  * 2.lock/unlock stream
  *  dice driver implements the same functionality.
+ * 3.get notification about starting/stopping stream
  */
 
 #include "fireworks.h"

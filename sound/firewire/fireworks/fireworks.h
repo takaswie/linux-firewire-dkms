@@ -38,13 +38,12 @@
 
 #include <sound/core.h>
 #include <sound/initval.h>
+#include <sound/pcm.h>
+#include <sound/info.h>
 #include <sound/control.h>
 #include <sound/rawmidi.h>
-#include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/hwdep.h>
-#include <sound/info.h>
-#include <sound/tlv.h>
 
 #include "../packets-buffer.h"
 #include "../iso-resources.h"
@@ -103,15 +102,15 @@ struct snd_efw {
 	unsigned int pcm_capture_channels[SND_EFW_MUITIPLIER_MODES];
 	unsigned int pcm_playback_channels[SND_EFW_MUITIPLIER_MODES];
 
-	/* notification to control components */
-	struct snd_ctl_elem_id *control_id_sampling_rate;
-
 	/* for IEC 61883-1 and -6 streaming */
 	struct amdtp_stream tx_stream;
 	struct amdtp_stream rx_stream;
 	/* Fireworks has only two plugs */
 	struct cmp_connection out_conn;
 	struct cmp_connection in_conn;
+
+	/* notification to control components */
+	struct snd_ctl_elem_id *control_id_sampling_rate;
 
 	/* for uapi */
 	int dev_lock_count;
@@ -213,18 +212,18 @@ void snd_efw_command_bus_reset(struct fw_unit *unit);
 int snd_efw_command_identify(struct snd_efw *efw);
 int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 				  u16 addr_high, u32 addr_low);
-int snd_efw_command_set_tx_mode(struct snd_efw *efw, int mode);
+int snd_efw_command_set_tx_mode(struct snd_efw *efw, unsigned int mode);
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 			       struct snd_efw_hwinfo *hwinfo);
 int snd_efw_command_get_phys_meters(struct snd_efw *efw,
 				    struct snd_efw_phys_meters *meters,
-				    int len);
+				    unsigned int len);
 int snd_efw_command_get_clock_source(struct snd_efw *efw,
 				     enum snd_efw_clock_source *source);
 int snd_efw_command_set_clock_source(struct snd_efw *efw,
 				     enum snd_efw_clock_source source);
-int snd_efw_command_get_sampling_rate(struct snd_efw *efw, int *sampling_rate);
-int snd_efw_command_set_sampling_rate(struct snd_efw *efw, int sampling_rate);
+int snd_efw_command_get_sampling_rate(struct snd_efw *efw, unsigned int *rate);
+int snd_efw_command_set_sampling_rate(struct snd_efw *efw, unsigned int rate);
 int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
 					enum snd_efw_iec60958_format *format);
 int snd_efw_command_set_iec60958_format(struct snd_efw *efw,
@@ -246,9 +245,6 @@ void snd_efw_stream_lock_changed(struct snd_efw *efw);
 int snd_efw_stream_lock_try(struct snd_efw *efw);
 void snd_efw_stream_lock_release(struct snd_efw *efw);
 
-/* for hwdep component */
-int snd_efw_create_hwdep_device(struct snd_efw *efw);
-
 /* for procfs subsystem */
 void snd_efw_proc_init(struct snd_efw *efw);
 
@@ -261,6 +257,9 @@ int snd_efw_create_midi_devices(struct snd_efw *efw);
 /* for pcm component */
 int snd_efw_create_pcm_devices(struct snd_efw *efw);
 int snd_efw_get_multiplier_mode(int sampling_rate);
+
+/* for hwdep component */
+int snd_efw_create_hwdep_device(struct snd_efw *efw);
 
 #define SND_EFW_DEV_ENTRY(vendor, model) \
 { \

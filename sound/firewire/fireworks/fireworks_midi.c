@@ -32,7 +32,11 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	snd_efw_stream_start_duplex(efw, &efw->tx_stream, 0);
+	err = snd_efw_stream_start_duplex(efw, &efw->tx_stream, 0);
+	if (err < 0) {
+		snd_efw_stream_lock_release(efw);
+		goto end;
+	}
 	amdtp_stream_midi_add(&efw->tx_stream, substream);
 end:
 	return err;
@@ -47,7 +51,11 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	snd_efw_stream_start_duplex(efw, &efw->rx_stream, 0);
+	err = snd_efw_stream_start_duplex(efw, &efw->rx_stream, 0);
+	if (err < 0) {
+		snd_efw_stream_lock_release(efw);
+		goto end;
+	}
 	amdtp_stream_midi_add(&efw->rx_stream, substream);
 	/*
 	 * Fireworks ignores MIDI messages in greater than first 8 data blocks

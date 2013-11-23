@@ -95,7 +95,7 @@ proc_read_clock(struct snd_info_entry *entry, struct snd_info_buffer *buffer)
 {
 	struct snd_efw *efw = entry->private_data;
 	enum snd_efw_clock_source clock_source;
-	int sampling_rate;
+	unsigned int sampling_rate;
 
 	if (snd_efw_command_get_clock_source(efw, &clock_source) < 0)
 		goto end;
@@ -121,10 +121,9 @@ proc_read_phys_meters(struct snd_info_entry *entry,
 			       "Guitar", "Piezo Guitar", "Guitar String"};
 
 	struct snd_efw_phys_meters *meters;
-	int i, g, c;
-	int base = sizeof(struct snd_efw_phys_meters);
-	int count = efw->input_meter_counts + efw->output_meter_counts;
-	int err;
+	unsigned int i, g, c;
+	unsigned int count = efw->input_meter_counts + efw->output_meter_counts;
+	int err, base = sizeof(struct snd_efw_phys_meters);
 
 	meters = kzalloc(base + count * 4, GFP_KERNEL);
 	if (meters == NULL)

@@ -322,17 +322,17 @@ static int snd_efw_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
-	/* create PCM interface */
-	err = snd_efw_create_pcm_devices(efw);
-	if (err < 0)
-		goto error;
-
 	/* create midi interface */
 	if (efw->midi_output_ports || efw->midi_input_ports) {
 		err = snd_efw_create_midi_devices(efw);
 		if (err < 0)
 			goto error;
 	}
+
+	/* create PCM interface */
+	err = snd_efw_create_pcm_devices(efw);
+	if (err < 0)
+		goto error;
 
 	err = snd_efw_create_hwdep_device(efw);
 	if (err < 0)
@@ -354,10 +354,8 @@ static int snd_efw_probe(struct fw_unit *unit,
 	/* proved */
 	err = 0;
 	goto end;
-
 error:
 	snd_card_free(card);
-
 end:
 	mutex_unlock(&devices_mutex);
 	return err;
@@ -366,7 +364,8 @@ end:
 static void snd_efw_update(struct fw_unit *unit)
 {
 	struct snd_efw *efw = dev_get_drvdata(&unit->device);
-	int tries, err;
+	unsigned int tries;
+	int err;
 
 	snd_efw_command_bus_reset(efw->unit);
 
@@ -436,7 +435,6 @@ static void snd_efw_remove(struct fw_unit *unit)
 
 	snd_card_disconnect(efw->card);
 	snd_card_free_when_closed(efw->card);
-
 	return;
 }
 

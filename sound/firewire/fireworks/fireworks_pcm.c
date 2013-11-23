@@ -309,7 +309,6 @@ static int pcm_open(struct snd_pcm_substream *substream)
 	snd_pcm_set_sync(substream);
 end:
 	return err;
-
 err_locked:
 	snd_efw_stream_lock_release(efw);
 	return err;

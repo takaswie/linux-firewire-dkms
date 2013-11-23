@@ -266,7 +266,7 @@ int snd_efw_command_set_resp_addr(struct snd_efw *efw,
  * CIP header in AMDTP transmit packet is used as 'presentation timestamp'. The
  * value of this field is 0x90ffffff in NODATA packet.
  */
-int snd_efw_command_set_tx_mode(struct snd_efw *efw, int mode)
+int snd_efw_command_set_tx_mode(struct snd_efw *efw, unsigned int mode)
 {
 	u32 param = mode;
 	return efc(efw, EFC_CAT_TRANSPORT, EFC_CMD_TRANSPORT_SET_TX_MODE,
@@ -277,11 +277,11 @@ int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 			       struct snd_efw_hwinfo *hwinfo)
 {
 	u32 *tmp;
-	int i;
-	int count;
-	int err = efc(efw, EFC_CAT_HWINFO,
-				EFC_CMD_HWINFO_GET_CAPS,
-				NULL, 0, hwinfo, sizeof(*hwinfo) / 4);
+	unsigned int i, count;
+	int err;
+
+	err  = efc(efw, EFC_CAT_HWINFO, EFC_CMD_HWINFO_GET_CAPS,
+		   NULL, 0, hwinfo, sizeof(*hwinfo) / 4);
 	if (err < 0)
 		goto end;
 
@@ -313,7 +313,7 @@ end:
 
 int snd_efw_command_get_phys_meters(struct snd_efw *efw,
 				    struct snd_efw_phys_meters *meters,
-				    int len)
+				    unsigned int len)
 {
 	return efc(efw, EFC_CAT_HWINFO,
 				EFC_CMD_HWINFO_GET_POLLED,
@@ -328,16 +328,17 @@ command_get_clock(struct snd_efw *efw, struct efc_clock *clock)
 				NULL, 0, clock, sizeof(struct efc_clock) / 4);
 }
 
+/* give UINT_MAX if set nothing */
 static int
 command_set_clock(struct snd_efw *efw,
-			  int source, int sampling_rate)
+		  unsigned int source, unsigned int rate)
 {
 	int err;
 
 	struct efc_clock clock = {0};
 
 	/* check arguments */
-	if ((source < 0) && (sampling_rate < 0)) {
+	if ((source == UINT_MAX) && (rate == UINT_MAX)) {
 		err = -EINVAL;
 		goto end;
 	}
@@ -349,21 +350,22 @@ command_set_clock(struct snd_efw *efw,
 
 	/* no need */
 	if ((clock.source == source) &&
-	    (clock.sampling_rate == sampling_rate))
+	    (clock.sampling_rate == rate))
 		goto end;
 
 	/* set params */
-	if ((source >= 0) && (clock.source != source))
+	if ((source == UINT_MAX) && (clock.source != source))
 		clock.source = source;
-	if ((sampling_rate > 0) && (clock.sampling_rate != sampling_rate))
-		clock.sampling_rate = sampling_rate;
+	if ((rate == UINT_MAX) && (clock.sampling_rate != rate))
+		clock.sampling_rate = rate;
 	clock.index = 0;
 
 	err = efc(efw, EFC_CAT_HWCTL,
 				EFC_CMD_HWCTL_SET_CLOCK,
 				(u32 *)&clock, 3, NULL, 0);
+	if (err < 0)
+		goto end;
 
-	err = 0;
 	/*
 	 * With firmware version 5.8, just after changing clock state, these
 	 * parameters are not immediately retrieved by get command. In my
@@ -394,22 +396,23 @@ int snd_efw_command_set_clock_source(struct snd_efw *efw,
 }
 
 int snd_efw_command_get_sampling_rate(struct snd_efw *efw,
-				      int *sampling_rate)
+				      unsigned int *rate)
 {
 	int err;
 	struct efc_clock clock = {0};
 
 	err = command_get_clock(efw, &clock);
 	if (err >= 0)
-		*sampling_rate = clock.sampling_rate;
+		*rate = clock.sampling_rate;
 
 	return err;
 }
 
 int
-snd_efw_command_set_sampling_rate(struct snd_efw *efw, int sampling_rate)
+snd_efw_command_set_sampling_rate(struct snd_efw *efw,
+				  unsigned int rate)
 {
-	return command_set_clock(efw, -1, sampling_rate);
+	return command_set_clock(efw, -1, rate);
 }
 
 int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
@@ -510,7 +513,8 @@ efc_transaction_run(struct fw_unit *unit,
 		    void *response, unsigned int size, u32 seqnum)
 {
 	struct efc_transaction t;
-	int tcode, ret, tries = 0;
+	unsigned int tries;
+	int tcode, ret;
 
 	t.unit = unit;
 	t.buffer = response;
@@ -523,6 +527,7 @@ efc_transaction_run(struct fw_unit *unit,
 	list_add_tail(&t.list, &transactions);
 	spin_unlock_irq(&transactions_lock);
 
+	tries = 0;
 	do {
 		tcode = command_size == 4 ? TCODE_WRITE_QUADLET_REQUEST
 					  : TCODE_WRITE_BLOCK_REQUEST;
