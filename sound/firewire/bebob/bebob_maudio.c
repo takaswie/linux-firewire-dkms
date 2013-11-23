@@ -371,7 +371,7 @@ end:
 }
 
 static char *special_dig_iface_labels[] = {
-	"""S/PDIF Optical", "S/PDIF Coaxial", "ADAT Optical" 
+	"S/PDIF Optical", "S/PDIF Coaxial", "ADAT Optical"
 };
 static int special_dig_in_iface_info(struct snd_kcontrol *kctl,
 				      struct snd_ctl_elem_info *einf)
@@ -716,7 +716,7 @@ solo_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 		goto end;
 
 	c = 0;
-	do 
+	do
 		buf[c] = be32_to_cpu(buf[c]);
 	while (++c < 4);
 
@@ -882,7 +882,7 @@ struct snd_bebob_spec maudio_solo_spec = {
 };
 
 /* Ozonic specification */
-struct snd_bebob_clock_spec normal_clk_spec = {
+struct snd_bebob_clock_spec usual_clk_spec = {
 	.get_freq	= &snd_bebob_stream_get_rate,
 	.set_freq	= &snd_bebob_stream_set_rate
 };
@@ -893,7 +893,7 @@ static struct snd_bebob_meter_spec ozonic_meter_spec = {
 };
 struct snd_bebob_spec maudio_ozonic_spec = {
 	.load	= NULL,
-	.clock	= &normal_clk_spec,
+	.clock	= &usual_clk_spec,
 	.meter	= &ozonic_meter_spec
 };
 
@@ -905,6 +905,6 @@ static struct snd_bebob_meter_spec nrv10_meter_spec = {
 };
 struct snd_bebob_spec maudio_nrv10_spec = {
 	.load	= NULL,
-	.clock	= &normal_clk_spec,
+	.clock	= &usual_clk_spec,
 	.meter	= &nrv10_meter_spec
 };

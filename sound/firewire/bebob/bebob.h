@@ -33,13 +33,12 @@
 
 #include <sound/core.h>
 #include <sound/initval.h>
+#include <sound/info.h>
 #include <sound/control.h>
 #include <sound/rawmidi.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/hwdep.h>
-#include <sound/info.h>
-#include <sound/tlv.h>
 
 #include "../packets-buffer.h"
 #include "../iso-resources.h"
@@ -52,15 +51,6 @@
 #define BEBOB_ADDR_REG_INFO	0xffffc8020000
 #define BEBOB_ADDR_REG_REQ	0xffffc8021000
 
-/*
- * Offsets from information register.
- * In detail, see struct hw_info in bebob_proc.c
- */
-#define INFO_OFFSET_GUID		0x10
-#define INFO_OFFSET_HW_MODEL_ID		0x18
-#define INFO_OFFSET_HW_MODEL_REVISION	0x1c
-
-/* defined later */
 struct snd_bebob;
 
 #define SND_BEBOB_STRM_FMT_ENTRIES	9
@@ -109,8 +99,6 @@ struct snd_bebob {
 
 	const struct snd_bebob_spec *spec;
 
-	unsigned int supported_sampling_rates;
-
 	unsigned int midi_input_ports;
 	unsigned int midi_output_ports;
 
@@ -119,12 +107,15 @@ struct snd_bebob {
 	struct cmp_connection in_conn;
 	struct amdtp_stream rx_stream;
 
-	bool loaded;
-
 	struct snd_bebob_stream_formation
 		tx_stream_formations[SND_BEBOB_STRM_FMT_ENTRIES];
 	struct snd_bebob_stream_formation
 		rx_stream_formations[SND_BEBOB_STRM_FMT_ENTRIES];
+
+        /* for uapi */
+        int dev_lock_count;
+        bool dev_lock_changed;
+        wait_queue_head_t hwdep_wait;
 
 	/* for M-Audio special devices */
 	bool maudio_special_quirk;
@@ -134,11 +125,6 @@ struct snd_bebob {
 	unsigned int dig_in_fmt;
 	unsigned int dig_out_fmt;
 	unsigned int clk_lock;
-
-	/* for uapi */
-	int dev_lock_count;
-	bool dev_lock_changed;
-	wait_queue_head_t hwdep_wait;
 };
 
 static inline int
@@ -171,7 +157,7 @@ int avc_ccm_set_sig_src(struct fw_unit *unit,
 	unsigned int src_stype, unsigned int src_sid, unsigned int src_pid,
 	unsigned int dst_stype, unsigned int dst_sid, unsigned int dst_pid);
 
-/* Additional AVC commands, AV/C Unit and Subunit, Revision 17 (BridgeCo.) */
+/* AVC command extensions, AV/C Unit and Subunit, Revision 17 (BridgeCo.) */
 enum snd_bebob_plug_dir {
 	SND_BEBOB_PLUG_DIR_IN	= 0x00,
 	SND_BEBOB_PLUG_DIR_OUT	= 0x01
@@ -212,6 +198,7 @@ int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
 int snd_bebob_set_rate(struct snd_bebob *bebob, unsigned int rate,
                        enum avc_general_plug_dir dir);
 
+/* for AMDTP streaming */
 int snd_bebob_stream_get_rate(struct snd_bebob *bebob, unsigned int *rate);
 int snd_bebob_stream_set_rate(struct snd_bebob *bebob, unsigned int rate);
 int snd_bebob_stream_discover(struct snd_bebob *bebob);
@@ -224,20 +211,20 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob);
 void snd_bebob_stream_update_duplex(struct snd_bebob *bebob);
 void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob);
+
 void snd_bebob_stream_lock_changed(struct snd_bebob *bebob);
 int snd_bebob_stream_lock_try(struct snd_bebob *bebob);
 void snd_bebob_stream_lock_release(struct snd_bebob *bebob);
 
-/* for hwdep component */
-int snd_bebob_create_hwdep_device(struct snd_bebob *bebob);
-
-int snd_bebob_create_pcm_devices(struct snd_bebob *bebob);
+void snd_bebob_proc_init(struct snd_bebob *bebob);
 
 int snd_bebob_create_control_devices(struct snd_bebob *bebob);
 
 int snd_bebob_create_midi_devices(struct snd_bebob *bebob);
 
-void snd_bebob_proc_init(struct snd_bebob *bebob);
+int snd_bebob_create_pcm_devices(struct snd_bebob *bebob);
+
+int snd_bebob_create_hwdep_device(struct snd_bebob *bebob);
 
 /* device specific operations */
 int snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814);
@@ -250,13 +237,14 @@ extern struct snd_bebob_spec maudio_fw410_spec;
 extern struct snd_bebob_spec maudio_audiophile_spec;
 extern struct snd_bebob_spec maudio_solo_spec;
 extern struct snd_bebob_spec maudio_ozonic_spec;
-extern struct snd_bebob_spec yamaha_go_spec;
 extern struct snd_bebob_spec saffirepro_26_spec;
 extern struct snd_bebob_spec saffirepro_10_spec;
 extern struct snd_bebob_spec saffire_le_spec;
 extern struct snd_bebob_spec saffire_spec;
 extern struct snd_bebob_spec phase88_rack_spec;
 extern struct snd_bebob_spec phase24_series_spec;
+extern struct snd_bebob_spec yamaha_go_spec;
+extern struct snd_bebob_spec presonus_firebox_spec;
 
 #define SND_BEBOB_DEV_ENTRY(vendor, model, private_data) \
 { \

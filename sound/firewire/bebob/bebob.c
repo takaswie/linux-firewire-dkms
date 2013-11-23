@@ -16,7 +16,6 @@
  */
 
 #include "bebob.h"
-#include <sound/core.h>
 
 MODULE_DESCRIPTION("bridgeCo BeBoB driver");
 MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp>");
@@ -36,21 +35,28 @@ MODULE_PARM_DESC(enable, "enable BeBoB sound card");
 static DEFINE_MUTEX(devices_mutex);
 static unsigned int devices_used;
 
-#define VEN_YAMAHA	0x0000a0de
-#define VEN_MAUDIO1	0x00000d6c
-#define VEN_MAUDIO2	0x000007f5
-#define VEN_FOCUSRITE	0x0000130e
+/* Offsets from information register. */
+#define INFO_OFFSET_GUID		0x10
+#define INFO_OFFSET_HW_MODEL_ID		0x18
+#define INFO_OFFSET_HW_MODEL_REVISION	0x1c
+
 #define VEN_EDIROL	0x000040ab
-#define VEN_PRESONUS	0x00000a92
-#define VEN_TERRATEK	0x00000aac
 #define VEN_BRIDGECO	0x000007f5
 #define VEN_MACKIE	0x0000000f
 #define VEN_TASCOM	0x0000022e
 #define VEN_BEHRINGER	0x00001564
 #define VEN_APOGEE	0x000003db
 #define VEN_ESI		0x00000f1b
+#define VEN_ACOUSTIC	0x00000002
 #define VEN_CME		0x0000000a
 #define VEN_PHONIC	0x00001496
+#define VEN_MAUDIO1	0x00000d6c
+#define VEN_MAUDIO2	0x000007f5
+#define VEN_FOCUSRITE	0x0000130e
+#define VEN_TERRATEC	0x00000aac
+#define VEN_YAMAHA	0x0000a0de
+#define VEN_PRESONUS	0x00000a92
+
 #define MODEL_MAUDIO_AUDIOPHILE_BOTH	0x00010060
 #define MODEL_MAUDIO_FW1814		0x00010071
 #define MODEL_MAUDIO_PROJECTMIX		0x00010091
@@ -67,32 +73,34 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 	int err;
 
 	/* get vendor name */
-	if ((vendor_id == VEN_MAUDIO1) || (vendor_id == VEN_MAUDIO2))
-		strcpy(vendor, "M-Audio");
-	else if (vendor_id == VEN_YAMAHA)
-		strcpy(vendor, "YAMAHA");
-	else if (vendor_id == VEN_FOCUSRITE)
-		strcpy(vendor, "Focusrite");
-	else if (vendor_id == VEN_EDIROL)
+	if (vendor_id == VEN_EDIROL)
 		strcpy(vendor, "Edirol");
-	else if (vendor_id == VEN_TERRATEK)
-		strcpy(vendor, "Terratek");
-	else if (vendor_id == VEN_PRESONUS)
-		strcpy(vendor, "Presonus");
-	else if (vendor_id == VEN_TASCOM)
-		strcpy(vendor, "Tacsom");
 	else if (vendor_id == VEN_BRIDGECO)
 		strcpy(vendor, "BridgeCo");
+	else if (vendor_id == VEN_MACKIE)
+		strcpy(vendor, "Mackie");
+	else if (vendor_id == VEN_TASCOM)
+		strcpy(vendor, "Tacsom");
 	else if (vendor_id == VEN_BEHRINGER)
 		strcpy(vendor, "Behringer");
 	else if (vendor_id == VEN_APOGEE)
 		strcpy(vendor, "Apogee");
 	else if (vendor_id == VEN_ESI)
 		strcpy(vendor, "ESI");
+	else if (vendor_id == VEN_ACOUSTIC)
+		strcpy(vendor, "AcousticReality");
 	else if (vendor_id == VEN_CME)
 		strcpy(vendor, "CME");
 	else if (vendor_id == VEN_PHONIC)
 		strcpy(vendor, "Phonic");
+	else if ((vendor_id == VEN_MAUDIO1) || (vendor_id == VEN_MAUDIO2))
+		strcpy(vendor, "M-Audio");
+	else if (vendor_id == VEN_TERRATEC)
+		strcpy(vendor, "Terratec");
+	else if (vendor_id == VEN_YAMAHA)
+		strcpy(vendor, "YAMAHA");
+	else if (vendor_id == VEN_PRESONUS)
+		strcpy(vendor, "Presonus");
 
 	/* get model name */
 	err = fw_csr_string(bebob->unit->directory, CSR_MODEL,
@@ -121,12 +129,11 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 	strcpy(bebob->card->driver, "BeBoB");
 	strcpy(bebob->card->shortname, model);
 	snprintf(bebob->card->longname, sizeof(bebob->card->longname),
-		"%s %s (id:%d, rev:%d), GUID %08x%08x at %s, S%d",
-		vendor, model, id, revision,
-		data[0], data[1],
-		dev_name(&bebob->unit->device),
-		100 << bebob->device->max_speed);
-
+		 "%s %s (id:%d, rev:%d), GUID %08x%08x at %s, S%d",
+		 vendor, model, id, revision,
+		 data[0], data[1],
+		 dev_name(&bebob->unit->device),
+		 100 << bebob->device->max_speed);
 end:
 	return err;
 }
@@ -174,6 +181,7 @@ get_saffire_spec(struct fw_unit *unit)
 	else
 		return &saffire_spec;
 }
+
 
 static int
 snd_bebob_probe(struct fw_unit *unit,
@@ -238,9 +246,11 @@ snd_bebob_probe(struct fw_unit *unit,
 	init_waitqueue_head(&bebob->hwdep_wait);
 
 	/* discover */
-	if (entry->model_id == MODEL_MAUDIO_FW1814)
+	if ((entry->vendor_id == VEN_MAUDIO1) &&
+	    (entry->model_id == MODEL_MAUDIO_FW1814))
 		err = snd_bebob_maudio_special_discover(bebob, true);
-	else if (entry->model_id == MODEL_MAUDIO_PROJECTMIX)
+	else if ((entry->vendor_id == VEN_MAUDIO1) &&
+	         (entry->model_id == MODEL_MAUDIO_PROJECTMIX))
 		err = snd_bebob_maudio_special_discover(bebob, false);
 	else
 		err = snd_bebob_stream_discover(bebob);
@@ -252,11 +262,7 @@ snd_bebob_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
-	/* proc interfaces */
-	snd_bebob_proc_init(bebob);
-
-	/* create interfaces */
-	err = snd_bebob_create_control_devices(bebob);
+	err = snd_bebob_create_hwdep_device(bebob);
 	if (err < 0)
 		goto error;
 
@@ -271,9 +277,11 @@ snd_bebob_probe(struct fw_unit *unit,
 			goto error;
 	}
 
-	err = snd_bebob_create_hwdep_device(bebob);
+	err = snd_bebob_create_control_devices(bebob);
 	if (err < 0)
 		goto error;
+
+	snd_bebob_proc_init(bebob);
 
 	err = snd_bebob_stream_init_duplex(bebob);
 	if (err < 0)
@@ -292,12 +300,11 @@ snd_bebob_probe(struct fw_unit *unit,
 
 	/* proved */
 	err = 0;
-	goto end;
-
+end:
+	mutex_unlock(&devices_mutex);
+	return err;
 error:
 	snd_card_free(card);
-
-end:
 	mutex_unlock(&devices_mutex);
 	return err;
 }
@@ -312,7 +319,6 @@ snd_bebob_update(struct fw_unit *unit)
 		return;
 
 	fcp_bus_reset(bebob->unit);
-
 	snd_bebob_stream_update_duplex(bebob);
 }
 
@@ -323,32 +329,50 @@ static void snd_bebob_remove(struct fw_unit *unit)
 
 	/* this is for firmware bootloader */
 	if (bebob == NULL)
-		goto end;
+		return;
 
 	snd_bebob_stream_destroy_duplex(bebob);
-
 	snd_card_disconnect(bebob->card);
 	snd_card_free_when_closed(bebob->card);
-
-end:
-	return;
 }
 
-struct snd_bebob_clock_spec usual_clk_spec = {
+struct snd_bebob_clock_spec normal_clk_spec = {
 	.get_freq	= &snd_bebob_stream_get_rate,
 	.set_freq	= &snd_bebob_stream_set_rate
 };
-static const struct snd_bebob_spec spec_nothing = {
+static const struct snd_bebob_spec spec_normal = {
 	.load		= NULL,
-	.clock		= &usual_clk_spec,
+	.clock		= &normal_clk_spec,
 	.meter		= NULL
 };
 
 static const struct ieee1394_device_id snd_bebob_id_table[] = {
-	/* Yamaha, GO44 */
-	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000b, yamaha_go_spec),
-	/* YAMAHA, GO46 */
-	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000c, yamaha_go_spec),
+	/* Edirol, FA-66 */
+	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010049, spec_normal),
+	/* Edirol, FA-101 */
+	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010048, spec_normal),
+	/* BridgeCo, RDAudio1 */
+	SND_BEBOB_DEV_ENTRY(VEN_BRIDGECO, 0x00010048, spec_normal),
+	/* BridgeCo, Audio5 */
+	SND_BEBOB_DEV_ENTRY(VEN_BRIDGECO, 0x00010049, spec_normal),
+	/* Mackie, OnyxFirewire */
+	SND_BEBOB_DEV_ENTRY(VEN_MACKIE, 0x00010065, spec_normal),
+	/* Mackie, OnyxFirewire */
+	SND_BEBOB_DEV_ENTRY(VEN_MACKIE, 0x00010067, spec_normal),
+	/* Tascam, IF-FW/DM */
+	SND_BEBOB_DEV_ENTRY(VEN_TASCOM, 0x00010067, spec_normal),
+	/* Behringer, X32 */
+	SND_BEBOB_DEV_ENTRY(VEN_BEHRINGER, 0x00000006, spec_normal),
+	/* ApogeeElectronics, Rosetta200 */
+	SND_BEBOB_DEV_ENTRY(VEN_APOGEE, 0x00010048, spec_normal),
+	/* ESI, Quatafire610 */
+	SND_BEBOB_DEV_ENTRY(VEN_ESI, 0x00010064, spec_normal),
+	/* AcousticReality, eARMasterOne */
+	SND_BEBOB_DEV_ENTRY(VEN_ACOUSTIC, 0x00000002, spec_normal),
+	/* CME, MatrixKFW */
+	SND_BEBOB_DEV_ENTRY(VEN_CME, 0x00030000, spec_normal),
+	/* Phonic, HB24U */
+	SND_BEBOB_DEV_ENTRY(VEN_PHONIC, 0x00000000, spec_normal),
 	/* M-Audio, Ozonic */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x0000000a, maudio_ozonic_spec),
 	/* M-Audio, Firewire 410.  */
@@ -369,50 +393,28 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_PROJECTMIX,
 						maudio_special_spec),
 	/* M-Audio, ProFireLightbridge */
-	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x000100a1, spec_nothing),
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x000100a1, spec_normal),
 	/* Focusrite, SaffirePro 26 I/O */
 	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000003, saffirepro_26_spec),
 	/* Focusrite, SaffirePro 10 I/O */
 	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000006, saffirepro_10_spec),
-	/* Focusrite, Saffire(LE) */
+	/* Focusrite, Saffire(no label and LE) */
 	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, MODEL_FOCUSRITE_SAFFIRE_BOTH,
 			    saffire_spec),
-	/* Edirol, FA-66 */
-	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010049, spec_nothing),
-	/* Edirol, FA-101 */
-	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010048, spec_nothing),
 	/* TerraTecElectronic GmbH, PHASE 88 Rack FW */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000003, phase88_rack_spec),
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000003, phase88_rack_spec),
 	/* TerraTecElectronic GmbH, PHASE 24 FW */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000004, phase24_series_spec),
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000004, phase24_series_spec),
 	/* TerraTecElectronic GmbH, Phase X24 FW */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000007, phase24_series_spec),
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000007, phase24_series_spec),
+	/* Yamaha, GO44 */
+	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000b, yamaha_go_spec),
+	/* YAMAHA, GO46 */
+	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000c, yamaha_go_spec),
 	/* Presonus, FireBox */
-	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010000, spec_nothing),
+	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010000, presonus_firebox_spec),
 	/* PreSonus FirePod */
-	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010066, spec_nothing),
-	/* BridgeCo, RDAudio1 */
-	SND_BEBOB_DEV_ENTRY(VEN_BRIDGECO, 0x00010048, spec_nothing),
-	/* BridgeCo, Audio5 */
-	SND_BEBOB_DEV_ENTRY(VEN_BRIDGECO, 0x00010049, spec_nothing),
-	/* Mackie, OnyxFirewire */
-	SND_BEBOB_DEV_ENTRY(VEN_MACKIE, 0x00010065, spec_nothing),
-	/* Mackie, OnyxFirewire */
-	SND_BEBOB_DEV_ENTRY(VEN_MACKIE, 0x00010067, spec_nothing),
-	/* Tascam, IF-FW/DM */
-	SND_BEBOB_DEV_ENTRY(VEN_TASCOM, 0x00010067, spec_nothing),
-	/* Behringer, X32 */
-	SND_BEBOB_DEV_ENTRY(VEN_BEHRINGER, 0x00000006, spec_nothing),
-	/* ApogeeElectronics, Rosetta200 */
-	SND_BEBOB_DEV_ENTRY(VEN_APOGEE, 0x00010048, spec_nothing),
-	/* ESI, Quatafire610 */
-	SND_BEBOB_DEV_ENTRY(VEN_ESI, 0x00010064, spec_nothing),
-	/* AcousticReality, eARMasterOne */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEK, 0x00000002, spec_nothing),
-	/* CME, MatrixKFW */
-	SND_BEBOB_DEV_ENTRY(VEN_CME, 0x00030000, spec_nothing),
-	/* Phonic, HB24U */
-	SND_BEBOB_DEV_ENTRY(VEN_PHONIC, 0x00000000, spec_nothing),
+	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010066, spec_normal),
 	{}
 };
 MODULE_DEVICE_TABLE(ieee1394, snd_bebob_id_table);

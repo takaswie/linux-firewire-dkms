@@ -161,6 +161,7 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 			SNDRV_PCM_INFO_INTERLEAVED |
 			SNDRV_PCM_INFO_SYNC_START |
 			SNDRV_PCM_INFO_FIFO_IN_FRAMES |
+			SNDRV_PCM_INFO_JOINT_DUPLEX |
 			/* for Open Sound System compatibility */
 			SNDRV_PCM_INFO_MMAP_VALID |
 			SNDRV_PCM_INFO_BLOCK_TRANSFER,
@@ -210,9 +211,12 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 	if (err < 0)
 		goto end;
 
-	/* format of PCM samples is 16bit or 24bit inner 32bit */
+	/*
+	 * AMDTP functionality in firewire-lib require periods to be aligned to
+	 * 16 bit, or 24bit inner 32bit.
+	 */
 	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
-				SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
+					 SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
 	if (err < 0)
 		goto end;
 
@@ -255,7 +259,6 @@ pcm_open(struct snd_pcm_substream *substream)
 	}
 
 	snd_pcm_set_sync(substream);
-
 end:
 	return err;
 err_locked:

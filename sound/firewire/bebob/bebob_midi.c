@@ -30,7 +30,10 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	snd_bebob_stream_start_duplex(bebob, &bebob->tx_stream, 0);
+	err = snd_bebob_stream_start_duplex(bebob, &bebob->tx_stream, 0);
+	if (err < 0)
+		goto end;
+
 	amdtp_stream_midi_add(&bebob->tx_stream, substream);
 end:
 	return err;
@@ -45,7 +48,10 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	snd_bebob_stream_start_duplex(bebob, &bebob->rx_stream, 0);
+	err = snd_bebob_stream_start_duplex(bebob, &bebob->rx_stream, 0);
+	if (err < 0)
+		goto end;
+
 	amdtp_stream_midi_add(&bebob->rx_stream, substream);
 end:
 	return err;

@@ -1,5 +1,5 @@
 /*
- * fireworks_hwdep.c - a part of driver for Fireworks based devices
+ * bebob_hwdep.c - a part of driver for BeBoB based devices
  *
  * Copyright (c) 2013 Takashi Sakamoto
  *
@@ -19,9 +19,10 @@
 /*
  * This codes give three functionality.
  * 
- * 1.get firewire node reference
+ * 1.get firewire node infomation
  * 2.lock/unlock stream
  *  dice driver implements the same functionality.
+ * 3.get notification about starting/stopping stream
  */
 
 #include "bebob.h"

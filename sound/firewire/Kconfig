@@ -81,20 +81,15 @@ config SND_FIREWORKS
 
 config SND_BEBOB
 	tristate "BridgeCo BeBoB chipset support"
-        select SND_PCM
-        select SND_RAWMIDI
+	select SND_RAWMIDI
+	select SND_PCM
 	select SND_HWDEP
 	select SND_FIREWIRE_LIB
         help
 	 Say Y here to include support for FireWire devices based
 	 on BridgeCo BeBoB chipset:
-	  * M-Audio Firewire410/AudioPhile/Solo/Ozonic/NRV10
-	  * M-Audio Firewire1814/ProjectMix IO/ProfireLightBridge
 	  * PreSonus FIREBOX/FirePod
-	  * Yamaha GO44/GO46
-	  * TerraTec PHASE 24 FW/PHASE X24 FW/PHASE 88 Rack FW
 	  * Edirol FA-66/FA-101
-	  * Focusrite Saffire/Saffire LE/SaffirePro10 IO/SaffirePro26 IO
 	  * Mackie OnyxFirewire
 	  * Tascam  IF-FW/DM
 	  * Behringer X32
@@ -104,6 +99,11 @@ config SND_BEBOB
 	  * CME MatrixKFW
 	  * Phonic HB24U
 	  * BridgeCo RDAudio1/Audio5
+	  * M-Audio Firewire410/AudioPhile/Solo/Ozonic/NRV10
+	  * M-Audio Firewire1814/ProjectMix IO/ProfireLightBridge
+	  * Focusrite Saffire/Saffire LE/SaffirePro10 IO/SaffirePro26 IO
+	  * TerraTec PHASE 24 FW/PHASE X24 FW/PHASE 88 Rack FW
+	  * Yamaha GO44/GO46
 
           To compile this driver as a module, choose M here: the module
           will be called snd-fireworks.
