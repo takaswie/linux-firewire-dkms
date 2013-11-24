@@ -751,7 +751,7 @@ static void handle_out_packet(struct amdtp_stream *s, unsigned int syt)
 	if (s->packet_index < 0)
 		return;
 
-	/* this module generate empty CIP packet for 'no data' */
+	/* this module generate empty packet for 'no data' */
 	if (!(s->flags & CIP_BLOCKING) || (syt != CIP_SYT_NO_INFO))
 		data_blocks = calculate_data_blocks(s);
 	else

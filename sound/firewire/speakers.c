@@ -188,10 +188,9 @@ static int fwspk_close(struct snd_pcm_substream *substream)
 
 static void fwspk_stop_stream(struct fwspk *fwspk)
 {
-	if (amdtp_stream_running(&fwspk->stream)) {
+	if (fwspk->stream_running) {
 		amdtp_stream_stop(&fwspk->stream);
 		cmp_connection_break(&fwspk->connection);
-		fwspk->stream_running = false;
 	}
 }
 
@@ -268,8 +267,6 @@ static int fwspk_prepare(struct snd_pcm_substream *substream)
 					 fwspk->connection.speed);
 		if (err < 0)
 			goto err_connection;
-
-		fwspk->stream_running = true;
 	}
 
 	mutex_unlock(&fwspk->mutex);
@@ -657,8 +654,8 @@ static int fwspk_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto err_unit;
 
-	err = amdtp_stream_init(&fwspk->stream, unit,
-				AMDTP_RECEIVE_STREAM, CIP_NONBLOCKING);
+	err = amdtp_stream_init(&fwspk->stream, unit, AMDTP_RECEIVE_STREAM,
+				CIP_NONBLOCKING);
 	if (err < 0)
 		goto err_connection;
 

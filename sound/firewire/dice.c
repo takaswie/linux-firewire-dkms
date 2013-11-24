@@ -468,7 +468,7 @@ static int dice_stream_start_packets(struct dice *dice)
 		return 0;
 
 	err = amdtp_stream_start(&dice->stream, dice->resources.channel,
-				     fw_parent_device(dice->unit)->max_speed);
+				 fw_parent_device(dice->unit)->max_speed);
 	if (err < 0)
 		return err;
 
@@ -586,11 +586,11 @@ static int dice_hw_params(struct snd_pcm_substream *substream,
 
 	mode = rate_index_to_mode(rate_index);
 	amdtp_stream_set_parameters(&dice->stream,
-					params_rate(hw_params),
-					params_channels(hw_params),
-					dice->rx_midi_ports[mode]);
+				    params_rate(hw_params),
+				    params_channels(hw_params),
+				    dice->rx_midi_ports[mode]);
 	amdtp_stream_set_pcm_format(&dice->stream,
-					params_format(hw_params));
+				    params_format(hw_params));
 
 	return 0;
 }
@@ -1364,8 +1364,7 @@ static int dice_probe(struct fw_unit *unit, const struct ieee1394_device_id *id)
 		goto err_owner;
 	dice->resources.channels_mask = 0x00000000ffffffffuLL;
 
-	err = amdtp_stream_init(&dice->stream, unit,
-				AMDTP_RECEIVE_STREAM,
+	err = amdtp_stream_init(&dice->stream, unit, AMDTP_RECEIVE_STREAM,
 				CIP_BLOCKING | CIP_HI_DUALWIRE);
 	if (err < 0)
 		goto err_resources;

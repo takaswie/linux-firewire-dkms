@@ -114,6 +114,7 @@ static int pcr_modify(struct cmp_connection *c,
 	return 0;
 }
 
+
 /**
  * cmp_connection_init - initializes a connection manager
  * @c: the connection manager to initialize
@@ -202,12 +203,15 @@ static int get_overhead_id(struct cmp_connection *c)
 	int id;
 
 	/*
-	 * Apply "oPCR overhead ID encoding"
-	 * The encoding table can convert up to 512.
-	 * Here the value over 512 is converted as the same way as 512.
+	 * apply "oPCR overhead ID encoding"
+	 * the encoding table can convert up to 512.
+	 * here the value over 512 is converted as the same way as 512.
 	 */
-	id = DIV_ROUND_UP(c->resources.bandwidth_overhead, 32);
-	if (id >= 16)
+	for (id = 1; id < 16; id++) {
+		if (c->resources.bandwidth_overhead < (id << 5))
+			break;
+	}
+	if (id == 16)
 		id = 0;
 
 	return id;
@@ -217,6 +221,7 @@ static __be32 opcr_set_modify(struct cmp_connection *c, __be32 opcr)
 {
 	unsigned int spd, xspd;
 
+	/* generate speed and extended speed field value */
 	if (c->speed > SCODE_400) {
 		spd  = SCODE_800;
 		xspd = c->speed - SCODE_800;
@@ -230,14 +235,21 @@ static __be32 opcr_set_modify(struct cmp_connection *c, __be32 opcr)
 			     OPCR_XSPEED_MASK |
 			     PCR_CHANNEL_MASK |
 			     OPCR_SPEED_MASK |
-			     OPCR_OVERHEAD_ID_MASK);
+			     OPCR_OVERHEAD_ID_MASK |
+			     OPCR_PAYLOAD_MASK);
 	opcr |= cpu_to_be32(1 << PCR_P2P_CONN_SHIFT);
 	opcr |= cpu_to_be32(xspd << OPCR_XSPEED_SHIFT);
 	opcr |= cpu_to_be32(c->resources.channel << PCR_CHANNEL_SHIFT);
 	opcr |= cpu_to_be32(spd << OPCR_SPEED_SHIFT);
 	opcr |= cpu_to_be32(get_overhead_id(c) << OPCR_OVERHEAD_ID_SHIFT);
-
-	/* NOTE: payload field is set by target device */
+	/*
+	 * here zero is applied to payload field.
+	 * it means the maximum number of quadlets in an isochronous packet is
+	 * 1024 when spd is less than three, 1024 * 2 * xspd + 1 when spd is
+	 * equal to three. An arbitrary value can be set here but 0 is enough
+	 * for our purpose.
+	 */
+	opcr |= cpu_to_be32(0 << OPCR_PAYLOAD_SHIFT);
 
 	return opcr;
 }

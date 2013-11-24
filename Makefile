@@ -3,6 +3,14 @@ obj-m += sound/firewire/
 KDIR := /lib/modules/$(shell uname -r)/build
 PWD := $(shell pwd)
 
+#force to build all modules
+export CONFIG_SND_FIREWIRE_LIB=m
+export CONFIG_SND_DICE=m
+export CONFIG_SND_FIREWIRE_SPEAKERS=m
+export CONFIG_SND_ISIGHT=m
+export CONFIG_SND_SCS1X=m
+export CONFIG_SND_BEBOB=m
+export CONFIG_SND_FIREWORKS=m
 
 all:
 	$(MAKE) -Wall -C $(KDIR) M=$(PWD) modules

@@ -8,8 +8,8 @@
 struct fw_unit;
 
 enum cmp_direction {
-	CMP_OUTPUT = 0,
-	CMP_INPUT
+	CMP_INPUT = 0,
+	CMP_OUTPUT,
 };
 
 /**
