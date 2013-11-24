@@ -1,416 +1,86 @@
-= Developing for snd-fireworks=
+= Developing for snd-firewire-lib, snd-bebob and snd-fireworks =
 
-2013/10/01 坂本 貴史
+2013/11/24 坂本 貴史
 Takashi Sakamoto <o-takashi@sakamocchi.jp>
 
 == General ==
 
-This is a device driver utilizing Advanced Linux Sound Architecture (ALSA) and Linux
-Firewire Subsystem (so called "juju"). This is an sound device driver for Echo Audio's
-firewire audio interface called as "fireworks(TM)".
+This repository is a test for my patch candidates for ALSA firewire stack.
+You can install my snd-firewire-lib, snd-bebob and snd-fireworks by DKMS.
+
+
+== snd-firewire-lib, snd-bebob and snd-fireworks ==
+
+These are device drivers utilize Advanced Linux Sound Architecture (ALSA) and Linux
+Firewire Subsystem (so called "juju").
+ - snd-bebob: for devices based on BridgeCo's BeBoB chipset
+ - snd-fireworks: for devices based on Echo Audio's Fireworks chipset
+ - snd-firewire-lib: for helper functions of AMDTP/CMP/FCP and AV/C commands
 
 There is a project in user land, "FFADO".
 http://www.ffado.org/
 
-My aim is migration of the similar functions which FFADO did into kernel land.
+My aim is implementing streaming functionality in ALSA, in kernel land.
 
-I test this code with AudioFirePre8.
-http://echoaudio.com/products/audiofire-pre8
+I test these drivers with:
+ - snd-bebob: Yamaha GO44, GO46
+ - snd-bebob: M-Audio Ozonic, Firewire Solo, Firewire Audiophile, Firewire 410,
+ - snd-bebob: Firewire 1814
+ - snd-fireworks: Echo AudioFire12, AudioFirePre8, AudioFire4
 
-== Original source codes and strategy==
-The original source code was developed by Clemens Ladish in 2010. You can see
-it in alsa-kprivate.git repository.
-http://git.alsa-project.org/?p=alsa-kprivate.git;a=shortlog;h=refs/heads/fireworks
-
-It has some restriction below:
-1.It cannot get and set device status
-2.It utilizes few code in snd-firewire-lib.ko
-
-1.For this function, snd-fireworks need to speak Device-Dependent AV/C Commands but
-it can't speak it. With this command, below status is changeable:
-	- sampling rate, clock source, digital I/O mode, SPDIF format
-	- inner I/O routing, gain, pan, solo, mute, nominal
-	- save and load session state
-	- download and upload DSP firmware
-
-Without this function, snd-fireworks can play and capture 44.1kHz with internal
-clock source
-
-In the beginning of my developing, I work for implementation of this function with ALSA's
-control component. With this implementation, users can change device's status with
-alsa-lib control/hcontrol/mixer API.
-
-2.snd-firewire-lib.ko was developed by Clemens Ladish. Before developing it, He worked
-with snd-fireworks. After merging snd-firewire-lib.ko into upstream, he didn't touch
-snd-fireworks. Then snd-fireworks has some duplicate codes.
-
-In the middle of my developing, I work for removing duplicate codes from snd-fireworks and
-in the last, I commit some patches for snd-firewire.ko for lack of functions like cmp of
-oMPR/oPCR and receiving AMDTP, MIDI handling.
+My testers test these drivers with:
+ - snd-bebob: Edirol FA-66 (great thanks to Fryderyk Dziarmagowski)
 
 
-== current status ==
+== Requirement ==
 
-1. get/set sampling rate, clock source, digital I/O mode, digital I/O format via alsamixer
-2. get physical metering and internal monitoring via procfs
-3. playback and capturing PCM samples with any sampling rate
-4. playback and capturing MIDI streams when PCM running
+- Linux kernel 3.11 or later
 
-Hardware information is in the end of this README.
 
-== rest of work ==
+== Current status ==
 
- 0.[done]write loadable ALSA codes
- 1.[done]handling Echo Fireworks Commands
- 2.[done]implementing Basic control implementing
- 3.[done]PCM transmit with snd-firewire-lib.ko
- 4.[done]PCM receive with adding codes to snd-firewire-lib
- 5.[done]MIDI receive with adding codes to snd-firewire-lib
- 6.[done]MIDI transmit with adding codes to snd-firewire-lib
-   6.5.FIX FFADO issue of MIDI transmit
- 7.commit patches for snd-firewire-lib.ko to ALSA
-   7.0.search for the way to stream in BeBoB and Dice devices
-   7.1.look for patch reviewer
-   7.2.request for comment
-   7.3.fix inappropriate issue
-   7.4.commit request
- 8.interfaces for hardware monitoring, metering, mixer
-   7.0.research for what types of control the other devices such as BeBoB and Dice support
-   7.1.ask the better way for interface in ALSA
-   7.2.implement
-   7.3.commit request if needed
- 9.commit patches newly for snd-fireworks to ALSA
-10.write user-land utility
+ - Capture/playback of PCM/MIDI is supported at any sampling rate, any clock source
+ - HWDEP interface is supported for mixer control application
 
-== easy instraction with DKMS ==
+
+== Easy instraction with DKMS ==
 
 DKMS - Dynamic Kernel Module Support is easy for installing or updating external modules.
 http://linux.dell.com/dkms/
 
-You should create new directory named "alsa-firewire-3.11" in the directory which your
-system DKMS setting indicate. The path is "/usr/src" in my Ubuntu rootfs.
-("3.11" just means for Linux 3.11)
+This instruction is for Debian/Ubuntu. You need to make your arrangement for
+the other Linux distribution if you use.
 
-Then follow usual DKMS steps, for example:
- sudo dkms add -m alsa-firewire -v 3.11
- sudo dkms build -m alsa-firewire -v 3.11
- sudo dkms install -m alsa-firewire -v 3.11
- sudo dkms remove -m alsa-firewire -v 3.11 --all
+Then you need to install 'dkms' package.
+ $ sudo apt-get install dkms
 
-Of cource, you should install dkms package in advance. For example, in Ubuntu system:
-sudo apt-get install dkms
+Then you need to install 'linux-headers' package to make drivers for your kernel.
+ $ sudo apt-get install linux-headers-generic
 
+Install:
+1. $ git clone https://github.com/takaswie/snd-firewire-improve.git
+2. $ ln -s $(pwd)/snd-firewire-improve/ /usr/src/alsa-firewire-3.11
+(superuser)
+3. $ dkms install snd-firewire/3.11 (superuser)
 
-= snd-fireworks.koの開発 =
+Uninstall
+1. $ modprobe -r snd-bebob snd-fireworks snd-firewire-lib (superuser)
+2. $ dkms remove ans-firewire/3.11 --all (superuser)
+3. $ rm /usr/src/alsa-firewire-3.11 (superuser)
+4. $ rm snd-firewire-improve
 
-2013/10/01 坂本 貴史
-Takashi Sakamoto <o-takashi@sakamocchi.jp>
+== Bug repots  ==
 
-== 概要 ==
+I add proc interface to help debug. Please send the output to me with your
+experience.
 
-このソフトウェアは、LinuxのAdvanced Linux Sound Architecture（ALSA）とFirewireサブシステ
-ムを利用したデバイスドライバーです。Echo社のFireworksを採用したFirewireオーディオインター
-フェイスのためのサウンドドライバーとなります。
+snd-bebob:
+ - /proc/asound/cardX/#hardware
+ - /proc/asound/cardX/#formation
+ - /proc/asound/cardX/#meter (if the device has)
 
-この装置のユーザー空間ドライバーは存在しています。FFADOです。
-http://www.ffado.org/
-
-FFADOプロジェクトがこの装置に対して実現していることを、ALSAの諸機能を用いてカーネル空間に
-持ち込むことが、この開発の目的です。
-
-== オリジナルソースと開発方針  ==
-
-オリジナルのソースは、alsa-kprivateリポジトリのfireworksブランチにあります。
-このブランチは、Clemens Ladischが2010年にコミットしたものです。
-http://git.alsa-project.org/?p=alsa-kprivate.git;a=shortlog;h=refs/heads/fireworks
-
-fireworksブランチのsnd-fireworksには以下の制約があります。
-1.装置の挙動を変更できない
-2.snd-firewire-lib.koに含まれる機能をあまり使ってない
-
-1.fireworksを採用した装置の挙動を変えるには、Vendor DependentなAV/Cコマンドを実装する必要
-があります。オリジナルのsnd-fireworksはこの機能を含んでいませんでした。この機能を使うと、
-以下の変更が可能となります。
-	装置の標本化周波数、動作クロック源、デジタル入出力モード、S/PDIFフォーマット
-	装置の入出力ルーティング、ゲイン、パニング、ソロ、ミュート
-	装置のセッション情報の保存、復元
-	装置のファームウェアのダウンロード、アップロード
-
-この機能が実装されていないため、標本化周波数44100Hzでの再生・録音のみのサポートでした。
-
-この開発の初期段階は、この機能をALSAのコントロールコンポーネントとともに実装することです。
-ユーザーが、ALSAのコントロールインターフェイスを通じ、装置の挙動を変更できるようにします。
-
-2.snd-firewire-lib.koはClemens Ladischが書いたものです。彼はまず、fireworksブランチでsnd-
-fireworks.koを書き上げ、その成果から、他のドライバでも再利用できるコードを集めてこのsnd-f
-irewire-lib.koを書きました。snd-firewire-lib.koがマージされて以降、firewireブランチは更新
-されていません。そのため、snd-fireworks.koはsnd-firewire-lib.koの機能を使っていません。
-
-Linux3.8-rc3時点で、snd-firewire-lib.koは、装置にPCMデータを送る機能しか持っていません。
-MIDIや装置からデータを取得する機能を実装するため、snd-fireworks.koは、snd-firewire-lib.ko
-と重複するコードを含んでいました。
-
-この開発の中期段階は、snd-firewire-lib.koとの重複コードをなくすことです。そしてsnd-firewi
-re-lib.koにデータ受信機能とMIDI処理を実装することが、この開発の最終段階となります。その
-作業は、ALSAのメインラインにマージしてもらえるような修正パッチをコミットすることになる
-でしょう。
-
-== インストール ==
-
-私が開発に用いているカーネルは、Linux3.11です。
-
-私はAudioFire4とAudioFirePre8を使って開発をしており、それ以外のデバイスがちゃんと動くかどうかは確認し
-ていません。下記の「ハードウェアの基本情報」を教えていただけると助かります。
-
-procfsが有効なカーネルでは、ハードウェアの特定の情報を出力できます。
-（以下、「X」はALSAが装置に割り振ったカード番号）
-	ハードウェアの基本情報
-		/proc/asound/cardX/#hardware
-	現在の標本化周波数とクロック源
-		/proc/asound/cardX/#clock
-	現在のハードウェアメーター（装置への入出力の大きさ）
-		/proc/asound/cardX/#meters
-
-
-== いまできること ==
-
-1.PCM再生・録音
-装置によりますが、標本化周波数32.0kHz〜192.0kHzでの再生が可能です。
-装置によりますが、クロックソースはどれでも使えます。
-装置の制約があり、チャンネル数は以下のようになります。
-	 48.0kHz以下 アナログ入出力8chずつ、デジタル入出力8chずつ
-	 96.0kHz以下 アナログ入出力8chずつ、デジタル入出力4chずつ
-	192.0kHz以下 アナログ入出力8chずつ、デジタル入出力2chずつ
-
-2.MIDIの再生・録音
-PCM再生・録音が始まっているときに可能です。
-
-3.alsamixerやamixerを使い、装置の挙動の一部を変更可能
-現在、標本化周波数、クロック源、デジタル出力モード、S/PDIFフォーマットを変更できます。
-
-4.procfsでの装置情報の取得
-ハードウェア情報、クロック情報、メーター情報を出力することができます。
-
-== 残りの作業 ==
-
-2.ハードウェアモニター、メーター、ミキサーへのインターフェイスの実装
-3.ALSAにsnd-firewire-lib.koへのパッチをコミット
-4.ALSAにsnd-fireworks.koのパッチを新規にコミット
-
- 0.[done]ロード可能なALSAのコードを書く
- 1.[done]Echo Fireworks Commandを扱う
- 2.[done]基本的なコントロールの実装
- 3.[done]snd-firewire-libを使いPCMを送る
- 4.[done]snd-firewire-libにコードを追加してPCMを受信する
- 5.[done]snd-firewire-libにコードを追加してMIDIを受信する
- 6.[done]snd-firewire-libにコードを追加してMIDIを送信する
- 6.5.FFADOのMIDI送信バグを修正する
- 7.ALSAにsnd-firewire-libの修正パッチをコミットする
-   7.0.BeBoBとDiceがストリームする方法を調べる
-   7.1.パッチレビュワーを探す
-   7.2.Request For Commentを送る
-   7.3.指摘された問題を修正する
-   7.4.コミットリクエスト
- 8.ハードウェアモニタリング・メータリング・ミキサー用インターフェイスの実装
-   7.0.BeBoBやDiceがサポートするコントロールの種類を調べる
-   7.1.インターフェイスのよさそうなインターフェイスを質問する
-   7.2.実装
-   7.3.必要に応じてコミットリクエスト
- 9.ALSAへのsnd-fireworksのコミット
-10.ユーザーランドのユーティリティを書く
-
-== DKMSを使った簡単な導入 ==
-
-DKMS - Dynamic Kernel Module Supportはカーネルモジュールのインストールやアップデートを
-簡単にする便利な仕組みです。
-
-http://linux.dell.com/dkms/
-
-初めに、alsa-firewire-3.11というディレクトリを、システムのDKMSがデフォルトのソースディ
-レクトリに使うディレクトリに作成し、ソース一式を入れて下さい。Ubuntuのルートファイルシ
-ステムであれば、/usr/srcになります。
-(3.11はただLinux 3.11を指しているだけ)
-
-作成したら、DKMSの通常のステップを踏みます。例えば以下です。
- sudo dkms add -m alsa-firewire -v 3.11
- sudo dkms build -m alsa-firewire -v 3.11
- sudo dkms install -m alsa-firewire -v 3.11
- sudo dkms remove -m alsa-firewire -v 3.11 --all
-
-もちろん、あらかじめシステムにDKMSパッケージをインストールしておいて下さい。例えばUbuntu
-であれば、端末で以下を実行します。
- sudo apt-get install dkms
-
-== hardware information ==
-Note that there are several firmware versions.
-
-=== Echo AudioFire2 ===
-(thanks to Doug McLain)
-flags: 0xA1
-guid_hi: 0x148606
-guid_lo: 0x9D5BD6CA
-type: 0xAF2
-version: 0x0
-vendor_name: Echo Digital Audio
-model_name: AudioFire2
-supported_clock: 0x9
-nb_1394_playback_channels: 0x6
-nb_1394_capture_channels: 0x4
-nb_phys_audio_out: 0x6
-nb_phys_audio_in: 0x4
-nb_out_groups: 0x3
-out_group[0x0]: type 0x0, count 0x2
-out_group[0x1]: type 0x5, count 0x2
-out_group[0x2]: type 0x1, count 0x2
-out_group[0x3]: type 0x0, count 0x0
-out_group[0x4]: type 0x0, count 0x0
-out_group[0x5]: type 0x0, count 0x0
-out_group[0x6]: type 0x0, count 0x0
-out_group[0x7]: type 0x0, count 0x0
-nb_in_groups: 0x2
-out_group[0x0]: type 0x0, count 0x2
-out_group[0x1]: type 0x5, count 0x2
-out_group[0x2]: type 0x1, count 0x2
-out_group[0x3]: type 0x0, count 0x0
-out_group[0x4]: type 0x0, count 0x0
-out_group[0x5]: type 0x0, count 0x0
-out_group[0x6]: type 0x0, count 0x0
-out_group[0x7]: type 0x0, count 0x0
-nb_midi_out: 0x1
-nb_midi_in: 0x1
-max_sample_rate: 0x17700
-min_sample_rate: 0x7D00
-dsp_version: 0x0
-arm_version: 0x4080000
-mixer_playback_channels: 0x6
-mixer_capture_channels: 0x4
-fpga_version: 0x3000200
-nb_1394_playback_channels_2x: 0x6
-nb_1394_capture_channels_2x: 0x4
-nb_1394_playback_channels_4x: 0x6
-nb_1394_capture_channels_4x: 0x4
-
-=== Echo AudioFire12===
-(thanks to Doug McLain)
-flags: 0x11
-guid_hi: 0x14860F
-guid_lo: 0xC44A84A6
-type: 0xAF12
-version: 0x0
-vendor_name: Echo Digital Audio
-model_name: AudioFire12
-supported_clock: 0x5
-nb_1394_playback_channels: 0xC
-nb_1394_capture_channels: 0xC
-nb_phys_audio_out: 0xC
-nb_phys_audio_in: 0xC
-nb_out_groups: 0x1
-out_group[0x0]: type 0x0, count 0x12
-out_group[0x1]: type 0x0, count 0x0
-out_group[0x2]: type 0x0, count 0x0
-out_group[0x3]: type 0x0, count 0x0
-out_group[0x4]: type 0x0, count 0x0
-out_group[0x5]: type 0x0, count 0x0
-out_group[0x6]: type 0x0, count 0x0
-out_group[0x7]: type 0x0, count 0x0
-nb_in_groups: 0x1
-out_group[0x0]: type 0x0, count 0x12
-out_group[0x1]: type 0x0, count 0x0
-out_group[0x2]: type 0x0, count 0x0
-out_group[0x3]: type 0x0, count 0x0
-out_group[0x4]: type 0x0, count 0x0
-out_group[0x5]: type 0x0, count 0x0
-out_group[0x6]: type 0x0, count 0x0
-out_group[0x7]: type 0x0, count 0x0
-nb_midi_out: 0x1
-nb_midi_in: 0x1
-max_sample_rate: 0x2EE00
-min_sample_rate: 0x7D00
-dsp_version: 0x4080000
-arm_version: 0x4080000
-mixer_playback_channels: 0xC
-mixer_capture_channels: 0xC
-fpga_version: 0x0
-nb_1394_playback_channels_2x: 0xC
-nb_1394_capture_channels_2x: 0xC
-nb_1394_playback_channels_4x: 0xC
-nb_1394_capture_channels_4x: 0xC
-
-=== Echo AudioFirePre8 ===
-flags: 0x625
-guid_hi: 0x14860A
-guid_lo: 0x5B6BDB9B
-type: 0xAF9
-version: 0x0
-vendor_name: Echo Digital Audio
-model_name: AudioFirePre8
-supported_clock: 0x1D
-nb_1394_playback_channels: 0x10
-nb_1394_capture_channels: 0x10
-nb_phys_audio_out: 0x10
-nb_phys_audio_in: 0x10
-nb_out_groups: 0x2
-out_group[0x0]: type 0x0, count 0x8
-out_group[0x1]: type 0x3, count 0x8
-out_group[0x2]: type 0x0, count 0x0
-out_group[0x3]: type 0x0, count 0x0
-out_group[0x4]: type 0x0, count 0x0
-out_group[0x5]: type 0x0, count 0x0
-out_group[0x6]: type 0x0, count 0x0
-out_group[0x7]: type 0x0, count 0x0
-nb_in_groups: 0x2
-out_group[0x0]: type 0x0, count 0x8
-out_group[0x1]: type 0x3, count 0x8
-out_group[0x2]: type 0x0, count 0x0
-out_group[0x3]: type 0x0, count 0x0
-out_group[0x4]: type 0x0, count 0x0
-out_group[0x5]: type 0x0, count 0x0
-out_group[0x6]: type 0x0, count 0x0
-out_group[0x7]: type 0x0, count 0x0
-nb_midi_out: 0x1
-nb_midi_in: 0x1
-max_sample_rate: 0x17700
-min_sample_rate: 0x7D00
-dsp_version: 0x0
-arm_version: 0x5050000
-mixer_playback_channels: 0x10
-mixer_capture_channels: 0x10
-fpga_version: 0x4010100
-nb_1394_playback_channels_2x: 0xC
-nb_1394_capture_channels_2x: 0xC
-nb_1394_playback_channels_4x: 0xA
-nb_1394_capture_channels_4x: 0xA
-
-== Echo AudioFire4 ==
-guid_hi: 0x14860F
-guid_lo: 0x5A616E83
-type: 0xAF4
-version: 0x0
-vendor_name: Echo Digital Audio
-model_name: AudioFire4
-dsp_version: 0x0
-arm_version: 0x5070300
-fpga_version: 0x3000200
-flags: 0xE1
-max_sample_rate: 0x17700
-min_sample_rate: 0x7D00
-supported_clock: 0x9
-nb_phys_audio_out: 0x6
-nb_phys_audio_in: 0x6
-nb_in_groups: 0x2
-in_group[0x0]: type 0x0, count 0x4
-in_group[0x1]: type 0x1, count 0x2
-nb_out_groups: 0x2
-out_group[0x0]: type 0x0, count 0x4
-out_group[0x1]: type 0x1, count 0x2
-nb_1394_playback_channels: 0x6
-nb_1394_capture_channels: 0x6
-nb_1394_playback_channels_2x: 0x6
-nb_1394_capture_channels_2x: 0x6
-nb_1394_playback_channels_4x: 0x6
-nb_1394_capture_channels_4x: 0x6
-nb_midi_out: 0x1
-nb_midi_in: 0x1
-mixer_playback_channels: 0x6
-mixer_capture_channels: 0x6
+snd-fireworks:
+ - /proc/asound/cardX/#hardware
+ - /proc/asound/cardX/#clock
+ - /proc/asound/cardX/#meters
 
