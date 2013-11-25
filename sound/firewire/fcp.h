@@ -15,9 +15,6 @@ int avc_general_set_sig_fmt(struct fw_unit *unit, unsigned int rate,
 int avc_general_get_sig_fmt(struct fw_unit *unit, unsigned int *rate,
 			    enum avc_general_plug_dir dir,
 			    unsigned short plug);
-int avc_general_get_plug_info(struct fw_unit *unit,
-			unsigned short bus_plugs[AVC_GENERAL_PLUG_DIR_COUNT],
-			unsigned short ext_plugs[AVC_GENERAL_PLUG_DIR_COUNT]);
 
 int fcp_avc_transaction(struct fw_unit *unit,
 			const void *command, unsigned int command_size,

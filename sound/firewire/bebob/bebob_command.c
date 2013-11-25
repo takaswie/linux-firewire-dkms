@@ -20,6 +20,42 @@
 #define BEBOB_COMMAND_MAX_TRIAL	3
 #define BEBOB_COMMAND_WAIT_MSEC	100
 
+int avc_general_get_plug_info(struct fw_unit *unit, unsigned int addr_mode,
+			      u8 info[4])
+{
+	u8 *buf;
+	int err;
+
+	buf = kzalloc(8, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0] = 0x01;			/* AV/C STATUS */
+	buf[1] = 0xff & addr_mode;	/* UNIT or Subunit, Functionblock */
+	buf[2] = 0x02;			/* PLUG INFO */
+
+	err = fcp_avc_transaction(unit, buf, 8, buf, 8, BIT(1) | BIT(2));
+	if (err < 0)
+		goto end;
+
+	/* check length */
+	if (err != 8) {
+		err = -EIO;
+		goto end;
+	}
+
+	info[0] = buf[4];
+	info[1] = buf[5];
+	info[2] = buf[6];
+	info[3] = buf[7];
+
+	/* return response code */
+	err = buf[0];
+end:
+	kfree(buf);
+	return err;
+}
+
 int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
 			   unsigned int fb_id, unsigned int num)
 {
@@ -53,8 +89,6 @@ int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
 		err = -EIO;
 		goto end;
 	}
-
-	err = 0;
 end:
 	kfree(buf);
 	return err;
@@ -101,89 +135,22 @@ end:
 	return err;
 }
 
-int avc_ccm_get_sig_src(struct fw_unit *unit,
-	unsigned int *src_stype, unsigned int *src_sid, unsigned int *src_pid,
-	unsigned int dst_stype, unsigned int dst_sid, unsigned int dst_pid)
+static inline void
+avc_bridgeco_fill_command_base(u8 *buf, unsigned int ctype, unsigned int opcode,
+			       unsigned int subfunction, u8 addr[6])
 {
-	int err;
-	u8 *buf;
-
-	buf = kzalloc(8, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0] = 0x01;	/* AV/C STATUS */
-	buf[1] = 0xff;	/* UNIT */
-	buf[2] = 0x1A;	/* SIGNAL SOURCE */
-	buf[3] = 0x0f;
-	buf[4] = 0xff;
-	buf[5] = 0xfe;
-	buf[6] = (0xf8 & (dst_stype << 3)) | dst_sid;
-	buf[7] = 0xff & dst_pid;
-
-	/* do transaction and check buf[1,2,6,7] are the same against command */
-	err = fcp_avc_transaction(unit, buf, 8, buf, 8,
-				  BIT(1) | BIT(2) | BIT(6) | BIT(7));
-	if (err < 0)
-		goto end;
-	if ((err < 0) || (buf[0] != 0x0c)) {
-		dev_err(&unit->device,
-			"failed to get signal status\n");
-		err = -EIO;
-		goto end;
-	}
-
-	*src_stype = buf[4] >> 3;
-	*src_sid = buf[4] & 0x07;
-	*src_pid = buf[5];
-end:
-	kfree(buf);
-	return err;
+	buf[0] = 0x7 & ctype;
+	buf[1] = addr[0];
+	buf[2] = 0xff & opcode;
+	buf[3] = 0xff & subfunction;
+	buf[4] = addr[1];
+	buf[5] = addr[2];
+	buf[6] = addr[3];
+	buf[7] = addr[4];
+	buf[8] = addr[5];
 }
 
-int avc_ccm_set_sig_src(struct fw_unit *unit,
-	unsigned int src_stype, unsigned int src_sid, unsigned int src_pid,
-	unsigned int dst_stype, unsigned int dst_sid, unsigned int dst_pid)
-{
-	int err;
-	u8 *buf;
-
-	buf = kzalloc(8, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0] = 0x00;	/* AV/C CONTROL */
-	buf[1] = 0xff;	/* UNIT */
-	buf[2] = 0x1A;	/* SIGNAL SOURCE */
-	buf[3] = 0x0f;
-	buf[4] = (0xf8 & (src_stype << 3)) | src_sid;
-	buf[5] = 0xff & src_pid;
-	buf[6] = (0xf8 & (dst_stype << 3)) | dst_sid;
-	buf[7] = 0xff & dst_pid;
-
-	/* do transaction and check buf[1-7] are the same against command */
-	err = fcp_avc_transaction(unit, buf, 8, buf, 8,
-				  BIT(1) | BIT(2) | BIT(4) | BIT(5) |
-				  BIT(6) | BIT(7));
-	if (err < 0)
-		goto end;
-	if ((err < 0) || ((buf[0] != 0x09) && (buf[0] != 0x0f))) {
-		dev_err(&unit->device,
-			"failed to set signal status\n");
-		err = -EIO;
-		goto end;
-	}
-
-	err = 0;
-end:
-	kfree(buf);
-	return err;
-}
-
-int avc_bridgeco_get_plug_type(struct fw_unit *unit,
-			       enum snd_bebob_plug_dir pdir,
-			       enum snd_bebob_plug_unit punit,
-			       unsigned short pid,
+int avc_bridgeco_get_plug_type(struct fw_unit *unit, u8 addr[5],
 			       enum snd_bebob_plug_type *type)
 {
 	u8 *buf;
@@ -193,15 +160,8 @@ int avc_bridgeco_get_plug_type(struct fw_unit *unit,
 	if (buf == NULL)
 		return -ENOMEM;
 
-	buf[0] = 0x01;		/* AV/C STATUS */
-	buf[1] = 0xff;		/* UNIT */
-	buf[2] = 0x02;		/* PLUG INFO */
-	buf[3] = 0xC0;		/* Extended Plug Info */
-	buf[4] = pdir;		/* plug direction */
-	buf[5] = 0x00;		/* address mode [0x00/0x01/0x02] */
-	buf[6] = punit;		/* plug unit type */
-	buf[7]  = 0xff & pid;	/* plug id */
-	buf[8]  = 0xff;		/* reserved */
+	/* status for plug info with bridgeco extension */
+	avc_bridgeco_fill_command_base(buf, 0x01, 0x02, 0xc0, addr);
 	buf[9]  = 0x00;		/* info type is 'plug type' */
 	buf[10] = 0xff;		/* plug type in response */
 
@@ -225,9 +185,8 @@ end:
 	return err;
 }
 
-int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
-				 enum snd_bebob_plug_dir pdir,
-				 unsigned short pid, u8 *buf, unsigned int len)
+int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit, u8 addr[6],
+				 u8 *buf, unsigned int len)
 {
 	unsigned int trial;
 	int err;
@@ -238,16 +197,11 @@ int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
 		goto end;
 	}
 
-	buf[0] = 0x01;		/* AV/C STATUS */
-	buf[1] = 0xff;		/* Unit */
-	buf[2] = 0x02;		/* PLUG INFO */
-	buf[3] = 0xC0;		/* Extended Plug Info */
-	buf[4] = pdir;		/* plug direction */
-	buf[5] = 0x00;		/* address mode is 'Unit' */
-	buf[6] = 0x00;		/* plug unit type is 'ISOC'*/
-	buf[7] = 0xff & pid;	/* plug id */
-	buf[8] = 0xff;		/* reserved */
-	buf[9] = 0x03;		/* info type is 'channel position' */
+	/* status for plug info with bridgeco extension */
+	avc_bridgeco_fill_command_base(buf, 0x01, 0x02, 0xc0, addr);
+
+	/* info type is 'channel position' */
+	buf[9] = 0x03;
 
 	/*
 	 * NOTE:
@@ -282,10 +236,8 @@ end:
 	return err;
 }
 
-int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
-				       enum snd_bebob_plug_dir pdir,
-				       unsigned int pid, unsigned int cluster_id,
-				       u8 *type)
+int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit, u8 addr[6],
+				       unsigned int cluster_id, u8 *type)
 {
 	u8 *buf;
 	int err;
@@ -295,15 +247,9 @@ int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
 	if (buf == NULL)
 		return -ENOMEM;
 
-	buf[0] = 0x01;		/* AV/C STATUS */
-	buf[1] = 0xff;		/* UNIT */
-	buf[2] = 0x02;		/* PLUG INFO */
-	buf[3] = 0xc0;		/* Extended Plug Info */
-	buf[4] = pdir;		/* plug direction */
-	buf[5] = 0x00;		/* address mode is 'Unit' */
-	buf[6] = 0x00;		/* plug unit type is 'ISOC' */
-	buf[7] = 0xff & pid;	/* plug id */
-	buf[8] = 0xff;		/* reserved */
+	/* status for plug info with bridgeco extension */
+	avc_bridgeco_fill_command_base(buf, 0x01, 0x02, 0xc0, addr);
+
 	buf[9] = 0x07;		/* info type is 'cluster info' */
 	buf[10] = 0xff & (cluster_id + 1);	/* cluster id */
 	buf[11] = 0x00;		/* type in response */
@@ -326,9 +272,41 @@ end:
 	return err;
 }
 
-int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
-				   enum snd_bebob_plug_dir pdir,
-				   unsigned short pid,
+int avc_bridgeco_get_plug_input(struct fw_unit *unit, u8 addr[6],
+				u8 input[7])
+{
+	int err;
+	u8 *buf;
+
+	/* cluster info includes characters but this module don't need it */
+	buf = kzalloc(18, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	/* status for plug info with bridgeco extension */
+	avc_bridgeco_fill_command_base(buf, 0x01, 0x02, 0xc0, addr);
+
+	/* info type is 'Plug Input Specific Data' */
+	buf[9] = 0x05;
+
+	/* do transaction and check buf[1-7,9,10] are the same */
+	err = fcp_avc_transaction(unit, buf, 16, buf, 16,
+				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
+				  BIT(6) | BIT(7));
+	if (err < 0)
+		goto end;
+	else if ((err < 18) && (buf[0] != 0x0c)) {
+		err = -EIO;
+		goto end;
+	}
+
+	memcpy(addr, buf + 10, 5);
+end:
+	kfree(buf);
+	return err;
+}
+
+int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit, u8 addr[6],
 				   unsigned int entryid, u8 *buf,
 				   unsigned int *len)
 {
@@ -340,16 +318,9 @@ int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 		goto end;
 	}
 
-	/* fill buffer as command */
-	buf[0] = 0x01;			/* AV/C STATUS */
-	buf[1] = 0xff;			/* unit */
-	buf[2] = 0x2f;			/* opcode is STREAM FORMAT SUPPORT */
-	buf[3] = 0xc1;			/* COMMAND LIST, BridgeCo extension */
-	buf[4] = pdir;			/* plug direction */
-	buf[5] = 0x00;			/* address mode is 'Unit' */
-	buf[6] = 0x00;			/* plug unit type is 'ISOC' */
-	buf[7] = 0xff & pid;		/* plug ID */
-	buf[8] = 0xff;			/* reserved */
+	/* status for plug info with bridgeco extension */
+	avc_bridgeco_fill_command_base(buf, 0x01, 0x2f, 0xc1, addr);
+
 	buf[9] = 0xff;			/* stream status in response */
 	buf[10] = 0xff & entryid;	/* entry ID */
 

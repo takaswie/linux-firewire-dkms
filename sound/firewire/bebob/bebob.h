@@ -27,10 +27,6 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 
-/* TODO: when mering to upstream, this path should be changed. */
-#include "../../../include/uapi/sound/asound.h"
-#include "../../../include/uapi/sound/firewire.h"
-
 #include <sound/core.h>
 #include <sound/initval.h>
 #include <sound/info.h>
@@ -38,6 +34,7 @@
 #include <sound/rawmidi.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
+#include <sound/firewire.h>
 #include <sound/hwdep.h>
 
 #include "../packets-buffer.h"
@@ -112,6 +109,8 @@ struct snd_bebob {
 	struct snd_bebob_stream_formation
 		rx_stream_formations[SND_BEBOB_STRM_FMT_ENTRIES];
 
+	int sync_input_plug;
+
         /* for uapi */
         int dev_lock_count;
         bool dev_lock_changed;
@@ -143,24 +142,25 @@ snd_bebob_read_quad(struct snd_bebob *bebob, u64 addr, void *buf, int size)
 				  buf, size, 0);
 }
 
+/* AV/C Digital Interface Command Set General Specification 4.2 (1394TA) */
+int avc_general_get_plug_info(struct fw_unit *unit, unsigned int addr_mode,
+			      u8 info[4]);
+
 /* AV/C Audio Subunit Specification 1.0 (1394TA) */
 int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
 			   unsigned int fb_id, unsigned int num);
 int avc_audio_get_selector(struct fw_unit *unit,unsigned  int subunit_id,
 			   unsigned int fb_id, unsigned int *num);
 
-/* Connection and Compatibility Management 1.0 (1394TA) */
-int avc_ccm_get_sig_src(struct fw_unit *unit,
-	unsigned int *src_stype, unsigned int *src_sid, unsigned int *src_pid,
-	unsigned int dst_stype, unsigned int dst_sid, unsigned int dst_pid);
-int avc_ccm_set_sig_src(struct fw_unit *unit,
-	unsigned int src_stype, unsigned int src_sid, unsigned int src_pid,
-	unsigned int dst_stype, unsigned int dst_sid, unsigned int dst_pid);
-
 /* AVC command extensions, AV/C Unit and Subunit, Revision 17 (BridgeCo.) */
 enum snd_bebob_plug_dir {
 	SND_BEBOB_PLUG_DIR_IN	= 0x00,
 	SND_BEBOB_PLUG_DIR_OUT	= 0x01
+};
+enum snd_bebob_plug_mode {
+	SND_BEBOB_PLUG_MODE_UNIT		= 0x00,
+	SND_BEBOB_PLUG_MODE_SUBUNIT		= 0x01,
+	SND_BEBOB_PLUG_MODE_FUNCTION_BLOCK	= 0x02
 };
 enum snd_bebob_plug_unit {
 	SND_BEBOB_PLUG_UNIT_ISOC	= 0x00,
@@ -175,21 +175,40 @@ enum snd_bebob_plug_type {
 	SND_BEBOB_PLUG_TYPE_ANA		= 0x04,
 	SND_BEBOB_PLUG_TYPE_DIG		= 0x05
 };
-int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
-				 enum snd_bebob_plug_dir pdir,
-				 unsigned short pid, u8 *buf, unsigned int len);
-int avc_bridgeco_get_plug_type(struct fw_unit *unit,
-			       enum snd_bebob_plug_dir pdir,
-			       enum snd_bebob_plug_unit punit,
-			       unsigned short p_id,
+static inline void
+avc_bridgeco_fill_unit_addr(u8 buf[6],
+			    enum snd_bebob_plug_dir dir,
+			    enum snd_bebob_plug_unit unit,
+			    unsigned int pid)
+{
+	buf[0] = 0xff;	/* Unit */
+	buf[1] = dir;
+	buf[2] = SND_BEBOB_PLUG_MODE_UNIT;
+	buf[3] = unit;
+	buf[4] = 0xff & pid;
+	buf[5] = 0xff;	/* reserved */
+}
+static inline void
+avc_bridgeco_fill_subunit_addr(u8 buf[6], unsigned int mode,
+			       enum snd_bebob_plug_dir dir,
+			       unsigned int pid)
+{
+	buf[0] = 0xff & mode;	/* Subunit */
+	buf[1] = dir;
+	buf[2] = SND_BEBOB_PLUG_MODE_SUBUNIT;
+	buf[3] = 0xff & pid;
+	buf[4] = 0xff;	/* reserved */
+	buf[5] = 0xff;	/* reserved */
+}
+int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit, u8 add[6],
+				 u8 *buf, unsigned int len);
+int avc_bridgeco_get_plug_type(struct fw_unit *unit, u8 addr[6],
 			       enum snd_bebob_plug_type *type);
-int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
-				       enum snd_bebob_plug_dir pdir,
-				       unsigned int pid, unsigned int cluster_id,
-				       u8 *ctype);
-int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
-				   enum snd_bebob_plug_dir pdir,
-				   unsigned short pid,
+int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit, u8 addr[6],
+				       unsigned int cluster_id, u8 *ctype);
+int avc_bridgeco_get_plug_input(struct fw_unit *unit, u8 addr[6],
+				u8 input[7]);
+int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit, u8 addr[6],
 				   unsigned int entryid, u8 *buf,
 				   unsigned int *len);
 
@@ -201,6 +220,8 @@ int snd_bebob_set_rate(struct snd_bebob *bebob, unsigned int rate,
 /* for AMDTP streaming */
 int snd_bebob_stream_get_rate(struct snd_bebob *bebob, unsigned int *rate);
 int snd_bebob_stream_set_rate(struct snd_bebob *bebob, unsigned int rate);
+int snd_bebob_stream_check_internal_clock(struct snd_bebob *bebob,
+					  bool *internal);
 int snd_bebob_stream_discover(struct snd_bebob *bebob);
 int snd_bebob_stream_map(struct snd_bebob *bebob,
 			 struct amdtp_stream *stream);
@@ -244,7 +265,6 @@ extern struct snd_bebob_spec saffire_spec;
 extern struct snd_bebob_spec phase88_rack_spec;
 extern struct snd_bebob_spec phase24_series_spec;
 extern struct snd_bebob_spec yamaha_go_spec;
-extern struct snd_bebob_spec presonus_firebox_spec;
 
 #define SND_BEBOB_DEV_ENTRY(vendor, model, private_data) \
 { \

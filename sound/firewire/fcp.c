@@ -134,44 +134,6 @@ end:
 }
 EXPORT_SYMBOL(avc_general_get_sig_fmt);
 
-int avc_general_get_plug_info(struct fw_unit *unit,
-			unsigned short bus_plugs[AVC_GENERAL_PLUG_DIR_COUNT],
-			unsigned short ext_plugs[AVC_GENERAL_PLUG_DIR_COUNT])
-{
-	u8 *buf;
-	int err;
-
-	buf = kzalloc(8, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0] = 0x01;	/* AV/C STATUS */
-	buf[1] = 0xff;	/* UNIT */
-	buf[2] = 0x02;	/* PLUG INFO */
-
-	err = fcp_avc_transaction(unit, buf, 8, buf, 8, BIT(1) | BIT(2));
-	if (err < 0)
-		goto end;
-
-	/* check length */
-	if (err != 8) {
-		err = -EIO;
-		goto end;
-	}
-
-	bus_plugs[AVC_GENERAL_PLUG_DIR_IN]  = buf[4];
-	bus_plugs[AVC_GENERAL_PLUG_DIR_OUT] = buf[5];
-	ext_plugs[AVC_GENERAL_PLUG_DIR_IN]  = buf[6];
-	ext_plugs[AVC_GENERAL_PLUG_DIR_OUT] = buf[7];
-
-	/* return response code */
-	err = buf[0];
-end:
-	kfree(buf);
-	return err;
-}
-EXPORT_SYMBOL(avc_general_get_plug_info);
-
 static DEFINE_SPINLOCK(transactions_lock);
 static LIST_HEAD(transactions);
 

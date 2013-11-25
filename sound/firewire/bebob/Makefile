@@ -1,6 +1,6 @@
 snd-bebob-objs := bebob_command.o bebob_stream.o bebob_proc.o bebob_control.o \
 		  bebob_midi.o bebob_pcm.o bebob_hwdep.o \
 		  bebob_maudio.o bebob_focusrite.o bebob_terratec.o \
-		  bebob_yamaha.o bebob_presonus.o \
+		  bebob_yamaha.o \
 		  bebob.o
 obj-m += snd-bebob.o

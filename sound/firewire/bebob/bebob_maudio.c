@@ -501,52 +501,6 @@ end:
 }
 
 /* Firewire 410 specific controls */
-static char *fw410_clk_src_labels[] = {
-	SND_BEBOB_CLOCK_INTERNAL, "Digital Optical", "Digital Coaxial"
-};
-static int
-fw410_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
-{
-	int err;
-	unsigned int stype, sid, pid;
-
-	err = avc_ccm_get_sig_src(bebob->unit,
-				  &stype, &sid, &pid, 0x0c, 0x00, 0x01);
-	if (err < 0)
-		goto end;
-
-	*id = 0;
-	if ((stype == 0x1f) && (sid == 0x07)) {
-		if (pid == 0x82)
-			*id = 2;
-		else if (pid == 0x83)
-			*id = 1;
-	}
-end:
-	return err;
-}
-static int
-fw410_clk_src_set(struct snd_bebob *bebob, unsigned int id)
-{
-	unsigned int stype, sid, pid;
-
-	if (id == 0) {
-		stype = 0x0c;
-		sid = 0x00;
-		pid = 0x01;
-	} else if (id == 1) {
-		stype = 0x1f;
-		sid = 0x07;
-		pid = 0x83;
-	} else {
-		stype = 0x1f;
-		sid = 0x07;
-		pid = 0x82;
-	}
-
-	return avc_ccm_set_sig_src(bebob->unit,
-				   stype, sid, pid, 0x0c, 0x00, 0x01);
-}
 static int
 fw410_clk_synced(struct snd_bebob *bebob, bool *synced)
 {
@@ -580,45 +534,6 @@ end:
 }
 
 /* Firewire Audiophile specific controls */
-static char *audiophile_clk_src_labels[] = {
-	SND_BEBOB_CLOCK_INTERNAL, "Digital Coaxial"
-};
-static int
-audiophile_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
-{
-	unsigned int stype, sid, pid;
-	int err;
-
-	err = avc_ccm_get_sig_src(bebob->unit,
-				  &stype, &sid, &pid, 0x0c, 0x00, 0x01);
-	if (err < 0)
-		goto end;
-
-	if ((stype == 0x1f) && (sid == 0x07) && (pid == 0x82))
-		*id = 1;
-	else
-		*id = 0;
-end:
-	return err;
-}
-static int
-audiophile_clk_src_set(struct snd_bebob *bebob, unsigned int id)
-{
-	unsigned int stype, sid, pid;
-
-	if (id == 0) {
-		stype = 0x0c;
-		sid = 0x00;
-		pid = 0x01;
-	} else {
-		stype = 0x1f;
-		sid = 0x07;
-		pid = 0x82;
-	}
-
-	return avc_ccm_set_sig_src(bebob->unit,
-				   stype, sid, pid, 0x0c, 0x00, 0x01);
-}
 static int
 audiophile_clk_synced(struct snd_bebob *bebob, bool *synced)
 {
@@ -651,45 +566,6 @@ end:
 }
 
 /* Firewire Solo specific controls */
-static char *solo_clk_src_labels[] = {
-	SND_BEBOB_CLOCK_INTERNAL, "Digital Coaxial"
-};
-static int
-solo_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
-{
-	unsigned int stype, sid, pid;
-	int err;
-
-	err = avc_ccm_get_sig_src(bebob->unit,
-				  &stype, &sid, &pid, 0x0c, 0x00, 0x01);
-	if (err < 0)
-		goto end;
-
-	if ((stype == 0x1f) && (sid = 0x07) && (pid== 0x81))
-		*id = 1;
-	else
-		*id = 0;
-end:
-	return err;
-}
-static int
-solo_clk_src_set(struct snd_bebob *bebob, unsigned int id)
-{
-	unsigned int stype, sid, pid;
-
-	if (id == 0) {
-		stype = 0x0c;
-		sid = 0x00;
-		pid = 0x01;
-	} else {
-		stype = 0x1f;
-		sid = 0x07;
-		pid = 0x81;
-	}
-
-	return avc_ccm_set_sig_src(bebob->unit,
-				   stype, sid, pid, 0x0c, 0x00, 0x01);
-}
 static int
 solo_clk_synced(struct snd_bebob *bebob, bool *synced)
 {
@@ -820,10 +696,6 @@ struct snd_bebob_spec maudio_special_spec = {
 
 /* Firewire 410 specification */
 static struct snd_bebob_clock_spec fw410_clk_spec = {
-	.num		= ARRAY_SIZE(fw410_clk_src_labels),
-	.labels		= fw410_clk_src_labels,
-	.get_src	= &fw410_clk_src_get,
-	.set_src	= &fw410_clk_src_set,
 	.get_freq	= &snd_bebob_stream_get_rate,
 	.set_freq	= &snd_bebob_stream_set_rate,
 	.synced		= &fw410_clk_synced
@@ -841,10 +713,6 @@ struct snd_bebob_spec maudio_fw410_spec = {
 
 /* Firewire Audiophile specification */
 static struct snd_bebob_clock_spec audiophile_clk_spec = {
-	.num		= ARRAY_SIZE(audiophile_clk_src_labels),
-	.labels		= audiophile_clk_src_labels,
-	.get_src	= &audiophile_clk_src_get,
-	.set_src	= &audiophile_clk_src_set,
 	.get_freq	= &snd_bebob_stream_get_rate,
 	.set_freq	= &snd_bebob_stream_set_rate,
 	.synced		= &audiophile_clk_synced
@@ -862,10 +730,6 @@ struct snd_bebob_spec maudio_audiophile_spec = {
 
 /* Firewire Solo specification */
 static struct snd_bebob_clock_spec solo_clk_spec = {
-	.num		= ARRAY_SIZE(solo_clk_src_labels),
-	.labels		= solo_clk_src_labels,
-	.get_src	= &solo_clk_src_get,
-	.set_src	= &solo_clk_src_set,
 	.get_freq	= &snd_bebob_stream_get_rate,
 	.set_freq	= &snd_bebob_stream_set_rate,
 	.synced		= &solo_clk_synced

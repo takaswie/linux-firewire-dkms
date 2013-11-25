@@ -41,6 +41,7 @@ static unsigned int devices_used;
 #define INFO_OFFSET_HW_MODEL_REVISION	0x1c
 
 #define VEN_EDIROL	0x000040ab
+#define VEN_PRESONUS	0x00000a92
 #define VEN_BRIDGECO	0x000007f5
 #define VEN_MACKIE	0x0000000f
 #define VEN_TASCOM	0x0000022e
@@ -55,7 +56,6 @@ static unsigned int devices_used;
 #define VEN_FOCUSRITE	0x0000130e
 #define VEN_TERRATEC	0x00000aac
 #define VEN_YAMAHA	0x0000a0de
-#define VEN_PRESONUS	0x00000a92
 
 #define MODEL_MAUDIO_AUDIOPHILE_BOTH	0x00010060
 #define MODEL_MAUDIO_FW1814		0x00010071
@@ -75,6 +75,8 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 	/* get vendor name */
 	if (vendor_id == VEN_EDIROL)
 		strcpy(vendor, "Edirol");
+	else if (vendor_id == VEN_PRESONUS)
+		strcpy(vendor, "Presonus");
 	else if (vendor_id == VEN_BRIDGECO)
 		strcpy(vendor, "BridgeCo");
 	else if (vendor_id == VEN_MACKIE)
@@ -99,8 +101,6 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 		strcpy(vendor, "Terratec");
 	else if (vendor_id == VEN_YAMAHA)
 		strcpy(vendor, "YAMAHA");
-	else if (vendor_id == VEN_PRESONUS)
-		strcpy(vendor, "Presonus");
 
 	/* get model name */
 	err = fw_csr_string(bebob->unit->directory, CSR_MODEL,
@@ -351,6 +351,10 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010049, spec_normal),
 	/* Edirol, FA-101 */
 	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010048, spec_normal),
+	/* Presonus, FIREBOX */
+	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010000, spec_normal),
+	/* PreSonus FIREPOD */
+	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010066, spec_normal),
 	/* BridgeCo, RDAudio1 */
 	SND_BEBOB_DEV_ENTRY(VEN_BRIDGECO, 0x00010048, spec_normal),
 	/* BridgeCo, Audio5 */
@@ -411,10 +415,6 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000b, yamaha_go_spec),
 	/* YAMAHA, GO46 */
 	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000c, yamaha_go_spec),
-	/* Presonus, FireBox */
-	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010000, presonus_firebox_spec),
-	/* PreSonus FirePod */
-	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010066, spec_normal),
 	{}
 };
 MODULE_DEVICE_TABLE(ieee1394, snd_bebob_id_table);
