@@ -19,7 +19,7 @@
 #include <linux/spinlock.h>
 #include <linux/wait.h>
 
-/* MEMOCCHI: this is not the best way... */
+/* TODO: when mering to upstream, this path should be changed. */
 #include "../../include/uapi/sound/asound.h"
 #include "../../include/uapi/sound/firewire.h"
 
