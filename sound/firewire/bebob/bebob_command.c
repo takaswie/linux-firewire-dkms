@@ -355,6 +355,56 @@ end:
 	return err;
 }
 
+int avc_bridgeco_detect_plug_strm(struct fw_unit *unit,
+				  enum snd_bebob_plug_dir dir,
+				  unsigned int ext_pid,
+				  unsigned int *detect)
+{
+	u8 *buf;
+	int err;
+
+	buf = kzalloc(12, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	/*
+	 * For company ID, anything is OK as long as I investigated.
+	 * So here I use ID for BridgeCo.
+	 */
+	buf[0]  = 0x01;	/* AVC/STATUS */
+	buf[1]  = 0xff;	/* UNIT */
+	buf[2]  = 0x00;	/* Vendor Dependent command */
+	buf[3]  = 0x00;	/* Company ID high */
+	buf[4]  = 0x07;	/* Company ID middle */
+	buf[5]  = 0xf5;	/* Company ID low */
+	buf[6]  = 0x00;	/* Stream state subfunction */
+	buf[7]  = dir;	/* Plug direction */
+	buf[8]  = 0xff & ext_pid;	/* External unit plug ID */
+	buf[9]  = 0xff;	/* Stream state */
+
+	/* do transaction and check buf[1-8] are the same against command */
+	err = fcp_avc_transaction(unit, buf, 12, buf, 12,
+				  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
+				  BIT(5) | BIT(6) | BIT(7) | BIT(8));
+	if (err < 0)
+		goto end;
+	/* IMPLEMENTED/STABLE is OK */
+	if ((err < 10) || (buf[0] != 0x0c)){
+		dev_err(&unit->device,
+			"failed to detect stream presence 0x%02X\n",
+			buf[0]);
+		err = -EIO;
+		goto end;
+	}
+
+	/* when stream is detected, 10th byte is 0x01 */
+	*detect = (buf[9] == 0x01);
+	err = 0;
+end:
+	kfree(buf);
+	return err;
+}
+
 int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
 		       enum avc_general_plug_dir dir)
 {

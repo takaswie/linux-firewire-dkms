@@ -38,52 +38,6 @@
  */
 
 static int
-detect_dig_in(struct snd_bebob *bebob, unsigned int *detect)
-{
-	int err;
-	u8 *buf;
-
-	buf = kmalloc(12, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	/* This is a vendor dependent command */
-	buf[0]  = 0x01;	/* STATUS */
-	buf[1]  = 0xff;	/* UNIT */
-	buf[2]  = 0x00;	/* Vendor Dependent command */
-	buf[3]  = 0x00;	/* Company ID high */
-	buf[4]  = 0x07;	/* Company ID middle */
-	buf[5]  = 0xf5;	/* Company ID low */
-	buf[6]  = 0x00;	/* Unknown Subfunction*/
-	buf[7]  = 0x00;	/* Unknown */
-	buf[8]  = 0x01; /* Unknown */
-	buf[9]  = 0x00;	/* Unknown */
-	buf[10] = 0x00;	/* Unknown */
-	buf[11] = 0x00;	/* Unknown */
-
-	/* do transaction and check buf[1-6] are the same against command */
-	err = fcp_avc_transaction(bebob->unit, buf, 12, buf, 12,
-				  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
-				  BIT(5) | BIT(6));
-	if (err < 0)
-		goto end;
-	/* IMPLEMENTED/STABLE is OK */
-	if ((err < 6) || (buf[0] != 0x0c)){
-		dev_err(&bebob->unit->device,
-			"failed to detect clock source 0x%02X\n",
-			buf[0]);
-		err = -EIO;
-		goto end;
-	}
-
-	/* when digital clock input exists, 10th byte is 0x01 */
-	*detect = (buf[9] > 0);
-	err = 0;
-end:
-	return err;
-}
-
-static int
 get_sync_status(struct snd_bebob *bebob, bool *sync)
 {
 	u8 *buf;
@@ -130,7 +84,10 @@ clk_src_set(struct snd_bebob *bebob, unsigned int id)
 	unsigned int detect;
 
 	if (id > 0) {
-		err = detect_dig_in(bebob, &detect);
+		/* check external input plug 0x01 */
+		err = avc_bridgeco_detect_plug_strm(bebob->unit,
+						    SND_BEBOB_PLUG_DIR_IN, 0x01,
+						    &detect);
 		if ((err < 0) || (detect == 0))
 			return -EIO;
 	}

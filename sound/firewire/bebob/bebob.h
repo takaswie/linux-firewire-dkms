@@ -27,6 +27,10 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 
+/* TODO: when mering to upstream, this path should be changed. */
+#include "../../../include/uapi/sound/asound.h"
+#include "../../../include/uapi/sound/firewire.h"
+
 #include <sound/core.h>
 #include <sound/initval.h>
 #include <sound/info.h>
@@ -34,7 +38,6 @@
 #include <sound/rawmidi.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
-#include <sound/firewire.h>
 #include <sound/hwdep.h>
 
 #include "../packets-buffer.h"
@@ -211,6 +214,10 @@ int avc_bridgeco_get_plug_input(struct fw_unit *unit, u8 addr[6],
 int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit, u8 addr[6],
 				   unsigned int entryid, u8 *buf,
 				   unsigned int *len);
+int avc_bridgeco_detect_plug_strm(struct fw_unit *unit,
+				  enum snd_bebob_plug_dir dir,
+				  unsigned int ext_pid,
+				  unsigned int *detect);
 
 int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
                        enum avc_general_plug_dir dir);
