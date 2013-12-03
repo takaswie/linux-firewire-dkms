@@ -32,9 +32,7 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 
 	err = snd_bebob_stream_start_duplex(bebob, &bebob->tx_stream, 0);
 	if (err < 0)
-		goto end;
-
-	amdtp_stream_midi_add(&bebob->tx_stream, substream);
+		snd_bebob_stream_lock_release(bebob);
 end:
 	return err;
 }
@@ -50,32 +48,16 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 
 	err = snd_bebob_stream_start_duplex(bebob, &bebob->rx_stream, 0);
 	if (err < 0)
-		goto end;
-
-	amdtp_stream_midi_add(&bebob->rx_stream, substream);
+		snd_bebob_stream_lock_release(bebob);
 end:
 	return err;
 }
 
-static int midi_capture_close(struct snd_rawmidi_substream *substream)
+static int midi_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_bebob *bebob = substream->rmidi->private_data;
-
-	amdtp_stream_midi_remove(&bebob->tx_stream, substream);
 	snd_bebob_stream_stop_duplex(bebob);
 	snd_bebob_stream_lock_release(bebob);
-
-	return 0;
-}
-
-static int midi_playback_close(struct snd_rawmidi_substream *substream)
-{
-	struct snd_bebob *bebob = substream->rmidi->private_data;
-
-	amdtp_stream_midi_remove(&bebob->rx_stream, substream);
-	snd_bebob_stream_stop_duplex(bebob);
-	snd_bebob_stream_lock_release(bebob);
-
 	return 0;
 }
 
@@ -87,9 +69,11 @@ static void midi_capture_trigger(struct snd_rawmidi_substream *substrm, int up)
 	spin_lock_irqsave(&bebob->lock, flags);
 
 	if (up)
-		__set_bit(substrm->number, &bebob->tx_stream.midi_triggered);
+		amdtp_stream_midi_trigger(&bebob->tx_stream,
+					  substrm->number, substrm);
 	else
-		__clear_bit(substrm->number, &bebob->tx_stream.midi_triggered);
+		amdtp_stream_midi_trigger(&bebob->tx_stream,
+					  substrm->number, NULL);
 
 	spin_unlock_irqrestore(&bebob->lock, flags);
 
@@ -104,9 +88,11 @@ static void midi_playback_trigger(struct snd_rawmidi_substream *substrm, int up)
 	spin_lock_irqsave(&bebob->lock, flags);
 
 	if (up)
-		__set_bit(substrm->number, &bebob->rx_stream.midi_triggered);
+		amdtp_stream_midi_trigger(&bebob->rx_stream,
+					  substrm->number, substrm);
 	else
-		__clear_bit(substrm->number, &bebob->rx_stream.midi_triggered);
+		amdtp_stream_midi_trigger(&bebob->rx_stream,
+					  substrm->number, NULL);
 
 	spin_unlock_irqrestore(&bebob->lock, flags);
 
@@ -115,13 +101,13 @@ static void midi_playback_trigger(struct snd_rawmidi_substream *substrm, int up)
 
 static struct snd_rawmidi_ops midi_capture_ops = {
 	.open		= midi_capture_open,
-	.close		= midi_capture_close,
+	.close		= midi_close,
 	.trigger	= midi_capture_trigger,
 };
 
 static struct snd_rawmidi_ops midi_playback_ops = {
 	.open		= midi_playback_open,
-	.close		= midi_playback_close,
+	.close		= midi_close,
 	.trigger	= midi_playback_trigger,
 };
 

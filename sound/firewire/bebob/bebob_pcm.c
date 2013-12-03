@@ -253,6 +253,10 @@ pcm_open(struct snd_pcm_substream *substream)
 	if (err < 0)
 		goto err_locked;
 
+	/*
+	 * When source of clock is internal or any PCM stream are running,
+	 * the available sampling rate is limited at current sampling rate.
+	 */
 	if (!internal ||
 	    amdtp_stream_pcm_running(&bebob->tx_stream) ||
 	    amdtp_stream_pcm_running(&bebob->rx_stream)) {

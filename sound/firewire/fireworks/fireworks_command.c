@@ -22,16 +22,15 @@
 #include "../lib.h"
 #include "./fireworks.h"
 
-
 /*
- * Echo's Fireworks(TM) utilize its own command.
+ * Fireworks utilize its own command.
  * This module calls it as 'Echo Fireworks Commands' (a.k.a EFC).
  *
  * EFC substance:
  *  At first, 6 data exist. we call these data as 'EFC fields'.
  *  Following to the 6 data, parameters for each commands exists.
  *  Most of parameters are 32 bit. But exception exists according to command.
- *   data[0]:	Length of EFC substance.
+ *   data[0]:	Length of EFC substance
  *   data[1]:	EFC version
  *   data[2]:	Sequence number. This is incremented by both host and target
  *   data[3]:	EFC category
@@ -43,9 +42,13 @@
  *  command:	0xecc000000000
  *  response:	0xecc080000000
  *
- * As a result, Echo's Fireworks doesn't need AVC generic command sets.
+ * This driver supports EFC version 1 or later to use extended hardware
+ * information. Then too old devices are not available.
  *
- * NOTE: old FFADO implementaion is EFC over AVC but device with firmware
+ * Each commands are not required to have continuous sequence numbers. The
+ * sequence number is just used to match command and response.
+ *
+ * NOTE: FFADO implementaion is EFC over AVC but device with firmware
  * version 5.5 or later don't use it but support it. This module support a part
  * of commands. Please see FFADO if you want to see whole commands.
  */
@@ -260,7 +263,7 @@ int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 
 /*
  * mode == 0: Windows mode
- * mode >= 1: IEC61883-1 compliant mode
+ * mode >= 1: IEC61883-6 compliant mode
  *
  * This is for timestamp processing. In Windows mode, all 32bit fields of second
  * CIP header in AMDTP transmit packet is used as 'presentation timestamp'. The

@@ -33,11 +33,8 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 		goto end;
 
 	err = snd_efw_stream_start_duplex(efw, &efw->tx_stream, 0);
-	if (err < 0) {
+	if (err < 0)
 		snd_efw_stream_lock_release(efw);
-		goto end;
-	}
-	amdtp_stream_midi_add(&efw->tx_stream, substream);
 end:
 	return err;
 }
@@ -52,39 +49,17 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 		goto end;
 
 	err = snd_efw_stream_start_duplex(efw, &efw->rx_stream, 0);
-	if (err < 0) {
+	if (err < 0)
 		snd_efw_stream_lock_release(efw);
-		goto end;
-	}
-	amdtp_stream_midi_add(&efw->rx_stream, substream);
-	/*
-	 * Fireworks ignores MIDI messages in greater than first 8 data blocks
-	 * in an AMDTP packet.
-	 */
-	efw->rx_stream.blocks_for_midi = 8;
 end:
 	return err;
 }
 
-static int midi_capture_close(struct snd_rawmidi_substream *substream)
+static int midi_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw *efw = substream->rmidi->private_data;
-
-	amdtp_stream_midi_remove(&efw->tx_stream, substream);
 	snd_efw_stream_stop_duplex(efw);
 	snd_efw_stream_lock_release(efw);
-
-	return 0;
-}
-
-static int midi_playback_close(struct snd_rawmidi_substream *substream)
-{
-	struct snd_efw *efw = substream->rmidi->private_data;
-
-	amdtp_stream_midi_remove(&efw->rx_stream, substream);
-	snd_efw_stream_stop_duplex(efw);
-	snd_efw_stream_lock_release(efw);
-
 	return 0;
 }
 
@@ -96,9 +71,11 @@ static void midi_capture_trigger(struct snd_rawmidi_substream *substrm, int up)
 	spin_lock_irqsave(&efw->lock, flags);
 
 	if (up)
-		__set_bit(substrm->number, &efw->tx_stream.midi_triggered);
+		amdtp_stream_midi_trigger(&efw->tx_stream,
+					  substrm->number, substrm);
 	else
-		__clear_bit(substrm->number, &efw->tx_stream.midi_triggered);
+		amdtp_stream_midi_trigger(&efw->tx_stream,
+					  substrm->number, NULL);
 
 	spin_unlock_irqrestore(&efw->lock, flags);
 
@@ -113,9 +90,11 @@ static void midi_playback_trigger(struct snd_rawmidi_substream *substrm, int up)
 	spin_lock_irqsave(&efw->lock, flags);
 
 	if (up)
-		__set_bit(substrm->number, &efw->rx_stream.midi_triggered);
+		amdtp_stream_midi_trigger(&efw->rx_stream,
+					  substrm->number, substrm);
 	else
-		__clear_bit(substrm->number, &efw->rx_stream.midi_triggered);
+		amdtp_stream_midi_trigger(&efw->rx_stream,
+					  substrm->number, NULL);
 
 	spin_unlock_irqrestore(&efw->lock, flags);
 
@@ -124,13 +103,13 @@ static void midi_playback_trigger(struct snd_rawmidi_substream *substrm, int up)
 
 static struct snd_rawmidi_ops midi_capture_ops = {
 	.open		= midi_capture_open,
-	.close		= midi_capture_close,
+	.close		= midi_close,
 	.trigger	= midi_capture_trigger,
 };
 
 static struct snd_rawmidi_ops midi_playback_ops = {
 	.open		= midi_playback_open,
-	.close		= midi_playback_close,
+	.close		= midi_close,
 	.trigger	= midi_playback_trigger,
 };
 
@@ -187,6 +166,12 @@ int snd_efw_create_midi_devices(struct snd_efw *efw)
 		str = &rmidi->streams[SNDRV_RAWMIDI_STREAM_OUTPUT];
 
 		set_midi_substream_names(efw, str);
+
+		/*
+		 * Fireworks ignores MIDI messages in greater than first 8 data blocks
+		 * of an AMDTP packet.
+		 */
+		efw->rx_stream.blocks_for_midi = 8;
 	}
 
 	if ((efw->midi_output_ports > 0) && (efw->midi_input_ports > 0))

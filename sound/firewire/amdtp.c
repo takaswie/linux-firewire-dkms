@@ -38,9 +38,10 @@
 
 /*
  * Audio and Music transfer protocol specific parameters
- * only "Clock-based rate controll mode" is supported
+ * only "Clock-based rate control mode" is supported
  */
 #define AMDTP_FDF_AM824		(0 << (CIP_FDF_SFC_SHIFT + 3))
+#define AMDTP_FDF_NO_DATA	0xff
 #define AMDTP_DBS_MASK		0x00ff0000
 #define AMDTP_DBS_SHIFT		16
 #define AMDTP_DBC_MASK		0x000000ff
@@ -51,8 +52,8 @@
 #define QUEUE_LENGTH		48
 #define CALLBACK_TIMEOUT_MS	100
 
-#define TRANSMIT_PACKET_HEADER_SIZE	4
-#define RECEIVE_PACKET_HEADER_SIZE	0
+#define IN_PACKET_HEADER_SIZE	4
+#define OUT_PACKET_HEADER_SIZE	0
 
 /* for re-ordering receive packets */
 struct sort_table {
@@ -247,26 +248,28 @@ void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
 		WARN_ON(1);
 		/* fall through */
 	case SNDRV_PCM_FORMAT_S16:
-		if (s->direction == AMDTP_TRANSMIT_STREAM) {
+		if (s->direction == AMDTP_IN_STREAM) {
 			if (s->dual_wire)
 				s->transfer_samples = amdtp_read_s16_dualwire;
 			else
 				s->transfer_samples = amdtp_read_s16;
-		} else if (s->dual_wire)
+		} else if (s->dual_wire) {
 			s->transfer_samples = amdtp_write_s16_dualwire;
-		else
+		} else {
 			s->transfer_samples = amdtp_write_s16;
+		}
 		break;
 	case SNDRV_PCM_FORMAT_S32:
-		if (s->direction == AMDTP_TRANSMIT_STREAM) {
+		if (s->direction == AMDTP_IN_STREAM) {
 			if (s->dual_wire)
 				s->transfer_samples = amdtp_read_s32_dualwire;
 			else
 				s->transfer_samples = amdtp_read_s32;
-		} else if (s->dual_wire)
+		} else if (s->dual_wire) {
 			s->transfer_samples = amdtp_write_s32_dualwire;
-		else
+		} else {
 			s->transfer_samples = amdtp_write_s32;
+		}
 		break;
 	}
 }
@@ -361,7 +364,7 @@ static unsigned int calculate_syt(struct amdtp_stream *s,
 
 		return syt & CIP_SYT_MASK;
 	} else {
-		return CIP_SYT_NO_INFO; /* no info */
+		return CIP_SYT_NO_INFO;
 	}
 }
 
@@ -512,7 +515,7 @@ static void amdtp_read_s16(struct amdtp_stream *s,
 
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < s->pcm_channels; ++c) {
-			*dst = be32_to_cpu(buffer[s->pcm_positions[c]]) << 8;
+			*dst = be32_to_cpu(buffer[s->pcm_positions[c]]) >> 8;
 			dst++;
 		}
 		buffer +=s->data_block_quadlets;
@@ -568,13 +571,13 @@ static void amdtp_read_s16_dualwire(struct amdtp_stream *s,
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < channels; ++c) {
 			*dst =
-			     be32_to_cpu(buffer[s->pcm_positions[c] * 2]) << 8;
+			     be32_to_cpu(buffer[s->pcm_positions[c] * 2]) >> 8;
 			dst++;
 		}
 		buffer += 1;
 		for (c = 0; c < channels; ++c) {
 			*dst =
-			     be32_to_cpu(buffer[s->pcm_positions[c] * 2]) << 8;
+			     be32_to_cpu(buffer[s->pcm_positions[c] * 2]) >> 8;
 			dst++;
 		}
 		buffer += s->data_block_quadlets - 1;
@@ -614,15 +617,14 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
 	unsigned int m, f, c, port;
-	int len;
-	u8 b[2];
+	u8 *b;
 
 	for (f = 0; f < frames; f++) {
 		m = (s->data_block_counter + f) % 8;
+
 		for (c = 0; c < s->midi_channels; c++) {
-			b[0] = 0x80;
-			b[1] = 0x00;
-			len = 0;
+			buffer[s->midi_positions[c]] = 0x00;
+			b = (u8 *)&buffer[s->midi_positions[c]];
 
 			/*
 			 * NOTE:
@@ -630,18 +632,15 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 			 * data blocks in an packet.
 			 */
 			port = c * 8 + m;
-			if ((f < s->blocks_for_midi) &&
-			    (s->midi[port] != NULL) &&
-			    test_bit(port, &s->midi_triggered)) {
-				len = snd_rawmidi_transmit(s->midi[port],
-								b + 1, 1);
-				if (len <= 0)
-					b[1] = 0x00;
-				else
-					b[0] = 0x81;
+			if ((f >= s->blocks_for_midi) ||
+			    (s->midi[port] == NULL) ||
+			    (snd_rawmidi_transmit(s->midi[port],
+							b + 1, 1) > 0)) {
+				b[0] = 0x80;
+				b[1] = 0x00;	/* confirm to be zero */
+			} else {
+				b[0] = 0x81;
 			}
-			buffer[s->midi_positions[c]] =
-				be32_to_cpu((b[0] << 24) | (b[1] << 16));
 		}
 		buffer += s->data_block_quadlets;
 	}
@@ -658,24 +657,24 @@ static void amdtp_pull_midi(struct amdtp_stream *s,
 		m = (s->data_block_counter + f) % 8;
 		for (c = 0; c < s->midi_channels; c++) {
 			b = (u8 *)&buffer[s->midi_positions[c]];
-			if (b[0] < 0x81 || 0x83 < b[0])
+
+			len = b[0] - 0x80;
+			if (len < 0x81 || 0x83 < len)
 				continue;
 
 			port = c * 8 + m;
-			if ((s->midi[port] == NULL) ||
-			    !test_bit(port, &s->midi_triggered))
+			if (s->midi[port] == NULL)
 				continue;
 
-			len = b[0] - 0x80;
 			snd_rawmidi_receive(s->midi[port], b + 1, len);
 		}
 		buffer += s->data_block_quadlets;
 	}
 }
 
-static void check_pcm_pointer(struct amdtp_stream *s,
-			      struct snd_pcm_substream *pcm,
-			      unsigned int frames)
+static void update_pcm_pointers(struct amdtp_stream *s,
+				struct snd_pcm_substream *pcm,
+				unsigned int frames)
 {	unsigned int ptr;
 
 	if (s->dual_wire)
@@ -732,13 +731,13 @@ end:
 static inline int queue_out_packet(struct amdtp_stream *s,
 				   unsigned int payload_length, bool skip)
 {
-	return queue_packet(s, RECEIVE_PACKET_HEADER_SIZE,
+	return queue_packet(s, OUT_PACKET_HEADER_SIZE,
 			    payload_length, skip);
 }
 
 static inline int queue_in_packet(struct amdtp_stream *s)
 {
-	return queue_packet(s, TRANSMIT_PACKET_HEADER_SIZE,
+	return queue_packet(s, IN_PACKET_HEADER_SIZE,
 			    amdtp_stream_get_max_payload(s), false);
 }
 
@@ -784,7 +783,7 @@ static void handle_out_packet(struct amdtp_stream *s, unsigned int syt)
 	}
 
 	if (pcm)
-		check_pcm_pointer(s, pcm, data_blocks);
+		update_pcm_pointers(s, pcm, data_blocks);
 }
 
 static void handle_in_packet(struct amdtp_stream *s,
@@ -811,9 +810,10 @@ static void handle_in_packet(struct amdtp_stream *s,
 		return;
 	}
 
+	/* ignore empty CIP packet or NO-DATA AMDTP packet */
 	if ((payload_quadlets < 3) ||
-	     ((s->flags & CIP_BLOCKING) &&
-	      ((cip_header[1] & CIP_SYT_MASK) == CIP_SYT_NO_INFO)))
+	    (((cip_header[1] & CIP_FDF_MASK) >> CIP_FDF_SFC_SHIFT) ==
+							AMDTP_FDF_NO_DATA))
 		return;
 
 	/*
@@ -838,7 +838,7 @@ static void handle_in_packet(struct amdtp_stream *s,
 		amdtp_pull_midi(s, buffer, data_blocks);
 
 	if (pcm)
-		check_pcm_pointer(s, pcm, data_blocks);
+		update_pcm_pointers(s, pcm, data_blocks);
 }
 
 #define SWAP(tbl, m, n) \
@@ -919,7 +919,7 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 	__be32 *buffer, *headers = header;
 
 	/* The number of packets in buffer */
-	packets = header_length / TRANSMIT_PACKET_HEADER_SIZE;
+	packets = header_length / IN_PACKET_HEADER_SIZE;
 
 	/* Store into sort table and sort. */
 	for (i = 0; i < packets; i++) {
@@ -1005,7 +1005,7 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
 
 	s->callbacked = true;
 
-	if (s->direction == AMDTP_TRANSMIT_STREAM)
+	if (s->direction == AMDTP_IN_STREAM)
 		context->callback.sc = in_stream_callback;
 	else if (!(s->flags & CIP_SYNC_TO_DEVICE))
 		context->callback.sc = out_stream_callback;
@@ -1058,14 +1058,14 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	s->last_syt_offset = TICKS_PER_CYCLE;
 
 	/* initialize packet buffer */
-	if (s->direction == AMDTP_TRANSMIT_STREAM) {
+	if (s->direction == AMDTP_IN_STREAM) {
 		dir = DMA_FROM_DEVICE;
 		type = FW_ISO_CONTEXT_RECEIVE;
-		header_size = TRANSMIT_PACKET_HEADER_SIZE;
+		header_size = IN_PACKET_HEADER_SIZE;
 	} else {
 		dir = DMA_TO_DEVICE;
 		type = FW_ISO_CONTEXT_TRANSMIT;
-		header_size = RECEIVE_PACKET_HEADER_SIZE;
+		header_size = OUT_PACKET_HEADER_SIZE;
 	}
 	err = iso_packets_buffer_init(&s->buffer, s->unit, QUEUE_LENGTH,
 				      amdtp_stream_get_max_payload(s), dir);
@@ -1073,7 +1073,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		goto err_unlock;
 
 	/* for sorting transmitted packets */
-	if (s->direction == AMDTP_TRANSMIT_STREAM) {
+	if (s->direction == AMDTP_IN_STREAM) {
 		s->remain_packets = 0;
 		s->sort_table = kzalloc(sizeof(struct sort_table) *
 					QUEUE_LENGTH, GFP_KERNEL);
@@ -1086,7 +1086,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
 					   type, channel, speed, header_size,
 					   amdtp_stream_callback, s);
-	if (!amdtp_stream_running(s)) {
+	if (IS_ERR(s->context)) {
 		err = PTR_ERR(s->context);
 		if (err == -EBUSY)
 			dev_err(&s->unit->device,
@@ -1098,7 +1098,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 
 	s->packet_index = 0;
 	do {
-		if (s->direction == AMDTP_TRANSMIT_STREAM)
+		if (s->direction == AMDTP_IN_STREAM)
 			err = queue_in_packet(s);
 		else
 			err = queue_out_packet(s, 0, true);

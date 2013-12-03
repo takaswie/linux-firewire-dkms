@@ -286,6 +286,7 @@ static int pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
 	int sampling_rate;
+	unsigned int clock_source;
 	int err;
 
 	err = snd_efw_stream_lock_try(efw);
@@ -296,8 +297,16 @@ static int pcm_open(struct snd_pcm_substream *substream)
 	if (err < 0)
 		goto err_locked;
 
-	/* the same sampling rate is applied when any PCM stream running */
-	if (amdtp_stream_pcm_running(&efw->tx_stream) ||
+	err = snd_efw_command_get_clock_source(efw, &clock_source);
+	if (err < 0)
+		goto end;
+
+	/*
+	 * When source of clock is internal or any PCM stream are running,
+	 * the available sampling rate is limited at current sampling rate.
+	 */
+	if ((clock_source != SND_EFW_CLOCK_SOURCE_INTERNAL) ||
+	    amdtp_stream_pcm_running(&efw->tx_stream) ||
 	    amdtp_stream_pcm_running(&efw->rx_stream)) {
 		err = snd_efw_command_get_sampling_rate(efw, &sampling_rate);
 		if (err < 0)
