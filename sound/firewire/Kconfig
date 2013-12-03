@@ -62,30 +62,40 @@ config SND_SCS1X
 	  will be called snd-scs1x.
 
 config SND_BEBOB
-	tristate "BridgeCo BeBoB chipset support"
+	tristate "BridgeCo DM1000/1500 with BeBoB firmware"
 	select SND_RAWMIDI
 	select SND_PCM
 	select SND_HWDEP
 	select SND_FIREWIRE_LIB
         help
 	 Say Y here to include support for FireWire devices based
-	 on BridgeCo BeBoB chipset:
+	 on BridgeCo DM1000/1500 with BeBoB firmware:
 	  * Edirol FA-66/FA-101
-	  * Mackie OnyxFirewire
+	  * PreSonus FIREBOX/FIREPOD
+	  * BridgeCo RDAudio1/Audio5
+	  * Mackie Onyx 820/1220/1620/1640 (Firewire I/O Card)
+	  * Mackie d.2 (Firewire Option)
+	  * Stanton FinalScratch 2 (ScratchAmp)
 	  * Tascam  IF-FW/DM
-	  * Behringer X32
-	  * Apogee Rosetta200
+	  * Apogee Rosetta 200/400 (X-FireWire card)
+	  * Apogee DA/AD/DD-16X (X-FireWire card)
 	  * ESI Quotafire610
 	  * AcousticReality eARMasterOne
 	  * CME MatrixKFW
-	  * Phonic HB24U
-	  * BridgeCo RDAudio1/Audio5
+	  * Phonic HB 12/12 MkII/12 Universal
+	  * Phonic HB 18/18 MkII/18 Universal
+	  * Phonic HB 24/24 MkII/24 Universal
+	  * Phinic FireFly 202/302
+	  * Lynx Aurora 8/16 (LT-FW)
+	  * ICON FireXon
+	  * PrismSound Orpheus/ADA-8XR
 	  * M-Audio Firewire410/AudioPhile/Solo/Ozonic/NRV10
 	  * M-Audio Firewire1814/ProjectMix IO/ProfireLightBridge
 	  * Focusrite Saffire/Saffire LE/SaffirePro10 IO/SaffirePro26 IO
 	  * TerraTec PHASE 24 FW/PHASE X24 FW/PHASE 88 Rack FW
+	  * Terratec EWS MIC2/EWS MIC4
+	  * Terratec Aureon 7.1 Firewire
 	  * Yamaha GO44/GO46
-	  * PreSonus FIREBOX/FirePod
 
           To compile this driver as a module, choose M here: the module
           will be called snd-bebob.

@@ -44,13 +44,17 @@ static unsigned int devices_used;
 #define VEN_PRESONUS	0x00000a92
 #define VEN_BRIDGECO	0x000007f5
 #define VEN_MACKIE	0x0000000f
-#define VEN_TASCOM	0x0000022e
+#define VEN_STANTON	0x00001260
+#define VEN_TASCAM	0x0000022e
 #define VEN_BEHRINGER	0x00001564
 #define VEN_APOGEE	0x000003db
 #define VEN_ESI		0x00000f1b
 #define VEN_ACOUSTIC	0x00000002
 #define VEN_CME		0x0000000a
 #define VEN_PHONIC	0x00001496
+#define VEN_LYNX	0x000019e5
+#define VEN_ICON	0x00001a9e
+#define VEN_PRISMSOUND	0x00001198
 #define VEN_MAUDIO1	0x00000d6c
 #define VEN_MAUDIO2	0x000007f5
 #define VEN_FOCUSRITE	0x0000130e
@@ -81,8 +85,10 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 		strcpy(vendor, "BridgeCo");
 	else if (vendor_id == VEN_MACKIE)
 		strcpy(vendor, "Mackie");
-	else if (vendor_id == VEN_TASCOM)
-		strcpy(vendor, "Tacsom");
+	else if (vendor_id == VEN_STANTON)
+		strcpy(vendor, "Stanton");
+	else if (vendor_id == VEN_TASCAM)
+		strcpy(vendor, "Tacsam");
 	else if (vendor_id == VEN_BEHRINGER)
 		strcpy(vendor, "Behringer");
 	else if (vendor_id == VEN_APOGEE)
@@ -95,6 +101,12 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 		strcpy(vendor, "CME");
 	else if (vendor_id == VEN_PHONIC)
 		strcpy(vendor, "Phonic");
+	else if (vendor_id == VEN_LYNX)
+		strcpy(vendor, "Lynx");
+	else if (vendor_id == VEN_ICON)
+		strcpy(vendor, "ICON");
+	else if (vendor_id == VEN_PRISMSOUND)
+		strcpy(vendor, "PrismSound");
 	else if ((vendor_id == VEN_MAUDIO1) || (vendor_id == VEN_MAUDIO2))
 		strcpy(vendor, "M-Audio");
 	else if (vendor_id == VEN_TERRATEC)
@@ -359,15 +371,17 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_BRIDGECO, 0x00010048, spec_normal),
 	/* BridgeCo, Audio5 */
 	SND_BEBOB_DEV_ENTRY(VEN_BRIDGECO, 0x00010049, spec_normal),
-	/* Mackie, OnyxFirewire */
+	/* Mackie, Onyx 820/1220/1620/1640 (Firewire I/O Card) */
 	SND_BEBOB_DEV_ENTRY(VEN_MACKIE, 0x00010065, spec_normal),
-	/* Mackie, OnyxFirewire */
 	SND_BEBOB_DEV_ENTRY(VEN_MACKIE, 0x00010067, spec_normal),
+	/* Mackie, d.2 (Firewire Option) */
+	SND_BEBOB_DEV_ENTRY(VEN_MACKIE, 0x00010067, spec_normal),
+	/* Stanton, ScratchAmp */
+	SND_BEBOB_DEV_ENTRY(VEN_STANTON, 0x00000001, spec_normal),
 	/* Tascam, IF-FW/DM */
-	SND_BEBOB_DEV_ENTRY(VEN_TASCOM, 0x00010067, spec_normal),
-	/* Behringer, X32 */
-	SND_BEBOB_DEV_ENTRY(VEN_BEHRINGER, 0x00000006, spec_normal),
-	/* ApogeeElectronics, Rosetta200 */
+	SND_BEBOB_DEV_ENTRY(VEN_TASCAM, 0x00010067, spec_normal),
+	/* ApogeeElectronics, Rosetta 200/400 (X-FireWire card) */
+	/* ApogeeElectronics, DA/AD/DD-16X (X-FireWire card) */
 	SND_BEBOB_DEV_ENTRY(VEN_APOGEE, 0x00010048, spec_normal),
 	/* ESI, Quatafire610 */
 	SND_BEBOB_DEV_ENTRY(VEN_ESI, 0x00010064, spec_normal),
@@ -375,8 +389,19 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_ACOUSTIC, 0x00000002, spec_normal),
 	/* CME, MatrixKFW */
 	SND_BEBOB_DEV_ENTRY(VEN_CME, 0x00030000, spec_normal),
-	/* Phonic, HB24U */
+	/* Phonic, HB 12/12 MkII/12 Universal */
+	/* Phonic, HB 18/18 MkII/18 Universal */
+	/* Phonic, HB 24/24 MkII/24 Universal */
+	/* Phonic, FireFly 202/302 */
 	SND_BEBOB_DEV_ENTRY(VEN_PHONIC, 0x00000000, spec_normal),
+	/* Lynx, Aurora 8/16 (LT-FW) */
+	SND_BEBOB_DEV_ENTRY(VEN_LYNX, 0x00000001, spec_normal),
+	/* ICON, FireXon */
+	SND_BEBOB_DEV_ENTRY(VEN_ICON, 0x00000001, spec_normal),
+	/* PrismSound, Orpheus */
+	SND_BEBOB_DEV_ENTRY(VEN_PRISMSOUND, 0x00010048, spec_normal),
+	/* PrismSound, ADA-8XR */
+	SND_BEBOB_DEV_ENTRY(VEN_PRISMSOUND, 0x0000ada8, spec_normal),
 	/* M-Audio, Ozonic */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x0000000a, maudio_ozonic_spec),
 	/* M-Audio, Firewire 410.  */
@@ -405,16 +430,28 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	/* Focusrite, Saffire(no label and LE) */
 	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, MODEL_FOCUSRITE_SAFFIRE_BOTH,
 			    saffire_spec),
-	/* TerraTecElectronic GmbH, PHASE 88 Rack FW */
+	/* TerraTec Electronic GmbH, PHASE 88 Rack FW */
 	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000003, phase88_rack_spec),
-	/* TerraTecElectronic GmbH, PHASE 24 FW */
+	/* TerraTec Electronic GmbH, PHASE 24 FW */
 	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000004, phase24_series_spec),
-	/* TerraTecElectronic GmbH, Phase X24 FW */
+	/* TerraTec Electronic GmbH, Phase X24 FW */
 	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000007, phase24_series_spec),
+	/* TerraTec Electronic GmbH, EWS MIC2/MIC8 */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000005, spec_normal),
+	/* Terratec Electronic GmbH, Aureon 7.1 Firewire */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000002, spec_normal),
 	/* Yamaha, GO44 */
 	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000b, yamaha_go_spec),
 	/* YAMAHA, GO46 */
 	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000c, yamaha_go_spec),
+	/* Ids are unknown but able to be supported */
+	/*  PreSonus, Inspire 1394 */
+	/*  Mackie, Digital X Bus x.200 */
+	/*  Mackie, Digital X Bus x.400 */
+	/*  CME, UF400e */
+	/*  Infrasonic, DewX */
+	/*  Infrasonic, Windy6 */
+	/*  Rolf Spuler, Firewire Guitar */
 	{}
 };
 MODULE_DEVICE_TABLE(ieee1394, snd_bebob_id_table);

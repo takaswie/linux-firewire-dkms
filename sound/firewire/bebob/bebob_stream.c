@@ -128,7 +128,7 @@ snd_bebob_stream_check_internal_clock(struct snd_bebob *bebob, bool *internal)
 
 	/*
 	 * 3.The device supports to switch source of clock by an usual way.
-	 *   Let's heck input for 'Music Sub Unit Sync Input' plug.
+	 *   Let's check input for 'Music Sub Unit Sync Input' plug.
 	 */
 	avc_bridgeco_fill_subunit_addr(addr, 0x60, SND_BEBOB_PLUG_DIR_IN,
 				       bebob->sync_input_plug);
