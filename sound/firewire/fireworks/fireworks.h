@@ -49,6 +49,7 @@
 #include "../iso-resources.h"
 #include "../amdtp.h"
 #include "../cmp.h"
+#include "../lib.h"
 
 #define SND_EFW_MAX_MIDI_OUTPUTS 2
 #define SND_EFW_MAX_MIDI_INPUTS 2
@@ -56,6 +57,9 @@
 #define SND_EFW_MUITIPLIER_MODES 3
 #define HWINFO_NAME_SIZE_BYTES 32
 #define HWINFO_MAX_CAPS_GROUPS 8
+
+extern unsigned int resp_buf_size;
+extern bool resp_buf_debug;
 
 struct snd_efw_phys_group {
 	u8 type;	/* see enum snd_efw_ch_type */
@@ -116,6 +120,12 @@ struct snd_efw {
 	int dev_lock_count;
 	bool dev_lock_changed;
 	wait_queue_head_t hwdep_wait;
+
+	/* command/response for user land */
+	u8 *resp_buf;
+	u8 *pull_ptr;
+	u8 *push_ptr;
+	unsigned int resp_queues;
 };
 
 struct snd_efw_hwinfo {
@@ -206,9 +216,17 @@ enum snd_efw_ch_type {
 };
 
 /* Echo Fireworks Command functions */
-int snd_efw_command_register(void);
-void snd_efw_command_unregister(void);
-void snd_efw_command_bus_reset(struct fw_unit *unit);
+int snd_efw_transaction_cmd(struct fw_unit *unit,
+			    const void *cmd, unsigned int size);
+int snd_efw_transaction_run(struct fw_unit *unit,
+			    const void *cmd, unsigned int cmd_size,
+			    void *resp, unsigned int resp_size, u32 seqnum);
+void snd_efw_transaction_register_instance(struct snd_efw *efw);
+void snd_efw_transaction_unregister_instance(struct snd_efw *efw);
+int snd_efw_transaction_register(void);
+void snd_efw_transaction_unregister(void);
+void snd_efw_transaction_bus_reset(struct fw_unit *unit);
+
 int snd_efw_command_identify(struct snd_efw *efw);
 int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 				  u16 addr_high, u32 addr_low);

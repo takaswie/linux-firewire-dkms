@@ -7,6 +7,7 @@
 
 #define SNDRV_FIREWIRE_EVENT_LOCK_STATUS	0x000010cc
 #define SNDRV_FIREWIRE_EVENT_DICE_NOTIFICATION	0xd1ce004e
+#define SNDRV_FIREWIRE_EVENT_EFW_RESPONSE	0x57616269
 
 struct snd_firewire_event_common {
 	unsigned int type; /* SNDRV_FIREWIRE_EVENT_xxx */
@@ -22,10 +23,27 @@ struct snd_firewire_event_dice_notification {
 	unsigned int notification; /* DICE-specific bits */
 };
 
+#define SND_EFW_TRANSACTION_SEQNUM_MAX	((uint32_t)(BIT(28) - 1))
+/* each field should be in big endian */
+struct snd_efw_transaction {
+	uint32_t length;
+	uint32_t version;
+	uint32_t seqnum;
+	uint32_t category;
+	uint32_t command;
+	uint32_t status;
+	uint32_t params[0];
+};
+struct snd_firewire_event_efw_response {
+	unsigned int type;
+	uint32_t response[0];	/* some responses */
+};
+
 union snd_firewire_event {
 	struct snd_firewire_event_common            common;
 	struct snd_firewire_event_lock_status       lock_status;
 	struct snd_firewire_event_dice_notification dice_notification;
+	struct snd_firewire_event_efw_response      efw_response;
 };
 
 

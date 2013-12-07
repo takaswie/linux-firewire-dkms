@@ -105,7 +105,6 @@ proc_read_clock(struct snd_info_entry *entry, struct snd_info_buffer *buffer)
 
 	snd_iprintf(buffer, "Clock Source: %d\n", clock_source);
 	snd_iprintf(buffer, "Sampling Rate: %d\n", sampling_rate);
-
 end:
 	return;
 }
@@ -162,10 +161,26 @@ proc_read_phys_meters(struct snd_info_entry *entry,
 				descs[efw->output_groups[g].type], c++,
 				meters->values[i]);
 	}
-
 end:
 	kfree(meters);
 	return;
+}
+
+static void
+proc_read_queues_state(struct snd_info_entry *entry,
+		       struct snd_info_buffer *buffer)
+{
+	struct snd_efw *efw = entry->private_data;
+	unsigned int consumed;
+
+	if (efw->pull_ptr > efw->push_ptr)
+		consumed = resp_buf_size -
+			   (unsigned int)(efw->pull_ptr - efw->push_ptr);
+	else
+		consumed = (unsigned int)(efw->push_ptr - efw->pull_ptr);
+
+	snd_iprintf(buffer, "%d %d/%d\n",
+		    efw->resp_queues, consumed, resp_buf_size - consumed);
 }
 
 void snd_efw_proc_init(struct snd_efw *efw)
@@ -174,6 +189,8 @@ void snd_efw_proc_init(struct snd_efw *efw)
 
 	if (!snd_card_proc_new(efw->card, "#hardware", &entry))
 		snd_info_set_text_ops(entry, efw, proc_read_hwinfo);
+	if (!snd_card_proc_new(efw->card, "#queues", &entry))
+		snd_info_set_text_ops(entry, efw, proc_read_queues_state);
 	if (!snd_card_proc_new(efw->card, "#clock", &entry))
 		snd_info_set_text_ops(entry, efw, proc_read_clock);
 	if (!snd_card_proc_new(efw->card, "#meters", &entry))

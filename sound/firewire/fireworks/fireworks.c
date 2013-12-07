@@ -20,13 +20,15 @@
 #include "fireworks.h"
 
 MODULE_DESCRIPTION("Echo Fireworks driver");
-MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp>"
+MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp>, "
 	      "Clemens Ladisch <clemens@ladisch.de>");
 MODULE_LICENSE("GPL v2");
 
 static int index[SNDRV_CARDS]	= SNDRV_DEFAULT_IDX;
 static char *id[SNDRV_CARDS]	= SNDRV_DEFAULT_STR;
 static bool enable[SNDRV_CARDS]	= SNDRV_DEFAULT_ENABLE_PNP;
+unsigned int resp_buf_size	= 1024;
+bool resp_buf_debug		= false;
 
 module_param_array(index, int, NULL, 0444);
 MODULE_PARM_DESC(index, "card index");
@@ -34,6 +36,10 @@ module_param_array(id, charp, NULL, 0444);
 MODULE_PARM_DESC(id, "ID string");
 module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "enable Fireworks sound card");
+module_param(resp_buf_size, uint, 0444);
+MODULE_PARM_DESC(resp_buf_size, "response buffer size (default 1024)");
+module_param(resp_buf_debug, bool, 0444);
+MODULE_PARM_DESC(resp_buf_debug, "store all responses to buffer");
 
 static DEFINE_MUTEX(devices_mutex);
 static unsigned int devices_used;
@@ -85,12 +91,10 @@ static unsigned int devices_used;
 static int
 get_hardware_info(struct snd_efw *efw)
 {
-	int err;
-
 	struct snd_efw_hwinfo *hwinfo;
-	char version[12];
-	int size;
-	int i;
+	char version[12] = {0};
+	unsigned int i, size;
+	int err;
 
 	hwinfo = kzalloc(sizeof(struct snd_efw_hwinfo), GFP_KERNEL);
 	if (hwinfo == NULL)
@@ -210,16 +214,14 @@ get_hardware_info(struct snd_efw *efw)
 	/* MIDI inputs and outputs */
 	efw->midi_output_ports = hwinfo->nb_midi_out;
 	efw->midi_input_ports = hwinfo->nb_midi_in;
-
-	err = 0;
-	goto end;
-
+end:
+	kfree(hwinfo);
+	return err;
 error:
 	if (efw->input_group_counts > 0)
 		kfree(efw->input_groups);
 	if (efw->output_group_counts > 0)
 		kfree(efw->output_groups);
-end:
 	kfree(hwinfo);
 	return err;
 }
@@ -241,8 +243,6 @@ get_hardware_meters_count(struct snd_efw *efw)
 
 	efw->input_meter_counts = meters->nb_input_meters;
 	efw->output_meter_counts = meters->nb_output_meters;
-
-	err = 0;
 end:
 	kfree(meters);
 	return err;
@@ -264,6 +264,8 @@ snd_efw_card_free(struct snd_card *card)
 	if (efw->input_group_counts > 0)
 		kfree(efw->input_groups);
 
+	kfree(efw->resp_buf);
+
 	mutex_destroy(&efw->mutex);
 
 	return;
@@ -274,6 +276,7 @@ static int snd_efw_probe(struct fw_unit *unit,
 {
 	struct snd_card *card;
 	struct snd_efw *efw;
+	void *resp_buf;
 	int card_index, err;
 
 	mutex_lock(&devices_mutex);
@@ -284,6 +287,13 @@ static int snd_efw_probe(struct fw_unit *unit,
 			break;
 	if (card_index >= SNDRV_CARDS) {
 		err = -ENOENT;
+		goto end;
+	}
+
+	/* prepare response buffer for user land */
+	resp_buf = kzalloc(resp_buf_size, GFP_KERNEL);
+	if (resp_buf == NULL) {
+		err = -ENOMEM;
 		goto end;
 	}
 
@@ -303,6 +313,7 @@ static int snd_efw_probe(struct fw_unit *unit,
 	mutex_init(&efw->mutex);
 	spin_lock_init(&efw->lock);
 	init_waitqueue_head(&efw->hwdep_wait);
+	efw->resp_buf = efw->pull_ptr = efw->push_ptr = resp_buf;
 
 	/* get hardware information */
 	err = get_hardware_info(efw);
@@ -314,26 +325,23 @@ static int snd_efw_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
-	/* create procfs interface */
 	snd_efw_proc_init(efw);
 
-	/* create control interface */
 	err = snd_efw_create_control_devices(efw);
 	if (err < 0)
 		goto error;
 
-	/* create midi interface */
 	if (efw->midi_output_ports || efw->midi_input_ports) {
 		err = snd_efw_create_midi_devices(efw);
 		if (err < 0)
 			goto error;
 	}
 
-	/* create PCM interface */
 	err = snd_efw_create_pcm_devices(efw);
 	if (err < 0)
 		goto error;
 
+	snd_efw_transaction_register_instance(efw);
 	err = snd_efw_create_hwdep_device(efw);
 	if (err < 0)
 		goto error;
@@ -350,13 +358,11 @@ static int snd_efw_probe(struct fw_unit *unit,
 	dev_set_drvdata(&unit->device, efw);
 	devices_used |= BIT(card_index);
 	efw->card_index = card_index;
-
-	/* proved */
-	err = 0;
-	goto end;
+end:
+	mutex_unlock(&devices_mutex);
+	return err;
 error:
 	snd_card_free(card);
-end:
 	mutex_unlock(&devices_mutex);
 	return err;
 }
@@ -367,7 +373,7 @@ static void snd_efw_update(struct fw_unit *unit)
 	unsigned int tries;
 	int err;
 
-	snd_efw_command_bus_reset(efw->unit);
+	snd_efw_transaction_bus_reset(efw->unit);
 
 	/*
 	 * NOTE:
@@ -432,6 +438,7 @@ static void snd_efw_remove(struct fw_unit *unit)
 	struct snd_efw *efw= dev_get_drvdata(&unit->device);
 
 	snd_efw_stream_destroy_duplex(efw);
+	snd_efw_transaction_unregister_instance(efw);
 
 	snd_card_disconnect(efw->card);
 	snd_card_free_when_closed(efw->card);
@@ -472,13 +479,13 @@ static int __init snd_efw_init(void)
 {
 	int err;
 
-	err = snd_efw_command_register();
+	err = snd_efw_transaction_register();
 	if (err < 0)
 		goto end;
 
 	err = driver_register(&snd_efw_driver.driver);
 	if (err < 0)
-		snd_efw_command_unregister();
+		snd_efw_transaction_unregister();
 
 end:
 	return err;
@@ -486,7 +493,7 @@ end:
 
 static void __exit snd_efw_exit(void)
 {
-	snd_efw_command_unregister();
+	snd_efw_transaction_unregister();
 	driver_unregister(&snd_efw_driver.driver);
 	mutex_destroy(&devices_mutex);
 }

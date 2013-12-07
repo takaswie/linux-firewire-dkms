@@ -17,27 +17,101 @@
  */
 
 /*
- * This codes give three functionality.
- * 
+ * This codes give three functionality for user-land.
+ *
  * 1.get firewire node reference
  * 2.lock/unlock stream
- *  dice driver implements the same functionality.
- * 3.get notification about starting/stopping stream
+ * 3.get notification when starting/stopping stream
+ * 4.transmit command of EFW transaction
+ * 5.receive response of EFW transaction
+ *
  */
 
 #include "fireworks.h"
 
 static long
-hwdep_read(struct snd_hwdep *hwdep, char __user *buf,  long count,
+hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
+		    loff_t *offset)
+{
+	unsigned int length, till_end, type;
+	struct snd_efw_transaction *t;
+	long count = 0;
+
+	/* data type is SNDRV_FIREWIRE_EVENT_EFW_RESPONSE */
+	if (remained < sizeof(type))
+		goto err;
+	type = SNDRV_FIREWIRE_EVENT_EFW_RESPONSE;
+	if (copy_to_user(buf, &type, sizeof(type)))
+		goto err;
+	remained -= sizeof(type);
+	buf += sizeof(type);
+
+	/* write into buffer as many responses as possible */
+	while (efw->resp_queues > 0) {
+		t = (struct snd_efw_transaction *)(efw->pull_ptr);
+		length = be32_to_cpu(t->length) * sizeof(t->length);
+
+		/* confirm enough space for this response */
+		if (remained < length)
+			break;
+
+		/* copy from ring buffer to user buffer */
+		while (length > 0) {
+			till_end = resp_buf_size -
+				(unsigned int)(efw->pull_ptr - efw->resp_buf);
+			till_end = min(length, till_end);
+
+			if (copy_to_user(buf, efw->pull_ptr, till_end))
+				goto err;
+
+			efw->pull_ptr += till_end;
+			if (efw->pull_ptr >= efw->resp_buf + resp_buf_size)
+				efw->pull_ptr = efw->resp_buf;
+
+			length -= till_end;
+			buf += till_end;
+			count += till_end;
+			remained -= till_end;
+		}
+
+		efw->resp_queues--;
+	}
+
+	return count;
+err:
+	return -EFAULT;
+}
+
+static long
+hwdep_read_locked(struct snd_efw *efw, char __user *buf, long count,
+		  loff_t *offset)
+{
+	union snd_firewire_event event;
+
+	memset(&event, 0, sizeof(event));
+
+	event.lock_status.type = SNDRV_FIREWIRE_EVENT_LOCK_STATUS;
+	event.lock_status.status = (efw->dev_lock_count > 0);
+	efw->dev_lock_changed = false;
+
+	count = min(count, (long)sizeof(event.lock_status));
+
+	if (copy_to_user(buf, &event, count))
+		return -EFAULT;
+
+	return count;
+}
+
+static long
+hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
 	   loff_t *offset)
 {
 	struct snd_efw *efw = hwdep->private_data;
 	DEFINE_WAIT(wait);
-	union snd_firewire_event event;
 
 	spin_lock_irq(&efw->lock);
 
-	while (!efw->dev_lock_changed) {
+	while ((!efw->dev_lock_changed) && (efw->resp_queues == 0)) {
 		prepare_to_wait(&efw->hwdep_wait, &wait, TASK_INTERRUPTIBLE);
 		spin_unlock_irq(&efw->lock);
 		schedule();
@@ -47,20 +121,47 @@ hwdep_read(struct snd_hwdep *hwdep, char __user *buf,  long count,
 		spin_lock_irq(&efw->lock);
 	}
 
-	memset(&event, 0, sizeof(event));
-	if (efw->dev_lock_changed) {
-		event.lock_status.type = SNDRV_FIREWIRE_EVENT_LOCK_STATUS;
-		event.lock_status.status = (efw->dev_lock_count > 0);
-		efw->dev_lock_changed = false;
-
-		count = min(count, (long)sizeof(event.lock_status));
-	}
+	if (efw->dev_lock_changed)
+		count = hwdep_read_locked(efw, buf, count, offset);
+	else if (efw->resp_queues > 0)
+		count = hwdep_read_resp_buf(efw, buf, count, offset);
 
 	spin_unlock_irq(&efw->lock);
 
-	if (copy_to_user(buf, &event, count))
+	return count;
+}
+
+static long
+hwdep_write(struct snd_hwdep *hwdep, const char __user *data, long count,
+	    loff_t *offset)
+{
+	struct snd_efw *efw = hwdep->private_data;
+	u32 seqnum;
+	u8 *buf;
+
+	if (count < sizeof(struct snd_efw_transaction))
 		return -EFAULT;
 
+	buf = kmalloc(count, GFP_KERNEL);
+	if (buf == NULL)
+		return -EFAULT;
+
+	if (copy_from_user(buf, data, count)) {
+		count = -EFAULT;
+		goto end;
+	}
+
+	/* check seqnum is not for kernel-land */
+	seqnum = ((struct snd_efw_transaction *)buf)->seqnum;
+	if (seqnum + 2 > SND_EFW_TRANSACTION_SEQNUM_MAX) {
+		count = -EFAULT;
+		goto end;
+	}
+
+	if (snd_efw_transaction_cmd(efw->unit, buf, count) < 0)
+		count = -EFAULT;
+end:
+	kfree(buf);
 	return count;
 }
 
@@ -73,13 +174,13 @@ hwdep_poll(struct snd_hwdep *hwdep, struct file *file, poll_table *wait)
 	poll_wait(file, &efw->hwdep_wait, wait);
 
 	spin_lock_irq(&efw->lock);
-	if (efw->dev_lock_changed)
+	if (efw->dev_lock_changed || (efw->resp_queues > 0))
 		events = POLLIN | POLLRDNORM;
 	else
 		events = 0;
 	spin_unlock_irq(&efw->lock);
 
-	return events;
+	return events | POLLOUT;
 }
 
 static int
@@ -183,6 +284,7 @@ hwdep_compat_ioctl(struct snd_hwdep *hwdep, struct file *file,
 
 static const struct snd_hwdep_ops hwdep_ops = {
 	.read		= hwdep_read,
+	.write		= hwdep_write,
 	.release	= hwdep_release,
 	.poll		= hwdep_poll,
 	.ioctl		= hwdep_ioctl,

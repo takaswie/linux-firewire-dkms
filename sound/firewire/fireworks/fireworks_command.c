@@ -19,30 +19,10 @@
  * optionally version 3).
  */
 
-#include "../lib.h"
 #include "./fireworks.h"
 
 /*
- * Fireworks utilize its own command.
- * This module calls it as 'Echo Fireworks Commands' (a.k.a EFC).
- *
- * EFC substance:
- *  At first, 6 data exist. we call these data as 'EFC fields'.
- *  Following to the 6 data, parameters for each commands exists.
- *  Most of parameters are 32 bit. But exception exists according to command.
- *   data[0]:	Length of EFC substance
- *   data[1]:	EFC version
- *   data[2]:	Sequence number. This is incremented by both host and target
- *   data[3]:	EFC category
- *   data[4]:	EFC command
- *   data[5]:	EFC return value in EFC response.
- *   data[6-]:	parameters
- *
- * EFC address:
- *  command:	0xecc000000000
- *  response:	0xecc080000000
- *
- * This driver supports EFC version 1 or later to use extended hardware
+ * This driver uses EFC version 1 or later to use extended hardware
  * information. Then too old devices are not available.
  *
  * Each commands are not required to have continuous sequence numbers. The
@@ -50,20 +30,12 @@
  *
  * NOTE: FFADO implementaion is EFC over AVC but device with firmware
  * version 5.5 or later don't use it but support it. This module support a part
- * of commands. Please see FFADO if you want to see whole commands.
+ * of commands. Please see FFADO if you want to see whole commands. But I note
+ * there are some commands which FFADO don't implement
  */
 
-struct efc_header {
-	u32 length;
-	u32 version;
-	u32 seqnum;
-	u32 category;
-	u32 command;
-	u32 retval;
-	u32 params[0];
-};
-#define EFC_HEADER_QUADLETS	6
-#define EFC_SEQNUM_MAX		BIT(31)	/* prevent over flow */
+#define EFW_TRANSACTION_SEQNUM_MIN	SND_EFW_TRANSACTION_SEQNUM_MAX + 1
+#define EFW_TRANSACTION_SEQNUM_MAX	((u32)~0)
 
 /* for clock source and sampling rate */
 struct efc_clock {
@@ -110,7 +82,7 @@ enum efc_cmd_ioconf {
 };
 
 /* return values in response */
-enum efc_retval {
+enum efr_status {
 	EFC_RETVAL_OK			= 0,
 	EFC_RETVAL_BAD			= 1,
 	EFC_RETVAL_BAD_COMMAND		= 2,
@@ -130,7 +102,7 @@ enum efc_retval {
 	EFC_RETVAL_INCOMPLETE		= 0x80000000
 };
 
-static const char *const efc_retval_names[] = {
+static const char *const efr_status_names[] = {
 	[EFC_RETVAL_OK]			= "OK",
 	[EFC_RETVAL_BAD]		= "bad",
 	[EFC_RETVAL_BAD_COMMAND]	= "bad command",
@@ -151,78 +123,71 @@ static const char *const efc_retval_names[] = {
 };
 
 static int
-efc_transaction_run(struct fw_unit *unit,
-		    const void *command, unsigned int command_size,
-		    void *response, unsigned int size,
-		    u32 seqnum);
-
-static int
-efc(struct snd_efw *efw, unsigned int category,
-    unsigned int command,
-    const u32 *params, unsigned int param_count,
-    void *response, unsigned int response_quadlets)
+efw_transaction(struct snd_efw *efw, unsigned int category,
+		unsigned int command,
+		const u32 *params, unsigned int param_count,
+		void *response, unsigned int response_quadlets)
 {
+	struct snd_efw_transaction *header;
+	__be32 *buf;
+	u32 seqnum;
+	unsigned int i, buf_bytes;
 	int err;
 
-	unsigned int cmdbuf_bytes;
-	__be32 *cmdbuf;
-	struct efc_header *header;
-	u32 seqnum;
-	unsigned int i;
-
 	/* calculate buffer size*/
-	cmdbuf_bytes = EFC_HEADER_QUADLETS * 4
+	buf_bytes = sizeof(struct snd_efw_transaction)
 			 + max(param_count, response_quadlets) * 4;
 
 	/* keep buffer */
-	cmdbuf = kzalloc(cmdbuf_bytes, GFP_KERNEL);
-	if (cmdbuf == NULL)
+	buf = kzalloc(buf_bytes, GFP_KERNEL);
+	if (buf == NULL)
 		return -ENOMEM;
 
 	/* to keep consistency of sequence number */
 	spin_lock(&efw->lock);
-	seqnum = efw->seqnum;
-	if (efw->seqnum > EFC_SEQNUM_MAX)
-		efw->seqnum = 0;
+	if ((efw->seqnum < EFW_TRANSACTION_SEQNUM_MIN) ||
+	    (efw->seqnum >= EFW_TRANSACTION_SEQNUM_MAX - 2))
+		efw->seqnum = EFW_TRANSACTION_SEQNUM_MIN;
 	else
 		efw->seqnum += 2;
+	seqnum = efw->seqnum;
 	spin_unlock(&efw->lock);
 
 	/* fill efc fields */
-	header			= (struct efc_header *)cmdbuf;
-	header->length		= EFC_HEADER_QUADLETS + param_count;
+	header = (struct snd_efw_transaction *)buf;
+	header->length		= sizeof(struct snd_efw_transaction) / 4 +
+				  param_count;
 	header->version		= 1;
 	header->seqnum		= seqnum;
 	header->category	= category;
 	header->command		= command;
-	header->retval		= 0;
+	header->status		= 0;
 
 	/* fill EFC parameters */
 	for (i = 0; i < param_count; i++)
 		header->params[i] = params[i];
 
 	/* for endian-ness*/
-	for (i = 0; i < (cmdbuf_bytes / 4); i++)
-		cmdbuf[i] = cpu_to_be32(cmdbuf[i]);
+	for (i = 0; i < (buf_bytes / 4); i++)
+		buf[i] = cpu_to_be32(buf[i]);
 
-	/* if return value is positive, it means return bytes */
-	err = efc_transaction_run(efw->unit, cmdbuf, cmdbuf_bytes,
-				  cmdbuf, cmdbuf_bytes, seqnum);
+	err = snd_efw_transaction_run(efw->unit, buf, buf_bytes,
+				      buf, buf_bytes, seqnum);
 	if (err < 0)
 		goto end;
 
 	/* for endian-ness */
 	for (i = 0; i < (err / 4); i++)
-		cmdbuf[i] = be32_to_cpu(cmdbuf[i]);
+		buf[i] = be32_to_cpu(buf[i]);
 
 	/* check EFC response fields */
 	if ((header->version < 1) ||
 	    (header->category != category) ||
 	    (header->command != command) ||
-	    (header->retval != EFC_RETVAL_OK)) {
+	    (header->status != EFC_RETVAL_OK)) {
 		dev_err(&efw->unit->device, "EFC failed [%u/%u]: %s\n",
 			header->category, header->command,
-			efc_retval_names[header->retval]);
+			efr_status_names[header->status]);
 		err = -EIO;
 		goto end;
 	}
@@ -233,18 +198,16 @@ efc(struct snd_efw *efw, unsigned int category,
 		response_quadlets = min(response_quadlets, header->length);
 		memcpy(response, header->params, response_quadlets * 4);
 	}
-
-	err = 0;
-
 end:
-	kfree(cmdbuf);
+	kfree(buf);
 	return err;
 }
 
 int snd_efw_command_identify(struct snd_efw *efw)
 {
-	return efc(efw, EFC_CAT_HWCTL, EFC_CMD_HWCTL_IDENTIFY,
-		   NULL, 0, NULL, 0);
+	return efw_transaction(efw, EFC_CAT_HWCTL,
+			       EFC_CMD_HWCTL_IDENTIFY,
+			       NULL, 0, NULL, 0);
 }
 
 /*
@@ -257,8 +220,9 @@ int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 {
 	u32 addr[2] = {addr_high, addr_low};
 
-	return efc(efw, EFC_CAT_HWCTL, EFC_CMD_HWINFO_SET_RESP_ADDR,
-		   addr, 2, NULL, 0);
+	return efw_transaction(efw, EFC_CAT_HWCTL,
+			       EFC_CMD_HWINFO_SET_RESP_ADDR,
+			       addr, 2, NULL, 0);
 }
 
 /*
@@ -272,8 +236,9 @@ int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 int snd_efw_command_set_tx_mode(struct snd_efw *efw, unsigned int mode)
 {
 	u32 param = mode;
-	return efc(efw, EFC_CAT_TRANSPORT, EFC_CMD_TRANSPORT_SET_TX_MODE,
-		   &param, 1, NULL, 0);
+	return efw_transaction(efw, EFC_CAT_TRANSPORT,
+			       EFC_CMD_TRANSPORT_SET_TX_MODE,
+			       &param, 1, NULL, 0);
 }
 
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
@@ -283,8 +248,9 @@ int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 	unsigned int i, count;
 	int err;
 
-	err  = efc(efw, EFC_CAT_HWINFO, EFC_CMD_HWINFO_GET_CAPS,
-		   NULL, 0, hwinfo, sizeof(*hwinfo) / 4);
+	err  = efw_transaction(efw, EFC_CAT_HWINFO,
+			       EFC_CMD_HWINFO_GET_CAPS,
+			       NULL, 0, hwinfo, sizeof(*hwinfo) / 4);
 	if (err < 0)
 		goto end;
 
@@ -318,17 +284,17 @@ int snd_efw_command_get_phys_meters(struct snd_efw *efw,
 				    struct snd_efw_phys_meters *meters,
 				    unsigned int len)
 {
-	return efc(efw, EFC_CAT_HWINFO,
-				EFC_CMD_HWINFO_GET_POLLED,
-				NULL, 0, meters, len / 4);
+	return efw_transaction(efw, EFC_CAT_HWINFO,
+			       EFC_CMD_HWINFO_GET_POLLED,
+			       NULL, 0, meters, len / 4);
 }
 
 static int
 command_get_clock(struct snd_efw *efw, struct efc_clock *clock)
 {
-	return efc(efw, EFC_CAT_HWCTL,
-				EFC_CMD_HWCTL_GET_CLOCK,
-				NULL, 0, clock, sizeof(struct efc_clock) / 4);
+	return efw_transaction(efw, EFC_CAT_HWCTL,
+			       EFC_CMD_HWCTL_GET_CLOCK,
+			       NULL, 0, clock, sizeof(struct efc_clock) / 4);
 }
 
 /* give UINT_MAX if set nothing */
@@ -352,20 +318,19 @@ command_set_clock(struct snd_efw *efw,
 		goto end;
 
 	/* no need */
-	if ((clock.source == source) &&
-	    (clock.sampling_rate == rate))
+	if ((clock.source == source) && (clock.sampling_rate == rate))
 		goto end;
 
 	/* set params */
-	if ((source == UINT_MAX) && (clock.source != source))
+	if ((source != UINT_MAX) && (clock.source != source))
 		clock.source = source;
-	if ((rate == UINT_MAX) && (clock.sampling_rate != rate))
+	if ((rate != UINT_MAX) && (clock.sampling_rate != rate))
 		clock.sampling_rate = rate;
 	clock.index = 0;
 
-	err = efc(efw, EFC_CAT_HWCTL,
-				EFC_CMD_HWCTL_SET_CLOCK,
-				(u32 *)&clock, 3, NULL, 0);
+	err = efw_transaction(efw, EFC_CAT_HWCTL,
+			      EFC_CMD_HWCTL_SET_CLOCK,
+			      (u32 *)&clock, 3, NULL, 0);
 	if (err < 0)
 		goto end;
 
@@ -395,7 +360,7 @@ int snd_efw_command_get_clock_source(struct snd_efw *efw,
 int snd_efw_command_set_clock_source(struct snd_efw *efw,
 				     enum snd_efw_clock_source source)
 {
-	return command_set_clock(efw, source, -1);
+	return command_set_clock(efw, source, UINT_MAX);
 }
 
 int snd_efw_command_get_sampling_rate(struct snd_efw *efw,
@@ -415,7 +380,7 @@ int
 snd_efw_command_set_sampling_rate(struct snd_efw *efw,
 				  unsigned int rate)
 {
-	return command_set_clock(efw, -1, rate);
+	return command_set_clock(efw, UINT_MAX, rate);
 }
 
 int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
@@ -424,9 +389,9 @@ int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
 	int err;
 	u32 flag = {0};
 
-	err = efc(efw, EFC_CAT_HWCTL,
-				EFC_CMD_HWCTL_GET_FLAGS,
-				NULL, 0, &flag, 1);
+	err = efw_transaction(efw, EFC_CAT_HWCTL,
+			      EFC_CMD_HWCTL_GET_FLAGS,
+			      NULL, 0, &flag, 1);
 	if (err >= 0) {
 		if (flag & EFC_HWCTL_FLAG_DIGITAL_PRO)
 			*format = SND_EFW_IEC60958_FORMAT_PROFESSIONAL;
@@ -451,9 +416,9 @@ int snd_efw_command_set_iec60958_format(struct snd_efw *efw,
 	else
 		mask[1] = EFC_HWCTL_FLAG_DIGITAL_PRO;
 
-	return efc(efw, EFC_CAT_HWCTL,
-				EFC_CMD_HWCTL_CHANGE_FLAGS,
-				(u32 *)mask, 2, NULL, 0);
+	return efw_transaction(efw, EFC_CAT_HWCTL,
+			       EFC_CMD_HWCTL_CHANGE_FLAGS,
+			       (u32 *)mask, 2, NULL, 0);
 }
 
 int snd_efw_command_get_digital_interface(struct snd_efw *efw,
@@ -462,9 +427,9 @@ int snd_efw_command_get_digital_interface(struct snd_efw *efw,
 	int err;
 	u32 value = 0;
 
-	err = efc(efw, EFC_CAT_IOCONF,
-				EFC_CMD_IOCONF_GET_DIGITAL_MODE,
-				NULL, 0, &value, 1);
+	err = efw_transaction(efw, EFC_CAT_IOCONF,
+			      EFC_CMD_IOCONF_GET_DIGITAL_MODE,
+			      NULL, 0, &value, 1);
 
 	if (err >= 0)
 		*digital_interface = value;
@@ -477,173 +442,8 @@ int snd_efw_command_set_digital_interface(struct snd_efw *efw,
 {
 	u32 value = digital_interface;
 
-	return efc(efw, EFC_CAT_IOCONF,
-				EFC_CMD_IOCONF_SET_DIGITAL_MODE,
-				&value, 1, NULL, 0);
+	return efw_transaction(efw, EFC_CAT_IOCONF,
+			       EFC_CMD_IOCONF_SET_DIGITAL_MODE,
+			       &value, 1, NULL, 0);
 }
 
-#define INITIAL_MEMORY_SPACE_EFC_COMMAND	0xecc000000000
-#define INITIAL_MEMORY_SPACE_EFC_RESPONSE	0xecc080000000
-/* this for juju convinience */
-#define INITIAL_MEMORY_SPACE_EFC_END		0xecc080000200
-
-#define ERROR_RETRIES 3
-#define ERROR_DELAY_MS 5
-#define EFC_TIMEOUT_MS 125
-
-static DEFINE_SPINLOCK(transactions_lock);
-static LIST_HEAD(transactions);
-
-enum efc_state {
-	STATE_PENDING,
-	STATE_BUS_RESET,
-	STATE_COMPLETE
-};
-
-struct efc_transaction {
-	struct list_head list;
-	struct fw_unit *unit;
-	void *buffer;
-	unsigned int size;
-	u32 seqnum;
-	enum efc_state state;
-	wait_queue_head_t wait;
-};
-
-static int
-efc_transaction_run(struct fw_unit *unit,
-		    const void *command, unsigned int command_size,
-		    void *response, unsigned int size, u32 seqnum)
-{
-	struct efc_transaction t;
-	unsigned int tries;
-	int tcode, ret;
-
-	t.unit = unit;
-	t.buffer = response;
-	t.size = size;
-	t.seqnum = seqnum + 1;
-	t.state = STATE_PENDING;
-	init_waitqueue_head(&t.wait);
-
-	spin_lock_irq(&transactions_lock);
-	list_add_tail(&t.list, &transactions);
-	spin_unlock_irq(&transactions_lock);
-
-	tries = 0;
-	do {
-		tcode = command_size == 4 ? TCODE_WRITE_QUADLET_REQUEST
-					  : TCODE_WRITE_BLOCK_REQUEST;
-		ret = snd_fw_transaction(t.unit, tcode,
-					 INITIAL_MEMORY_SPACE_EFC_COMMAND,
-					 (void *)command, command_size, 0);
-		if (ret < 0)
-			break;
-
-		wait_event_timeout(t.wait, t.state != STATE_PENDING,
-				   msecs_to_jiffies(EFC_TIMEOUT_MS));
-
-		if (t.state == STATE_COMPLETE) {
-			ret = t.size;
-			break;
-		} else if (t.state == STATE_BUS_RESET) {
-			msleep(ERROR_DELAY_MS);
-		} else if (++tries >= ERROR_RETRIES) {
-			dev_err(&t.unit->device, "EFC command timed out\n");
-			ret = -EIO;
-			break;
-		}
-	} while(1);
-
-	spin_lock_irq(&transactions_lock);
-	list_del(&t.list);
-	spin_unlock_irq(&transactions_lock);
-
-	return ret;
-}
-
-static void
-efc_response(struct fw_card *card, struct fw_request *request,
-	     int tcode, int destination, int source,
-	     int generation, unsigned long long offset,
-	     void *data, size_t length, void *callback_data)
-{
-	struct efc_transaction *t;
-	unsigned long flags;
-	int rcode;
-	u32 seqnum;
-
-	rcode = -1;
-	if (length < sizeof(struct efc_header)) {
-		rcode = RCODE_DATA_ERROR;
-		goto end;
-	} else if (offset != INITIAL_MEMORY_SPACE_EFC_RESPONSE) {
-		rcode = RCODE_ADDRESS_ERROR;
-		goto end;
-	}
-
-	seqnum = be32_to_cpu(((struct efc_header *)data)->seqnum);
-
-	spin_lock_irqsave(&transactions_lock, flags);
-	list_for_each_entry(t, &transactions, list) {
-		struct fw_device *device = fw_parent_device(t->unit);
-		if ((device->card != card) ||
-		    (device->generation != generation))
-			continue;
-		smp_rmb();	/* node_id vs. generation */
-		if (device->node_id != source)
-			continue;
-
-		if ((t->state == STATE_PENDING) && (t->seqnum == seqnum)) {
-			t->state = STATE_COMPLETE;
-			t->size = min((unsigned int)length, t->size);
-			memcpy(t->buffer, data, t->size);
-			wake_up(&t->wait);
-			rcode = RCODE_COMPLETE;
-		}
-	}
-	spin_unlock_irqrestore(&transactions_lock, flags);
-
-	/* invalid transaction */
-	if (rcode < 0)
-		rcode = RCODE_TYPE_ERROR;
-end:
-	fw_send_response(card, request, rcode);
-}
-
-void snd_efw_command_bus_reset(struct fw_unit *unit)
-{
-	struct efc_transaction *t;
-
-	spin_lock_irq(&transactions_lock);
-	list_for_each_entry(t, &transactions, list) {
-		if ((t->unit == unit) &&
-		    (t->state == STATE_PENDING)) {
-			t->state = STATE_BUS_RESET;
-			wake_up(&t->wait);
-		}
-	}
-	spin_unlock_irq(&transactions_lock);
-}
-
-static struct fw_address_handler response_register_handler = {
-	.length = INITIAL_MEMORY_SPACE_EFC_END - INITIAL_MEMORY_SPACE_EFC_RESPONSE,
-	.address_callback = efc_response
-};
-
-int snd_efw_command_register(void)
-{
-	static const struct fw_address_region response_register_region = {
-		.start	= INITIAL_MEMORY_SPACE_EFC_RESPONSE,
-		.end	= INITIAL_MEMORY_SPACE_EFC_END
-	};
-
-	return fw_core_add_address_handler(&response_register_handler,
-					   &response_register_region);
-}
-
-void snd_efw_command_unregister(void)
-{
-	WARN_ON(!list_empty(&transactions));
-	fw_core_remove_address_handler(&response_register_handler);
-}
