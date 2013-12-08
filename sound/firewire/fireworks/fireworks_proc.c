@@ -19,6 +19,23 @@
 
 #include "./fireworks.h"
 
+static inline const char*
+get_phys_name(struct snd_efw_phys_grp *grp)
+{
+	const char *ch_type[] = {
+		"Analog", "S/PDIF", "ADAT", "S/PDIF or ADAT",
+		"Mirroring", "Headphones", "I2S", "Guitar",
+		"Pirzo Guitar", "Guitar String", "Virtual", "Dummy"
+	};
+
+	if (grp->type < 10)
+		return ch_type[grp->type];
+	else if (grp->type == 0x10000)
+		return ch_type[10];
+	else
+		return ch_type[11];
+}
+
 static void
 proc_read_hwinfo(struct snd_info_entry *entry, struct snd_info_buffer *buffer)
 {
@@ -47,40 +64,40 @@ proc_read_hwinfo(struct snd_info_entry *entry, struct snd_info_buffer *buffer)
 	snd_iprintf(buffer, "supported_clock: 0x%X\n",
 		    hwinfo.supported_clocks);
 
-	snd_iprintf(buffer, "num_phys_audio_out: 0x%X\n",
-		    hwinfo.nb_phys_audio_out);
-	snd_iprintf(buffer, "num_phys_audio_in: 0x%X\n",
-		    hwinfo.nb_phys_audio_in);
+	snd_iprintf(buffer, "phys out: 0x%X\n", hwinfo.phys_out);
+	snd_iprintf(buffer, "phys in: 0x%X\n", hwinfo.phys_in);
 
-	snd_iprintf(buffer, "num_phys_in_groups: 0x%X\n", hwinfo.nb_in_groups);
-	for (i = 0; i < hwinfo.nb_in_groups; i++) {
-		snd_iprintf(buffer, "phys_in_group[0x%d]: type 0x%d, count 0x%d\n",
-			    i, hwinfo.out_groups[i].type,
-			    hwinfo.out_groups[i].count);
+	snd_iprintf(buffer, "phys in grps: 0x%X\n", hwinfo.phys_in_grp_count);
+	for (i = 0; i < hwinfo.phys_in_grp_count; i++) {
+		snd_iprintf(buffer,
+			    "phys in grp[0x%d]: type 0x%d, count 0x%d\n",
+			    i, hwinfo.phys_out_grps[i].type,
+			    hwinfo.phys_out_grps[i].count);
 	}
 
-	snd_iprintf(buffer, "num_phys_out_groups: 0x%X\n", hwinfo.nb_out_groups);
-	for (i = 0; i < hwinfo.nb_out_groups; i++) {
-		snd_iprintf(buffer, "phys_out_group[0x%d]: type 0x%d, count 0x%d\n",
-			    i, hwinfo.out_groups[i].type,
-			    hwinfo.out_groups[i].count);
+	snd_iprintf(buffer, "phys out grps: 0x%X\n", hwinfo.phys_out_grp_count);
+	for (i = 0; i < hwinfo.phys_out_grp_count; i++) {
+		snd_iprintf(buffer,
+			    "phys out grps[0x%d]: type 0x%d, count 0x%d\n",
+			    i, hwinfo.phys_out_grps[i].type,
+			    hwinfo.phys_out_grps[i].count);
 	}
 
-	snd_iprintf(buffer, "num_1394_playback_channels_1x: 0x%X\n",
-		    hwinfo.nb_1394_playback_channels);
-	snd_iprintf(buffer, "num_1394_capture_channels_1x: 0x%X\n",
-		    hwinfo.nb_1394_capture_channels);
-	snd_iprintf(buffer, "num_1394_playback_channels_2x: 0x%X\n",
-		    hwinfo.nb_1394_playback_channels_2x);
-	snd_iprintf(buffer, "num_1394_capture_channels_2x: 0x%X\n",
-		    hwinfo.nb_1394_capture_channels_2x);
-	snd_iprintf(buffer, "num_1394_playback_channels_4x: 0x%X\n",
-		    hwinfo.nb_1394_playback_channels_4x);
-	snd_iprintf(buffer, "num_1394_capture_channels_4x: 0x%X\n",
-		    hwinfo.nb_1394_capture_channels_4x);
+	snd_iprintf(buffer, "amdtp rx pcm channels 1x: 0x%X\n",
+		    hwinfo.amdtp_rx_pcm_channels);
+	snd_iprintf(buffer, "amdtp tx pcm channels 1x: 0x%X\n",
+		    hwinfo.amdtp_tx_pcm_channels);
+	snd_iprintf(buffer, "amdtp rx pcm channels 2x: 0x%X\n",
+		    hwinfo.amdtp_rx_pcm_channels_2x);
+	snd_iprintf(buffer, "amdtp tx pcm channels 2x: 0x%X\n",
+		    hwinfo.amdtp_tx_pcm_channels_2x);
+	snd_iprintf(buffer, "amdtp rx pcm channels 4x: 0x%X\n",
+		    hwinfo.amdtp_rx_pcm_channels_4x);
+	snd_iprintf(buffer, "amdtp tx pcm channels 4x: 0x%X\n",
+		    hwinfo.amdtp_tx_pcm_channels_4x);
 
-	snd_iprintf(buffer, "num_midi_out: 0x%X\n", hwinfo.nb_midi_out);
-	snd_iprintf(buffer, "num_midi_in: 0x%X\n", hwinfo.nb_midi_in);
+	snd_iprintf(buffer, "midi out ports: 0x%X\n", hwinfo.midi_out_ports);
+	snd_iprintf(buffer, "midi in ports: 0x%X\n", hwinfo.midi_in_ports);
 
 	snd_iprintf(buffer, "num mixer_playback_channels: 0x%X\n",
 		    hwinfo.mixer_playback_channels);
@@ -109,57 +126,57 @@ end:
 	return;
 }
 
+/*
+ * NOTE:
+ *  dB = 20 * log10(linear / 0x01000000)
+ *  -144.0 dB when linear is 0
+ */
 static void
 proc_read_phys_meters(struct snd_info_entry *entry,
 		      struct snd_info_buffer *buffer)
 {
 	struct snd_efw *efw = entry->private_data;
-
-	char const *descs[] = {"Analog", "S/PDIF", "ADAT", "S/PDIF or ADAT",
-			       "Analog Mirroring", "Headphones", "I2S"
-			       "Guitar", "Piezo Guitar", "Guitar String"};
-
 	struct snd_efw_phys_meters *meters;
-	unsigned int i, g, c;
-	unsigned int count = efw->input_meter_counts + efw->output_meter_counts;
-	int err, base = sizeof(struct snd_efw_phys_meters);
+	unsigned int g, c, m, max, size;
+	const char *name;
+	u32 *linear;
+	int err;
 
-	meters = kzalloc(base + count * 4, GFP_KERNEL);
+	size = sizeof(struct snd_efw_phys_meters) +
+	       (efw->phys_in + efw->phys_out) * sizeof(u32);
+	meters = kzalloc(size, GFP_KERNEL);
 	if (meters == NULL)
 		return;
 
-	err = snd_efw_command_get_phys_meters(efw, meters, base + count * 4);
+	err = snd_efw_command_get_phys_meters(efw, meters, size);
 	if (err < 0)
 		goto end;
 
 	snd_iprintf(buffer, "Physical Meters:\n");
 
-	snd_iprintf(buffer, " %d Inputs:\n", efw->input_meter_counts);
-	g = 0;
-	c = 0;
-	for (i = 0; i < efw->input_meter_counts; i++) {
-		if (c == efw->input_groups[g].count) {
-			g++;
-			c = 0;
+	m = 0;
+	max = min(efw->phys_out, meters->out_meters);
+	linear = meters->values;
+	snd_iprintf(buffer, " %d Outputs:\n", max);
+	for (g = 0; g < efw->phys_out_grp_count; g++) {
+		name = get_phys_name(&efw->phys_out_grps[g]);
+		for (c = 0; c < efw->phys_out_grps[g].count; c++) {
+			if (m < max)
+				snd_iprintf(buffer, "\t%s [%d]: %d\n",
+					    name, c, linear[m++]);
 		}
-		if (efw->input_groups[g].type < ARRAY_SIZE(descs))
-			snd_iprintf(buffer, "\t%s [%d]: %d\n",
-				descs[efw->input_groups[g].type], c++,
-				meters->values[efw->output_meter_counts + i]);
 	}
 
-	snd_iprintf(buffer, " %d Outputs:\n", efw->output_meter_counts);
-	g = 0;
-	c = 0;
-	for (i = 0; i < efw->output_meter_counts; i++) {
-		if (c == efw->output_groups[g].count) {
-			g++;
-			c = 0;
-		}
-		if (efw->output_groups[g].type < ARRAY_SIZE(descs))
-			snd_iprintf(buffer, "\t%s [%d]: %d\n",
-				descs[efw->output_groups[g].type], c++,
-				meters->values[i]);
+	m = 0;
+	max = min(efw->phys_in, meters->in_meters);
+	linear = meters->values + meters->out_meters;
+	snd_iprintf(buffer, " %d Inputs:\n", max);
+	for (g = 0; g < efw->phys_in_grp_count; g++) {
+		name = get_phys_name(&efw->phys_in_grps[g]);
+		for (c = 0; c < efw->phys_in_grps[g].count; c++)
+			if (m < max)
+				snd_iprintf(buffer, "\t%s [%d]: %d\n",
+					    name, c, linear[m++]);
 	}
 end:
 	kfree(meters);

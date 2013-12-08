@@ -20,15 +20,16 @@
  */
 
 /*
- * Fireworks have its own transaction.
+ * Fireworks have its own transaction. Fireworks also support AV/C General
+ * commands and AV/C Stream Format Information commands. This module supports
+ * own commands.
  *
- * EFW transaction substance:
+ * Transaction substance:
  *  At first, 6 data exist. Following to the 6 data, parameters for each
- *  commands exists. Most of parameters are 32 bit. But exception exists
- *  according to command.
+ *  commands exists. All of parameters are 32 bit alighed to big endian.
  *   data[0]:	Length of transaction substance
- *   data[1]:	EFW transaction version
- *   data[2]:	Sequence number. This is incremented by both host and target
+ *   data[1]:	Transaction version
+ *   data[2]:	Sequence number. This is incremented by the device
  *   data[3]:	transaction category
  *   data[4]:	transaction command
  *   data[5]:	return value in response.
@@ -120,7 +121,7 @@ int snd_efw_transaction_run(struct fw_unit *unit,
 			ret = -EIO;
 			break;
 		}
-	} while(1);
+	} while (1);
 
 	spin_lock_irq(&transaction_queues_lock);
 	list_del(&t.list);
@@ -138,13 +139,13 @@ copy_resp_to_buf(struct snd_efw *efw, void *data, size_t length, int *rcode)
 	spin_lock_irq(&efw->lock);
 
 	t = (struct snd_efw_transaction *)data;
-	length = min(t->length * sizeof(t->length), length);
+	length = min_t(size_t, t->length * sizeof(t->length), length);
 
 	if (efw->push_ptr < efw->pull_ptr)
 		capacity = (unsigned int)(efw->pull_ptr - efw->push_ptr);
 	else
 		capacity = resp_buf_size -
-			((unsigned int)(efw->push_ptr - efw->pull_ptr));
+			   (unsigned int)(efw->push_ptr - efw->pull_ptr);
 
 	/* confirm enough space for this response */
 	if (capacity < length) {
@@ -155,8 +156,8 @@ copy_resp_to_buf(struct snd_efw *efw, void *data, size_t length, int *rcode)
 	/* copy to ring buffer */
 	while (length > 0) {
 		till_end = resp_buf_size -
-			    ((unsigned int)(efw->push_ptr - efw->resp_buf));
-		till_end = min(length, till_end);
+			   (unsigned int)(efw->push_ptr - efw->resp_buf);
+		till_end = min_t(unsigned int, length, till_end);
 
 		memcpy(efw->push_ptr, data, till_end);
 
@@ -229,7 +230,7 @@ handle_resp_for_kernel(struct fw_card *card, int generation, int source,
 
 		if ((t->state == STATE_PENDING) && (t->seqnum == seqnum)) {
 			t->state = STATE_COMPLETE;
-			t->size = min((unsigned int)length, t->size);
+			t->size = min_t(unsigned int, length, t->size);
 			memcpy(t->buf, data, t->size);
 			wake_up(&t->wait);
 			*rcode = RCODE_COMPLETE;

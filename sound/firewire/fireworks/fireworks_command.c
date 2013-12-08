@@ -14,27 +14,24 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this driver; if not, see <http://www.gnu.org/licenses/>.
- *
- * Mostly based on FFADO's souce, which is licensed under GPL version 2 (and
- * optionally version 3).
  */
 
 #include "./fireworks.h"
 
 /*
- * This driver uses EFC version 1 or later to use extended hardware
+ * This driver uses transaction version 1 or later to use extended hardware
  * information. Then too old devices are not available.
  *
- * Each commands are not required to have continuous sequence numbers. The
- * sequence number is just used to match command and response.
+ * Each commands are not required to have continuous sequence numbers. This
+ * number is just used to match command and response.
  *
  * NOTE: FFADO implementaion is EFC over AVC but device with firmware
- * version 5.5 or later don't use it but support it. This module support a part
+ * version 5.5 or later support it but don't use it. This module support a part
  * of commands. Please see FFADO if you want to see whole commands. But I note
  * there are some commands which FFADO don't implement
  */
 
-#define EFW_TRANSACTION_SEQNUM_MIN	SND_EFW_TRANSACTION_SEQNUM_MAX + 1
+#define EFW_TRANSACTION_SEQNUM_MIN	(SND_EFW_TRANSACTION_SEQNUM_MAX + 1)
 #define EFW_TRANSACTION_SEQNUM_MAX	((u32)~0)
 
 /* for clock source and sampling rate */
@@ -49,7 +46,6 @@ enum efc_category {
 	EFC_CAT_HWINFO		= 0,
 	EFC_CAT_TRANSPORT	= 2,
 	EFC_CAT_HWCTL		= 3,
-	EFC_CAT_IOCONF		= 9,
 };
 
 /* hardware info category commands */
@@ -67,18 +63,7 @@ enum efc_cmd_transport {
 enum efc_cmd_hwctl {
 	EFC_CMD_HWCTL_SET_CLOCK		= 0,
 	EFC_CMD_HWCTL_GET_CLOCK		= 1,
-	EFC_CMD_HWCTL_CHANGE_FLAGS	= 3,
-	EFC_CMD_HWCTL_GET_FLAGS		= 4,
 	EFC_CMD_HWCTL_IDENTIFY		= 5
-};
-/* for flags */
-#define EFC_HWCTL_FLAG_DIGITAL_PRO	0x02
-#define EFC_HWCTL_FLAG_DIGITAL_RAW	0x04
-
-/* I/O config category commands */
-enum efc_cmd_ioconf {
-	EFC_CMD_IOCONF_SET_DIGITAL_MODE	= 2,
-	EFC_CMD_IOCONF_GET_DIGITAL_MODE	= 3,
 };
 
 /* return values in response */
@@ -226,14 +211,12 @@ int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 }
 
 /*
- * mode == 0: Windows mode
- * mode >= 1: IEC61883-6 compliant mode
- *
  * This is for timestamp processing. In Windows mode, all 32bit fields of second
  * CIP header in AMDTP transmit packet is used as 'presentation timestamp'. The
  * value of this field is 0x90ffffff in NODATA packet.
  */
-int snd_efw_command_set_tx_mode(struct snd_efw *efw, unsigned int mode)
+int snd_efw_command_set_tx_mode(struct snd_efw *efw,
+				enum snd_efw_transport_mode mode)
 {
 	u32 param = mode;
 	return efw_transaction(efw, EFC_CAT_TRANSPORT,
@@ -263,19 +246,17 @@ int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 	for (i = 0; i < count; i++)
 		tmp[i] = cpu_to_be32(tmp[i]);
 
-	count = sizeof(struct snd_efw_phys_group) * HWINFO_MAX_CAPS_GROUPS / 4;
-	tmp = (u32 *)&hwinfo->out_groups;
+	count = sizeof(struct snd_efw_phys_grp) * HWINFO_MAX_CAPS_GROUPS / 4;
+	tmp = (u32 *)&hwinfo->phys_out_grps;
 	for (i = 0; i < count; i++)
 		tmp[i] = cpu_to_be32(tmp[i]);
-	tmp = (u32 *)&hwinfo->in_groups;
+	tmp = (u32 *)&hwinfo->phys_in_grps;
 	for (i = 0; i < count; i++)
 		tmp[i] = cpu_to_be32(tmp[i]);
 
 	/* ensure terminated */
 	hwinfo->vendor_name[HWINFO_NAME_SIZE_BYTES - 1] = '\0';
 	hwinfo->model_name[HWINFO_NAME_SIZE_BYTES  - 1] = '\0';
-
-	err = 0;
 end:
 	return err;
 }
@@ -381,69 +362,5 @@ snd_efw_command_set_sampling_rate(struct snd_efw *efw,
 				  unsigned int rate)
 {
 	return command_set_clock(efw, UINT_MAX, rate);
-}
-
-int snd_efw_command_get_iec60958_format(struct snd_efw *efw,
-					enum snd_efw_iec60958_format *format)
-{
-	int err;
-	u32 flag = {0};
-
-	err = efw_transaction(efw, EFC_CAT_HWCTL,
-			      EFC_CMD_HWCTL_GET_FLAGS,
-			      NULL, 0, &flag, 1);
-	if (err >= 0) {
-		if (flag & EFC_HWCTL_FLAG_DIGITAL_PRO)
-			*format = SND_EFW_IEC60958_FORMAT_PROFESSIONAL;
-		else
-			*format = SND_EFW_IEC60958_FORMAT_CONSUMER;
-	}
-
-	return err;
-}
-
-int snd_efw_command_set_iec60958_format(struct snd_efw *efw,
-					enum snd_efw_iec60958_format format)
-{
-	/*
-	 * mask[0]: for set
-	 * mask[1]: for clear
-	 */
-	u32 mask[2] = {0};
-
-	if (format == SND_EFW_IEC60958_FORMAT_PROFESSIONAL)
-		mask[0] = EFC_HWCTL_FLAG_DIGITAL_PRO;
-	else
-		mask[1] = EFC_HWCTL_FLAG_DIGITAL_PRO;
-
-	return efw_transaction(efw, EFC_CAT_HWCTL,
-			       EFC_CMD_HWCTL_CHANGE_FLAGS,
-			       (u32 *)mask, 2, NULL, 0);
-}
-
-int snd_efw_command_get_digital_interface(struct snd_efw *efw,
-			enum snd_efw_digital_interface *digital_interface)
-{
-	int err;
-	u32 value = 0;
-
-	err = efw_transaction(efw, EFC_CAT_IOCONF,
-			      EFC_CMD_IOCONF_GET_DIGITAL_MODE,
-			      NULL, 0, &value, 1);
-
-	if (err >= 0)
-		*digital_interface = value;
-
-	return err;
-}
-
-int snd_efw_command_set_digital_interface(struct snd_efw *efw,
-			enum snd_efw_digital_interface digital_interface)
-{
-	u32 value = digital_interface;
-
-	return efw_transaction(efw, EFC_CAT_IOCONF,
-			       EFC_CMD_IOCONF_SET_DIGITAL_MODE,
-			       &value, 1, NULL, 0);
 }
 

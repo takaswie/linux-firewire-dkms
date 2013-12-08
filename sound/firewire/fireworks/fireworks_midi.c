@@ -18,11 +18,6 @@
  */
 #include "fireworks.h"
 
-/*
- * According to MMA/AMEI-027, MIDI stream is multiplexed with PCM stream in
- * AMDTP packet. The data rate of MIDI message is much less than PCM so there
- * is a little problem to suspend MIDI streams.
- */
 static int midi_capture_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw *efw = substream->rmidi->private_data;
@@ -131,13 +126,13 @@ int snd_efw_create_midi_devices(struct snd_efw *efw)
 	int err;
 
 	/* check the number of midi stream */
-	if ((efw->midi_input_ports > SND_EFW_MAX_MIDI_INPUTS) |
-	    (efw->midi_output_ports > SND_EFW_MAX_MIDI_OUTPUTS))
+	if ((efw->midi_in_ports > SND_EFW_MAX_MIDI_IN_PORTS) |
+	    (efw->midi_out_ports > SND_EFW_MAX_MIDI_OUT_PORTS))
 		return -EIO;
 
 	/* create midi ports */
 	err = snd_rawmidi_new(efw->card, efw->card->driver, 0,
-			      efw->midi_output_ports, efw->midi_input_ports,
+			      efw->midi_out_ports, efw->midi_in_ports,
 			      &rmidi);
 	if (err < 0)
 		return err;
@@ -146,7 +141,7 @@ int snd_efw_create_midi_devices(struct snd_efw *efw)
 			"%s MIDI", efw->card->shortname);
 	rmidi->private_data = efw;
 
-	if (efw->midi_input_ports > 0) {
+	if (efw->midi_in_ports > 0) {
 		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_INPUT;
 
 		snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_INPUT,
@@ -157,7 +152,7 @@ int snd_efw_create_midi_devices(struct snd_efw *efw)
 		set_midi_substream_names(efw, str);
 	}
 
-	if (efw->midi_output_ports > 0) {
+	if (efw->midi_out_ports > 0) {
 		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_OUTPUT;
 
 		snd_rawmidi_set_ops(rmidi, SNDRV_RAWMIDI_STREAM_OUTPUT,
@@ -168,13 +163,13 @@ int snd_efw_create_midi_devices(struct snd_efw *efw)
 		set_midi_substream_names(efw, str);
 
 		/*
-		 * Fireworks ignores MIDI messages in greater than first 8 data blocks
-		 * of an AMDTP packet.
+		 * Fireworks ignores MIDI messages in greater than first 8 data
+		 * blocks of an AMDTP packet.
 		 */
 		efw->rx_stream.blocks_for_midi = 8;
 	}
 
-	if ((efw->midi_output_ports > 0) && (efw->midi_input_ports > 0))
+	if ((efw->midi_out_ports > 0) && (efw->midi_in_ports > 0))
 		rmidi->info_flags |= SNDRV_RAWMIDI_INFO_DUPLEX;
 
 	return 0;

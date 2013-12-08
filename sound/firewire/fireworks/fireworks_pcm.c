@@ -20,14 +20,14 @@
 
 /*
  * NOTE:
- * Fireworks changes its PCM channels according to its sampling rate.
- * There are three modes. Here _XXX is either _playback or _capture.
+ * Fireworks changes its AMDTP channels for PCM data according to its sampling
+ * rate. There are three modes. Here _XXX is either _playback or _capture.
  *  0:  32.0- 48.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels    applied
  *  1:  88.2- 96.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels_2x applied
  *  2: 176.4-192.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels_4x applied
  *
- * Then the number of PCM channels for analog input and output are always fixed
- * but the number of PCM channels for digital input and output are differed.
+ * The number of PCM channels for analog input and output are always fixed but
+ * the number of PCM channels for digital input and output are differed.
  *
  * Additionally, according to "AudioFire Owner's Manual Version 2.2", in some
  * model, the number of PCM channels for digital input has more restriction
@@ -35,9 +35,8 @@
  *  - S/PDIF coaxial and optical	: use input 1-2
  *  - ADAT optical at 32.0-48.0 kHz	: use input 1-8
  *  - ADAT optical at 88.2-96.0 kHz	: use input 1-4 (S/MUX format)
- * Even if these restriction exists, the number of channels in AMDTP stream
- * is decided according to above 0/1/2 modes. The needless channel is filled with
- * zero.
+ *
+ * The data in AMDTP channels for blank PCM channels are zero.
  */
 static unsigned int freq_table[] = {
 	/* multiplier mode 0 */
@@ -232,10 +231,10 @@ pcm_init_hw_params(struct snd_efw *efw,
 		pcm_channels = efw->pcm_playback_channels;
 	}
 
-	/* preparing min/max sampling rate */
+	/* limitation for min/max sampling rate */
 	snd_pcm_limit_hw_rates(substream->runtime);
 
-	/* preparing the number of channels */
+	/* limitation for the number of channels */
 	for (i = 0; i < ARRAY_SIZE(freq_table); i++) {
 		/* skip unsupported sampling rate */
 		rate_bit = snd_pcm_rate_to_rate_bit(freq_table[i]);
@@ -258,14 +257,12 @@ pcm_init_hw_params(struct snd_efw *efw,
 	if (err < 0)
 		goto end;
 
-	/* TODO: format of PCM samples is 16bit or 24bit inner 32bit */
+	/*
+	 * AMDTP functionality in firewire-lib require periods to be aligned to
+	 * 16 bit, or 24bit inner 32bit.
+	 */
 	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
 				SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
-	if (err < 0)
-		goto end;
-	/* TODO: */
-	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
-				SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 32);
 	if (err < 0)
 		goto end;
 
@@ -275,9 +272,6 @@ pcm_init_hw_params(struct snd_efw *efw,
 					500, UINT_MAX);
 	if (err < 0)
 		goto end;
-
-	err = 0;
-
 end:
 	return err;
 }

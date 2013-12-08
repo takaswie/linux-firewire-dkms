@@ -17,11 +17,11 @@
  */
 
 /*
- * This codes give three functionality for user-land.
+ * This codes have four functionality for user-land.
  *
- * 1.get firewire node reference
- * 2.lock/unlock stream
- * 3.get notification when starting/stopping stream
+ * 1.get information about firewire node
+ * 2.get notification about starting/stopping stream
+ * 3.lock/unlock streaming
  * 4.transmit command of EFW transaction
  * 5.receive response of EFW transaction
  *
@@ -59,7 +59,7 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 		while (length > 0) {
 			till_end = resp_buf_size -
 				(unsigned int)(efw->pull_ptr - efw->resp_buf);
-			till_end = min(length, till_end);
+			till_end = min_t(unsigned int, length, till_end);
 
 			if (copy_to_user(buf, efw->pull_ptr, till_end))
 				goto err;
@@ -94,7 +94,7 @@ hwdep_read_locked(struct snd_efw *efw, char __user *buf, long count,
 	event.lock_status.status = (efw->dev_lock_count > 0);
 	efw->dev_lock_changed = false;
 
-	count = min(count, (long)sizeof(event.lock_status));
+	count = min_t(long, count, sizeof(event.lock_status));
 
 	if (copy_to_user(buf, &event, count))
 		return -EFAULT;
