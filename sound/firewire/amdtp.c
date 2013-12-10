@@ -804,9 +804,10 @@ static void handle_in_packet(struct amdtp_stream *s,
 	if (((cip_header[0] & CIP_EOH_MASK) == CIP_EOH) ||
 	    ((cip_header[1] & CIP_EOH_MASK) != CIP_EOH) ||
 	    ((cip_header[1] & CIP_FMT_MASK) != CIP_FMT_AM)) {
-		dev_info(&s->unit->device,
-			 "Invalid CIP header for AMDTP: %08X:%08X\n",
-			 cip_header[0], cip_header[1]);
+		if (printk_ratelimit())
+			dev_info(&s->unit->device,
+				 "Invalid CIP header for AMDTP: %08X:%08X\n",
+				 cip_header[0], cip_header[1]);
 		return;
 	}
 
