@@ -1,6 +1,8 @@
 #ifndef SOUND_FIREWIRE_FCP_H_INCLUDED
 #define SOUND_FIREWIRE_FCP_H_INCLUDED
 
+#define	AVC_PLUG_INFO_BUF_COUNT	4
+
 struct fw_unit;
 
 /* AV/C Digital Interface Command Set General Specification 4.2 (1394TA) */
@@ -15,6 +17,9 @@ int avc_general_set_sig_fmt(struct fw_unit *unit, unsigned int rate,
 int avc_general_get_sig_fmt(struct fw_unit *unit, unsigned int *rate,
 			    enum avc_general_plug_dir dir,
 			    unsigned short plug);
+int avc_general_get_plug_info(struct fw_unit *unit, unsigned int subunit_type,
+			      unsigned int subunit_id, unsigned int subfunction,
+			      u8 info[AVC_PLUG_INFO_BUF_COUNT]);
 
 int fcp_avc_transaction(struct fw_unit *unit,
 			const void *command, unsigned int command_size,

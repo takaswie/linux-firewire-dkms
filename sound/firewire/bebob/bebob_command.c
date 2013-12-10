@@ -20,42 +20,6 @@
 #define BEBOB_COMMAND_MAX_TRIAL	3
 #define BEBOB_COMMAND_WAIT_MSEC	100
 
-int avc_general_get_plug_info(struct fw_unit *unit, unsigned int addr_mode,
-			      u8 info[4])
-{
-	u8 *buf;
-	int err;
-
-	buf = kzalloc(8, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	buf[0] = 0x01;			/* AV/C STATUS */
-	buf[1] = 0xff & addr_mode;	/* UNIT or Subunit, Functionblock */
-	buf[2] = 0x02;			/* PLUG INFO */
-
-	err = fcp_avc_transaction(unit, buf, 8, buf, 8, BIT(1) | BIT(2));
-	if (err < 0)
-		goto end;
-
-	/* check length */
-	if (err != 8) {
-		err = -EIO;
-		goto end;
-	}
-
-	info[0] = buf[4];
-	info[1] = buf[5];
-	info[2] = buf[6];
-	info[3] = buf[7];
-
-	/* return response code */
-	err = buf[0];
-end:
-	kfree(buf);
-	return err;
-}
-
 int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
 			   unsigned int fb_id, unsigned int num)
 {
@@ -150,7 +114,7 @@ avc_bridgeco_fill_command_base(u8 *buf, unsigned int ctype, unsigned int opcode,
 	buf[8] = addr[5];
 }
 
-int avc_bridgeco_get_plug_type(struct fw_unit *unit, u8 addr[5],
+int avc_bridgeco_get_plug_type(struct fw_unit *unit, u8 addr[6],
 			       enum snd_bebob_plug_type *type)
 {
 	u8 *buf;

@@ -655,19 +655,19 @@ end:
 static int
 seek_msu_sync_input_plug(struct snd_bebob *bebob)
 {
-	u8 plugs[4], addr[6];
+	u8 plugs[AVC_PLUG_INFO_BUF_COUNT], addr[6];
 	unsigned int i, type;
 	int err;
 
 	/* get information about Music Sub Unit */
-	err = avc_general_get_plug_info(bebob->unit, 0x80, plugs);
+	err = avc_general_get_plug_info(bebob->unit, 0x0c, 0x00, 0x00, plugs);
 	if (err < 0)
 		goto end;
 
 	/* seek destination plugs for 'MSU sync input' */
 	bebob->sync_input_plug = -1;
 	for (i = 0; i < plugs[0]; i++) {
-		avc_bridgeco_fill_subunit_addr(addr, 0x80,
+		avc_bridgeco_fill_subunit_addr(addr, 0x60,
 					       SND_BEBOB_PLUG_DIR_IN, i);
 		err = avc_bridgeco_get_plug_type(bebob->unit, addr, &type);
 		if (err < 0)
@@ -683,13 +683,13 @@ end:
 /* In this function, 2 means input and output */
 int snd_bebob_stream_discover(struct snd_bebob *bebob)
 {
-	u8 plugs[4], addr[6];
+	u8 plugs[AVC_PLUG_INFO_BUF_COUNT], addr[6];
 	enum snd_bebob_plug_type type;
 	unsigned int i;
 	int err;
 
 	/* the number of plugs for isoc in/out, ext in/out  */
-	err = avc_general_get_plug_info(bebob->unit, 0xff, plugs);
+	err = avc_general_get_plug_info(bebob->unit, 0x1f, 0x07, 0x00, plugs);
 	if (err < 0)
 		goto end;
 

@@ -46,7 +46,7 @@
 #include "../cmp.h"
 #include "../fcp.h"
 
-/* basic register addresses on bebob chip */
+/* basic register addresses on DM1000 */
 #define BEBOB_ADDR_REG_INFO	0xffffc8020000
 #define BEBOB_ADDR_REG_REQ	0xffffc8021000
 
@@ -143,10 +143,6 @@ snd_bebob_read_quad(struct snd_bebob *bebob, u64 addr, void *buf, int size)
 				  BEBOB_ADDR_REG_INFO + addr,
 				  buf, size, 0);
 }
-
-/* AV/C Digital Interface Command Set General Specification 4.2 (1394TA) */
-int avc_general_get_plug_info(struct fw_unit *unit, unsigned int addr_mode,
-			      u8 info[4]);
 
 /* AV/C Audio Subunit Specification 1.0 (1394TA) */
 int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
