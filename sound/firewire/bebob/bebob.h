@@ -66,14 +66,10 @@ struct snd_bebob_clock_spec {
 	unsigned int num;
 	char **labels;
 	int (*get_src)(struct snd_bebob *bebob, unsigned int *id);
-	int (*set_src)(struct snd_bebob *bebob, unsigned int id);
 	int (*get_freq)(struct snd_bebob *bebob, unsigned int *rate);
 	int (*set_freq)(struct snd_bebob *bebob, unsigned int rate);
-	int (*synced)(struct snd_bebob *bebob, bool *synced);
 	/* private */
-	struct snd_ctl_elem_id *ctl_id_src;
 	struct snd_ctl_elem_id *ctl_id_freq;
-	struct snd_ctl_elem_id *ctl_id_synced;
 };
 struct snd_bebob_meter_spec {
 	unsigned int num;
@@ -271,7 +267,6 @@ extern struct snd_bebob_spec maudio_solo_spec;
 extern struct snd_bebob_spec maudio_ozonic_spec;
 
 int snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814);
-int snd_bebob_maudio_special_add_controls(struct snd_bebob *bebob);
 
 #define SND_BEBOB_DEV_ENTRY(vendor, model, private_data) \
 { \

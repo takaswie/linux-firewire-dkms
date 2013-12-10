@@ -171,60 +171,6 @@ saffirepro_both_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 end:
 	return err;
 }
-static int
-saffirepro_both_clk_src_set(struct snd_bebob *bebob, unsigned int id)
-{
-	int err;
-	u32 values[3];
-
-	if (bebob->spec->clock->labels == saffirepro_10_clk_src_labels) {
-		if (id == 2)
-			id = 5;
-		else if (id == 1)
-			id = 2;
-	} else if (id > 0)
-		id++;
-
-	/* if requesting digital input, check whether it's enabled or not */
-	/* TODO: consider to add switch for these digital inputs */
-	if ((id > 1) && (id < 5)) {
-		err = saffire_read_block(bebob, SAFFIREPRO_ENABLE_DIG_IFACES,
-					 values, sizeof(values));
-		if (err < 0)
-			goto end;
-		if (values[id - 2] == 0)
-			goto end;
-	}
-
-	err = saffire_write_quad(bebob, SAFFIREPRO_OFFSET_CLOCK_SOURCE, id);
-end:
-	return err;
-}
-static int
-saffirepro_both_clk_synced(struct snd_bebob *bebob, bool *synced)
-{
-	unsigned int clock;
-	u32 value;
-	int err;
-
-	err = saffirepro_both_clk_src_get(bebob, &clock);
-	if (err < 0)
-		goto end;
-	/* internal */
-	if (clock == 0) {
-		*synced = true;
-		goto end;
-	}
-
-	err = saffire_read_quad(bebob,
-				SAFFIREPRO_OFFSET_CLOCK_SYNC_EXT, &value);
-	if (err < 0)
-		goto end;
-
-	*synced = (value & 0x01);
-end:
-	return err;
-}
 
 struct snd_bebob_spec saffire_le_spec;
 static char *saffire_both_clk_src_labels[] = {
@@ -244,40 +190,6 @@ saffire_both_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 end:
 	return err;
 };
-static int
-saffire_both_clk_src_set(struct snd_bebob *bebob, unsigned int id)
-{
-	return saffire_write_quad(bebob, SAFFIRE_OFFSET_CLOCK_SOURCE, id);
-};
-static int
-saffire_both_clk_synced(struct snd_bebob *bebob, bool *synced)
-{
-	int err;
-	u64 offset;
-	u32 value;
-
-	err = saffire_both_clk_src_get(bebob, &value);
-	if (err < 0)
-		goto end;
-	/* internal */
-	if (value == 0) {
-		*synced = true;
-		goto end;
-	}
-
-	if (bebob->spec == &saffire_le_spec)
-		offset = SAFFIRE_LE_OFFSET_CLOCK_SYNC_EXT;
-	else
-		offset = SAFFIRE_OFFSET_CLOCK_SYNC_EXT;
-
-	err = saffire_read_quad(bebob, offset, &value);
-	if (err < 0)
-		goto end;
-
-	*synced = (0x01 & value);
-end:
-	return err;
-}
 static char *saffire_le_meter_labels[] = {
 	ANA_IN, ANA_IN, DIG_IN,
 	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT,
@@ -331,10 +243,8 @@ static struct snd_bebob_clock_spec saffirepro_26_clk_spec = {
 	.num		= ARRAY_SIZE(saffirepro_26_clk_src_labels),
 	.labels		= saffirepro_26_clk_src_labels,
 	.get_src	= &saffirepro_both_clk_src_get,
-	.set_src	= &saffirepro_both_clk_src_set,
 	.get_freq	= &saffirepro_both_clk_freq_get,
 	.set_freq	= &saffirepro_both_clk_freq_set,
-	.synced		= &saffirepro_both_clk_synced
 };
 struct snd_bebob_spec saffirepro_26_spec = {
 	.load	= NULL,
@@ -347,10 +257,8 @@ static struct snd_bebob_clock_spec saffirepro_10_clk_spec = {
 	.num		= ARRAY_SIZE(saffirepro_10_clk_src_labels),
 	.labels		= saffirepro_10_clk_src_labels,
 	.get_src	= &saffirepro_both_clk_src_get,
-	.set_src	= &saffirepro_both_clk_src_set,
 	.get_freq	= &saffirepro_both_clk_freq_get,
 	.set_freq	= &saffirepro_both_clk_freq_set,
-	.synced		= &saffirepro_both_clk_synced
 };
 struct snd_bebob_spec saffirepro_10_spec = {
 	.load	= NULL,
@@ -362,10 +270,8 @@ struct snd_bebob_clock_spec saffire_both_clk_spec = {
 	.num		= ARRAY_SIZE(saffire_both_clk_src_labels),
 	.labels		= saffire_both_clk_src_labels,
 	.get_src	= &saffire_both_clk_src_get,
-	.set_src	= &saffire_both_clk_src_set,
 	.get_freq	= &snd_bebob_stream_get_rate,
 	.set_freq	= &snd_bebob_stream_set_rate,
-	.synced		= &saffire_both_clk_synced
 };
 
 /* Saffire LE */

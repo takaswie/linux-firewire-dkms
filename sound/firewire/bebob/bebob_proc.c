@@ -127,7 +127,7 @@ proc_read_formation(struct snd_info_entry *entry,
 	snd_iprintf(buffer, "Output Stream from device:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
 	formation = bebob->tx_stream_formations;
-	for (i = 0; i < 9; i++) {
+	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		snd_iprintf(buffer,
 			"\t%d\t%d\t%d\n", snd_bebob_rate_table[i],
 			formation[i].pcm, formation[i].midi);
@@ -136,7 +136,7 @@ proc_read_formation(struct snd_info_entry *entry,
 	snd_iprintf(buffer, "Input Stream to device:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
 	formation = bebob->rx_stream_formations;
-	for (i = 0; i < 9; i++) {
+	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		snd_iprintf(buffer,
 			"\t%d\t%d\t%d\n", snd_bebob_rate_table[i],
 			formation[i].pcm, formation[i].midi);
