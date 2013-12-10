@@ -100,7 +100,7 @@ int
 snd_bebob_stream_check_internal_clock(struct snd_bebob *bebob, bool *internal)
 {
 	struct snd_bebob_clock_spec *clk = bebob->spec->clock;
-	u8 addr[6], input[7];
+	u8 addr[AVC_BRIDGECO_ADDR_BYTES], input[7];
 	unsigned int id;
 	int err = 0;
 
@@ -130,7 +130,7 @@ snd_bebob_stream_check_internal_clock(struct snd_bebob *bebob, bool *internal)
 	 * 3.The device supports to switch source of clock by an usual way.
 	 *   Let's check input for 'Music Sub Unit Sync Input' plug.
 	 */
-	avc_bridgeco_fill_subunit_addr(addr, 0x60, SND_BEBOB_PLUG_DIR_IN,
+	avc_bridgeco_fill_subunit_addr(addr, 0x60, AVC_BRIDGECO_PLUG_DIR_IN,
 				       bebob->sync_input_plug);
 	err = avc_bridgeco_get_plug_input(bebob->unit, addr, input);
 	if (err < 0)
@@ -140,8 +140,8 @@ snd_bebob_stream_check_internal_clock(struct snd_bebob *bebob, bool *internal)
 	 * If source of clock is internal CSR, Music Sub Unit Sync Input is
 	 * a destination of Music Sub Unit Sync Output.
 	 */
-	*internal = ((input[0] == SND_BEBOB_PLUG_DIR_OUT) &&
-		     (input[1] == SND_BEBOB_PLUG_MODE_SUBUNIT) &&
+	*internal = ((input[0] == AVC_BRIDGECO_PLUG_DIR_OUT) &&
+		     (input[1] == AVC_BRIDGECO_PLUG_MODE_SUBUNIT) &&
 		     (input[2] == 0x0c) &&
 		     (input[3] == 0x00));
 end:
@@ -154,8 +154,8 @@ int snd_bebob_stream_map(struct snd_bebob *bebob,
 {
 	unsigned int cl, ch, clusters, channels, pos, pcm, midi;
 	u8 *buf, ctype;
-	u8 addr[6];
-	enum snd_bebob_plug_dir dir;
+	u8 addr[AVC_BRIDGECO_ADDR_BYTES];
+	enum avc_bridgeco_plug_dir dir;
 	int err;
 
 	/*
@@ -169,11 +169,11 @@ int snd_bebob_stream_map(struct snd_bebob *bebob,
 	}
 
 	if (stream == &bebob->tx_stream)
-		dir = SND_BEBOB_PLUG_DIR_OUT;
+		dir = AVC_BRIDGECO_PLUG_DIR_OUT;
 	else
-		dir = SND_BEBOB_PLUG_DIR_IN;
+		dir = AVC_BRIDGECO_PLUG_DIR_IN;
 
-	avc_bridgeco_fill_unit_addr(addr, dir, SND_BEBOB_PLUG_UNIT_ISOC, 0);
+	avc_bridgeco_fill_unit_addr(addr, dir, AVC_BRIDGECO_PLUG_UNIT_ISOC, 0);
 	err = avc_bridgeco_get_plug_ch_pos(bebob->unit, addr, buf, 256);
 	if (err < 0)
 		goto end;
@@ -184,7 +184,7 @@ int snd_bebob_stream_map(struct snd_bebob *bebob,
 	midi = 0;
 	for (cl = 0; cl < clusters; cl++) {
 		avc_bridgeco_fill_unit_addr(addr, dir,
-					    SND_BEBOB_PLUG_UNIT_ISOC, 0);
+					    AVC_BRIDGECO_PLUG_UNIT_ISOC, 0);
 		err = avc_bridgeco_get_plug_cluster_type(bebob->unit, addr,
 							 cl, &ctype);
 		if (err < 0)
@@ -585,7 +585,7 @@ set_stream_formation(u8 *buf, unsigned int len,
 }
 
 static int
-fill_stream_formations(struct snd_bebob *bebob, enum snd_bebob_plug_dir dir,
+fill_stream_formations(struct snd_bebob *bebob, enum avc_bridgeco_plug_dir dir,
 		       unsigned short pid)
 {
 	static const unsigned int freq_table[] = {
@@ -603,14 +603,14 @@ fill_stream_formations(struct snd_bebob *bebob, enum snd_bebob_plug_dir dir,
 	u8 *buf;
 	struct snd_bebob_stream_formation *formations;
 	unsigned int i, index, len, eid;
-	u8 addr[6];
+	u8 addr[AVC_BRIDGECO_ADDR_BYTES];
 	int err;
 
 	buf = kmalloc(FORMAT_MAXIMUM_LENGTH, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
 
-	if (dir == SND_BEBOB_PLUG_DIR_IN)
+	if (dir == AVC_BRIDGECO_PLUG_DIR_IN)
 		formations = bebob->rx_stream_formations;
 	else
 		formations = bebob->tx_stream_formations;
@@ -620,7 +620,7 @@ fill_stream_formations(struct snd_bebob *bebob, enum snd_bebob_plug_dir dir,
 
 		memset(buf, 0, len);
 		avc_bridgeco_fill_unit_addr(addr, dir,
-					    SND_BEBOB_PLUG_UNIT_ISOC, pid);
+					    AVC_BRIDGECO_PLUG_UNIT_ISOC, pid);
 		err = avc_bridgeco_get_plug_strm_fmt(bebob->unit, addr,
 						     eid, buf, &len);
 		if (err < 0)
@@ -655,7 +655,7 @@ end:
 static int
 seek_msu_sync_input_plug(struct snd_bebob *bebob)
 {
-	u8 plugs[AVC_PLUG_INFO_BUF_COUNT], addr[6];
+	u8 plugs[AVC_PLUG_INFO_BUF_COUNT], addr[AVC_BRIDGECO_ADDR_BYTES];
 	unsigned int i, type;
 	int err;
 
@@ -668,12 +668,12 @@ seek_msu_sync_input_plug(struct snd_bebob *bebob)
 	bebob->sync_input_plug = -1;
 	for (i = 0; i < plugs[0]; i++) {
 		avc_bridgeco_fill_subunit_addr(addr, 0x60,
-					       SND_BEBOB_PLUG_DIR_IN, i);
+					       AVC_BRIDGECO_PLUG_DIR_IN, i);
 		err = avc_bridgeco_get_plug_type(bebob->unit, addr, &type);
 		if (err < 0)
 			goto end;
 
-		if (type == SND_BEBOB_PLUG_TYPE_SYNC)
+		if (type == AVC_BRIDGECO_PLUG_TYPE_SYNC)
 			bebob->sync_input_plug = i;
 	}
 end:
@@ -683,8 +683,8 @@ end:
 /* In this function, 2 means input and output */
 int snd_bebob_stream_discover(struct snd_bebob *bebob)
 {
-	u8 plugs[AVC_PLUG_INFO_BUF_COUNT], addr[6];
-	enum snd_bebob_plug_type type;
+	u8 plugs[AVC_PLUG_INFO_BUF_COUNT], addr[AVC_BRIDGECO_ADDR_BYTES];
+	enum avc_bridgeco_plug_type type;
 	unsigned int i;
 	int err;
 
@@ -701,12 +701,12 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 		err = -EIO;
 		goto end;
 	}
-	avc_bridgeco_fill_unit_addr(addr, SND_BEBOB_PLUG_DIR_IN,
-				    SND_BEBOB_PLUG_UNIT_ISOC, 0);
+	avc_bridgeco_fill_unit_addr(addr, AVC_BRIDGECO_PLUG_DIR_IN,
+				    AVC_BRIDGECO_PLUG_UNIT_ISOC, 0);
 	err = avc_bridgeco_get_plug_type(bebob->unit, addr, &type);
 	if (err < 0)
 		goto end;
-	else if (type != SND_BEBOB_PLUG_TYPE_ISOC) {
+	else if (type != AVC_BRIDGECO_PLUG_TYPE_ISOC) {
 		err = -EIO;
 		goto end;
 	}
@@ -715,12 +715,12 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 		err = -EIO;
 		goto end;
 	}
-	avc_bridgeco_fill_unit_addr(addr, SND_BEBOB_PLUG_DIR_OUT,
-				    SND_BEBOB_PLUG_UNIT_ISOC, 0);
+	avc_bridgeco_fill_unit_addr(addr, AVC_BRIDGECO_PLUG_DIR_OUT,
+				    AVC_BRIDGECO_PLUG_UNIT_ISOC, 0);
 	err = avc_bridgeco_get_plug_type(bebob->unit, addr, &type);
 	if (err < 0)
 		goto end;
-	else if (type != SND_BEBOB_PLUG_TYPE_ISOC) {
+	else if (type != AVC_BRIDGECO_PLUG_TYPE_ISOC) {
 		err = -EIO;
 		goto end;
 	}
@@ -735,24 +735,24 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 	/* count external input plugs for MIDI */
 	bebob->midi_input_ports = 0;
 	for (i = 0; i < plugs[2]; i++) {
-		avc_bridgeco_fill_unit_addr(addr, SND_BEBOB_PLUG_DIR_IN,
-					    SND_BEBOB_PLUG_UNIT_EXT, i);
+		avc_bridgeco_fill_unit_addr(addr, AVC_BRIDGECO_PLUG_DIR_IN,
+					    AVC_BRIDGECO_PLUG_UNIT_EXT, i);
 		err = avc_bridgeco_get_plug_type(bebob->unit, addr, &type);
 		if (err < 0)
 			goto end;
-		else if (type == SND_BEBOB_PLUG_TYPE_MIDI)
+		else if (type == AVC_BRIDGECO_PLUG_TYPE_MIDI)
 			bebob->midi_input_ports++;
 	}
 
 	/* count external output plugs for MIDI */
 	bebob->midi_output_ports = 0;
 	for (i = 0; i < plugs[3]; i++) {
-		avc_bridgeco_fill_unit_addr(addr, SND_BEBOB_PLUG_DIR_OUT,
-					    SND_BEBOB_PLUG_UNIT_EXT, i);
+		avc_bridgeco_fill_unit_addr(addr, AVC_BRIDGECO_PLUG_DIR_OUT,
+					    AVC_BRIDGECO_PLUG_UNIT_EXT, i);
 		err = avc_bridgeco_get_plug_type(bebob->unit, addr, &type);
 		if (err < 0)
 			goto end;
-		else if (type == SND_BEBOB_PLUG_TYPE_MIDI)
+		else if (type == AVC_BRIDGECO_PLUG_TYPE_MIDI)
 			bebob->midi_output_ports++;
 	}
 

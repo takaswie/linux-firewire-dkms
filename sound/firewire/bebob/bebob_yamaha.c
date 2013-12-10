@@ -86,8 +86,8 @@ clk_src_set(struct snd_bebob *bebob, unsigned int id)
 	if (id > 0) {
 		/* check external input plug 0x01 */
 		err = avc_bridgeco_detect_plug_strm(bebob->unit,
-						    SND_BEBOB_PLUG_DIR_IN, 0x01,
-						    &detect);
+						    AVC_BRIDGECO_PLUG_DIR_IN,
+						    0x01, &detect);
 		if ((err < 0) || (detect == 0))
 			return -EIO;
 	}

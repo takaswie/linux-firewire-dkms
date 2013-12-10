@@ -151,66 +151,73 @@ int avc_audio_get_selector(struct fw_unit *unit, unsigned  int subunit_id,
 			   unsigned int fb_id, unsigned int *num);
 
 /* AVC command extensions, AV/C Unit and Subunit, Revision 17 (BridgeCo.) */
-enum snd_bebob_plug_dir {
-	SND_BEBOB_PLUG_DIR_IN	= 0x00,
-	SND_BEBOB_PLUG_DIR_OUT	= 0x01
+#define	AVC_BRIDGECO_ADDR_BYTES	6
+enum avc_bridgeco_plug_dir {
+	AVC_BRIDGECO_PLUG_DIR_IN	= 0x00,
+	AVC_BRIDGECO_PLUG_DIR_OUT	= 0x01
 };
-enum snd_bebob_plug_mode {
-	SND_BEBOB_PLUG_MODE_UNIT		= 0x00,
-	SND_BEBOB_PLUG_MODE_SUBUNIT		= 0x01,
-	SND_BEBOB_PLUG_MODE_FUNCTION_BLOCK	= 0x02
+enum avc_bridgeco_plug_mode {
+	AVC_BRIDGECO_PLUG_MODE_UNIT		= 0x00,
+	AVC_BRIDGECO_PLUG_MODE_SUBUNIT		= 0x01,
+	AVC_BRIDGECO_PLUG_MODE_FUNCTION_BLOCK	= 0x02
 };
-enum snd_bebob_plug_unit {
-	SND_BEBOB_PLUG_UNIT_ISOC	= 0x00,
-	SND_BEBOB_PLUG_UNIT_EXT		= 0x01,
-	SND_BEBOB_PLUG_UNIT_ASYNC	= 0x02
+enum avc_bridgeco_plug_unit {
+	AVC_BRIDGECO_PLUG_UNIT_ISOC	= 0x00,
+	AVC_BRIDGECO_PLUG_UNIT_EXT	= 0x01,
+	AVC_BRIDGECO_PLUG_UNIT_ASYNC	= 0x02
 };
-enum snd_bebob_plug_type {
-	SND_BEBOB_PLUG_TYPE_ISOC	= 0x00,
-	SND_BEBOB_PLUG_TYPE_ASYNC	= 0x01,
-	SND_BEBOB_PLUG_TYPE_MIDI	= 0x02,
-	SND_BEBOB_PLUG_TYPE_SYNC	= 0x03,
-	SND_BEBOB_PLUG_TYPE_ANA		= 0x04,
-	SND_BEBOB_PLUG_TYPE_DIG		= 0x05
+enum avc_bridgeco_plug_type {
+	AVC_BRIDGECO_PLUG_TYPE_ISOC	= 0x00,
+	AVC_BRIDGECO_PLUG_TYPE_ASYNC	= 0x01,
+	AVC_BRIDGECO_PLUG_TYPE_MIDI	= 0x02,
+	AVC_BRIDGECO_PLUG_TYPE_SYNC	= 0x03,
+	AVC_BRIDGECO_PLUG_TYPE_ANA	= 0x04,
+	AVC_BRIDGECO_PLUG_TYPE_DIG	= 0x05
 };
 static inline void
-avc_bridgeco_fill_unit_addr(u8 buf[6],
-			    enum snd_bebob_plug_dir dir,
-			    enum snd_bebob_plug_unit unit,
+avc_bridgeco_fill_unit_addr(u8 buf[AVC_BRIDGECO_ADDR_BYTES],
+			    enum avc_bridgeco_plug_dir dir,
+			    enum avc_bridgeco_plug_unit unit,
 			    unsigned int pid)
 {
 	buf[0] = 0xff;	/* Unit */
 	buf[1] = dir;
-	buf[2] = SND_BEBOB_PLUG_MODE_UNIT;
+	buf[2] = AVC_BRIDGECO_PLUG_MODE_UNIT;
 	buf[3] = unit;
 	buf[4] = 0xff & pid;
 	buf[5] = 0xff;	/* reserved */
 }
 static inline void
-avc_bridgeco_fill_subunit_addr(u8 buf[6], unsigned int mode,
-			       enum snd_bebob_plug_dir dir,
+avc_bridgeco_fill_subunit_addr(u8 buf[AVC_BRIDGECO_ADDR_BYTES],
+			       unsigned int mode,
+			       enum avc_bridgeco_plug_dir dir,
 			       unsigned int pid)
 {
 	buf[0] = 0xff & mode;	/* Subunit */
 	buf[1] = dir;
-	buf[2] = SND_BEBOB_PLUG_MODE_SUBUNIT;
+	buf[2] = AVC_BRIDGECO_PLUG_MODE_SUBUNIT;
 	buf[3] = 0xff & pid;
 	buf[4] = 0xff;	/* reserved */
 	buf[5] = 0xff;	/* reserved */
 }
-int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit, u8 add[6],
+int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
+				 u8 add[AVC_BRIDGECO_ADDR_BYTES],
 				 u8 *buf, unsigned int len);
-int avc_bridgeco_get_plug_type(struct fw_unit *unit, u8 addr[6],
-			       enum snd_bebob_plug_type *type);
-int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit, u8 addr[6],
+int avc_bridgeco_get_plug_type(struct fw_unit *unit,
+			       u8 addr[AVC_BRIDGECO_ADDR_BYTES],
+			       enum avc_bridgeco_plug_type *type);
+int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
+				       u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				       unsigned int cluster_id, u8 *ctype);
-int avc_bridgeco_get_plug_input(struct fw_unit *unit, u8 addr[6],
+int avc_bridgeco_get_plug_input(struct fw_unit *unit,
+				u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				u8 input[7]);
-int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit, u8 addr[6],
+int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
+				   u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				   unsigned int entryid, u8 *buf,
 				   unsigned int *len);
 int avc_bridgeco_detect_plug_strm(struct fw_unit *unit,
-				  enum snd_bebob_plug_dir dir,
+				  enum avc_bridgeco_plug_dir dir,
 				  unsigned int ext_pid,
 				  unsigned int *detect);
 

@@ -101,7 +101,8 @@ end:
 
 static inline void
 avc_bridgeco_fill_command_base(u8 *buf, unsigned int ctype, unsigned int opcode,
-			       unsigned int subfunction, u8 addr[6])
+			       unsigned int subfunction,
+			       u8 addr[AVC_BRIDGECO_ADDR_BYTES])
 {
 	buf[0] = 0x7 & ctype;
 	buf[1] = addr[0];
@@ -114,8 +115,9 @@ avc_bridgeco_fill_command_base(u8 *buf, unsigned int ctype, unsigned int opcode,
 	buf[8] = addr[5];
 }
 
-int avc_bridgeco_get_plug_type(struct fw_unit *unit, u8 addr[6],
-			       enum snd_bebob_plug_type *type)
+int avc_bridgeco_get_plug_type(struct fw_unit *unit,
+			       u8 addr[AVC_BRIDGECO_ADDR_BYTES],
+			       enum avc_bridgeco_plug_type *type)
 {
 	u8 *buf;
 	int err;
@@ -149,7 +151,8 @@ end:
 	return err;
 }
 
-int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit, u8 addr[6],
+int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
+				 u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				 u8 *buf, unsigned int len)
 {
 	unsigned int trial;
@@ -200,7 +203,8 @@ end:
 	return err;
 }
 
-int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit, u8 addr[6],
+int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
+				       u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				       unsigned int cluster_id, u8 *type)
 {
 	u8 *buf;
@@ -236,8 +240,8 @@ end:
 	return err;
 }
 
-int avc_bridgeco_get_plug_input(struct fw_unit *unit, u8 addr[6],
-				u8 input[7])
+int avc_bridgeco_get_plug_input(struct fw_unit *unit,
+				u8 addr[AVC_BRIDGECO_ADDR_BYTES], u8 input[7])
 {
 	int err;
 	u8 *buf;
@@ -270,7 +274,8 @@ end:
 	return err;
 }
 
-int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit, u8 addr[6],
+int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
+				   u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				   unsigned int entryid, u8 *buf,
 				   unsigned int *len)
 {
@@ -320,7 +325,7 @@ end:
 }
 
 int avc_bridgeco_detect_plug_strm(struct fw_unit *unit,
-				  enum snd_bebob_plug_dir dir,
+				  enum avc_bridgeco_plug_dir dir,
 				  unsigned int ext_pid,
 				  unsigned int *detect)
 {
