@@ -23,9 +23,9 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 	     struct snd_bebob_stream_formation *formations)
 {
 	struct snd_interval *r =
-			hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	const struct snd_interval *c =
-			hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+		hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	struct snd_interval t = {
 		.min = UINT_MAX, .max = 0, .integer = 1
 	};
@@ -185,23 +185,31 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 
 	/* add rule between channels and sampling rate */
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		prepare_rates(&substream->runtime->hw, bebob->tx_stream_formations);
-		prepare_channels(&substream->runtime->hw, bebob->tx_stream_formations);
+		prepare_rates(&substream->runtime->hw,
+			      bebob->tx_stream_formations);
+		prepare_channels(&substream->runtime->hw,
+				 bebob->tx_stream_formations);
 		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
-		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+		snd_pcm_hw_rule_add(substream->runtime, 0,
+				SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_capture_channels, bebob,
 				SNDRV_PCM_HW_PARAM_RATE, -1);
-		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+		snd_pcm_hw_rule_add(substream->runtime, 0,
+				SNDRV_PCM_HW_PARAM_RATE,
 				hw_rule_capture_rate, bebob,
 				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 	} else {
-		prepare_rates(&substream->runtime->hw, bebob->rx_stream_formations);
-		prepare_channels(&substream->runtime->hw, bebob->rx_stream_formations);
+		prepare_rates(&substream->runtime->hw,
+			      bebob->rx_stream_formations);
+		prepare_channels(&substream->runtime->hw,
+				 bebob->rx_stream_formations);
 		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
-		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+		snd_pcm_hw_rule_add(substream->runtime, 0,
+				SNDRV_PCM_HW_PARAM_CHANNELS,
 				hw_rule_playback_channels, bebob,
 				SNDRV_PCM_HW_PARAM_RATE, -1);
-		snd_pcm_hw_rule_add(substream->runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+		snd_pcm_hw_rule_add(substream->runtime, 0,
+				SNDRV_PCM_HW_PARAM_RATE,
 				hw_rule_playback_rate, bebob,
 				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 	}
@@ -421,7 +429,8 @@ int snd_bebob_create_pcm_devices(struct snd_bebob *bebob)
 		goto end;
 
 	pcm->private_data = bebob;
-	snprintf(pcm->name, sizeof(pcm->name), "%s PCM", bebob->card->shortname);
+	snprintf(pcm->name, sizeof(pcm->name),
+		 "%s PCM", bebob->card->shortname);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &pcm_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &pcm_capture_ops);
 

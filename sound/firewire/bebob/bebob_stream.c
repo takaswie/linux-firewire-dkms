@@ -260,11 +260,11 @@ make_both_connections(struct snd_bebob *bebob, unsigned int rate)
 
 	/* establish connections for both streams */
 	err = cmp_connection_establish(&bebob->out_conn,
-				amdtp_stream_get_max_payload(&bebob->tx_stream));
+			amdtp_stream_get_max_payload(&bebob->tx_stream));
 	if (err < 0)
 		goto end;
 	err = cmp_connection_establish(&bebob->in_conn,
-				amdtp_stream_get_max_payload(&bebob->rx_stream));
+			amdtp_stream_get_max_payload(&bebob->rx_stream));
 	if (err < 0)
 		cmp_connection_break(&bebob->out_conn);
 end:
@@ -427,8 +427,6 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		err = spec->set_freq(bebob, rate);
 		if (err < 0)
 			goto end;
-		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
-			       spec->ctl_id_freq);
 
 		err = make_both_connections(bebob, rate);
 		if (err < 0)
@@ -725,7 +723,7 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 	else if (type != SND_BEBOB_PLUG_TYPE_ISOC) {
 		err = -EIO;
 		goto end;
-	}	
+	}
 
 	/* store formations */
 	for (i = 0; i < 2; i++) {

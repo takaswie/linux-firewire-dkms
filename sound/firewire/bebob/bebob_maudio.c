@@ -16,16 +16,17 @@
  */
 
 #include "./bebob.h"
+#include <sound/control.h>
 
 /*
  * NOTE:
  * For Firewire 410 and Firewire Audiophile, this module requests firmware
- * version 5058 or later. With former version, BeBoB chipset needs downloading
+ * version 5058 or later. With former version, DM1000 chipset needs downloading
  * firmware and the driver should do this. To do this with ALSA, I need to
  * examinate whether it's OK or not to include firmware binary blob to
- * alsa-firmware package. With later version, the firmware is in ROM of chipset
- * and the driver just send a cue to load it when probing the device. This cue
- * is sent just once.
+ * alsa-firmware package. With later version, the firmware is in ROM and the
+ * driver just send a cue to load it when probing the device. This cue is sent
+ * just once.
  *
  * For streaming, both of output and input streams are needed for Firewire 410
  * and Ozonic. The single stream is OK for the other devices even if the clock
@@ -128,9 +129,6 @@ get_meter(struct snd_bebob *bebob, void *buf, unsigned int size)
 				  buf, size, 0);
 }
 
-/*
- * BeBoB don't tell drivers to detect digital input, just show clock sync or not.
- */
 static int
 check_clk_sync(struct snd_bebob *bebob, unsigned int size, bool *sync)
 {
@@ -220,7 +218,7 @@ special_stream_formation_set(struct snd_bebob *bebob)
 	/*
 	 * the stream formation is different depending on digital interface
 	 */
-	if (bebob->dig_in_fmt== 0x01) {
+	if (bebob->dig_in_fmt == 0x01) {
 		bebob->tx_stream_formations[3].pcm = 16;
 		bebob->tx_stream_formations[4].pcm = 16;
 		bebob->tx_stream_formations[5].pcm = 12;

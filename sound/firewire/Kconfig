@@ -61,6 +61,21 @@ config SND_SCS1X
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-scs1x.
 
+config SND_FIREWORKS
+	tristate "Echo Fireworks board module support"
+	select SND_FIREWIRE_LIB
+	help
+	  Say Y here to include support for FireWire devices based
+	  on Echo Digital Audio Fireworks board:
+	   * Mackie Onyx 400F/1200F
+	   * Echo AudioFire8(until 2009 July)/AudioFire12
+	   * Echo AudioFire2/4/8(since 2009 July)/Pre8
+	   * Echo Fireworks 8/HDMI
+	   * Gibson Robot Interface Pack/GoldTop
+
+	  To compile this driver as a module, choose M here: the module
+	  will be called snd-fireworks.
+
 config SND_BEBOB
 	tristate "BridgeCo DM1000/1500 with BeBoB firmware"
 	select SND_RAWMIDI
@@ -89,30 +104,15 @@ config SND_BEBOB
 	  * Lynx Aurora 8/16 (LT-FW)
 	  * ICON FireXon
 	  * PrismSound Orpheus/ADA-8XR
-	  * M-Audio Firewire410/AudioPhile/Solo/Ozonic/NRV10
-	  * M-Audio Firewire1814/ProjectMix IO/ProfireLightBridge
-	  * Focusrite Saffire/Saffire LE/SaffirePro10 IO/SaffirePro26 IO
+	  * Yamaha GO44/GO46
 	  * TerraTec PHASE 24 FW/PHASE X24 FW/PHASE 88 Rack FW
 	  * Terratec EWS MIC2/EWS MIC4
 	  * Terratec Aureon 7.1 Firewire
-	  * Yamaha GO44/GO46
+	  * Focusrite Saffire/Saffire LE/SaffirePro10 IO/SaffirePro26 IO
+	  * M-Audio Firewire410/AudioPhile/Solo/Ozonic/NRV10
+	  * M-Audio Firewire1814/ProjectMix IO/ProfireLightBridge
 
           To compile this driver as a module, choose M here: the module
           will be called snd-bebob.
-
-config SND_FIREWORKS
-        tristate "Echo Fireworks board support"
-	select SND_FIREWIRE_LIB
-        help
-          Say Y here to include support for FireWire devices based
-          on Echo Digital Audio Fireworks board:
-          * Mackie Onyx 400F/1200F
-	  * Echo AudioFire8(until 2009 July)/AudioFire12
-          * Echo AudioFire2/4/8(since 2009 July)/Pre8
-          * Echo Fireworks 8/HDMI
-          * Gibson RIP/GoldTop
-
-          To compile this driver as a module, choose M here: the module
-          will be called snd-fireworks.
 
 endif # SND_FIREWIRE

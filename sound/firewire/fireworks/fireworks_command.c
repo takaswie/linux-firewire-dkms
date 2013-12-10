@@ -212,8 +212,8 @@ int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 
 /*
  * This is for timestamp processing. In Windows mode, all 32bit fields of second
- * CIP header in AMDTP transmit packet is used as 'presentation timestamp'. The
- * value of this field is 0x90ffffff in NODATA packet.
+ * CIP header in AMDTP transmit packet is used for 'presentation timestamp'. In
+ * 'no data' packet the value of this field is 0x90ffffff.
  */
 int snd_efw_command_set_tx_mode(struct snd_efw *efw,
 				enum snd_efw_transport_mode mode)

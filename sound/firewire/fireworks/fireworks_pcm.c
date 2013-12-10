@@ -21,10 +21,10 @@
 /*
  * NOTE:
  * Fireworks changes its AMDTP channels for PCM data according to its sampling
- * rate. There are three modes. Here _XXX is either _playback or _capture.
- *  0:  32.0- 48.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels    applied
- *  1:  88.2- 96.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels_2x applied
- *  2: 176.4-192.0 kHz then snd_efw_hwinfo.nb_1394_XXX_channels_4x applied
+ * rate. There are three modes. Here _XX is either _rx or _tx.
+ *  0:  32.0- 48.0 kHz then snd_efw_hwinfo.amdtp_XX_pcm_channels applied
+ *  1:  88.2- 96.0 kHz then snd_efw_hwinfo.amdtp_XX_pcm_channels_2x applied
+ *  2: 176.4-192.0 kHz then snd_efw_hwinfo.amdtp_XX_pcm_channels_4x applied
  *
  * The number of PCM channels for analog input and output are always fixed but
  * the number of PCM channels for digital input and output are differed.
@@ -185,14 +185,13 @@ pcm_init_hw_params(struct snd_efw *efw,
 			SNDRV_PCM_INFO_INTERLEAVED |
 			SNDRV_PCM_INFO_SYNC_START |
 			SNDRV_PCM_INFO_FIFO_IN_FRAMES |
+			SNDRV_PCM_INFO_JOINT_DUPLEX |
 			/* for Open Sound System compatibility */
 			SNDRV_PCM_INFO_MMAP_VALID |
 			SNDRV_PCM_INFO_BLOCK_TRANSFER,
 		.rates = efw->supported_sampling_rate,
-		/* set up later */
 		.rate_min = UINT_MAX,
 		.rate_max = 0,
-		/* set up later */
 		.channels_min = UINT_MAX,
 		.channels_max = 0,
 		.buffer_bytes_max = 1024 * 1024 * 1024,
@@ -270,8 +269,6 @@ pcm_init_hw_params(struct snd_efw *efw,
 	err = snd_pcm_hw_constraint_minmax(substream->runtime,
 					SNDRV_PCM_HW_PARAM_PERIOD_TIME,
 					500, UINT_MAX);
-	if (err < 0)
-		goto end;
 end:
 	return err;
 }
@@ -296,7 +293,7 @@ static int pcm_open(struct snd_pcm_substream *substream)
 		goto end;
 
 	/*
-	 * When source of clock is internal or any PCM stream are running,
+	 * When source of clock is not internal or any PCM stream are running,
 	 * the available sampling rate is limited at current sampling rate.
 	 */
 	if ((clock_source != SND_EFW_CLOCK_SOURCE_INTERNAL) ||

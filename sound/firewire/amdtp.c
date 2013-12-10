@@ -518,7 +518,7 @@ static void amdtp_read_s16(struct amdtp_stream *s,
 			*dst = be32_to_cpu(buffer[s->pcm_positions[c]]) >> 8;
 			dst++;
 		}
-		buffer +=s->data_block_quadlets;
+		buffer += s->data_block_quadlets;
 		if (--remaining_frames == 0)
 			dst = (void *)runtime->dma_area;
 	}
@@ -603,7 +603,7 @@ static void amdtp_fill_pcm_silence_dualwire(struct amdtp_stream *s,
 {
 	unsigned int i, c, channels;
 
-	channels = s->pcm_channels /2;
+	channels = s->pcm_channels / 2;
 	for (i = 0; i < frames; ++i) {
 		for (c = 0; c < channels; ++c) {
 			buffer[s->pcm_positions[c] * 2] =
@@ -713,7 +713,7 @@ static int queue_packet(struct amdtp_stream *s,
 	p.tag = TAG_CIP;
 	p.header_length = header_length;
 	p.payload_length = (!skip) ? payload_length : 0;
-	p.skip = (!skip) ? 0: 1;
+	p.skip = skip;
 	err = fw_iso_context_queue(s->context, &p, &s->buffer.iso_buffer,
 				   s->buffer.packets[s->packet_index].offset);
 	if (err < 0) {
@@ -862,7 +862,7 @@ static void packet_sort(struct sort_table *tbl, unsigned int len)
 			     (tbl[i].dbc - tbl[j].dbc < DBC_THREADSHOULD))) {
 				SWAP(tbl, i, j);
 			} else if ((tbl[j].dbc > tbl[i].dbc) &&
-			           (tbl[j].dbc - tbl[i].dbc >
+				   (tbl[j].dbc - tbl[i].dbc >
 							DBC_THREADSHOULD)) {
 				for (k = i; k > 0; k--) {
 					if ((tbl[k].dbc > tbl[j].dbc) ||
@@ -973,7 +973,7 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 		}
 	}
 
-	for (i = 0; i < packets; i ++) {
+	for (i = 0; i < packets; i++) {
 		if (queue_in_packet(s) < 0) {
 			amdtp_stream_pcm_abort(s);
 			return;

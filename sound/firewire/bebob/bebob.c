@@ -55,16 +55,16 @@ static unsigned int devices_used;
 #define VEN_LYNX	0x000019e5
 #define VEN_ICON	0x00001a9e
 #define VEN_PRISMSOUND	0x00001198
+#define VEN_YAMAHA	0x0000a0de
+#define VEN_TERRATEC	0x00000aac
+#define VEN_FOCUSRITE	0x0000130e
 #define VEN_MAUDIO1	0x00000d6c
 #define VEN_MAUDIO2	0x000007f5
-#define VEN_FOCUSRITE	0x0000130e
-#define VEN_TERRATEC	0x00000aac
-#define VEN_YAMAHA	0x0000a0de
 
+#define MODEL_FOCUSRITE_SAFFIRE_BOTH	0x00000000
 #define MODEL_MAUDIO_AUDIOPHILE_BOTH	0x00010060
 #define MODEL_MAUDIO_FW1814		0x00010071
 #define MODEL_MAUDIO_PROJECTMIX		0x00010091
-#define MODEL_FOCUSRITE_SAFFIRE_BOTH	0x00000000
 
 static int
 name_device(struct snd_bebob *bebob, unsigned int vendor_id)
@@ -107,12 +107,14 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 		strcpy(vendor, "ICON");
 	else if (vendor_id == VEN_PRISMSOUND)
 		strcpy(vendor, "PrismSound");
-	else if ((vendor_id == VEN_MAUDIO1) || (vendor_id == VEN_MAUDIO2))
-		strcpy(vendor, "M-Audio");
-	else if (vendor_id == VEN_TERRATEC)
-		strcpy(vendor, "Terratec");
 	else if (vendor_id == VEN_YAMAHA)
 		strcpy(vendor, "YAMAHA");
+	else if (vendor_id == VEN_TERRATEC)
+		strcpy(vendor, "Terratec");
+	else if (vendor_id == VEN_FOCUSRITE)
+		strcpy(vendor, "Focusrite");
+	else if ((vendor_id == VEN_MAUDIO1) || (vendor_id == VEN_MAUDIO2))
+		strcpy(vendor, "M-Audio");
 
 	/* get model name */
 	err = fw_csr_string(bebob->unit->directory, CSR_MODEL,
@@ -166,20 +168,6 @@ snd_bebob_card_free(struct snd_card *card)
 	return;
 }
 
-static bool
-check_audiophile_booted(struct fw_unit *unit)
-{
-	char name[24] = {0};
-
-	if (fw_csr_string(unit->directory, CSR_MODEL, name, sizeof(name)) < 0)
-		return false;
-
-	if (strncmp(name, "FW Audiophile Bootloader", 15) == 0)
-		return false;
-	else
-		return true;
-}
-
 static const struct snd_bebob_spec *
 get_saffire_spec(struct fw_unit *unit)
 {
@@ -194,6 +182,19 @@ get_saffire_spec(struct fw_unit *unit)
 		return &saffire_spec;
 }
 
+static bool
+check_audiophile_booted(struct fw_unit *unit)
+{
+	char name[24] = {0};
+
+	if (fw_csr_string(unit->directory, CSR_MODEL, name, sizeof(name)) < 0)
+		return false;
+
+	if (strncmp(name, "FW Audiophile Bootloader", 15) == 0)
+		return false;
+	else
+		return true;
+}
 
 static int
 snd_bebob_probe(struct fw_unit *unit,
@@ -262,7 +263,7 @@ snd_bebob_probe(struct fw_unit *unit,
 	    (entry->model_id == MODEL_MAUDIO_FW1814))
 		err = snd_bebob_maudio_special_discover(bebob, true);
 	else if ((entry->vendor_id == VEN_MAUDIO1) &&
-	         (entry->model_id == MODEL_MAUDIO_PROJECTMIX))
+		 (entry->model_id == MODEL_MAUDIO_PROJECTMIX))
 		err = snd_bebob_maudio_special_discover(bebob, false);
 	else
 		err = snd_bebob_stream_discover(bebob);
@@ -288,10 +289,6 @@ snd_bebob_probe(struct fw_unit *unit,
 		if (err < 0)
 			goto error;
 	}
-
-	err = snd_bebob_create_control_devices(bebob);
-	if (err < 0)
-		goto error;
 
 	snd_bebob_proc_init(bebob);
 
@@ -402,6 +399,27 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_PRISMSOUND, 0x00010048, spec_normal),
 	/* PrismSound, ADA-8XR */
 	SND_BEBOB_DEV_ENTRY(VEN_PRISMSOUND, 0x0000ada8, spec_normal),
+	/* Yamaha, GO44 */
+	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000b, yamaha_go_spec),
+	/* YAMAHA, GO46 */
+	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000c, yamaha_go_spec),
+	/* TerraTec Electronic GmbH, PHASE 88 Rack FW */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000003, phase88_rack_spec),
+	/* TerraTec Electronic GmbH, PHASE 24 FW */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000004, phase24_series_spec),
+	/* TerraTec Electronic GmbH, Phase X24 FW */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000007, phase24_series_spec),
+	/* TerraTec Electronic GmbH, EWS MIC2/MIC8 */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000005, spec_normal),
+	/* Terratec Electronic GmbH, Aureon 7.1 Firewire */
+	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000002, spec_normal),
+	/* Focusrite, SaffirePro 26 I/O */
+	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000003, saffirepro_26_spec),
+	/* Focusrite, SaffirePro 10 I/O */
+	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000006, saffirepro_10_spec),
+	/* Focusrite, Saffire(no label and LE) */
+	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, MODEL_FOCUSRITE_SAFFIRE_BOTH,
+			    saffire_spec),
 	/* M-Audio, Ozonic */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x0000000a, maudio_ozonic_spec),
 	/* M-Audio, Firewire 410.  */
@@ -423,27 +441,6 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 						maudio_special_spec),
 	/* M-Audio, ProFireLightbridge */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x000100a1, spec_normal),
-	/* Focusrite, SaffirePro 26 I/O */
-	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000003, saffirepro_26_spec),
-	/* Focusrite, SaffirePro 10 I/O */
-	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000006, saffirepro_10_spec),
-	/* Focusrite, Saffire(no label and LE) */
-	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, MODEL_FOCUSRITE_SAFFIRE_BOTH,
-			    saffire_spec),
-	/* TerraTec Electronic GmbH, PHASE 88 Rack FW */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000003, phase88_rack_spec),
-	/* TerraTec Electronic GmbH, PHASE 24 FW */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000004, phase24_series_spec),
-	/* TerraTec Electronic GmbH, Phase X24 FW */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000007, phase24_series_spec),
-	/* TerraTec Electronic GmbH, EWS MIC2/MIC8 */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000005, spec_normal),
-	/* Terratec Electronic GmbH, Aureon 7.1 Firewire */
-	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000002, spec_normal),
-	/* Yamaha, GO44 */
-	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000b, yamaha_go_spec),
-	/* YAMAHA, GO46 */
-	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000c, yamaha_go_spec),
 	/* Ids are unknown but able to be supported */
 	/*  PreSonus, Inspire 1394 */
 	/*  Mackie, Digital X Bus x.200 */

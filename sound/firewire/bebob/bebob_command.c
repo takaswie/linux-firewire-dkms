@@ -389,7 +389,7 @@ int avc_bridgeco_detect_plug_strm(struct fw_unit *unit,
 	if (err < 0)
 		goto end;
 	/* IMPLEMENTED/STABLE is OK */
-	if ((err < 10) || (buf[0] != 0x0c)){
+	if ((err < 10) || (buf[0] != 0x0c)) {
 		dev_err(&unit->device,
 			"failed to detect stream presence 0x%02X\n",
 			buf[0]);

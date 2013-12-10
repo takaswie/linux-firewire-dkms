@@ -118,7 +118,8 @@ static void set_midi_substream_names(struct snd_bebob *bebob,
 
 	list_for_each_entry(subs, &str->substreams, list) {
 		snprintf(subs->name, sizeof(subs->name),
-			 "%s MIDI %d", bebob->card->shortname, subs->number + 1);
+			 "%s MIDI %d",
+			 bebob->card->shortname, subs->number + 1);
 	}
 }
 

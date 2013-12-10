@@ -34,7 +34,6 @@
 #include <sound/core.h>
 #include <sound/initval.h>
 #include <sound/info.h>
-#include <sound/control.h>
 #include <sound/rawmidi.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
@@ -89,13 +88,13 @@ struct snd_bebob_spec {
 };
 
 struct snd_bebob {
-        struct snd_card *card;
-        struct fw_device *device;
-        struct fw_unit *unit;
-        int card_index;
+	struct snd_card *card;
+	struct fw_device *device;
+	struct fw_unit *unit;
+	int card_index;
 
-        struct mutex mutex;
-        spinlock_t lock;
+	struct mutex mutex;
+	spinlock_t lock;
 
 	const struct snd_bebob_spec *spec;
 
@@ -114,10 +113,10 @@ struct snd_bebob {
 
 	int sync_input_plug;
 
-        /* for uapi */
-        int dev_lock_count;
-        bool dev_lock_changed;
-        wait_queue_head_t hwdep_wait;
+	/* for uapi */
+	int dev_lock_count;
+	bool dev_lock_changed;
+	wait_queue_head_t hwdep_wait;
 
 	/* for M-Audio special devices */
 	bool maudio_special_quirk;
@@ -152,7 +151,7 @@ int avc_general_get_plug_info(struct fw_unit *unit, unsigned int addr_mode,
 /* AV/C Audio Subunit Specification 1.0 (1394TA) */
 int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
 			   unsigned int fb_id, unsigned int num);
-int avc_audio_get_selector(struct fw_unit *unit,unsigned  int subunit_id,
+int avc_audio_get_selector(struct fw_unit *unit, unsigned  int subunit_id,
 			   unsigned int fb_id, unsigned int *num);
 
 /* AVC command extensions, AV/C Unit and Subunit, Revision 17 (BridgeCo.) */
@@ -220,9 +219,9 @@ int avc_bridgeco_detect_plug_strm(struct fw_unit *unit,
 				  unsigned int *detect);
 
 int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
-                       enum avc_general_plug_dir dir);
+		       enum avc_general_plug_dir dir);
 int snd_bebob_set_rate(struct snd_bebob *bebob, unsigned int rate,
-                       enum avc_general_plug_dir dir);
+		       enum avc_general_plug_dir dir);
 
 /* for AMDTP streaming */
 int snd_bebob_stream_get_rate(struct snd_bebob *bebob, unsigned int *rate);
@@ -246,18 +245,20 @@ void snd_bebob_stream_lock_release(struct snd_bebob *bebob);
 
 void snd_bebob_proc_init(struct snd_bebob *bebob);
 
-int snd_bebob_create_control_devices(struct snd_bebob *bebob);
-
 int snd_bebob_create_midi_devices(struct snd_bebob *bebob);
 
 int snd_bebob_create_pcm_devices(struct snd_bebob *bebob);
 
 int snd_bebob_create_hwdep_device(struct snd_bebob *bebob);
 
-/* device specific operations */
-int snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814);
-int snd_bebob_maudio_special_add_controls(struct snd_bebob *bebob);
-
+/* model specific operations */
+extern struct snd_bebob_spec yamaha_go_spec;
+extern struct snd_bebob_spec phase88_rack_spec;
+extern struct snd_bebob_spec phase24_series_spec;
+extern struct snd_bebob_spec saffirepro_26_spec;
+extern struct snd_bebob_spec saffirepro_10_spec;
+extern struct snd_bebob_spec saffire_le_spec;
+extern struct snd_bebob_spec saffire_spec;
 extern struct snd_bebob_spec maudio_bootloader_spec;
 extern struct snd_bebob_spec maudio_special_spec;
 extern struct snd_bebob_spec maudio_nrv10_spec;
@@ -265,13 +266,9 @@ extern struct snd_bebob_spec maudio_fw410_spec;
 extern struct snd_bebob_spec maudio_audiophile_spec;
 extern struct snd_bebob_spec maudio_solo_spec;
 extern struct snd_bebob_spec maudio_ozonic_spec;
-extern struct snd_bebob_spec saffirepro_26_spec;
-extern struct snd_bebob_spec saffirepro_10_spec;
-extern struct snd_bebob_spec saffire_le_spec;
-extern struct snd_bebob_spec saffire_spec;
-extern struct snd_bebob_spec phase88_rack_spec;
-extern struct snd_bebob_spec phase24_series_spec;
-extern struct snd_bebob_spec yamaha_go_spec;
+
+int snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814);
+int snd_bebob_maudio_special_add_controls(struct snd_bebob *bebob);
 
 #define SND_BEBOB_DEV_ENTRY(vendor, model, private_data) \
 { \

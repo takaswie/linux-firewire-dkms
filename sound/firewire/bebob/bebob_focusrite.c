@@ -49,7 +49,7 @@
 /* saffirepro has its own parameter for sampling frequency */
 #define SAFFIREPRO_RATE_NOREBOOT		0x0000000001cc
 /* index is the value for this register */
-const static unsigned int rates[] = {
+static const unsigned int rates[] = {
 	[0] = 0,
 	[1] = 44100,
 	[2] = 48000,
@@ -284,9 +284,11 @@ static char *saffire_le_meter_labels[] = {
 	STM_IN, STM_IN
 };
 #define SWAP(a, b) \
-	tmp = a; \
-	a = b; \
-	b = tmp
+	do { \
+		tmp = a; \
+		a = b; \
+		b = tmp; \
+	} while (0)
 static int
 saffire_le_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 {
@@ -356,7 +358,7 @@ struct snd_bebob_spec saffirepro_10_spec = {
 	.meter	= NULL
 };
 
-struct snd_bebob_clock_spec saffire_both_clk_spec= {
+struct snd_bebob_clock_spec saffire_both_clk_spec = {
 	.num		= ARRAY_SIZE(saffire_both_clk_src_labels),
 	.labels		= saffire_both_clk_src_labels,
 	.get_src	= &saffire_both_clk_src_get,
@@ -383,7 +385,7 @@ struct snd_bebob_meter_spec saffire_meter_spec = {
 	.labels	= saffire_meter_labels,
 	.get	= &saffire_meter_get,
 };
-struct snd_bebob_spec saffire_spec ={
+struct snd_bebob_spec saffire_spec = {
 	.load	= NULL,
 	.clock	= &saffire_both_clk_spec,
 	.meter	= &saffire_meter_spec

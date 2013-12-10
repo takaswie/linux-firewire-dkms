@@ -18,10 +18,9 @@
 
 /*
  * This codes give three functionality.
- * 
+ *
  * 1.get firewire node infomation
  * 2.lock/unlock stream
- *  dice driver implements the same functionality.
  * 3.get notification about starting/stopping stream
  */
 
@@ -53,8 +52,8 @@ hwdep_read(struct snd_hwdep *hwdep, char __user *buf,  long count,
 		event.lock_status.status = (bebob->dev_lock_count > 0);
 		bebob->dev_lock_changed = false;
 
-		count = min(count, (long)sizeof(event.lock_status));
-	} 
+		count = min_t(long, count, sizeof(event.lock_status));
+	}
 
 	spin_unlock_irq(&bebob->lock);
 
