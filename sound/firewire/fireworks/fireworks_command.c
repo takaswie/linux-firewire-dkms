@@ -110,18 +110,18 @@ static const char *const efr_status_names[] = {
 static int
 efw_transaction(struct snd_efw *efw, unsigned int category,
 		unsigned int command,
-		const u32 *params, unsigned int param_count,
-		void *response, unsigned int response_quadlets)
+		const __be32 *params, unsigned int param_quads,
+		const __be32 *resp, unsigned int resp_quads)
 {
 	struct snd_efw_transaction *header;
 	__be32 *buf;
 	u32 seqnum;
-	unsigned int i, buf_bytes;
+	unsigned int i, buf_bytes, cmd_bytes;
 	int err;
 
 	/* calculate buffer size*/
-	buf_bytes = sizeof(struct snd_efw_transaction)
-			 + max(param_count, response_quadlets) * 4;
+	buf_bytes = sizeof(struct snd_efw_transaction) +
+		    max(param_quads, resp_quads) * sizeof(u32);
 
 	/* keep buffer */
 	buf = kzalloc(buf_bytes, GFP_KERNEL);
@@ -138,50 +138,50 @@ efw_transaction(struct snd_efw *efw, unsigned int category,
 	seqnum = efw->seqnum;
 	spin_unlock(&efw->lock);
 
-	/* fill efc fields */
+	/* fill transaction header fields */
+	cmd_bytes = sizeof(struct snd_efw_transaction) +
+		    param_quads * sizeof(u32);
 	header = (struct snd_efw_transaction *)buf;
-	header->length		= sizeof(struct snd_efw_transaction) / 4 +
-				  param_count;
-	header->version		= 1;
-	header->seqnum		= seqnum;
-	header->category	= category;
-	header->command		= command;
-	header->status		= 0;
+	header->length	 = cmd_bytes / sizeof(u32);
+	header->version	 = 1;
+	header->seqnum	 = seqnum;
+	header->category = category;
+	header->command	 = command;
+	header->status	 = 0;
+	for (i = 0; i < sizeof(struct snd_efw_transaction) / sizeof(u32); i++)
+		cpu_to_be32s(&buf[i]);
 
-	/* fill EFC parameters */
-	for (i = 0; i < param_count; i++)
-		header->params[i] = params[i];
+	/* fill transaction command parameters */
+	for (i = 0; i < param_quads; i++)
+		buf[6 + i] = params[i];
 
-	/* for endian-ness*/
-	for (i = 0; i < (buf_bytes / 4); i++)
-		buf[i] = cpu_to_be32(buf[i]);
-
-	err = snd_efw_transaction_run(efw->unit, buf, buf_bytes,
+	err = snd_efw_transaction_run(efw->unit, buf, cmd_bytes,
 				      buf, buf_bytes, seqnum);
 	if (err < 0)
 		goto end;
 
-	/* for endian-ness */
-	for (i = 0; i < (err / 4); i++)
-		buf[i] = be32_to_cpu(buf[i]);
-
-	/* check EFC response fields */
-	if ((header->version < 1) ||
+	/* check transaction header fields */
+	for (i = 0; i < sizeof(struct snd_efw_transaction) / sizeof(u32); i++)
+		be32_to_cpus(&buf[i]);
+	if ((header->version  < 1) ||
 	    (header->category != category) ||
-	    (header->command != command) ||
-	    (header->status != EFC_RETVAL_OK)) {
+	    (header->command  != command) ||
+	    (header->status   != EFC_RETVAL_OK)) {
 		dev_err(&efw->unit->device, "EFC failed [%u/%u]: %s\n",
-			header->category, header->command,
-			efr_status_names[header->status]);
+			be32_to_cpu(buf[3]), be32_to_cpu(buf[4]),
+			efr_status_names[be32_to_cpu(buf[5])]);
 		err = -EIO;
 		goto end;
 	}
 
-	/* fill response buffer */
-	if (response != NULL) {
-		memset(response, 0, response_quadlets * 4);
-		response_quadlets = min(response_quadlets, header->length);
-		memcpy(response, header->params, response_quadlets * 4);
+	/* fill transaction response parameters */
+	if (resp != NULL) {
+		memset((void *)resp, 0, resp_quads * sizeof(u32));
+		resp_quads = min_t(unsigned int, resp_quads,
+				   header->length -
+				    sizeof(struct snd_efw_transaction) /
+				    sizeof(u32));
+		memcpy((void *)resp, &buf[6], resp_quads * sizeof(u32));
 	}
 end:
 	kfree(buf);
@@ -203,7 +203,13 @@ int snd_efw_command_identify(struct snd_efw *efw)
 int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 				  u16 addr_high, u32 addr_low)
 {
-	u32 addr[2] = {addr_high, addr_low};
+	__be32 addr[2];
+
+	addr[0] = cpu_to_be32(addr_high);
+	addr[1] = cpu_to_be32(addr_low);
+
+	if (!efw->resp_addr_changable)
+		return -ENOSYS;
 
 	return efw_transaction(efw, EFC_CAT_HWCTL,
 			       EFC_CMD_HWINFO_SET_RESP_ADDR,
@@ -218,7 +224,7 @@ int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 int snd_efw_command_set_tx_mode(struct snd_efw *efw,
 				enum snd_efw_transport_mode mode)
 {
-	u32 param = mode;
+	__be32 param = cpu_to_be32(mode);
 	return efw_transaction(efw, EFC_CAT_TRANSPORT,
 			       EFC_CMD_TRANSPORT_SET_TX_MODE,
 			       &param, 1, NULL, 0);
@@ -227,32 +233,39 @@ int snd_efw_command_set_tx_mode(struct snd_efw *efw,
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 			       struct snd_efw_hwinfo *hwinfo)
 {
-	u32 *tmp;
-	unsigned int i, count;
 	int err;
 
 	err  = efw_transaction(efw, EFC_CAT_HWINFO,
 			       EFC_CMD_HWINFO_GET_CAPS,
-			       NULL, 0, hwinfo, sizeof(*hwinfo) / 4);
+			       NULL, 0, (__be32 *)hwinfo, sizeof(*hwinfo) / 4);
 	if (err < 0)
 		goto end;
 
-	/* arrangement for endianness */
-	count = HWINFO_NAME_SIZE_BYTES / 4;
-	tmp = (u32 *)&hwinfo->vendor_name;
-	for (i = 0; i < count; i++)
-		tmp[i] = cpu_to_be32(tmp[i]);
-	tmp = (u32 *)&hwinfo->model_name;
-	for (i = 0; i < count; i++)
-		tmp[i] = cpu_to_be32(tmp[i]);
-
-	count = sizeof(struct snd_efw_phys_grp) * HWINFO_MAX_CAPS_GROUPS / 4;
-	tmp = (u32 *)&hwinfo->phys_out_grps;
-	for (i = 0; i < count; i++)
-		tmp[i] = cpu_to_be32(tmp[i]);
-	tmp = (u32 *)&hwinfo->phys_in_grps;
-	for (i = 0; i < count; i++)
-		tmp[i] = cpu_to_be32(tmp[i]);
+	be32_to_cpus(&hwinfo->flags);
+	be32_to_cpus(&hwinfo->guid_hi);
+	be32_to_cpus(&hwinfo->guid_lo);
+	be32_to_cpus(&hwinfo->type);
+	be32_to_cpus(&hwinfo->version);
+	be32_to_cpus(&hwinfo->supported_clocks);
+	be32_to_cpus(&hwinfo->amdtp_rx_pcm_channels);
+	be32_to_cpus(&hwinfo->amdtp_tx_pcm_channels);
+	be32_to_cpus(&hwinfo->phys_out);
+	be32_to_cpus(&hwinfo->phys_in);
+	be32_to_cpus(&hwinfo->phys_out_grp_count);
+	be32_to_cpus(&hwinfo->phys_in_grp_count);
+	be32_to_cpus(&hwinfo->midi_out_ports);
+	be32_to_cpus(&hwinfo->midi_in_ports);
+	be32_to_cpus(&hwinfo->max_sample_rate);
+	be32_to_cpus(&hwinfo->min_sample_rate);
+	be32_to_cpus(&hwinfo->dsp_version);
+	be32_to_cpus(&hwinfo->arm_version);
+	be32_to_cpus(&hwinfo->mixer_playback_channels);
+	be32_to_cpus(&hwinfo->mixer_capture_channels);
+	be32_to_cpus(&hwinfo->fpga_version);
+	be32_to_cpus(&hwinfo->amdtp_rx_pcm_channels_2x);
+	be32_to_cpus(&hwinfo->amdtp_tx_pcm_channels_2x);
+	be32_to_cpus(&hwinfo->amdtp_rx_pcm_channels_4x);
+	be32_to_cpus(&hwinfo->amdtp_tx_pcm_channels_4x);
 
 	/* ensure terminated */
 	hwinfo->vendor_name[HWINFO_NAME_SIZE_BYTES - 1] = '\0';
@@ -265,17 +278,36 @@ int snd_efw_command_get_phys_meters(struct snd_efw *efw,
 				    struct snd_efw_phys_meters *meters,
 				    unsigned int len)
 {
-	return efw_transaction(efw, EFC_CAT_HWINFO,
-			       EFC_CMD_HWINFO_GET_POLLED,
-			       NULL, 0, meters, len / 4);
+	__be32 *buf = (__be32 *)meters;
+	unsigned int i;
+	int err;
+
+	err = efw_transaction(efw, EFC_CAT_HWINFO,
+			      EFC_CMD_HWINFO_GET_POLLED,
+			      NULL, 0, (__be32 *)meters, len / 4);
+	if (err >= 0)
+		for (i = 0; i < len / 4; i++)
+			be32_to_cpus(&buf[i]);
+
+	return err;
 }
 
 static int
 command_get_clock(struct snd_efw *efw, struct efc_clock *clock)
 {
-	return efw_transaction(efw, EFC_CAT_HWCTL,
-			       EFC_CMD_HWCTL_GET_CLOCK,
-			       NULL, 0, clock, sizeof(struct efc_clock) / 4);
+	int err;
+
+	err = efw_transaction(efw, EFC_CAT_HWCTL,
+			      EFC_CMD_HWCTL_GET_CLOCK,
+			      NULL, 0,
+			      (__be32 *)clock, sizeof(struct efc_clock) / 4);
+	if (err >= 0) {
+		be32_to_cpus(&clock->source);
+		be32_to_cpus(&clock->sampling_rate);
+		be32_to_cpus(&clock->index);
+	}
+
+	return err;
 }
 
 /* give UINT_MAX if set nothing */
@@ -283,9 +315,8 @@ static int
 command_set_clock(struct snd_efw *efw,
 		  unsigned int source, unsigned int rate)
 {
-	int err;
-
 	struct efc_clock clock = {0};
+	int err;
 
 	/* check arguments */
 	if ((source == UINT_MAX) && (rate == UINT_MAX)) {
@@ -309,9 +340,13 @@ command_set_clock(struct snd_efw *efw,
 		clock.sampling_rate = rate;
 	clock.index = 0;
 
+	cpu_to_be32s(&clock.source);
+	cpu_to_be32s(&clock.sampling_rate);
+	cpu_to_be32s(&clock.index);
+
 	err = efw_transaction(efw, EFC_CAT_HWCTL,
 			      EFC_CMD_HWCTL_SET_CLOCK,
-			      (u32 *)&clock, 3, NULL, 0);
+			      (__be32 *)&clock, 3, NULL, 0);
 	if (err < 0)
 		goto end;
 

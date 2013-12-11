@@ -72,6 +72,7 @@ struct snd_efw {
 
 	/* for transaction */
 	u32 seqnum;
+	bool resp_addr_changable;
 
 	unsigned int midi_in_ports;
 	unsigned int midi_out_ports;

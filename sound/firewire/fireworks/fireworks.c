@@ -67,6 +67,9 @@ static unsigned int devices_used;
 /* unknown as product */
 #define  MODEL_GIBSON_GOLDTOP		0x00afb9
 
+/* part of hardware capability flags */
+#define FLAG_RESP_ADDR_CHANGABLE	0
+
 static int
 get_hardware_info(struct snd_efw *efw)
 {
@@ -96,6 +99,9 @@ get_hardware_info(struct snd_efw *efw)
 		 hwinfo->guid_hi, hwinfo->guid_lo,
 		 dev_name(&efw->unit->device), 100 << efw->device->max_speed);
 	strcpy(efw->card->mixername, hwinfo->model_name);
+
+	if (hwinfo->flags & BIT(FLAG_RESP_ADDR_CHANGABLE))
+		efw->resp_addr_changable = true;
 
 	/* set flag for supported sampling rate */
 	efw->supported_sampling_rate = 0;
