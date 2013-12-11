@@ -37,12 +37,13 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 	struct snd_efw_transaction *t;
 	long count = 0;
 
+	if (remained < sizeof(type) + sizeof(struct snd_efw_transaction))
+		return -ENOSPC;
+
 	/* data type is SNDRV_FIREWIRE_EVENT_EFW_RESPONSE */
-	if (remained < sizeof(type))
-		goto err;
 	type = SNDRV_FIREWIRE_EVENT_EFW_RESPONSE;
 	if (copy_to_user(buf, &type, sizeof(type)))
-		goto err;
+		return -EFAULT;
 	remained -= sizeof(type);
 	buf += sizeof(type);
 
@@ -62,7 +63,7 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 			till_end = min_t(unsigned int, length, till_end);
 
 			if (copy_to_user(buf, efw->pull_ptr, till_end))
-				goto err;
+				return -EFAULT;
 
 			efw->pull_ptr += till_end;
 			if (efw->pull_ptr >= efw->resp_buf + resp_buf_size)
@@ -78,8 +79,6 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 	}
 
 	return count;
-err:
-	return -EFAULT;
 }
 
 static long
