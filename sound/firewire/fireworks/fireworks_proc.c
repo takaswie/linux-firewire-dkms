@@ -197,7 +197,7 @@ proc_read_queues_state(struct snd_info_entry *entry,
 		consumed = (unsigned int)(efw->push_ptr - efw->pull_ptr);
 
 	snd_iprintf(buffer, "%d %d/%d\n",
-		    efw->resp_queues, consumed, resp_buf_size - consumed);
+		    efw->resp_queues, consumed, resp_buf_size);
 }
 
 void snd_efw_proc_init(struct snd_efw *efw)

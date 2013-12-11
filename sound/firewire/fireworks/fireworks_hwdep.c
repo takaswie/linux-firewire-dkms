@@ -17,7 +17,7 @@
  */
 
 /*
- * This codes have four functionality for user-land.
+ * This codes have five functionalities.
  *
  * 1.get information about firewire node
  * 2.get notification about starting/stopping stream
