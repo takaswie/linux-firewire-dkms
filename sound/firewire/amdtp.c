@@ -804,10 +804,9 @@ static void handle_in_packet(struct amdtp_stream *s,
 	if (((cip_header[0] & CIP_EOH_MASK) == CIP_EOH) ||
 	    ((cip_header[1] & CIP_EOH_MASK) != CIP_EOH) ||
 	    ((cip_header[1] & CIP_FMT_MASK) != CIP_FMT_AM)) {
-		if (printk_ratelimit())
-			dev_info(&s->unit->device,
-				 "Invalid CIP header for AMDTP: %08X:%08X\n",
-				 cip_header[0], cip_header[1]);
+		dev_info_ratelimited(&s->unit->device,
+				"Invalid CIP header for AMDTP: %08X:%08X\n",
+				cip_header[0], cip_header[1]);
 		return;
 	}
 
@@ -821,9 +820,8 @@ static void handle_in_packet(struct amdtp_stream *s,
 	 * This module don't use the value of dbs and dbc beceause Echo
 	 * AudioFirePre8 reports inappropriate value.
 	 *
-	 * This device always reports a fixed value "16" as data block
-	 * size at any sampling rates but actually data block size isdifferent.
-	 *
+	 * This model always reports a fixed value "8" as data block size at
+	 * any sampling rates but actually data block size is different.
 	 * Additionally the value of data block count always incremented by
 	 * "8" at any sampling rates but actually it's different.
 	 */
