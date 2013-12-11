@@ -751,7 +751,6 @@ end:
 	return err;
 }
 
-
 /* BeBoB bootloader specification */
 struct snd_bebob_spec maudio_bootloader_spec = {
 	.load		= &firmware_load,

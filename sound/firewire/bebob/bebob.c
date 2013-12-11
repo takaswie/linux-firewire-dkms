@@ -153,7 +153,7 @@ end:
 }
 
 static void
-snd_bebob_card_free(struct snd_card *card)
+bebob_card_free(struct snd_card *card)
 {
 	struct snd_bebob *bebob = card->private_data;
 
@@ -197,8 +197,8 @@ check_audiophile_booted(struct fw_unit *unit)
 }
 
 static int
-snd_bebob_probe(struct fw_unit *unit,
-		const struct ieee1394_device_id *entry)
+bebob_probe(struct fw_unit *unit,
+	    const struct ieee1394_device_id *entry)
 {
 	struct snd_card *card;
 	struct snd_bebob *bebob;
@@ -245,7 +245,7 @@ snd_bebob_probe(struct fw_unit *unit,
 			THIS_MODULE, sizeof(struct snd_bebob), &card);
 	if (err < 0)
 		goto end;
-	card->private_free = snd_bebob_card_free;
+	card->private_free = bebob_card_free;
 
 	/* initialize myself */
 	bebob = card->private_data;
@@ -306,9 +306,6 @@ snd_bebob_probe(struct fw_unit *unit,
 	dev_set_drvdata(&unit->device, bebob);
 	devices_used |= BIT(card_index);
 	bebob->card_index = card_index;
-
-	/* proved */
-	err = 0;
 end:
 	mutex_unlock(&devices_mutex);
 	return err;
@@ -319,7 +316,7 @@ error:
 }
 
 static void
-snd_bebob_update(struct fw_unit *unit)
+bebob_update(struct fw_unit *unit)
 {
 	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
 
@@ -332,7 +329,7 @@ snd_bebob_update(struct fw_unit *unit)
 }
 
 
-static void snd_bebob_remove(struct fw_unit *unit)
+static void bebob_remove(struct fw_unit *unit)
 {
 	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
 
@@ -355,7 +352,7 @@ static const struct snd_bebob_spec spec_normal = {
 	.meter		= NULL
 };
 
-static const struct ieee1394_device_id snd_bebob_id_table[] = {
+static const struct ieee1394_device_id bebob_id_table[] = {
 	/* Edirol, FA-66 */
 	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010049, spec_normal),
 	/* Edirol, FA-101 */
@@ -451,30 +448,30 @@ static const struct ieee1394_device_id snd_bebob_id_table[] = {
 	/*  Rolf Spuler, Firewire Guitar */
 	{}
 };
-MODULE_DEVICE_TABLE(ieee1394, snd_bebob_id_table);
+MODULE_DEVICE_TABLE(ieee1394, bebob_id_table);
 
-static struct fw_driver snd_bebob_driver = {
+static struct fw_driver bebob_driver = {
 	.driver = {
 		.owner	= THIS_MODULE,
 		.name	= "snd-bebob",
 		.bus	= &fw_bus_type,
 	},
-	.probe    = snd_bebob_probe,
-	.update	  = snd_bebob_update,
-	.remove   = snd_bebob_remove,
-	.id_table = snd_bebob_id_table,
+	.probe    = bebob_probe,
+	.update	  = bebob_update,
+	.remove   = bebob_remove,
+	.id_table = bebob_id_table,
 };
 
 static int __init
 snd_bebob_init(void)
 {
-	return driver_register(&snd_bebob_driver.driver);
+	return driver_register(&bebob_driver.driver);
 }
 
 static void __exit
 snd_bebob_exit(void)
 {
-	driver_unregister(&snd_bebob_driver.driver);
+	driver_unregister(&bebob_driver.driver);
 	mutex_destroy(&devices_mutex);
 }
 
