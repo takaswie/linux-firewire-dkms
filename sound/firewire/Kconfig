@@ -78,10 +78,10 @@ config SND_FIREWORKS
 
 config SND_BEBOB
 	tristate "BridgeCo DM1000/1500 with BeBoB firmware"
+	select SND_FIREWIRE_LIB
 	select SND_RAWMIDI
 	select SND_PCM
 	select SND_HWDEP
-	select SND_FIREWIRE_LIB
         help
 	 Say Y here to include support for FireWire devices based
 	 on BridgeCo DM1000/1500 with BeBoB firmware:
@@ -100,7 +100,7 @@ config SND_BEBOB
 	  * Phonic HB 12/12 MkII/12 Universal
 	  * Phonic HB 18/18 MkII/18 Universal
 	  * Phonic HB 24/24 MkII/24 Universal
-	  * Phinic FireFly 202/302
+	  * Phonic FireFly 202/302
 	  * Lynx Aurora 8/16 (LT-FW)
 	  * ICON FireXon
 	  * PrismSound Orpheus/ADA-8XR
