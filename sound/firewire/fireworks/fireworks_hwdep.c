@@ -50,7 +50,7 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 	/* write into buffer as many responses as possible */
 	while (efw->resp_queues > 0) {
 		t = (struct snd_efw_transaction *)(efw->pull_ptr);
-		length = be32_to_cpu(t->length) * sizeof(t->length);
+		length = be32_to_cpu(t->length) * sizeof(u32);
 
 		/* confirm enough space for this response */
 		if (remained < length)
@@ -139,11 +139,11 @@ hwdep_write(struct snd_hwdep *hwdep, const char __user *data, long count,
 	u8 *buf;
 
 	if (count < sizeof(struct snd_efw_transaction))
-		return -EFAULT;
+		return -EINVAL;
 
 	buf = kmalloc(count, GFP_KERNEL);
 	if (buf == NULL)
-		return -EFAULT;
+		return -ENOMEM;
 
 	if (copy_from_user(buf, data, count)) {
 		count = -EFAULT;
@@ -153,12 +153,12 @@ hwdep_write(struct snd_hwdep *hwdep, const char __user *data, long count,
 	/* check seqnum is not for kernel-land */
 	seqnum = ((struct snd_efw_transaction *)buf)->seqnum;
 	if (seqnum + 2 > SND_EFW_TRANSACTION_SEQNUM_MAX) {
-		count = -EFAULT;
+		count = -EINVAL;
 		goto end;
 	}
 
 	if (snd_efw_transaction_cmd(efw->unit, buf, count) < 0)
-		count = -EFAULT;
+		count = -EIO;
 end:
 	kfree(buf);
 	return count;
