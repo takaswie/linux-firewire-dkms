@@ -27,7 +27,6 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 
-/* TODO: when mering to upstream, this path should be changed. */
 #include "../../../include/uapi/sound/asound.h"
 #include "../../../include/uapi/sound/firewire.h"
 
@@ -77,8 +76,6 @@ struct snd_bebob_meter_spec {
 	int (*get)(struct snd_bebob *bebob, u32 *target, unsigned int size);
 };
 struct snd_bebob_spec {
-	int (*load)(struct fw_unit *unit,
-		    const struct ieee1394_device_id *entry);
 	struct snd_bebob_clock_spec *clock;
 	struct snd_bebob_rate_spec *rate;
 	struct snd_bebob_meter_spec *meter;
@@ -259,24 +256,24 @@ extern struct snd_bebob_spec saffirepro_26_spec;
 extern struct snd_bebob_spec saffirepro_10_spec;
 extern struct snd_bebob_spec saffire_le_spec;
 extern struct snd_bebob_spec saffire_spec;
-extern struct snd_bebob_spec maudio_special_spec;
 extern struct snd_bebob_spec maudio_nrv10_spec;
 extern struct snd_bebob_spec maudio_fw410_spec;
 extern struct snd_bebob_spec maudio_audiophile_spec;
 extern struct snd_bebob_spec maudio_solo_spec;
 extern struct snd_bebob_spec maudio_ozonic_spec;
 
-extern struct snd_bebob_spec maudio_bootloader_spec;
-
+extern struct snd_bebob_spec maudio_special_spec;
 int snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814);
 
-#define SND_BEBOB_DEV_ENTRY(vendor, model, private_data) \
+int snd_bebob_maudio_load_firmware(struct fw_unit *unit);
+
+#define SND_BEBOB_DEV_ENTRY(vendor, model, data) \
 { \
 	.match_flags	= IEEE1394_MATCH_VENDOR_ID | \
 			  IEEE1394_MATCH_MODEL_ID, \
 	.vendor_id	= vendor, \
 	.model_id	= model, \
-	.driver_data	= (kernel_ulong_t)&private_data \
+	.driver_data	= (kernel_ulong_t)data \
 }
 
 #endif

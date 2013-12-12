@@ -101,8 +101,7 @@ run_a_transaction(struct fw_unit *unit, int tcode,
  * firmware. After loading, the device generates bus reset and
  * newly detected.
  */
-static int
-firmware_load(struct fw_unit *unit, const struct ieee1394_device_id *entry)
+int snd_bebob_maudio_load_firmware(struct fw_unit *unit)
 {
 	__be32 cues[3];
 
@@ -744,12 +743,6 @@ end:
 	return err;
 }
 
-/* bootloader specification */
-struct snd_bebob_spec maudio_bootloader_spec = {
-	.load		= &firmware_load,
-	.clock		= NULL,
-};
-
 /* for special customized devices */
 static struct snd_bebob_rate_spec special_rate_spec = {
 	.get	= &special_get_rate,
@@ -794,7 +787,6 @@ static struct snd_bebob_meter_spec audiophile_meter_spec = {
 	.get	= &audiophile_meter_get
 };
 struct snd_bebob_spec maudio_audiophile_spec = {
-	.load	= &firmware_load,
 	.clock	= NULL,
 	.rate	= &usual_rate_spec,
 	.meter	= &audiophile_meter_spec

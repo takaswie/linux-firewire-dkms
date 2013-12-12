@@ -109,8 +109,9 @@ config SND_BEBOB
 	  * Terratec EWS MIC2/EWS MIC4
 	  * Terratec Aureon 7.1 Firewire
 	  * Focusrite Saffire/Saffire LE/SaffirePro10 IO/SaffirePro26 IO
-	  * M-Audio Firewire410/AudioPhile/Solo/Ozonic/NRV10
-	  * M-Audio Firewire1814/ProjectMix IO/ProfireLightBridge
+	  * M-Audio Firewire410/AudioPhile/Solo
+	  * M-Audio Ozonic/NRV10/ProfireLightBridge
+	  * M-Audio Firewire 1814/ProjectMix IO
 
           To compile this driver as a module, choose M here: the module
           will be called snd-bebob.
