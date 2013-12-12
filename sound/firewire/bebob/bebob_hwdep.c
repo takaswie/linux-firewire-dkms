@@ -20,8 +20,8 @@
  * This codes give three functionality.
  *
  * 1.get firewire node infomation
- * 2.lock/unlock stream
- * 3.get notification about starting/stopping stream
+ * 2.get notification about starting/stopping stream
+ * 3.lock/unlock stream
  */
 
 #include "bebob.h"

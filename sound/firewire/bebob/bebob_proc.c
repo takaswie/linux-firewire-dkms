@@ -145,6 +145,33 @@ proc_read_formation(struct snd_info_entry *entry,
 	return;
 }
 
+static void
+proc_read_clock(struct snd_info_entry *entry,
+		struct snd_info_buffer *buffer)
+{
+	struct snd_bebob *bebob = entry->private_data;
+	struct snd_bebob_clock_spec *clk_spec = bebob->spec->clock;
+	unsigned int rate;
+	bool internal;
+	unsigned int id;
+
+	if (snd_bebob_stream_get_rate(bebob, &rate) < 0)
+		return;
+	snd_iprintf(buffer, "Sampling rate: %d\n", rate);
+
+	if (!clk_spec) {
+		if (snd_bebob_stream_check_internal_clock(bebob, &internal) < 0)
+			return;
+		snd_iprintf(buffer, "Clock Source: %s (MSU-dest: %d)\n",
+			    (internal) ? "Internal" : "External",
+			    bebob->sync_input_plug);
+	} else {
+		if (clk_spec->get(bebob, &id) < 0)
+			return;
+		snd_iprintf(buffer, "Clock Source: %s\n", clk_spec->labels[id]);
+	}
+}
+
 void snd_bebob_proc_init(struct snd_bebob *bebob)
 {
 	struct snd_info_entry *entry;
@@ -154,6 +181,9 @@ void snd_bebob_proc_init(struct snd_bebob *bebob)
 
 	if (!snd_card_proc_new(bebob->card, "#formation", &entry))
 		snd_info_set_text_ops(entry, bebob, proc_read_formation);
+
+	if (!snd_card_proc_new(bebob->card, "#clock", &entry))
+		snd_info_set_text_ops(entry, bebob, proc_read_clock);
 
 	if (bebob->spec->meter != NULL) {
 		if (!snd_card_proc_new(bebob->card, "#meter", &entry))

@@ -15,9 +15,15 @@
  * along with this driver; if not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * BeBoB is 'BridgeCo enhanced Breakout Box'. This is installed for firewire
+ * devices with DM1000/1000E/1100/1500 chipset. It gives common way for host
+ * system to handle BeBoB based devices.
+ */
+
 #include "bebob.h"
 
-MODULE_DESCRIPTION("bridgeCo BeBoB driver");
+MODULE_DESCRIPTION("BridgeCo BeBoB driver");
 MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp>");
 MODULE_LICENSE("GPL v2");
 
@@ -190,10 +196,7 @@ check_audiophile_booted(struct fw_unit *unit)
 	if (fw_csr_string(unit->directory, CSR_MODEL, name, sizeof(name)) < 0)
 		return false;
 
-	if (strncmp(name, "FW Audiophile Bootloader", 15) == 0)
-		return false;
-	else
-		return true;
+	return (strncmp(name, "FW Audiophile Bootloader", 15) != 0);
 }
 
 static int
@@ -208,7 +211,6 @@ bebob_probe(struct fw_unit *unit,
 
 	mutex_lock(&devices_mutex);
 
-	/* check registered cards */
 	for (card_index = 0; card_index < SNDRV_CARDS; card_index++) {
 		if (!(devices_used & BIT(card_index)) && enable[card_index])
 			break;
@@ -222,7 +224,6 @@ bebob_probe(struct fw_unit *unit,
 		spec = get_saffire_spec(unit);
 	else
 		spec = (const struct snd_bebob_spec *)entry->driver_data;
-
 	if (spec == NULL) {
 		err = -EIO;
 		goto end;
@@ -230,8 +231,9 @@ bebob_probe(struct fw_unit *unit,
 
 	/* if needed, load firmware and exit */
 	if ((spec->load) &&
-	    ((entry->model_id != MODEL_MAUDIO_AUDIOPHILE_BOTH) ||
-	     (!check_audiophile_booted(unit)))) {
+	    ((entry->vendor_id != VEN_MAUDIO1) ||
+	     (entry->model_id != MODEL_MAUDIO_AUDIOPHILE_BOTH) ||
+	     !check_audiophile_booted(unit))) {
 		spec->load(unit, entry);
 		dev_info(&unit->device,
 			 "loading firmware for 0x%08X:0x%08X\n",
@@ -240,14 +242,12 @@ bebob_probe(struct fw_unit *unit,
 		goto end;
 	}
 
-	/* create card */
 	err = snd_card_create(index[card_index], id[card_index],
 			THIS_MODULE, sizeof(struct snd_bebob), &card);
 	if (err < 0)
 		goto end;
 	card->private_free = bebob_card_free;
 
-	/* initialize myself */
 	bebob = card->private_data;
 	bebob->card = card;
 	bebob->device = fw_parent_device(unit);
@@ -258,7 +258,10 @@ bebob_probe(struct fw_unit *unit,
 	spin_lock_init(&bebob->lock);
 	init_waitqueue_head(&bebob->hwdep_wait);
 
-	/* discover */
+	err = name_device(bebob, entry->vendor_id);
+	if (err < 0)
+		goto error;
+
 	if ((entry->vendor_id == VEN_MAUDIO1) &&
 	    (entry->model_id == MODEL_MAUDIO_FW1814))
 		err = snd_bebob_maudio_special_discover(bebob, true);
@@ -270,18 +273,11 @@ bebob_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
-	/* name device with communication */
-	err = name_device(bebob, entry->vendor_id);
+	err = snd_bebob_stream_init_duplex(bebob);
 	if (err < 0)
 		goto error;
 
-	err = snd_bebob_create_hwdep_device(bebob);
-	if (err < 0)
-		goto error;
-
-	err = snd_bebob_create_pcm_devices(bebob);
-	if (err < 0)
-		goto error;
+	snd_bebob_proc_init(bebob);
 
 	if ((bebob->midi_input_ports > 0) ||
 	    (bebob->midi_output_ports > 0)) {
@@ -290,13 +286,14 @@ bebob_probe(struct fw_unit *unit,
 			goto error;
 	}
 
-	snd_bebob_proc_init(bebob);
-
-	err = snd_bebob_stream_init_duplex(bebob);
+	err = snd_bebob_create_pcm_devices(bebob);
 	if (err < 0)
 		goto error;
 
-	/* register card and device */
+	err = snd_bebob_create_hwdep_device(bebob);
+	if (err < 0)
+		goto error;
+
 	snd_card_set_dev(card, &unit->device);
 	err = snd_card_register(card);
 	if (err < 0) {
@@ -320,7 +317,6 @@ bebob_update(struct fw_unit *unit)
 {
 	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
 
-	/* this is for firmware bootloader */
 	if (bebob == NULL)
 		return;
 
@@ -333,7 +329,6 @@ static void bebob_remove(struct fw_unit *unit)
 {
 	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);
 
-	/* this is for firmware bootloader */
 	if (bebob == NULL)
 		return;
 
@@ -342,14 +337,14 @@ static void bebob_remove(struct fw_unit *unit)
 	snd_card_free_when_closed(bebob->card);
 }
 
-struct snd_bebob_clock_spec normal_clk_spec = {
-	.get_freq	= &snd_bebob_stream_get_rate,
-	.set_freq	= &snd_bebob_stream_set_rate
+struct snd_bebob_rate_spec normal_rate_spec = {
+	.get	= &snd_bebob_stream_get_rate,
+	.set	= &snd_bebob_stream_set_rate
 };
 static const struct snd_bebob_spec spec_normal = {
-	.load		= NULL,
-	.clock		= &normal_clk_spec,
-	.meter		= NULL
+	.clock	= NULL,
+	.rate	= &normal_rate_spec,
+	.meter	= NULL
 };
 
 static const struct ieee1394_device_id bebob_id_table[] = {
@@ -372,7 +367,7 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_MACKIE, 0x00010067, spec_normal),
 	/* Stanton, ScratchAmp */
 	SND_BEBOB_DEV_ENTRY(VEN_STANTON, 0x00000001, spec_normal),
-	/* Tascam, IF-FW/DM */
+	/* Tascam, IF-FW DM */
 	SND_BEBOB_DEV_ENTRY(VEN_TASCAM, 0x00010067, spec_normal),
 	/* ApogeeElectronics, Rosetta 200/400 (X-FireWire card) */
 	/* ApogeeElectronics, DA/AD/DD-16X (X-FireWire card) */
@@ -422,7 +417,7 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	/* M-Audio, Firewire 410.  */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO2, 0x00010058, maudio_bootloader_spec),
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO2, 0x00010046, maudio_fw410_spec),
-	/* M-Audio, Firewire Audiophile, both of bootloader and firmware */
+	/* M-Audio, Firewire Audiophile */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_AUDIOPHILE_BOTH,
 						maudio_audiophile_spec),
 	/* M-Audio, Firewire Solo */

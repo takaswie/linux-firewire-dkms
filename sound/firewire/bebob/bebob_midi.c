@@ -16,11 +16,6 @@
 
 #include "bebob.h"
 
-/*
- * According to MMA/AMEI-027, MIDI stream is multiplexed with PCM stream in
- * AMDTP packet. The data rate of MIDI message is much less than PCM so there
- * is a little problem to suspend MIDI streams.
- */
 static int midi_capture_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_bebob *bebob = substream->rmidi->private_data;

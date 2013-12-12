@@ -24,7 +24,7 @@
  * [Communication with Windows driver] According to logs of IEEE1394 packets,
  * all models seem to make both of connections when booting.
  *
- * [Actual behavior] In some devices, one CMP connection starts to
+ * [Actual behavior] In some devices, each CMP connection starts to
  * transmit/receive a corresponding stream. But in the others, both of CMP
  * connection needs to start transmitting stream. An example of the latter is
  * 'M-Audio Firewire 410'.
@@ -99,7 +99,7 @@ end:
 int
 snd_bebob_stream_check_internal_clock(struct snd_bebob *bebob, bool *internal)
 {
-	struct snd_bebob_clock_spec *clk = bebob->spec->clock;
+	struct snd_bebob_clock_spec *clk_spec = bebob->spec->clock;
 	u8 addr[AVC_BRIDGECO_ADDR_BYTES], input[7];
 	unsigned int id;
 	int err = 0;
@@ -107,11 +107,11 @@ snd_bebob_stream_check_internal_clock(struct snd_bebob *bebob, bool *internal)
 	*internal = false;
 
 	/* 1.The device has its own operation to switch source of clock */
-	if (clk->get_src) {
-		err = clk->get_src(bebob, &id);
+	if (clk_spec) {
+		err = clk_spec->get(bebob, &id);
 		if (err < 0)
 			goto end;
-		if (strncmp(clk->labels[id], SND_BEBOB_CLOCK_INTERNAL,
+		if (strncmp(clk_spec->labels[id], SND_BEBOB_CLOCK_INTERNAL,
 			    strlen(SND_BEBOB_CLOCK_INTERNAL)) == 0)
 			*internal = true;
 		goto end;
@@ -159,8 +159,9 @@ int snd_bebob_stream_map(struct snd_bebob *bebob,
 	int err;
 
 	/*
-	 * The length of return value of this command cannot be assumed. Here
-	 * keep the maximum length of AV/C command which defined specification.
+	 * The length of return value of this command cannot be expected. Here
+	 * keep the maximum length of AV/C command which defined in
+	 * the specification.
 	 */
 	buf = kzalloc(256, GFP_KERNEL);
 	if (buf == NULL) {
@@ -360,7 +361,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 				  struct amdtp_stream *request,
 				  unsigned int rate)
 {
-	struct snd_bebob_clock_spec *spec = bebob->spec->clock;
+	struct snd_bebob_rate_spec *rate_spec = bebob->spec->rate;
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
 	unsigned int curr_rate;
@@ -394,7 +395,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	}
 
 	/* get current rate */
-	err = spec->get_freq(bebob, &curr_rate);
+	err = rate_spec->get(bebob, &curr_rate);
 	if (err < 0)
 		goto end;
 	if (rate == 0)
@@ -421,10 +422,10 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 
 		/*
 		 * NOTE:
-		 * If establishing connections at first, Yamaha GO46 (and maybe
-		 * TerraTek X24) don't generate sound.
+		 * If establishing connections at first, Yamaha GO46
+		 * (and maybe Terratec X24) don't generate sound.
 		 */
-		err = spec->set_freq(bebob, rate);
+		err = rate_spec->set(bebob, rate);
 		if (err < 0)
 			goto end;
 
@@ -443,10 +444,10 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		/*
 		 * NOTE:
 		 * The firmware customized by M-Audio uses this cue to start
-		 * transmit stream. This is not in specification.
+		 * transmit stream. This is not usual way.
 		 */
 		if (bebob->maudio_special_quirk) {
-			err = spec->set_freq(bebob, rate);
+			err = rate_spec->set(bebob, rate);
 			if (err < 0) {
 				amdtp_stream_stop(master);
 				break_both_connections(bebob);
@@ -684,6 +685,7 @@ end:
 int snd_bebob_stream_discover(struct snd_bebob *bebob)
 {
 	u8 plugs[AVC_PLUG_INFO_BUF_COUNT], addr[AVC_BRIDGECO_ADDR_BYTES];
+	struct snd_bebob_clock_spec *clk_spec = bebob->spec->clock;
 	enum avc_bridgeco_plug_type type;
 	unsigned int i;
 	int err;
@@ -757,7 +759,7 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 	}
 
 	/* for check source of clock later */
-	if (!bebob->spec->clock->get_src)
+	if (!clk_spec)
 		err = seek_msu_sync_input_plug(bebob);
 end:
 	return err;

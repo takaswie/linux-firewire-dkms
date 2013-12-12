@@ -39,12 +39,12 @@
 #include <sound/pcm_params.h>
 #include <sound/hwdep.h>
 
+#include "../lib.h"
+#include "../fcp.h"
 #include "../packets-buffer.h"
 #include "../iso-resources.h"
 #include "../amdtp.h"
-#include "../lib.h"
 #include "../cmp.h"
-#include "../fcp.h"
 
 /* basic register addresses on DM1000 */
 #define BEBOB_ADDR_REG_INFO	0xffffc8020000
@@ -65,11 +65,11 @@ extern const unsigned int snd_bebob_rate_table[SND_BEBOB_STRM_FMT_ENTRIES];
 struct snd_bebob_clock_spec {
 	unsigned int num;
 	char **labels;
-	int (*get_src)(struct snd_bebob *bebob, unsigned int *id);
-	int (*get_freq)(struct snd_bebob *bebob, unsigned int *rate);
-	int (*set_freq)(struct snd_bebob *bebob, unsigned int rate);
-	/* private */
-	struct snd_ctl_elem_id *ctl_id_freq;
+	int (*get)(struct snd_bebob *bebob, unsigned int *id);
+};
+struct snd_bebob_rate_spec {
+	int (*get)(struct snd_bebob *bebob, unsigned int *rate);
+	int (*set)(struct snd_bebob *bebob, unsigned int rate);
 };
 struct snd_bebob_meter_spec {
 	unsigned int num;
@@ -80,6 +80,7 @@ struct snd_bebob_spec {
 	int (*load)(struct fw_unit *unit,
 		    const struct ieee1394_device_id *entry);
 	struct snd_bebob_clock_spec *clock;
+	struct snd_bebob_rate_spec *rate;
 	struct snd_bebob_meter_spec *meter;
 };
 
@@ -258,13 +259,14 @@ extern struct snd_bebob_spec saffirepro_26_spec;
 extern struct snd_bebob_spec saffirepro_10_spec;
 extern struct snd_bebob_spec saffire_le_spec;
 extern struct snd_bebob_spec saffire_spec;
-extern struct snd_bebob_spec maudio_bootloader_spec;
 extern struct snd_bebob_spec maudio_special_spec;
 extern struct snd_bebob_spec maudio_nrv10_spec;
 extern struct snd_bebob_spec maudio_fw410_spec;
 extern struct snd_bebob_spec maudio_audiophile_spec;
 extern struct snd_bebob_spec maudio_solo_spec;
 extern struct snd_bebob_spec maudio_ozonic_spec;
+
+extern struct snd_bebob_spec maudio_bootloader_spec;
 
 int snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814);
 
