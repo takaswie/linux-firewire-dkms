@@ -145,7 +145,6 @@ int avc_bridgeco_get_plug_type(struct fw_unit *unit,
 
 	*type = buf[10];
 	err = 0;
-
 end:
 	kfree(buf);
 	return err;
@@ -257,7 +256,7 @@ int avc_bridgeco_get_plug_input(struct fw_unit *unit,
 	/* info type is 'Plug Input Specific Data' */
 	buf[9] = 0x05;
 
-	/* do transaction and check buf[1-7,9,10] are the same */
+	/* do transaction and check buf[1-7] are the same */
 	err = fcp_avc_transaction(unit, buf, 16, buf, 16,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7));
@@ -268,7 +267,7 @@ int avc_bridgeco_get_plug_input(struct fw_unit *unit,
 		goto end;
 	}
 
-	memcpy(addr, buf + 10, 5);
+	memcpy(input, buf + 10, 5);
 end:
 	kfree(buf);
 	return err;
@@ -366,7 +365,7 @@ int avc_bridgeco_detect_plug_strm(struct fw_unit *unit,
 		goto end;
 	}
 
-	/* when stream is detected, 10th byte is 0x01 */
+	/* 0x01 means detected */
 	*detect = (buf[9] == 0x01);
 	err = 0;
 end:
