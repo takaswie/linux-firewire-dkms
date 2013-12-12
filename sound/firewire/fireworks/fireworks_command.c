@@ -25,10 +25,11 @@
  * Each commands are not required to have continuous sequence numbers. This
  * number is just used to match command and response.
  *
- * NOTE: FFADO implementaion is EFC over AVC but device with firmware
- * version 5.5 or later support it but don't use it. This module support a part
- * of commands. Please see FFADO if you want to see whole commands. But I note
- * there are some commands which FFADO don't implement
+ * This module support a part of commands. Please see FFADO if you want to see
+ * whole commands. But there are some commands which FFADO don't implement.
+ *
+ * Fireworks also supports AV/C general commands and AV/C Stream Format
+ * Information commands. But this module don't use them.
  */
 
 #define EFW_TRANSACTION_SEQNUM_MIN	(SND_EFW_TRANSACTION_SEQNUM_MAX + 1)
@@ -153,7 +154,7 @@ efw_transaction(struct snd_efw *efw, unsigned int category,
 
 	/* fill transaction command parameters */
 	for (i = 0; i < param_quads; i++)
-		buf[6 + i] = params[i];
+		header->params[i] = params[i];
 
 	err = snd_efw_transaction_run(efw->unit, buf, cmd_bytes,
 				      buf, buf_bytes, seqnum);
@@ -168,8 +169,8 @@ efw_transaction(struct snd_efw *efw, unsigned int category,
 	    (header->command  != command) ||
 	    (header->status   != EFC_RETVAL_OK)) {
 		dev_err(&efw->unit->device, "EFC failed [%u/%u]: %s\n",
-			be32_to_cpu(buf[3]), be32_to_cpu(buf[4]),
-			efr_status_names[be32_to_cpu(buf[5])]);
+			header->category, header->command,
+			efr_status_names[header->status]);
 		err = -EIO;
 		goto end;
 	}
@@ -237,7 +238,8 @@ int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 
 	err  = efw_transaction(efw, EFC_CAT_HWINFO,
 			       EFC_CMD_HWINFO_GET_CAPS,
-			       NULL, 0, (__be32 *)hwinfo, sizeof(*hwinfo) / 4);
+			       NULL, 0, (__be32 *)hwinfo,
+			       sizeof(*hwinfo) / sizeof(u32));
 	if (err < 0)
 		goto end;
 
@@ -284,9 +286,9 @@ int snd_efw_command_get_phys_meters(struct snd_efw *efw,
 
 	err = efw_transaction(efw, EFC_CAT_HWINFO,
 			      EFC_CMD_HWINFO_GET_POLLED,
-			      NULL, 0, (__be32 *)meters, len / 4);
+			      NULL, 0, (__be32 *)meters, len / sizeof(u32));
 	if (err >= 0)
-		for (i = 0; i < len / 4; i++)
+		for (i = 0; i < len / sizeof(u32); i++)
 			be32_to_cpus(&buf[i]);
 
 	return err;
@@ -300,7 +302,8 @@ command_get_clock(struct snd_efw *efw, struct efc_clock *clock)
 	err = efw_transaction(efw, EFC_CAT_HWCTL,
 			      EFC_CMD_HWCTL_GET_CLOCK,
 			      NULL, 0,
-			      (__be32 *)clock, sizeof(struct efc_clock) / 4);
+			      (__be32 *)clock,
+			      sizeof(struct efc_clock) / sizeof(u32));
 	if (err >= 0) {
 		be32_to_cpus(&clock->source);
 		be32_to_cpus(&clock->sampling_rate);
@@ -346,7 +349,9 @@ command_set_clock(struct snd_efw *efw,
 
 	err = efw_transaction(efw, EFC_CAT_HWCTL,
 			      EFC_CMD_HWCTL_SET_CLOCK,
-			      (__be32 *)&clock, 3, NULL, 0);
+			      (__be32 *)&clock,
+			      sizeof(struct efc_clock) / sizeof(u32),
+			      NULL, 0);
 	if (err < 0)
 		goto end;
 
