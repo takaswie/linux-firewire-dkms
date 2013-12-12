@@ -99,9 +99,9 @@ proc_read_hwinfo(struct snd_info_entry *entry, struct snd_info_buffer *buffer)
 	snd_iprintf(buffer, "midi out ports: 0x%X\n", hwinfo.midi_out_ports);
 	snd_iprintf(buffer, "midi in ports: 0x%X\n", hwinfo.midi_in_ports);
 
-	snd_iprintf(buffer, "num mixer_playback_channels: 0x%X\n",
+	snd_iprintf(buffer, "mixer playback channels: 0x%X\n",
 		    hwinfo.mixer_playback_channels);
-	snd_iprintf(buffer, "num mixer_capture_channels: 0x%X\n",
+	snd_iprintf(buffer, "mixer capture channels: 0x%X\n",
 		    hwinfo.mixer_capture_channels);
 end:
 	return;

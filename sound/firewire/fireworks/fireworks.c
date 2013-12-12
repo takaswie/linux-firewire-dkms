@@ -17,6 +17,14 @@
  * along with this driver; if not, see <http://www.gnu.org/licenses/>.
  */
 
+/*
+ * Fireworks is a board module which Echo Audio produces. This board module
+ * consists of three chipsets:
+ *  - Communication chipset for IEEE1394 PHY/Link and IEC 61883-1/6
+ *  - DSP or/and FPGA for signal processing
+ *  - Flash Memory to store firmwares
+ */
+
 #include "fireworks.h"
 
 MODULE_DESCRIPTION("Echo Fireworks driver");
@@ -85,12 +93,11 @@ get_hardware_info(struct snd_efw *efw)
 	if (err < 0)
 		goto end;
 
-	/* firmware version */
+	/* firmware version for communication chipset */
 	err = sprintf(version, "%u.%u",
 		      (hwinfo->arm_version >> 24) & 0xff,
 		      (hwinfo->arm_version >> 16) & 0xff);
 
-	/* set names */
 	strcpy(efw->card->driver, "Fireworks");
 	strcpy(efw->card->shortname, hwinfo->model_name);
 	snprintf(efw->card->longname, sizeof(efw->card->longname),
@@ -103,7 +110,6 @@ get_hardware_info(struct snd_efw *efw)
 	if (hwinfo->flags & BIT(FLAG_RESP_ADDR_CHANGABLE))
 		efw->resp_addr_changable = true;
 
-	/* set flag for supported sampling rate */
 	efw->supported_sampling_rate = 0;
 	if ((hwinfo->min_sample_rate <= 22050)
 	 && (22050 <= hwinfo->max_sample_rate))
@@ -130,11 +136,9 @@ get_hardware_info(struct snd_efw *efw)
 	 && (192000 <= hwinfo->max_sample_rate))
 		efw->supported_sampling_rate |= SNDRV_PCM_RATE_192000;
 
-	/* MIDI inputs and outputs */
 	efw->midi_out_ports = hwinfo->midi_out_ports;
 	efw->midi_in_ports = hwinfo->midi_in_ports;
 
-	/* PCM capture and playback channels */
 	efw->pcm_capture_channels[0] = hwinfo->amdtp_tx_pcm_channels;
 	efw->pcm_capture_channels[1] = hwinfo->amdtp_tx_pcm_channels_2x;
 	efw->pcm_capture_channels[2] = hwinfo->amdtp_tx_pcm_channels_4x;
@@ -235,7 +239,7 @@ efw_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
-	snd_efw_transaction_register_instance(efw);
+	snd_efw_transaction_add_instance(efw);
 	err = snd_efw_create_hwdep_device(efw);
 	if (err < 0)
 		goto error;
@@ -272,7 +276,7 @@ static void efw_remove(struct fw_unit *unit)
 	struct snd_efw *efw = dev_get_drvdata(&unit->device);
 
 	snd_efw_stream_destroy_duplex(efw);
-	snd_efw_transaction_unregister_instance(efw);
+	snd_efw_transaction_remove_instance(efw);
 
 	snd_card_disconnect(efw->card);
 	snd_card_free_when_closed(efw->card);

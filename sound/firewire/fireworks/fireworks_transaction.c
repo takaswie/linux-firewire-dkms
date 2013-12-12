@@ -14,15 +14,12 @@
  *
  * You should have received a copy of the GNU General Public License
  * along with this driver; if not, see <http://www.gnu.org/licenses/>.
- *
- * Mostly based on FFADO's souce, which is licensed under GPL version 2 (and
- * optionally version 3).
  */
 
 /*
- * Fireworks have its own transaction. Fireworks also support AV/C General
- * commands and AV/C Stream Format Information commands. This module supports
- * own commands.
+ * Fireworks have its own transaction. The transaction can be delivered by AV/C
+ * Vendor Specific command. But at least Windows driver and firmware version 5.5
+ * or later don't use it.
  *
  * Transaction substance:
  *  At first, 6 data exist. Following to the 6 data, parameters for each
@@ -196,7 +193,7 @@ handle_resp_for_user(struct fw_card *card, int generation, int source,
 		if ((device->card != card) ||
 		    (device->generation != generation))
 			continue;
-		smp_rmb();	/* node id vs.generation */
+		smp_rmb();	/* node id vs. generation */
 		if (device->node_id != source)
 			continue;
 
@@ -272,7 +269,7 @@ end:
 	fw_send_response(card, request, rcode);
 }
 
-void snd_efw_transaction_register_instance(struct snd_efw *efw)
+void snd_efw_transaction_add_instance(struct snd_efw *efw)
 {
 	unsigned int i;
 
@@ -288,7 +285,7 @@ void snd_efw_transaction_register_instance(struct snd_efw *efw)
 	spin_unlock_irq(&instances_lock);
 }
 
-void snd_efw_transaction_unregister_instance(struct snd_efw *efw)
+void snd_efw_transaction_remove_instance(struct snd_efw *efw)
 {
 	unsigned int i;
 

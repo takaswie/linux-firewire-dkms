@@ -293,8 +293,8 @@ static int pcm_open(struct snd_pcm_substream *substream)
 		goto end;
 
 	/*
-	 * When source of clock is not internal or any PCM stream are running,
-	 * the available sampling rate is limited at current sampling rate.
+	 * When source of clock is not internal or any PCM streams are running,
+	 * available sampling rate is limited at current sampling rate.
 	 */
 	if ((clock_source != SND_EFW_CLOCK_SOURCE_INTERNAL) ||
 	    amdtp_stream_pcm_running(&efw->tx_stream) ||

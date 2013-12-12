@@ -115,8 +115,8 @@ int snd_efw_transaction_run(struct fw_unit *unit,
 int snd_efw_transaction_register(void);
 void snd_efw_transaction_unregister(void);
 void snd_efw_transaction_bus_reset(struct fw_unit *unit);
-void snd_efw_transaction_register_instance(struct snd_efw *efw);
-void snd_efw_transaction_unregister_instance(struct snd_efw *efw);
+void snd_efw_transaction_add_instance(struct snd_efw *efw);
+void snd_efw_transaction_remove_instance(struct snd_efw *efw);
 
 /* for needed commands */
 struct snd_efw_hwinfo {
