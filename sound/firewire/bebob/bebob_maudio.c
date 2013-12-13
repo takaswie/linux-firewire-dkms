@@ -143,6 +143,10 @@ special_clk_set_params(struct snd_bebob *bebob, unsigned int clk_src,
 	int err;
 	u8 *buf;
 
+	if (amdtp_stream_running(&bebob->rx_stream) ||
+	    amdtp_stream_running(&bebob->tx_stream))
+		return -EBUSY;
+
 	buf = kmalloc(12, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
@@ -381,7 +385,7 @@ static int special_sync_ctl_get(struct snd_kcontrol *kctl,
 	mutex_lock(&bebob->mutex);
 	err = check_clk_sync(bebob, METER_SIZE_SPECIAL, &synced);
 	if (err >= 0)
-		uval->value.integer.value[0] = !synced;
+		uval->value.integer.value[0] = synced;
 	mutex_unlock(&bebob->mutex);
 
 	return 0;
@@ -499,11 +503,9 @@ static int special_dig_out_iface_ctl_set(struct snd_kcontrol *kctl,
 
 	err = special_clk_set_params(bebob, bebob->clk_src, bebob->dig_in_fmt,
 				     id, bebob->clk_lock);
-	if (err < 0)
-		goto end;
+	if (err >= 0)
+		special_stream_formation_set(bebob);
 
-	special_stream_formation_set(bebob);
-end:
 	return err;
 }
 static struct snd_kcontrol_new special_dig_out_iface_ctl = {
