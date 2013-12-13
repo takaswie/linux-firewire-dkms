@@ -74,43 +74,31 @@
 /* for NRV */
 #define UNKNOWN_METER	"Unknown"
 
-/* If we make any transaction to load firmware, the operation may failed. */
-/* TODO: change snd-firewire-lib and use it */
-static int
-run_a_transaction(struct fw_unit *unit, int tcode,
-		  u64 offset, void *buffer, size_t length)
-{
-	struct fw_device *device = fw_parent_device(unit);
-	int generation, rcode;
-
-	generation = device->generation;
-	smp_rmb();	/* node id vs. generation*/
-	rcode = fw_run_transaction(device->card, tcode,
-				   device->node_id, generation,
-				   device->max_speed, offset,
-				   buffer, length);
-	if (rcode == RCODE_COMPLETE)
-		return 0;
-
-	dev_err(&unit->device, "Failed to send a queue to load firmware\n");
-	return -EIO;
-}
-
 /*
- * For some M-Audio devices, this module just send cue to load
- * firmware. After loading, the device generates bus reset and
- * newly detected.
+ * For some M-Audio devices, this module just send cue to load firmware. After
+ * loading, the device generates bus reset and newly detected.
+ *
+ * If we make any transactions to load firmware, the operation may failed.
  */
 int snd_bebob_maudio_load_firmware(struct fw_unit *unit)
 {
+	struct fw_device *device = fw_parent_device(unit);
 	__be32 cues[3];
+	int rcode;
 
 	cues[0] = cpu_to_be32(MAUDIO_BOOTLOADER_CUE1);
 	cues[1] = cpu_to_be32(MAUDIO_BOOTLOADER_CUE2);
 	cues[2] = cpu_to_be32(MAUDIO_BOOTLOADER_CUE3);
 
-	return run_a_transaction(unit, TCODE_WRITE_BLOCK_REQUEST,
-				 BEBOB_ADDR_REG_REQ, cues, sizeof(cues));
+	rcode = fw_run_transaction(device->card, TCODE_WRITE_BLOCK_REQUEST,
+				   device->node_id, device->generation,
+				   device->max_speed, BEBOB_ADDR_REG_REQ,
+				   cues, sizeof(cues));
+	if (rcode == RCODE_COMPLETE)
+		return 0;
+
+	dev_err(&unit->device, "Failed to send a queue to load firmware\n");
+	return -EIO;
 }
 
 static inline int
