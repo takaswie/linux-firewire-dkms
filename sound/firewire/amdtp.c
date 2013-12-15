@@ -45,7 +45,7 @@
 #define AMDTP_DBS_MASK		0x00ff0000
 #define AMDTP_DBS_SHIFT		16
 #define AMDTP_DBC_MASK		0x000000ff
-#define DBC_THREADSHOULD        (AMDTP_DBC_MASK / 2)
+#define DBC_THRESHOLD		(AMDTP_DBC_MASK / 2)
 
 /* TODO: make these configurable */
 #define INTERRUPT_INTERVAL	16
@@ -858,15 +858,15 @@ static void packet_sort(struct sort_table *tbl, unsigned int len)
 	do {
 		for (j = i + 1; j < len; j++) {
 			if (((tbl[i].dbc > tbl[j].dbc) &&
-			     (tbl[i].dbc - tbl[j].dbc < DBC_THREADSHOULD))) {
+			     (tbl[i].dbc - tbl[j].dbc < DBC_THRESHOLD))) {
 				SWAP(tbl, i, j);
 			} else if ((tbl[j].dbc > tbl[i].dbc) &&
 				   (tbl[j].dbc - tbl[i].dbc >
-							DBC_THREADSHOULD)) {
+							DBC_THRESHOLD)) {
 				for (k = i; k > 0; k--) {
 					if ((tbl[k].dbc > tbl[j].dbc) ||
 					    (tbl[j].dbc - tbl[k].dbc >
-							DBC_THREADSHOULD)) {
+							DBC_THRESHOLD)) {
 						SWAP(tbl, j, k);
 					}
 					break;
