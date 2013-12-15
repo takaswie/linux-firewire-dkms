@@ -176,7 +176,7 @@ void snd_bebob_proc_init(struct snd_bebob *bebob)
 {
 	struct snd_info_entry *entry;
 
-	if (!snd_card_proc_new(bebob->card, "#hardware", &entry))
+	if (!snd_card_proc_new(bebob->card, "#firmware", &entry))
 		snd_info_set_text_ops(entry, bebob, proc_read_hw_info);
 
 	if (!snd_card_proc_new(bebob->card, "#formation", &entry))

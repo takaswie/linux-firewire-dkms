@@ -204,7 +204,7 @@ void snd_efw_proc_init(struct snd_efw *efw)
 {
 	struct snd_info_entry *entry;
 
-	if (!snd_card_proc_new(efw->card, "#hardware", &entry))
+	if (!snd_card_proc_new(efw->card, "#firmware", &entry))
 		snd_info_set_text_ops(entry, efw, proc_read_hwinfo);
 	if (!snd_card_proc_new(efw->card, "#queues", &entry))
 		snd_info_set_text_ops(entry, efw, proc_read_queues_state);
