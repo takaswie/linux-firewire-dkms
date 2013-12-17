@@ -148,6 +148,7 @@ void amdtp_stream_set_parameters(struct amdtp_stream *s,
 	unsigned int i, sfc, midi_channels;
 
 	midi_channels = DIV_ROUND_UP(midi_ports, 8);
+
 	if (WARN_ON(amdtp_stream_running(s)) |
 	    WARN_ON(pcm_channels > AMDTP_MAX_CHANNELS_FOR_PCM) |
 	    WARN_ON(midi_channels > AMDTP_MAX_CHANNELS_FOR_MIDI))
@@ -170,9 +171,8 @@ sfc_found:
 		s->pcm_channels = pcm_channels;
 	}
 	s->sfc = sfc;
-	s->pcm_channels = pcm_channels;
-	s->midi_channels = midi_channels;
-	s->data_block_quadlets = s->pcm_channels + s->midi_channels;
+	s->midi_ports = midi_ports;
+	s->data_block_quadlets = s->pcm_channels + midi_channels;
 
 	s->syt_interval = amdtp_syt_intervals[s->sfc];
 
@@ -185,8 +185,7 @@ sfc_found:
 	/* init the position map for PCM and MIDI channels */
 	for (i = 0; i < pcm_channels; i++)
 		s->pcm_positions[i] = i;
-	for (i = 0; i < midi_channels; i++)
-		s->midi_positions[i] = s->pcm_channels + i;
+	s->midi_position = i;
 }
 EXPORT_SYMBOL(amdtp_stream_set_parameters);
 
@@ -613,34 +612,30 @@ static void amdtp_fill_pcm_silence_dualwire(struct amdtp_stream *s,
 		buffer += s->data_block_quadlets;
 	}
 }
+
 static void amdtp_fill_midi(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
-	unsigned int m, f, c, port;
+	unsigned int f, port;
 	u8 *b;
 
 	for (f = 0; f < frames; f++) {
-		m = (s->data_block_counter + f) % 8;
+		buffer[s->midi_position] = 0x00;
+		b = (u8 *)&buffer[s->midi_position];
 
-		for (c = 0; c < s->midi_channels; c++) {
-			buffer[s->midi_positions[c]] = 0x00;
-			b = (u8 *)&buffer[s->midi_positions[c]];
-
-			/*
-			 * NOTE:
-			 * Fireworks ignores midi messages in more than first 8
-			 * data blocks in an packet.
-			 */
-			port = c * 8 + m;
-			if ((f >= s->blocks_for_midi) ||
-			    (s->midi[port] == NULL) ||
-			    (snd_rawmidi_transmit(s->midi[port],
-						  b + 1, 1) <= 0)) {
-				b[0] = 0x80;
-				b[1] = 0x00;	/* confirm to be zero */
-			} else {
-				b[0] = 0x81;
-			}
+		/*
+		 * NOTE:
+		 * Fireworks ignores midi messages in more than first 8
+		 * data blocks of an packet.
+		 */
+		port = (s->data_block_counter + f) % 8;
+		if ((f >= s->blocks_for_midi) ||
+		    (s->midi[port] == NULL) ||
+		    (snd_rawmidi_transmit(s->midi[port], b + 1, 1) <= 0)) {
+			b[0] = 0x80;
+			b[1] = 0x00;	/* confirm to be zero */
+		} else {
+			b[0] = 0x81;
 		}
 		buffer += s->data_block_quadlets;
 	}
@@ -649,25 +644,22 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 static void amdtp_pull_midi(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
-	unsigned int m, f, c, port;
+	unsigned int f, port;
 	int len;
 	u8 *b;
 
 	for (f = 0; f < frames; f++) {
-		m = (s->data_block_counter + f) % 8;
-		for (c = 0; c < s->midi_channels; c++) {
-			b = (u8 *)&buffer[s->midi_positions[c]];
+		port = (s->data_block_counter + f) % 8;
+		b = (u8 *)&buffer[s->midi_position];
 
-			len = b[0] - 0x80;
-			if (len < 1 || 3 < len)
-				continue;
+		len = b[0] - 0x80;
+		if (len < 1 || 3 < len)
+			continue;
 
-			port = c * 8 + m;
-			if (s->midi[port] == NULL)
-				continue;
+		if (s->midi[port] == NULL)
+			continue;
 
-			snd_rawmidi_receive(s->midi[port], b + 1, len);
-		}
+		snd_rawmidi_receive(s->midi[port], b + 1, len);
 		buffer += s->data_block_quadlets;
 	}
 }
@@ -771,7 +763,7 @@ static void handle_out_packet(struct amdtp_stream *s, unsigned int syt)
 		amdtp_fill_pcm_silence_dualwire(s, buffer, data_blocks);
 	else
 		amdtp_fill_pcm_silence(s, buffer, data_blocks);
-	if (s->midi_channels)
+	if (s->midi_ports)
 		amdtp_fill_midi(s, buffer, data_blocks);
 
 	s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
@@ -833,7 +825,7 @@ static void handle_in_packet(struct amdtp_stream *s,
 	if (pcm)
 		s->transfer_samples(s, pcm, buffer, data_blocks);
 
-	if (s->midi_channels)
+	if (s->midi_ports)
 		amdtp_pull_midi(s, buffer, data_blocks);
 
 	if (pcm)
@@ -1231,37 +1223,6 @@ bool amdtp_stream_wait_callback(struct amdtp_stream *s)
 EXPORT_SYMBOL(amdtp_stream_wait_callback);
 
 /**
- * amdtp_stream_midi_add - add MIDI stream
- * @s: the AMDTP stream
- * @substream: the MIDI stream to be added
- *
- * This function don't check the number of midi substream but it should be
- * within AMDTP_MAX_MIDI_STREAMS.
- */
-void amdtp_stream_midi_add(struct amdtp_stream *s,
-			   struct snd_rawmidi_substream *substream)
-{
-	ACCESS_ONCE(s->midi[substream->number]) = substream;
-}
-EXPORT_SYMBOL(amdtp_stream_midi_add);
-
-/**
- * amdtp_stream_midi_remove - remove MIDI stream
- * @s: the AMDTP stream
- * @substream: the MIDI stream to be removed
- *
- * This function should not be automatically called by amdtp_stream_stop
- * because the AMDTP stream only with MIDI stream need to be restarted by
- * PCM streams at requested sampling rate.
- */
-void amdtp_stream_midi_remove(struct amdtp_stream *s,
-			      struct snd_rawmidi_substream *substream)
-{
-	ACCESS_ONCE(s->midi[substream->number]) = NULL;
-}
-EXPORT_SYMBOL(amdtp_stream_midi_remove);
-
-/**
  * amdtp_stream_midi_running - check any MIDI streams are running or not
  * @s: the AMDTP stream
  *
@@ -1273,7 +1234,6 @@ bool amdtp_stream_midi_running(struct amdtp_stream *s)
 	for (i = 0; i < AMDTP_MAX_CHANNELS_FOR_MIDI * 8; i++)
 		if (!IS_ERR_OR_NULL(s->midi[i]))
 			return true;
-
 	return false;
 }
 EXPORT_SYMBOL(amdtp_stream_midi_running);

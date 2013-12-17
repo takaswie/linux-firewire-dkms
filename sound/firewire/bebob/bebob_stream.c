@@ -223,7 +223,7 @@ unsigned int map_stream(struct snd_bebob *bebob, struct amdtp_stream *s)
 					err = -ENOSYS;
 					goto end;
 				}
-				s->midi_positions[location] = stm_pos;
+				s->midi_position = stm_pos;
 				break;
 			/* for PCM data channel */
 			case 0x01:	/* Headphone */

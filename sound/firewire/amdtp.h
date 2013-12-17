@@ -55,15 +55,14 @@ enum cip_sfc {
 #define AMDTP_MAX_CHANNELS_FOR_PCM	64
 
 /*
- * AMDTP packet can include channels for midi conformant data.
+ * AMDTP packet can include channels for MIDI conformant data.
  * Each MIDI conformant data channel includes 8 MPX-MIDI data stream.
- * Each MPX-MIDI data stream include data stream from/to MIDI ports.
+ * Each MPX-MIDI data stream includes one data stream from/to MIDI ports.
  *
- * This module supports maximum 2 MIDI conformant data channels.
- * Then this AMDTP packets include maximum 16 MIDI streams.
- * This limitation is for our convinience.
+ * This module supports maximum 1 MIDI conformant data channels.
+ * Then this AMDTP packets can transfer maximum 8 MIDI data streams.
  */
-#define AMDTP_MAX_CHANNELS_FOR_MIDI	2
+#define AMDTP_MAX_CHANNELS_FOR_MIDI	1
 
 struct fw_unit;
 struct fw_iso_context;
@@ -86,12 +85,12 @@ struct amdtp_stream {
 	bool dual_wire;
 	unsigned int data_block_quadlets;
 	unsigned int pcm_channels;
-	unsigned int midi_channels;
+	unsigned int midi_ports;
 	void (*transfer_samples)(struct amdtp_stream *s,
 				 struct snd_pcm_substream *pcm,
 				 __be32 *buffer, unsigned int frames);
 	u8 pcm_positions[AMDTP_MAX_CHANNELS_FOR_PCM];
-	u8 midi_positions[AMDTP_MAX_CHANNELS_FOR_MIDI];
+	u8 midi_position;
 
 	unsigned int syt_interval;
 	unsigned int transfer_delay;
@@ -165,20 +164,6 @@ static inline bool amdtp_stream_running(struct amdtp_stream *s)
 bool amdtp_stream_midi_running(struct amdtp_stream *s);
 
 /**
- * amdtp_stream_set_pcm - configure format of PCM samples
- * @s: the AMDTP stream to be configured
- * @pcm_channels: the number of PCM samples in each data block, to be encoded
- *                as AM824 multi-bit linear audio
- *
- * This function must not be called while the stream is running.
- */
-static inline void amdtp_stream_set_pcm(struct amdtp_stream *s,
-					unsigned int pcm_channels)
-{
-	s->pcm_channels = pcm_channels;
-}
-
-/**
  * amdtp_streaming_error - check for streaming error
  * @s: the AMDTP stream
  *
@@ -219,6 +204,7 @@ static inline void amdtp_stream_pcm_trigger(struct amdtp_stream *s,
 /**
  * amdtp_stream_midi_trigger - start/stop playback/capture with a MIDI device
  * @s: the AMDTP stream
+ * @port: index of MIDI port
  * @midi: the MIDI device to be started, or %NULL to stop the current device
  *
  * Call this function on a running isochronous stream to enable the actual
@@ -229,7 +215,8 @@ static inline void amdtp_stream_midi_trigger(struct amdtp_stream *s,
 					     unsigned int port,
 					     struct snd_rawmidi_substream *midi)
 {
-	ACCESS_ONCE(s->midi[port]) = midi;
+	if (port < s->midi_ports)
+		ACCESS_ONCE(s->midi[port]) = midi;
 }
 
 static inline bool cip_sfc_is_base_44100(enum cip_sfc sfc)
