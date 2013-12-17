@@ -148,28 +148,24 @@ end:
 	return err;
 }
 
-
-int snd_bebob_stream_map(struct snd_bebob *bebob,
-			 struct amdtp_stream *stream)
+unsigned int map_stream(struct snd_bebob *bebob, struct amdtp_stream *s)
 {
-	unsigned int cl, ch, clusters, channels, pos, pcm, midi;
-	u8 *buf, ctype;
-	u8 addr[AVC_BRIDGECO_ADDR_BYTES];
+	unsigned int sec, sections, ch, channels;
+	unsigned int pcm, midi, location;
+	unsigned int stm_pos, sec_loc, pos;
+	u8 *buf, addr[AVC_BRIDGECO_ADDR_BYTES], type;
 	enum avc_bridgeco_plug_dir dir;
 	int err;
 
 	/*
 	 * The length of return value of this command cannot be expected. Here
-	 * keep the maximum length of AV/C command which defined in
-	 * the specification.
+	 * use the maximum length of FCP.
 	 */
 	buf = kzalloc(256, GFP_KERNEL);
-	if (buf == NULL) {
-		err = -ENOMEM;
-		goto end;
-	}
+	if (buf == NULL)
+		return -ENOMEM;
 
-	if (stream == &bebob->tx_stream)
+	if (s == &bebob->tx_stream)
 		dir = AVC_BRIDGECO_PLUG_DIR_OUT;
 	else
 		dir = AVC_BRIDGECO_PLUG_DIR_IN;
@@ -178,31 +174,86 @@ int snd_bebob_stream_map(struct snd_bebob *bebob,
 	err = avc_bridgeco_get_plug_ch_pos(bebob->unit, addr, buf, 256);
 	if (err < 0)
 		goto end;
+	pos = 0;
 
-	clusters = *buf;
-	buf++;
+	/* positions in I/O buffer */
 	pcm = 0;
 	midi = 0;
-	for (cl = 0; cl < clusters; cl++) {
+
+	/* the number of sections in AMDTP packet */
+	sections = buf[pos++];
+
+	for (sec = 0; sec < sections; sec++) {
+		/* type of this section */
 		avc_bridgeco_fill_unit_addr(addr, dir,
 					    AVC_BRIDGECO_PLUG_UNIT_ISOC, 0);
-		err = avc_bridgeco_get_plug_cluster_type(bebob->unit, addr,
-							 cl, &ctype);
+		err = avc_bridgeco_get_plug_section_type(bebob->unit, addr,
+							 sec, &type);
 		if (err < 0)
 			goto end;
-
-		channels = *buf;
-		buf++;
-		for (ch = 0; ch < channels; ch++) {
-			pos = *buf - 1;
-			if (ctype != 0x0a)
-				stream->pcm_positions[pcm++] = pos;
-			else
-				stream->midi_positions[midi++] = pos;
-			buf += 2;
+		/* NoType */
+		if (type == 0xff) {
+			err = -ENOSYS;
+			goto end;
 		}
+
+		/* the number of channels in this section */
+		channels = buf[pos++];
+
+		for (ch = 0; ch < channels; ch++) {
+			/* position of this channel in AMDTP packet */
+			stm_pos = buf[pos++] - 1;
+			/* location of this channel in this section */
+			sec_loc = buf[pos++] - 1;
+
+			/*
+			 * Basically the number of location is within the
+			 * number of channels in this section. But some models
+			 * of M-Audio don't follow this. Its location for MIDI
+			 * is the position of MIDI channels in AMDTP packet.
+			 */
+			if (sec_loc >= channels)
+				sec_loc = ch;
+
+			switch (type) {
+			/* for MIDI conformant data channel */
+			case 0x0a:
+				location = midi + sec_loc;
+				if (location >= AMDTP_MAX_CHANNELS_FOR_MIDI) {
+					err = -ENOSYS;
+					goto end;
+				}
+				s->midi_positions[location] = stm_pos;
+				break;
+			/* for PCM data channel */
+			case 0x01:	/* Headphone */
+			case 0x02:	/* Microphone */
+			case 0x03:	/* Line */
+			case 0x04:	/* SPDIF */
+			case 0x05:	/* ADAT */
+			case 0x06:	/* TDIF */
+			case 0x07:	/* MADI */
+			/* for undefined/changeable signal  */
+			case 0x08:	/* Analog */
+			case 0x09:	/* Digital */
+			default:
+				location = pcm + sec_loc;
+				if (location >= AMDTP_MAX_CHANNELS_FOR_PCM) {
+					err = -ENOSYS;
+					goto end;
+				}
+				s->pcm_positions[location] = stm_pos;
+				break;
+			}
+		}
+
+		if (type != 0x0a)
+			pcm += channels;
+		else
+			midi += channels;
 	}
 end:
+	kfree(buf);
 	return err;
 }
 
@@ -319,7 +370,7 @@ start_stream(struct snd_bebob *bebob, struct amdtp_stream *stream,
 
 	/* channel mapping */
 	if (!bebob->maudio_special_quirk) {
-		err = snd_bebob_stream_map(bebob, stream);
+		err = map_stream(bebob, stream);
 		if (err < 0)
 			goto end;
 	}

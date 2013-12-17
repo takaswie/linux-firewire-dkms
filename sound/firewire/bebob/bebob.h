@@ -200,9 +200,9 @@ int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
 int avc_bridgeco_get_plug_type(struct fw_unit *unit,
 			       u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 			       enum avc_bridgeco_plug_type *type);
-int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
+int avc_bridgeco_get_plug_section_type(struct fw_unit *unit,
 				       u8 addr[AVC_BRIDGECO_ADDR_BYTES],
-				       unsigned int cluster_id, u8 *ctype);
+				       unsigned int section_id, u8 *ctype);
 int avc_bridgeco_get_plug_input(struct fw_unit *unit,
 				u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				u8 input[7]);

@@ -202,14 +202,14 @@ end:
 	return err;
 }
 
-int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
+int avc_bridgeco_get_plug_section_type(struct fw_unit *unit,
 				       u8 addr[AVC_BRIDGECO_ADDR_BYTES],
-				       unsigned int cluster_id, u8 *type)
+				       unsigned int section_id, u8 *type)
 {
 	u8 *buf;
 	int err;
 
-	/* cluster info includes characters but this module don't need it */
+	/* sectioninfo includes characters but this module don't need it */
 	buf = kzalloc(12, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
@@ -217,8 +217,8 @@ int avc_bridgeco_get_plug_cluster_type(struct fw_unit *unit,
 	/* status for plug info with bridgeco extension */
 	avc_bridgeco_fill_command_base(buf, 0x01, 0x02, 0xc0, addr);
 
-	buf[9] = 0x07;		/* info type is 'cluster info' */
-	buf[10] = 0xff & (cluster_id + 1);	/* cluster id */
+	buf[9] = 0x07;		/* info type is 'section info' */
+	buf[10] = 0xff & (section_id + 1);	/* section id */
 	buf[11] = 0x00;		/* type in response */
 
 	/* do transaction and check buf[1-7,9,10] are the same */
@@ -245,7 +245,6 @@ int avc_bridgeco_get_plug_input(struct fw_unit *unit,
 	int err;
 	u8 *buf;
 
-	/* cluster info includes characters but this module don't need it */
 	buf = kzalloc(18, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
