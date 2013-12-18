@@ -163,18 +163,17 @@ void amdtp_stream_set_parameters(struct amdtp_stream *s,
 sfc_found:
 	s->dual_wire = (s->flags & CIP_HI_DUALWIRE) && sfc > CIP_SFC_96000;
 	if (s->dual_wire) {
-		s->sfc = sfc - 2;
-		s->pcm_channels = pcm_channels * 2;
+		sfc -= 2;
 		rate /= 2;
+		s->pcm_channels = pcm_channels * 2;
 	} else {
-		s->sfc = sfc;
 		s->pcm_channels = pcm_channels;
 	}
 	s->sfc = sfc;
-	s->midi_ports = midi_ports;
 	s->data_block_quadlets = s->pcm_channels + midi_channels;
+	s->midi_ports = midi_ports;
 
-	s->syt_interval = amdtp_syt_intervals[s->sfc];
+	s->syt_interval = amdtp_syt_intervals[sfc];
 
 	/* default buffering in the device */
 	s->transfer_delay = TRANSFER_DELAY_TICKS - TICKS_PER_CYCLE;
@@ -185,7 +184,7 @@ sfc_found:
 	/* init the position map for PCM and MIDI channels */
 	for (i = 0; i < pcm_channels; i++)
 		s->pcm_positions[i] = i;
-	s->midi_position = i;
+	s->midi_position = pcm_channels;
 }
 EXPORT_SYMBOL(amdtp_stream_set_parameters);
 
@@ -612,7 +611,6 @@ static void amdtp_fill_pcm_silence_dualwire(struct amdtp_stream *s,
 		buffer += s->data_block_quadlets;
 	}
 }
-
 static void amdtp_fill_midi(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
