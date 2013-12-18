@@ -613,23 +613,28 @@ set_stream_formation(u8 *buf, unsigned int len,
 		switch (format) {
 		/* PCM for IEC 60958-3 */
 		case 0x00:
-		/* PCM for IEC 61937-3 to 7 */
-		case 0x01:
-		case 0x02:
-		case 0x03:
-		case 0x04:
-		case 0x05:
-		/* PCM for Multi bit linear audio */
-		case 0x06:	/* raw */
-		case 0x07:	/* DVD-Audio */
+		/* PCM for Multi bit linear audio (raw) */
+		case 0x06:
 			formation->pcm += channels;
 			break;
 		/* MIDI comformant (MMA/AMEI RP-027) */
 		case 0x0d:
 			formation->midi += channels;
 			break;
+		/* PCM for Multi bit linear audio (DVD-audio) */
+		case 0x07:
+		/* IEC 61937-3 to 7 */
+		case 0x01:
+		case 0x02:
+		case 0x03:
+		case 0x04:
+		case 0x05:
+		/* High precision multi bit linear audio */
+		case 0x0c:
+		/* Don't care */
+		case 0xff:
 		default:
-			break;
+			break;	/* not supported */
 		}
 	}
 
