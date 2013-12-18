@@ -635,7 +635,7 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 			if ((f >= s->blocks_for_midi) ||
 			    (s->midi[port] == NULL) ||
 			    (snd_rawmidi_transmit(s->midi[port],
-							b + 1, 1) > 0)) {
+						  b + 1, 1) <= 0)) {
 				b[0] = 0x80;
 				b[1] = 0x00;	/* confirm to be zero */
 			} else {
@@ -659,7 +659,7 @@ static void amdtp_pull_midi(struct amdtp_stream *s,
 			b = (u8 *)&buffer[s->midi_positions[c]];
 
 			len = b[0] - 0x80;
-			if (len < 0x81 || 0x83 < len)
+			if (len < 1 || 3 < len)
 				continue;
 
 			port = c * 8 + m;
