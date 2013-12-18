@@ -148,7 +148,8 @@ end:
 	return err;
 }
 
-unsigned int map_stream(struct snd_bebob *bebob, struct amdtp_stream *s)
+static unsigned int
+map_stream(struct snd_bebob *bebob, struct amdtp_stream *s)
 {
 	unsigned int sec, sections, ch, channels;
 	unsigned int pcm, midi, location;
