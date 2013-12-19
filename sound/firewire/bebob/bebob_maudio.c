@@ -19,14 +19,20 @@
 #include <sound/control.h>
 
 /*
- * NOTE:
- * For Firewire 410 and Firewire Audiophile, this module requests firmware
- * version 5058 or later. With former version, DM1000 chipset needs downloading
- * firmware and the driver should do this. To do this with ALSA, I need to
- * examinate whether it's OK or not to include firmware binary blob to
- * alsa-firmware package. With later version, the firmware is in ROM of chipset
- * and the driver just send a cue to load it when probing the device. This cue
- * is sent just once.
+ * Just powering on, Firewire 410/1814/Audiophile and ProjectMix I/O wait to
+ * download firmware blob. To enable these devices, drivers should upload
+ * firmware blob and send a command to initialize configuration to factory
+ * settings when completing uploading. Then these devices generate bus reset
+ * and are recognized as new devices with the firmware.
+ *
+ * But with firmware version 5058 or later, the firmware is stored to flash
+ * memory in the device and drivers can tell DM1000 to load the firmware by
+ * sending a cue. This cue must be sent one time.
+ *
+ * If the firmware blobs are in alsa-firmware package, this driver can support
+ * these devices with any firmware versions. Then this driver need to add some
+ * codes to upload the firmware blob. But for this, the license of firmware blob
+ * needs to be considered.
  *
  * For streaming, both of output and input streams are needed for Firewire 410
  * and Ozonic. The single stream is OK for the other devices even if the clock
@@ -43,8 +49,18 @@
  * functionality is between 0xffc700700000 to 0xffc70070009c.
  */
 
-#define MAUDIO_BOOTLOADER_CUE1	0x01000000
-#define MAUDIO_BOOTLOADER_CUE2	0x00001101
+/* Offset from information register */
+#define INFO_OFFSET_SW_DATE	0x20
+
+/* Bootloader Protocol Version 1 */
+#define MAUDIO_BOOTLOADER_CUE1	0x00000001
+/*
+ * Initializing configuration to factory settings (= 0x1101), (swapped in line),
+ * Command code is zero (= 0x00),
+ * the number of operands is zero (= 0x00)(at least significant byte)
+ */
+#define MAUDIO_BOOTLOADER_CUE2	0x01110000
+/* padding */
 #define MAUDIO_BOOTLOADER_CUE3	0x00000000
 
 #define MAUDIO_SPECIFIC_ADDRESS	0xffc700000000
@@ -83,22 +99,41 @@
 int snd_bebob_maudio_load_firmware(struct fw_unit *unit)
 {
 	struct fw_device *device = fw_parent_device(unit);
-	__be32 cues[3];
-	int rcode;
+	int err, rcode;
+	u64 date;
+	__be32 cues[3] = {
+		MAUDIO_BOOTLOADER_CUE1,
+		MAUDIO_BOOTLOADER_CUE2,
+		MAUDIO_BOOTLOADER_CUE3
+	};
 
-	cues[0] = cpu_to_be32(MAUDIO_BOOTLOADER_CUE1);
-	cues[1] = cpu_to_be32(MAUDIO_BOOTLOADER_CUE2);
-	cues[2] = cpu_to_be32(MAUDIO_BOOTLOADER_CUE3);
+	/* check date of software used to build */
+	err = snd_bebob_read_block(unit, INFO_OFFSET_SW_DATE,
+				   &date, sizeof(u64));
+	if (err < 0)
+		goto end;
+	/*
+	 * firmware version 5058 or later has date later than "20070401", but
+	 * 'date' is not null-terminated.
+	 */
+	if (date < 0x3230303730343031) {
+		dev_err(&unit->device,
+			"Use firmware version 5058 or later\n");
+		err = -ENOSYS;
+		goto end;
+	}
 
 	rcode = fw_run_transaction(device->card, TCODE_WRITE_BLOCK_REQUEST,
 				   device->node_id, device->generation,
 				   device->max_speed, BEBOB_ADDR_REG_REQ,
 				   cues, sizeof(cues));
-	if (rcode == RCODE_COMPLETE)
-		return 0;
-
-	dev_err(&unit->device, "Failed to send a queue to load firmware\n");
-	return -EIO;
+	if (rcode != RCODE_COMPLETE) {
+		dev_err(&unit->device,
+			"Failed to send a cue to load firmware\n");
+		err = -EIO;
+	}
+end:
+	return err;
 }
 
 static inline int

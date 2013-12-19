@@ -232,12 +232,10 @@ bebob_probe(struct fw_unit *unit,
 
 	if (spec == NULL) {
 		if ((entry->vendor_id == VEN_MAUDIO1) ||
-		    (entry->vendor_id == VEN_MAUDIO2)) {
-			snd_bebob_maudio_load_firmware(unit);
-			err = 0;
-		} else {
+		    (entry->vendor_id == VEN_MAUDIO2))
+			err = snd_bebob_maudio_load_firmware(unit);
+		else
 			err = -ENOSYS;
-		}
 		goto end;
 	}
 
