@@ -123,19 +123,19 @@ struct snd_bebob {
 };
 
 static inline int
-snd_bebob_read_block(struct snd_bebob *bebob, u64 addr, void *buf, int size)
+snd_bebob_read_block(struct fw_unit *unit, u64 addr, void *buf, int size)
 {
-	return snd_fw_transaction(bebob->unit, TCODE_READ_BLOCK_REQUEST,
+	return snd_fw_transaction(unit, TCODE_READ_BLOCK_REQUEST,
 				  BEBOB_ADDR_REG_INFO + addr,
 				  buf, size, 0);
 }
 
 static inline int
-snd_bebob_read_quad(struct snd_bebob *bebob, u64 addr, void *buf, int size)
+snd_bebob_read_quad(struct fw_unit *unit, u64 addr, u32 *buf)
 {
-	return snd_fw_transaction(bebob->unit, TCODE_READ_QUADLET_REQUEST,
+	return snd_fw_transaction(unit, TCODE_READ_QUADLET_REQUEST,
 				  BEBOB_ADDR_REG_INFO + addr,
-				  buf, size, 0);
+				  (void *)buf, sizeof(u32), 0);
 }
 
 /* AV/C Audio Subunit Specification 1.0 (1394TA) */

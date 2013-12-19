@@ -53,7 +53,7 @@ proc_read_hw_info(struct snd_info_entry *entry,
 	if (info == NULL)
 		return;
 
-	err = snd_bebob_read_block(bebob, 0,
+	err = snd_bebob_read_block(bebob->unit, 0,
 				   info, sizeof(struct hw_info));
 	if (err < 0)
 		goto end;

@@ -129,19 +129,19 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 		goto end;
 
 	/* get hardware id */
-	err = snd_bebob_read_quad(bebob, INFO_OFFSET_HW_MODEL_ID,
-				  &id, sizeof(id));
+	err = snd_bebob_read_quad(bebob->unit, INFO_OFFSET_HW_MODEL_ID,
+				  &id);
 	if (err < 0)
 		goto end;
 
 	/* get hardware revision */
-	err = snd_bebob_read_quad(bebob, INFO_OFFSET_HW_MODEL_REVISION,
-				  &revision, sizeof(revision));
+	err = snd_bebob_read_quad(bebob->unit, INFO_OFFSET_HW_MODEL_REVISION,
+				  &revision);
 	if (err < 0)
 		goto end;
 
 	/* get GUID */
-	err = snd_bebob_read_block(bebob, INFO_OFFSET_GUID,
+	err = snd_bebob_read_block(bebob->unit, INFO_OFFSET_GUID,
 				   data, sizeof(data));
 	if (err < 0)
 		goto end;
