@@ -251,11 +251,10 @@ void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
 		/* fall through */
 	case SNDRV_PCM_FORMAT_S32:
 		if (s->direction == AMDTP_OUT_STREAM) {
-			if (s->dual_wire) {
+			if (s->dual_wire)
 				s->transfer_samples = amdtp_write_s32_dualwire;
-			} else {
+			else
 				s->transfer_samples = amdtp_write_s32;
-			}
 		} else if (s->dual_wire) {
 			s->transfer_samples = amdtp_read_s32_dualwire;
 		} else {
