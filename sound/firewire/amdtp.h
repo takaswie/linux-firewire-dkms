@@ -49,7 +49,7 @@ enum cip_sfc {
 
 
 /*
- * This module supports maximum 16 PCM channels for one PCM stream
+ * This module supports maximum 64 PCM channels for one PCM stream
  * This is for our convinience.
  */
 #define AMDTP_MAX_CHANNELS_FOR_PCM	64
