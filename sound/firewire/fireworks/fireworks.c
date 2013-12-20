@@ -4,22 +4,12 @@
  * Copyright (c) 2009-2010 Clemens Ladisch
  * Copyright (c) 2013 Takashi Sakamoto
  *
- *
- * This driver is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License, version 2.
- *
- * This driver is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this driver; if not, see <http://www.gnu.org/licenses/>.
+ * Licensed under the terms of the GNU General Public License, version 2.
  */
 
 /*
- * Fireworks is a board module which Echo Audio produces. This board module
- * consists of three chipsets:
+ * Fireworks is a board module which Echo Audio produced. This module consists
+ * of three chipsets:
  *  - Communication chipset for IEEE1394 PHY/Link and IEC 61883-1/6
  *  - DSP or/and FPGA for signal processing
  *  - Flash Memory to store firmwares

@@ -3,16 +3,7 @@
  *
  * Copyright (c) 2013 Takashi Sakamoto
  *
- * This driver is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License, version 2.
- *
- * This driver is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this driver; if not, see <http://www.gnu.org/licenses/>.
+ * Licensed under the terms of the GNU General Public License, version 2.
  */
 
 #include "./bebob.h"
@@ -209,7 +200,7 @@ int avc_bridgeco_get_plug_section_type(struct fw_unit *unit,
 	u8 *buf;
 	int err;
 
-	/* section info includes charactors but this module don't need it */
+	/* section info includes characters but this module don't need it */
 	buf = kzalloc(12, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;

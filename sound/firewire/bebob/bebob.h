@@ -3,16 +3,7 @@
  *
  * Copyright (c) 2013 Takashi Sakamoto
  *
- * This driver is free software; you can redistribute it and/or modify
- * it under the terms of the GNU General Public License, version 2.
- *
- * This driver is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
- *
- * You should have received a copy of the GNU General Public License
- * along with this driver; if not, see <http://www.gnu.org/licenses/>.
+ * Licensed under the terms of the GNU General Public License, version 2.
  */
 
 #ifndef SOUND_BEBOB_H_INCLUDED
@@ -27,6 +18,7 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 
+/* TODO: when mering to upstream, this path should be changed. */
 #include "../../../include/uapi/sound/asound.h"
 #include "../../../include/uapi/sound/firewire.h"
 
