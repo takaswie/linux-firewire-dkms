@@ -68,8 +68,8 @@ config SND_FIREWORKS
 	  Say Y here to include support for FireWire devices based
 	  on Echo Digital Audio Fireworks board:
 	   * Mackie Onyx 400F/1200F
-	   * Echo AudioFire8(until 2009 July)/AudioFire12
-	   * Echo AudioFire2/4/8(since 2009 July)/Pre8
+	   * Echo AudioFire12/8(until 2009 July)
+	   * Echo AudioFire2/4/Pre8/8(since 2009 July)
 	   * Echo Fireworks 8/HDMI
 	   * Gibson Robot Interface Pack/GoldTop
 
