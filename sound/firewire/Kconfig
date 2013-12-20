@@ -86,7 +86,7 @@ config SND_BEBOB
 	 Say Y here to include support for FireWire devices based
 	 on BridgeCo DM1000/1500 with BeBoB firmware:
 	  * Edirol FA-66/FA-101
-	  * PreSonus FIREBOX/FIREPOD
+	  * PreSonus FIREBOX/FIREPOD/Inspire1394
 	  * BridgeCo RDAudio1/Audio5
 	  * Mackie Onyx 820/1220/1620/1640 (Firewire I/O Card)
 	  * Mackie d.2 (Firewire Option)

@@ -318,8 +318,10 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_EDIROL, 0x00010048, &spec_normal),
 	/* Presonus, FIREBOX */
 	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010000, &spec_normal),
-	/* PreSonus FIREPOD */
+	/* PreSonus, FIREPOD */
 	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010066, &spec_normal),
+	/* PreSonus, Inspire1394 */
+	SND_BEBOB_DEV_ENTRY(VEN_PRESONUS, 0x00010001, &spec_normal),
 	/* BridgeCo, RDAudio1 */
 	SND_BEBOB_DEV_ENTRY(VEN_BRIDGECO, 0x00010048, &spec_normal),
 	/* BridgeCo, Audio5 */
@@ -398,7 +400,6 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_PROJECTMIX,
 			    &maudio_special_spec),
 	/* Ids are unknown but able to be supported */
-	/*  PreSonus, Inspire 1394 */
 	/*  Mackie, Digital X Bus x.200 */
 	/*  Mackie, Digital X Bus x.400 */
 	/*  CME, UF400e */
