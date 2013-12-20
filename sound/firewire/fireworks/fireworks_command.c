@@ -189,6 +189,7 @@ end:
 	return err;
 }
 
+/* just blink LEDs on the device */
 int snd_efw_command_identify(struct snd_efw *efw)
 {
 	return efw_transaction(efw, EFC_CAT_HWCTL,

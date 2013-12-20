@@ -164,7 +164,7 @@ enum snd_efw_grp_type {
 	SND_EFW_CH_TYPE_DUMMY
 };
 struct snd_efw_phys_meters {
-	u32 clock_in;
+	u32 status;	/* guitar state/midi signal/clock input detect */
 	u32 reserved0;
 	u32 reserved1;
 	u32 reserved2;
@@ -182,6 +182,7 @@ enum snd_efw_clock_source {
 	SND_EFW_CLOCK_SOURCE_SPDIF	= 3,
 	SND_EFW_CLOCK_SOURCE_ADAT_1	= 4,
 	SND_EFW_CLOCK_SOURCE_ADAT_2	= 5,
+	SND_EFW_CLOCK_SOURCE_CONTINUOUS	= 6	/* internal variable clock */
 };
 enum snd_efw_transport_mode {
 	SND_EFW_TRANSPORT_MODE_WINDOWS	= 0,
