@@ -214,10 +214,6 @@ int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 				   u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				   unsigned int entryid, u8 *buf,
 				   unsigned int *len);
-int avc_bridgeco_detect_plug_strm(struct fw_unit *unit,
-				  enum avc_bridgeco_plug_dir dir,
-				  unsigned int ext_pid,
-				  unsigned int *detect);
 
 int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
 		       enum avc_general_plug_dir dir);
