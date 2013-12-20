@@ -209,7 +209,7 @@ int avc_bridgeco_get_plug_section_type(struct fw_unit *unit,
 	u8 *buf;
 	int err;
 
-	/* section info includes characters but this module don't need it */
+	/* section info includes charactors but this module don't need it */
 	buf = kzalloc(12, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
