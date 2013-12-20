@@ -138,13 +138,16 @@ snd_bebob_read_quad(struct fw_unit *unit, u64 addr, u32 *buf)
 				  (void *)buf, sizeof(u32), 0);
 }
 
-/* AV/C Audio Subunit Specification 1.0 (1394TA) */
+/* AV/C Audio Subunit Specification 1.0 (Oct 2000, 1394TA) */
 int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
 			   unsigned int fb_id, unsigned int num);
 int avc_audio_get_selector(struct fw_unit *unit, unsigned  int subunit_id,
 			   unsigned int fb_id, unsigned int *num);
 
-/* AVC command extensions, AV/C Unit and Subunit, Revision 17 (BridgeCo.) */
+/*
+ * AVC command extensions, AV/C Unit and Subunit, Revision 17
+ * (Nov 2003, BridgeCo)
+ */
 #define	AVC_BRIDGECO_ADDR_BYTES	6
 enum avc_bridgeco_plug_dir {
 	AVC_BRIDGECO_PLUG_DIR_IN	= 0x00,
