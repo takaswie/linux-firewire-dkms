@@ -19,7 +19,7 @@
 #include <sound/control.h>
 
 /*
- * Just powering on, Firewire 410/1814/Audiophile and ProjectMix I/O wait to
+ * Just powering on, Firewire 410/Audiophile/1814 and ProjectMix I/O wait to
  * download firmware blob. To enable these devices, drivers should upload
  * firmware blob and send a command to initialize configuration to factory
  * settings when completing uploading. Then these devices generate bus reset
@@ -30,9 +30,9 @@
  * sending a cue. This cue must be sent one time.
  *
  * If the firmware blobs are in alsa-firmware package, this driver can support
- * these devices with any firmware versions. Then this driver need to add some
- * codes to upload the firmware blob. But for this, the license of firmware blob
- * needs to be considered.
+ * these devices with any firmware versions. (Then this driver need codes to
+ * upload the firmware blob.) But for this, the license of firmware blob needs
+ * to be considered.
  *
  * For streaming, both of output and input streams are needed for Firewire 410
  * and Ozonic. The single stream is OK for the other devices even if the clock
@@ -160,7 +160,6 @@ check_clk_sync(struct snd_bebob *bebob, unsigned int size, bool *sync)
 
 	/* if synced, this value is the same of SFC of FDF in CIP header */
 	*sync = (buf[size - 2] != 0xff);
-	err = 0;
 end:
 	kfree(buf);
 	return err;
@@ -214,21 +213,13 @@ special_clk_set_params(struct snd_bebob *bebob, unsigned int clk_src,
 	}
 
 	bebob->clk_src		= buf[6];
-	/* handle both of input and output in this member */
 	bebob->dig_in_fmt	= buf[7];
 	bebob->dig_out_fmt	= buf[8];
 	bebob->clk_lock		= buf[9];
-
-	err = 0;
 end:
 	kfree(buf);
 	return err;
 }
-/*
- * For special customized devices.
- * The driver can't receive response from this firmware frequently.
- * So need to reduce execution of command.
- */
 static void
 special_stream_formation_set(struct snd_bebob *bebob)
 {
@@ -280,7 +271,7 @@ special_stream_formation_set(struct snd_bebob *bebob)
 	for (i = 3; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		bebob->tx_stream_formations[i].midi = 1;
 		bebob->rx_stream_formations[i].midi = 1;
-		if ((i > 7) && (bebob->maudio_is1814))
+		if ((i > 7) && !bebob->maudio_is1814)
 			break;
 	}
 }
@@ -293,19 +284,17 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 
 	bebob->maudio_is1814 = is1814;
 
-	/* initialize these parameters because doesn't allow driver to ask */
+	/* initialize these parameters because driver is not allowed to ask */
 	err = special_clk_set_params(bebob, 0x03, 0x00, 0x00, 0x00);
-	if (err < 0) {
+	if (err < 0)
 		dev_err(&bebob->unit->device,
 			"failed to initialize clock params\n");
-	}
 
 	err = avc_audio_get_selector(bebob->unit, 0x00, 0x04,
 				     &bebob->dig_in_iface);
-	if (err < 0) {
+	if (err < 0)
 		dev_err(&bebob->unit->device,
 			"failed to get current dig iface.");
-	}
 
 	err = snd_bebob_maudio_special_add_controls(bebob);
 	if (err < 0)
@@ -375,17 +364,15 @@ static int special_clk_ctl_put(struct snd_kcontrol *kctl,
 	int err, id, changed = 0;
 
 	id = uval->value.enumerated.item[0];
+	if (id >= ARRAY_SIZE(special_clk_labels))
+		return 0;
 
 	spin_lock(&bebob->lock);
-	if (id < ARRAY_SIZE(special_clk_labels)) {
-		err = special_clk_set_params(bebob, id,
-					     bebob->dig_in_fmt,
-					     bebob->dig_out_fmt,
-					     bebob->clk_lock);
-		if (err >= 0)
-			changed = 1;
-	}
-
+	err = special_clk_set_params(bebob, id,
+				     bebob->dig_in_fmt,
+				     bebob->dig_out_fmt,
+				     bebob->clk_lock);
+	changed = (err >= 0);
 	spin_unlock(&bebob->lock);
 
 	return changed;
@@ -600,7 +587,7 @@ special_meter_get(struct snd_bebob *bebob, u32 *target, unsigned int size)
 	if (size < channels * sizeof(u32))
 		return -EINVAL;
 
-	/* omit last 5 bytes because it's clock info. */
+	/* omit last 4 bytes because it's clock info. */
 	buf = kmalloc(METER_SIZE_SPECIAL - 4, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
@@ -609,15 +596,16 @@ special_meter_get(struct snd_bebob *bebob, u32 *target, unsigned int size)
 	if (err < 0)
 		goto end;
 
-	/* some channels are not used and convert u16 to u32 */
-	for (i = 0, c = 2; c < channels + 2; c++)
-		target[i++] = be16_to_cpu(buf[c]) << 8;
+	/* some channels are not used, and format is u16 */
+	i = 0;
+	for (c = 2; c < channels + 2; c++)
+		target[i++] = be16_to_cpu(buf[c]) << 16;
 end:
 	kfree(buf);
 	return err;
 }
 
-/* Firewire 410 specific controls */
+/* Firewire 410 specific operations */
 static char *fw410_meter_labels[] = {
 	ANA_IN, DIG_IN,
 	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT, DIG_OUT,
@@ -630,11 +618,11 @@ fw410_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 	unsigned int c, channels;
 	int err;
 
+	/* last 4 bytes are omitted because it's clock info. */
 	channels = ARRAY_SIZE(fw410_meter_labels) * 2;
 	if (size < channels * sizeof(u32))
 		return -EINVAL;
 
-	/* omit last 4 bytes because it's clock info. */
 	err = get_meter(bebob, (void *)buf, size);
 	if (err < 0)
 		goto end;
@@ -645,7 +633,7 @@ end:
 	return err;
 }
 
-/* Firewire Audiophile specific controls */
+/* Firewire Audiophile specific operation */
 static char *audiophile_meter_labels[] = {
 	ANA_IN, DIG_IN,
 	ANA_OUT, ANA_OUT, DIG_OUT,
@@ -657,11 +645,11 @@ audiophile_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 	unsigned int c, channels;
 	int err;
 
+	/* last 4 bytes are omitted because it's clock info. */
 	channels = ARRAY_SIZE(audiophile_meter_labels) * 2;
 	if (size < channels * sizeof(u32))
 		return -EINVAL;
 
-	/* omit last 4 bytes because it's clock info. */
 	err = get_meter(bebob, (void *)buf, size);
 	if (err < 0)
 		goto end;
@@ -672,7 +660,7 @@ end:
 	return err;
 }
 
-/* Firewire Solo specific controls */
+/* Firewire Solo specific operation */
 static char *solo_meter_labels[] = {
 	ANA_IN, DIG_IN,
 	STRM_IN, STRM_IN,
@@ -685,10 +673,10 @@ solo_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 	int err;
 	u32 tmp;
 
+	/* last 4 bytes are omitted because it's clock info. */
 	if (size < ARRAY_SIZE(solo_meter_labels) * 2 * sizeof(u32))
-		return -ENOMEM;
+		return -EINVAL;
 
-	/* omit last 4 bytes because it's clock info. */
 	err = get_meter(bebob, (void *)buf, size);
 	if (err < 0)
 		goto end;
@@ -714,7 +702,7 @@ end:
 	return err;
 }
 
-/* Ozonic specific controls */
+/* Ozonic specific operation */
 static char *ozonic_meter_labels[] = {
 	ANA_IN, ANA_IN,
 	STRM_IN, STRM_IN,
@@ -740,8 +728,8 @@ end:
 	return err;
 }
 
-/* NRV10 specific controls */
-/* TODO: need testers. this is based on my assumption */
+/* NRV10 specific operation */
+/* TODO: need testers. these positions are based on my assumption */
 static char *nrv10_meter_labels[] = {
 	ANA_IN, ANA_IN, ANA_IN, ANA_IN,
 	DIG_IN,
