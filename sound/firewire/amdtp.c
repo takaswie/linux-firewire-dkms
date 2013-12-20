@@ -184,7 +184,7 @@ sfc_found:
 	/* init the position map for PCM and MIDI channels */
 	for (i = 0; i < pcm_channels; i++)
 		s->pcm_positions[i] = i;
-	s->midi_position = pcm_channels;
+	s->midi_position = s->pcm_channels;
 }
 EXPORT_SYMBOL(amdtp_stream_set_parameters);
 
