@@ -945,14 +945,14 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
 }
 
 /**
- * amdtp_stream_start - start sending packets
+ * amdtp_stream_start - start transferring packets
  * @s: the AMDTP stream to start
  * @channel: the isochronous channel on the bus
  * @speed: firewire speed code
  *
  * The stream cannot be started until it has been configured with
- * amdtp_stream_set_parameters() and amdtp_stream_set_pcm_format(),
- * and it must be started before any PCM or MIDI device can be started.
+ * amdtp_stream_set_parameters() and it must be started before any PCM or MIDI
+ * device can be started.
  */
 int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 {
