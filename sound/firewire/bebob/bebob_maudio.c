@@ -216,6 +216,9 @@ special_clk_set_params(struct snd_bebob *bebob, unsigned int clk_src,
 	bebob->dig_in_fmt	= buf[7];
 	bebob->dig_out_fmt	= buf[8];
 	bebob->clk_lock		= buf[9];
+
+	snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
+		       bebob->ctl_id_sync);
 end:
 	kfree(buf);
 	return err;
@@ -319,6 +322,21 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 static int special_get_rate(struct snd_bebob *bebob, unsigned int *rate)
 {
 	return snd_bebob_get_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN);
+}
+static int special_set_rate(struct snd_bebob *bebob, unsigned int rate)
+{
+	int err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_OUT);
+	msleep(100);
+	if (err < 0)
+		goto end;
+
+	err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN);
+	msleep(100);
+	if (err >= 0)
+		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
+			       bebob->ctl_id_sync);
+end:
+	return err;
 }
 
 /* Clock source control for special firmware */
@@ -553,6 +571,7 @@ static int snd_bebob_maudio_special_add_controls(struct snd_bebob *bebob)
 	err = snd_ctl_add(bebob->card, kctl);
 	if (err < 0)
 		goto end;
+	bebob->ctl_id_sync = &kctl->id;
 
 	kctl = snd_ctl_new1(&special_dig_in_iface_ctl, bebob);
 	err = snd_ctl_add(bebob->card, kctl);
@@ -759,7 +778,7 @@ end:
 /* for special customized devices */
 static struct snd_bebob_rate_spec special_rate_spec = {
 	.get	= &special_get_rate,
-	.set	= &snd_bebob_stream_set_rate,
+	.set	= &special_set_rate,
 };
 static struct snd_bebob_clock_spec special_clk_spec = {
 	.num	= ARRAY_SIZE(special_clk_labels),

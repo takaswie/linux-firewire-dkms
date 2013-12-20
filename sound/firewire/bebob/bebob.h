@@ -120,6 +120,7 @@ struct snd_bebob {
 	unsigned int dig_in_fmt;
 	unsigned int dig_out_fmt;
 	unsigned int clk_lock;
+	struct snd_ctl_elem_id *ctl_id_sync;
 };
 
 static inline int
