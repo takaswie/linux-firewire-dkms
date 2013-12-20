@@ -82,47 +82,13 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 	u32 revision;
 	int err;
 
-	/* get vendor name */
-	if (vendor_id == VEN_EDIROL)
-		strcpy(vendor, "Edirol");
-	else if (vendor_id == VEN_PRESONUS)
-		strcpy(vendor, "Presonus");
-	else if (vendor_id == VEN_BRIDGECO)
-		strcpy(vendor, "BridgeCo");
-	else if (vendor_id == VEN_MACKIE)
-		strcpy(vendor, "Mackie");
-	else if (vendor_id == VEN_STANTON)
-		strcpy(vendor, "Stanton");
-	else if (vendor_id == VEN_TASCAM)
-		strcpy(vendor, "Tacsam");
-	else if (vendor_id == VEN_BEHRINGER)
-		strcpy(vendor, "Behringer");
-	else if (vendor_id == VEN_APOGEE)
-		strcpy(vendor, "Apogee");
-	else if (vendor_id == VEN_ESI)
-		strcpy(vendor, "ESI");
-	else if (vendor_id == VEN_ACOUSTIC)
-		strcpy(vendor, "AcousticReality");
-	else if (vendor_id == VEN_CME)
-		strcpy(vendor, "CME");
-	else if (vendor_id == VEN_PHONIC)
-		strcpy(vendor, "Phonic");
-	else if (vendor_id == VEN_LYNX)
-		strcpy(vendor, "Lynx");
-	else if (vendor_id == VEN_ICON)
-		strcpy(vendor, "ICON");
-	else if (vendor_id == VEN_PRISMSOUND)
-		strcpy(vendor, "PrismSound");
-	else if (vendor_id == VEN_TERRATEC)
-		strcpy(vendor, "Terratec");
-	else if (vendor_id == VEN_YAMAHA)
-		strcpy(vendor, "YAMAHA");
-	else if (vendor_id == VEN_FOCUSRITE)
-		strcpy(vendor, "Focusrite");
-	else if ((vendor_id == VEN_MAUDIO1) || (vendor_id == VEN_MAUDIO2))
-		strcpy(vendor, "M-Audio");
+        /* get vendor name from root directory */
+        err = fw_csr_string(bebob->device->config_rom + 5, CSR_VENDOR,
+			    vendor, sizeof(vendor));
+        if (err < 0)
+                goto end;
 
-	/* get model name */
+	/* get model name from unit directory */
 	err = fw_csr_string(bebob->unit->directory, CSR_MODEL,
 			    model, sizeof(model));
 	if (err < 0)
@@ -154,6 +120,7 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 		 data[0], data[1],
 		 dev_name(&bebob->unit->device),
 		 100 << bebob->device->max_speed);
+	strcpy(bebob->card->mixername, model);
 end:
 	return err;
 }
