@@ -104,10 +104,10 @@ config SND_BEBOB
 	  * Lynx Aurora 8/16 (LT-FW)
 	  * ICON FireXon
 	  * PrismSound Orpheus/ADA-8XR
-	  * Yamaha GO44/GO46
 	  * TerraTec PHASE 24 FW/PHASE X24 FW/PHASE 88 Rack FW
 	  * Terratec EWS MIC2/EWS MIC4
 	  * Terratec Aureon 7.1 Firewire
+	  * Yamaha GO44/GO46
 	  * Focusrite Saffire/Saffire LE/SaffirePro10 IO/SaffirePro26 IO
 	  * M-Audio Firewire410/AudioPhile/Solo
 	  * M-Audio Ozonic/NRV10/ProfireLightBridge

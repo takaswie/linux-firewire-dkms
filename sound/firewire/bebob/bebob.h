@@ -249,9 +249,9 @@ int snd_bebob_create_pcm_devices(struct snd_bebob *bebob);
 int snd_bebob_create_hwdep_device(struct snd_bebob *bebob);
 
 /* model specific operations */
-extern struct snd_bebob_spec yamaha_go_spec;
 extern struct snd_bebob_spec phase88_rack_spec;
 extern struct snd_bebob_spec phase24_series_spec;
+extern struct snd_bebob_spec yamaha_go_spec;
 extern struct snd_bebob_spec saffirepro_26_spec;
 extern struct snd_bebob_spec saffirepro_10_spec;
 extern struct snd_bebob_spec saffire_le_spec;

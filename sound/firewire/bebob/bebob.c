@@ -61,8 +61,8 @@ static unsigned int devices_used;
 #define VEN_LYNX	0x000019e5
 #define VEN_ICON	0x00001a9e
 #define VEN_PRISMSOUND	0x00001198
-#define VEN_YAMAHA	0x0000a0de
 #define VEN_TERRATEC	0x00000aac
+#define VEN_YAMAHA	0x0000a0de
 #define VEN_FOCUSRITE	0x0000130e
 #define VEN_MAUDIO1	0x00000d6c
 #define VEN_MAUDIO2	0x000007f5
@@ -113,10 +113,10 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 		strcpy(vendor, "ICON");
 	else if (vendor_id == VEN_PRISMSOUND)
 		strcpy(vendor, "PrismSound");
-	else if (vendor_id == VEN_YAMAHA)
-		strcpy(vendor, "YAMAHA");
 	else if (vendor_id == VEN_TERRATEC)
 		strcpy(vendor, "Terratec");
+	else if (vendor_id == VEN_YAMAHA)
+		strcpy(vendor, "YAMAHA");
 	else if (vendor_id == VEN_FOCUSRITE)
 		strcpy(vendor, "Focusrite");
 	else if ((vendor_id == VEN_MAUDIO1) || (vendor_id == VEN_MAUDIO2))
@@ -388,10 +388,6 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_PRISMSOUND, 0x00010048, &spec_normal),
 	/* PrismSound, ADA-8XR */
 	SND_BEBOB_DEV_ENTRY(VEN_PRISMSOUND, 0x0000ada8, &spec_normal),
-	/* Yamaha, GO44 */
-	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000b, &yamaha_go_spec),
-	/* YAMAHA, GO46 */
-	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000c, &yamaha_go_spec),
 	/* TerraTec Electronic GmbH, PHASE 88 Rack FW */
 	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000003, &phase88_rack_spec),
 	/* TerraTec Electronic GmbH, PHASE 24 FW */
@@ -402,6 +398,10 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000005, &spec_normal),
 	/* Terratec Electronic GmbH, Aureon 7.1 Firewire */
 	SND_BEBOB_DEV_ENTRY(VEN_TERRATEC, 0x00000002, &spec_normal),
+	/* Yamaha, GO44 */
+	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000b, &yamaha_go_spec),
+	/* YAMAHA, GO46 */
+	SND_BEBOB_DEV_ENTRY(VEN_YAMAHA, 0x0010000c, &yamaha_go_spec),
 	/* Focusrite, SaffirePro 26 I/O */
 	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, 0x00000003, &saffirepro_26_spec),
 	/* Focusrite, SaffirePro 10 I/O */
@@ -409,8 +409,8 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	/* Focusrite, Saffire(no label and LE) */
 	SND_BEBOB_DEV_ENTRY(VEN_FOCUSRITE, MODEL_FOCUSRITE_SAFFIRE_BOTH,
 			    &saffire_spec),
-	/* M-Audio, Firewire 410.  */
-	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO2, 0x00010058, NULL),
+	/* M-Audio, Firewire 410 */
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO2, 0x00010058, NULL),	/* bootloader */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO2, 0x00010046, &maudio_fw410_spec),
 	/* M-Audio, Firewire Audiophile */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_AUDIOPHILE_BOTH,
@@ -424,7 +424,7 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	/* M-Audio, ProFireLightbridge */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x000100a1, &spec_normal),
 	/* Firewire 1814 */
-	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010070, NULL),
+	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, 0x00010070, NULL),	/* bootloader */
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_FW1814,
 			    &maudio_special_spec),
 	/* M-Audio ProjectMix */
