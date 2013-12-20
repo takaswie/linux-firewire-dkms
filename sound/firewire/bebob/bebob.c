@@ -75,10 +75,10 @@ static unsigned int devices_used;
 static int
 name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 {
-	char vendor[24] = {};
-	char model[24] = {};
+	char vendor[24] = {0};
+	char model[24] = {0};
 	u32 id;
-	u32 data[2] = {};
+	u32 data[2] = {0};
 	u32 revision;
 	int err;
 
