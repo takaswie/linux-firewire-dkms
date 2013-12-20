@@ -16,7 +16,7 @@
  */
 
 /*
- * BeBoB is 'BridgeCo enhanced Breakout Box'. This is installed for firewire
+ * BeBoB is 'BridgeCo enhanced Breakout Box'. This is installed to firewire
  * devices with DM1000/1000E/1100/1500 chipset. It gives common way for host
  * system to handle BeBoB based devices.
  */
@@ -82,11 +82,11 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 	u32 revision;
 	int err;
 
-        /* get vendor name from root directory */
-        err = fw_csr_string(bebob->device->config_rom + 5, CSR_VENDOR,
+	/* get vendor name from root directory */
+	err = fw_csr_string(bebob->device->config_rom + 5, CSR_VENDOR,
 			    vendor, sizeof(vendor));
-        if (err < 0)
-                goto end;
+	if (err < 0)
+		goto end;
 
 	/* get model name from unit directory */
 	err = fw_csr_string(bebob->unit->directory, CSR_MODEL,
@@ -163,7 +163,7 @@ check_audiophile_booted(struct fw_unit *unit)
 	if (fw_csr_string(unit->directory, CSR_MODEL, name, sizeof(name)) < 0)
 		return false;
 
-	return (strncmp(name, "FW Audiophile Bootloader", 15) != 0);
+	return strncmp(name, "FW Audiophile Bootloader", 15) != 0;
 }
 
 static int
