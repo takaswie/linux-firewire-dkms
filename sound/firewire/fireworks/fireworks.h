@@ -106,7 +106,6 @@ struct snd_efw {
 	unsigned int resp_queues;
 };
 
-/* for transaction */
 int snd_efw_transaction_cmd(struct fw_unit *unit,
 			    const void *cmd, unsigned int size);
 int snd_efw_transaction_run(struct fw_unit *unit,
@@ -118,7 +117,6 @@ void snd_efw_transaction_bus_reset(struct fw_unit *unit);
 void snd_efw_transaction_add_instance(struct snd_efw *efw);
 void snd_efw_transaction_remove_instance(struct snd_efw *efw);
 
-/* for needed commands */
 struct snd_efw_hwinfo {
 	u32 flags;
 	u32 guid_hi;
@@ -151,7 +149,6 @@ struct snd_efw_hwinfo {
 	u32 amdtp_tx_pcm_channels_4x;
 	u32 reserved[16];
 } __packed;
-
 enum snd_efw_grp_type {
 	SND_EFW_CH_TYPE_ANALOG			= 0,
 	SND_EFW_CH_TYPE_SPDIF			= 1,
@@ -166,7 +163,6 @@ enum snd_efw_grp_type {
 	SND_EFW_CH_TYPE_VIRTUAL			= 0x10000,
 	SND_EFW_CH_TYPE_DUMMY
 };
-
 struct snd_efw_phys_meters {
 	u32 clock_in;
 	u32 reserved0;
@@ -179,7 +175,6 @@ struct snd_efw_phys_meters {
 	u32 reserved5;
 	u32 values[0];
 } __packed;
-
 enum snd_efw_clock_source {
 	SND_EFW_CLOCK_SOURCE_INTERNAL	= 0,
 	SND_EFW_CLOCK_SOURCE_SYTMATCH	= 1,
@@ -188,12 +183,10 @@ enum snd_efw_clock_source {
 	SND_EFW_CLOCK_SOURCE_ADAT_1	= 4,
 	SND_EFW_CLOCK_SOURCE_ADAT_2	= 5,
 };
-
 enum snd_efw_transport_mode {
 	SND_EFW_TRANSPORT_MODE_WINDOWS	= 0,
 	SND_EFW_TRANSPORT_MODE_IEC61883	= 1,
 };
-
 int snd_efw_command_identify(struct snd_efw *efw);
 int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 				  u16 addr_high, u32 addr_low);
@@ -210,7 +203,6 @@ int snd_efw_command_set_clock_source(struct snd_efw *efw,
 int snd_efw_command_get_sampling_rate(struct snd_efw *efw, unsigned int *rate);
 int snd_efw_command_set_sampling_rate(struct snd_efw *efw, unsigned int rate);
 
-/* for AMDTP stream and CMP */
 int snd_efw_stream_init_duplex(struct snd_efw *efw);
 int snd_efw_stream_start_duplex(struct snd_efw *efw,
 				struct amdtp_stream *request,
