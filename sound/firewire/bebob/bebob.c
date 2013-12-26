@@ -329,6 +329,8 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	/* ApogeeElectronics, Rosetta 200/400 (X-FireWire card) */
 	/* ApogeeElectronics, DA/AD/DD-16X (X-FireWire card) */
 	SND_BEBOB_DEV_ENTRY(VEN_APOGEE, 0x00010048, &spec_normal),
+	/* ApogeeElectronics, Ensemble */
+	SND_BEBOB_DEV_ENTRY(VEN_APOGEE, 0x00001eee, &spec_normal),
 	/* ESI, Quatafire610 */
 	SND_BEBOB_DEV_ENTRY(VEN_ESI, 0x00010064, &spec_normal),
 	/* AcousticReality, eARMasterOne */
@@ -391,6 +393,7 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_PROJECTMIX,
 			    &maudio_special_spec),
 	/* Ids are unknown but able to be supported */
+	/*  Apogee, Mini-ME Firewire/Mini-DAC Firewire */
 	/*  Mackie, Digital X Bus x.200 */
 	/*  Mackie, Digital X Bus x.400 */
 	/*  CME, UF400e */

@@ -94,6 +94,7 @@ config SND_BEBOB
 	  * Tascam  IF-FW/DM
 	  * Apogee Rosetta 200/400 (X-FireWire card)
 	  * Apogee DA/AD/DD-16X (X-FireWire card)
+	  * Apogee Ensemble
 	  * ESI Quotafire610
 	  * AcousticReality eARMasterOne
 	  * CME MatrixKFW
