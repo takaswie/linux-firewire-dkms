@@ -326,8 +326,14 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_STANTON, 0x00000001, &spec_normal),
 	/* Tascam, IF-FW DM */
 	SND_BEBOB_DEV_ENTRY(VEN_TASCAM, 0x00010067, &spec_normal),
-	/* ApogeeElectronics, Rosetta 200/400 (X-FireWire card) */
-	/* ApogeeElectronics, DA/AD/DD-16X (X-FireWire card) */
+	/* Behringer, XENIX UFX 1204 */
+	SND_BEBOB_DEV_ENTRY(VEN_BEHRINGER, 0x00001204, &spec_normal),
+	/* Behringer, XENIX UFX 1604 */
+	SND_BEBOB_DEV_ENTRY(VEN_BEHRINGER, 0x00001604, &spec_normal),
+	/* Behringer, Digital Mixer X32 series (X-UF Card) */
+	SND_BEBOB_DEV_ENTRY(VEN_BEHRINGER, 0x00000006, &spec_normal),
+	/* Apogee Electronics, Rosetta 200/400 (X-FireWire card) */
+	/* Apogee Electronics, DA/AD/DD-16X (X-FireWire card) */
 	SND_BEBOB_DEV_ENTRY(VEN_APOGEE, 0x00010048, &spec_normal),
 	/* ApogeeElectronics, Ensemble */
 	SND_BEBOB_DEV_ENTRY(VEN_APOGEE, 0x00001eee, &spec_normal),
@@ -393,7 +399,10 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	SND_BEBOB_DEV_ENTRY(VEN_MAUDIO1, MODEL_MAUDIO_PROJECTMIX,
 			    &maudio_special_spec),
 	/* Ids are unknown but able to be supported */
-	/*  Apogee, Mini-ME Firewire/Mini-DAC Firewire */
+	/*  Apogee, Mini-ME Firewire/Mini-DAC */
+	/*  Apogee, Mini-DAC Firewire */
+	/*  Behringer, FCA 1616 */
+	/*  Behringer, FCA 610 */
 	/*  Mackie, Digital X Bus x.200 */
 	/*  Mackie, Digital X Bus x.400 */
 	/*  CME, UF400e */
