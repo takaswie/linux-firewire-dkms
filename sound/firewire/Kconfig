@@ -100,10 +100,8 @@ config SND_BEBOB
 	  * ESI Quotafire610
 	  * AcousticReality eARMasterOne
 	  * CME MatrixKFW
-	  * Phonic HB 12/12 MkII/12 Universal
-	  * Phonic HB 18/18 MkII/18 Universal
-	  * Phonic HB 24/24 MkII/24 Universal
-	  * Phonic FireFly 202/302
+	  * Phonic Helix Board 12 MkII/18 MkII/24 MkII
+	  * Phonic Helix Board 12 Universal/18 Universal/24 Universal
 	  * Lynx Aurora 8/16 (LT-FW)
 	  * ICON FireXon
 	  * PrismSound Orpheus/ADA-8XR
