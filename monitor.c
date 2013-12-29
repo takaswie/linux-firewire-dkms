@@ -1,19 +1,15 @@
 /* monitor.c: program to monitor the status of firewire sound devices */
 
 #include <stdio.h>
-#include <stdarg.h>
 #include <stdbool.h>
 #include <stdint.h>
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
-#include <unistd.h>
 #include <endian.h>
 #include <time.h>
 #include <sys/ioctl.h>
 #include <sys/epoll.h>
-#include <linux/firewire-cdev.h>
-#include <linux/firewire-constants.h>
 #include "./include/uapi/sound/firewire.h"
 
 static struct snd_firewire_get_info hwdep_info;
