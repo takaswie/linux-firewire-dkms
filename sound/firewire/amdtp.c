@@ -934,10 +934,10 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
 
 	if (s->direction == AMDTP_IN_STREAM)
 		context->callback.sc = in_stream_callback;
-	else if (!(s->flags & CIP_SYNC_TO_DEVICE))
-		context->callback.sc = out_stream_callback;
-	else
+	else if ((s->flags & CIP_BLOCKING) && (s->flags & CIP_SYNC_TO_DEVICE))
 		context->callback.sc = slave_stream_callback;
+	else
+		context->callback.sc = out_stream_callback;
 
 	context->callback.sc(context, cycle, header_length, header, s);
 
