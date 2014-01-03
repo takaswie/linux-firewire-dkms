@@ -11,6 +11,7 @@ export CONFIG_SND_ISIGHT=m
 export CONFIG_SND_SCS1X=m
 export CONFIG_SND_BEBOB=m
 export CONFIG_SND_FIREWORKS=m
+export CONFIG_SND_OXFW=m
 
 all:
 	$(MAKE) -Wall -C $(KDIR) M=$(PWD) modules
