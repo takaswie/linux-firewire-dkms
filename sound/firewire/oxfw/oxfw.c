@@ -145,16 +145,16 @@ oxfw_probe(struct fw_unit *unit,
 
 	snd_oxfw_proc_init(oxfw);
 
-	err = snd_oxfw_create_pcm_devices(oxfw);
-	if (err < 0)
-		goto error;
-
 	if ((oxfw->midi_input_ports > 0) ||
 	    (oxfw->midi_output_ports > 0)) {
 		err = snd_oxfw_create_midi_devices(oxfw);
 		if (err < 0)
 			goto error;
 	}
+
+	err = snd_oxfw_create_pcm_devices(oxfw);
+	if (err < 0)
+		goto error;
 
 	err = snd_oxfw_create_hwdep_device(oxfw);
 	if (err < 0)
@@ -186,7 +186,6 @@ oxfw_update(struct fw_unit *unit)
 	fcp_bus_reset(oxfw->unit);
 	snd_oxfw_stream_update_duplex(oxfw);
 }
-
 
 static void
 oxfw_remove(struct fw_unit *unit)

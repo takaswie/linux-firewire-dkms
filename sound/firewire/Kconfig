@@ -134,5 +134,4 @@ config SND_OXFW
           To compile this driver as a module, choose M here: the module
           will be called snd-oxfw.
 
-
 endif # SND_FIREWIRE

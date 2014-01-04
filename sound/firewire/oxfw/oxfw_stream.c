@@ -13,6 +13,11 @@
  *  OXFW970 32.0/44.1/48.0/96.0 Khz, 4 audio channels I/O
  *  OXFW971: 32.0/44.1/48.0/88.2/96.0 kHz, 16 audio channels I/O, MIDI I/O
  *
+ * OXFW970 seems not to implement 'LIST' subfunction for 'EXTENDED STREAM
+ * FORMAT INFORMATION' defined in 'AV/C Stream Format Information
+ * Specification 1.1 (Apr 2005, 1394TA)'. So this module uses an assumption
+ * that OXFW970 doesn't change its formation of channels in AMDTP stream.
+ *
  * They transmit packet following to 'CIP header with  SYT field' defined in
  * IEC 61883-1. But the sequence of value in SYT field is not compliant. So
  * this module doesn't use the value of SYT field in in-packets. Then this
@@ -21,11 +26,6 @@
  * this module transmits. But the device seems not to use it for in-packet
  * which the device transmits. Concluding, it doesn't matter whether this
  * module perform as a master or slave.
- *
- * OXFW970 seems not to implement 'LIST' subfunction for 'EXTENDED STREAM
- * FORMAT INFORMATION' defined in 'AV/C Stream Format Information
- * Specification 1.1 (Apr 2005, 1394TA)'. So this module uses an assumption
- * that OXFW970 doesn't change its formation of channels in AMDTP stream.
  */
 const unsigned int snd_oxfw_rate_table[SND_OXFW_RATE_TABLE_ENTRIES] = {
 	[0] = 32000,
@@ -51,8 +51,7 @@ static const unsigned int avc_stream_rate_table[] = {
 	[6] = 0x07,
 };
 
-int
-snd_oxfw_stream_get_rate(struct snd_oxfw *oxfw, unsigned int *curr_rate)
+int snd_oxfw_stream_get_rate(struct snd_oxfw *oxfw, unsigned int *curr_rate)
 {
 	unsigned int tx_rate, rx_rate;
 	int err;
@@ -75,8 +74,7 @@ end:
 	return err;
 }
 
-int
-snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate)
+int snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate)
 {
 	int err;
 

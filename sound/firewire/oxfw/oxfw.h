@@ -32,16 +32,10 @@
 
 #include "../lib.h"
 #include "../fcp.h"
+#include "../amdtp.h"
 #include "../packets-buffer.h"
 #include "../iso-resources.h"
-#include "../amdtp.h"
 #include "../cmp.h"
-
-/* basic register addresses on DM1000 */
-#define OXFW_ADDR_REG_INFO	0xffffc8020000
-#define OXFW_ADDR_REG_REQ	0xffffc8021000
-
-struct snd_oxfw;
 
 #define	SND_OXFW_RATE_TABLE_ENTRIES	7
 struct snd_oxfw_stream_formation {
@@ -60,13 +54,6 @@ struct snd_oxfw {
 	struct mutex mutex;
 	spinlock_t lock;
 
-	const struct snd_oxfw_spec *spec;
-
-	struct cmp_connection out_conn;
-	struct amdtp_stream tx_stream;
-	struct cmp_connection in_conn;
-	struct amdtp_stream rx_stream;
-
 	struct snd_oxfw_stream_formation
 		tx_stream_formations[SND_OXFW_RATE_TABLE_ENTRIES];
 	struct snd_oxfw_stream_formation
@@ -75,7 +62,10 @@ struct snd_oxfw {
 	unsigned int midi_input_ports;
 	unsigned int midi_output_ports;
 
-	int sync_input_plug;
+	struct cmp_connection out_conn;
+	struct amdtp_stream tx_stream;
+	struct cmp_connection in_conn;
+	struct amdtp_stream rx_stream;
 
 	/* for uapi */
 	int dev_lock_count;
@@ -120,9 +110,6 @@ int snd_oxfw_set_rate(struct snd_oxfw *oxfw, unsigned int rate,
 /* for AMDTP streaming */
 int snd_oxfw_stream_get_rate(struct snd_oxfw *oxfw, unsigned int *rate);
 int snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate);
-int snd_oxfw_stream_discover(struct snd_oxfw *oxfw);
-int snd_oxfw_stream_map(struct snd_oxfw *oxfw,
-			 struct amdtp_stream *stream);
 int snd_oxfw_stream_init_duplex(struct snd_oxfw *oxfw);
 int snd_oxfw_stream_start_duplex(struct snd_oxfw *oxfw,
 				  struct amdtp_stream *stream,
@@ -131,15 +118,17 @@ int snd_oxfw_stream_stop_duplex(struct snd_oxfw *oxfw);
 void snd_oxfw_stream_update_duplex(struct snd_oxfw *oxfw);
 void snd_oxfw_stream_destroy_duplex(struct snd_oxfw *oxfw);
 
+int snd_oxfw_stream_discover(struct snd_oxfw *oxfw);
+
 void snd_oxfw_stream_lock_changed(struct snd_oxfw *oxfw);
 int snd_oxfw_stream_lock_try(struct snd_oxfw *oxfw);
 void snd_oxfw_stream_lock_release(struct snd_oxfw *oxfw);
 
 void snd_oxfw_proc_init(struct snd_oxfw *oxfw);
 
-int snd_oxfw_create_pcm_devices(struct snd_oxfw *oxfw);
-
 int snd_oxfw_create_midi_devices(struct snd_oxfw *oxfw);
+
+int snd_oxfw_create_pcm_devices(struct snd_oxfw *oxfw);
 
 int snd_oxfw_create_hwdep_device(struct snd_oxfw *oxfw);
 
