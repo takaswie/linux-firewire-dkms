@@ -52,7 +52,6 @@ struct fwspk {
 	struct mutex mutex;
 	struct cmp_connection connection;
 	struct amdtp_stream stream;
-	bool stream_running;
 	bool mute;
 	s16 volume[6];
 	s16 volume_min;
@@ -188,7 +187,7 @@ static int fwspk_close(struct snd_pcm_substream *substream)
 
 static void fwspk_stop_stream(struct fwspk *fwspk)
 {
-	if (fwspk->stream_running) {
+	if (amdtp_stream_running(&fwspk->stream)) {
 		amdtp_stream_stop(&fwspk->stream);
 		cmp_connection_break(&fwspk->connection);
 	}
