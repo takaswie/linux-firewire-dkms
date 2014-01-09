@@ -117,21 +117,4 @@ config SND_BEBOB
           To compile this driver as a module, choose M here: the module
           will be called snd-bebob.
 
-config SND_OXFW
-	tristate "Oxford Semiconductor OXFW970/971 support"
-	select SND_FIREWIRE_LIB
-	select SND_RAWMIDI
-	select SND_PCM
-	select SND_HWDEP
-        help
-	 Say Y here to include support for FireWire devices based on
-	 Oxford Semiconductor OXFW970/971. SND_FIREWIRE_SPEAKERS also
-	 supports this chipset but this driver supports recording devices:
-	  * Behringer F-Control Audio 202
-	  * Mackie Onyx-i series (former model)
-	  * Mackie Onyx Satellite
-
-          To compile this driver as a module, choose M here: the module
-          will be called snd-oxfw.
-
 endif # SND_FIREWIRE
