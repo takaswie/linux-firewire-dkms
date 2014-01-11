@@ -7,92 +7,132 @@
 
 #include "oxfw.h"
 
-static int firewave_rate_constraint(struct snd_pcm_hw_params *params,
-				    struct snd_pcm_hw_rule *rule)
+static int hw_rule_rate(struct snd_pcm_hw_params *params,
+			struct snd_pcm_hw_rule *rule,
+			struct snd_oxfw *oxfw,
+			struct snd_oxfw_stream_formation *formations)
 {
-	static unsigned int stereo_rates[] = { 48000, 96000 };
-	struct snd_interval *channels =
-			hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
-	struct snd_interval *rate =
-			hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval *r =
+		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
+	const struct snd_interval *c =
+		hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+	struct snd_interval t = {
+		.min = UINT_MAX, .max = 0, .integer = 1
+	};
+	unsigned int i;
 
-	/* two channels work only at 48/96 kHz */
-	if (snd_interval_max(channels) < 6)
-		return snd_interval_list(rate, 2, stereo_rates, 0);
-	return 0;
+	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+		/* entry is invalid */
+		if (formations[i].pcm == 0)
+			continue;
+
+		if (!snd_interval_test(c, formations[i].pcm))
+			continue;
+
+		t.min = min(t.min, snd_oxfw_rate_table[i]);
+		t.max = max(t.max, snd_oxfw_rate_table[i]);
+
+	}
+	return snd_interval_refine(r, &t);
 }
 
-static int firewave_channels_constraint(struct snd_pcm_hw_params *params,
+static int hw_rule_channels(struct snd_pcm_hw_params *params,
+			    struct snd_pcm_hw_rule *rule,
+			    struct snd_oxfw *oxfw,
+			    struct snd_oxfw_stream_formation *formations)
+{
+	struct snd_interval *c =
+		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
+	const struct snd_interval *r =
+		hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_RATE);
+	struct snd_interval t = {
+		.min = UINT_MAX, .max = 0, .integer = 1
+	};
+
+	unsigned int i;
+
+	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+		/* entry is invalid */
+		if (formations[i].pcm == 0)
+			continue;
+
+		if (!snd_interval_test(r, snd_oxfw_rate_table[i]))
+			continue;
+
+		t.min = min(t.min, formations[i].pcm);
+		t.max = max(t.max, formations[i].pcm);
+	}
+
+	return snd_interval_refine(c, &t);
+}
+
+static inline int hw_rule_playback_rate(struct snd_pcm_hw_params *params,
 					struct snd_pcm_hw_rule *rule)
 {
-	static const struct snd_interval all_channels = { .min = 6, .max = 6 };
-	struct snd_interval *rate =
-			hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_interval *channels =
-			hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
-
-	/* 32/44.1 kHz work only with all six channels */
-	if (snd_interval_max(rate) < 48000)
-		return snd_interval_refine(channels, &all_channels);
-	return 0;
+	struct snd_oxfw *oxfw = rule->private;
+	return hw_rule_rate(params, rule, oxfw,
+			    oxfw->rx_stream_formations);
 }
 
-int firewave_constraints(struct snd_pcm_runtime *runtime)
+static inline int hw_rule_playback_channels(struct snd_pcm_hw_params *params,
+					    struct snd_pcm_hw_rule *rule)
 {
-	static unsigned int channels_list[] = { 2, 6 };
-	static struct snd_pcm_hw_constraint_list channels_list_constraint = {
-		.count = 2,
-		.list = channels_list,
-	};
-	int err;
-
-	runtime->hw.rates = SNDRV_PCM_RATE_32000 |
-			    SNDRV_PCM_RATE_44100 |
-			    SNDRV_PCM_RATE_48000 |
-			    SNDRV_PCM_RATE_96000;
-	runtime->hw.channels_max = 6;
-
-	err = snd_pcm_hw_constraint_list(runtime, 0,
-					 SNDRV_PCM_HW_PARAM_CHANNELS,
-					 &channels_list_constraint);
-	if (err < 0)
-		return err;
-	err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
-				  firewave_rate_constraint, NULL,
-				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
-	if (err < 0)
-		return err;
-	err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
-				  firewave_channels_constraint, NULL,
-				  SNDRV_PCM_HW_PARAM_RATE, -1);
-	if (err < 0)
-		return err;
-
-	return 0;
+	struct snd_oxfw *oxfw = rule->private;
+	return hw_rule_channels(params, rule, oxfw,
+				oxfw->rx_stream_formations);
 }
 
-int lacie_speakers_constraints(struct snd_pcm_runtime *runtime)
+static void prepare_channels(struct snd_pcm_hardware *hw,
+			     struct snd_oxfw_stream_formation *formations)
 {
-	runtime->hw.rates = SNDRV_PCM_RATE_32000 |
-			    SNDRV_PCM_RATE_44100 |
-			    SNDRV_PCM_RATE_48000 |
-			    SNDRV_PCM_RATE_88200 |
-			    SNDRV_PCM_RATE_96000;
+	unsigned int i;
 
-	return 0;
+	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+		/* entry has no PCM channels */
+		if (formations[i].pcm == 0)
+			continue;
+
+		hw->channels_min = min(hw->channels_min, formations[i].pcm);
+		hw->channels_max = max(hw->channels_max, formations[i].pcm);
+	}
+
+	return;
+}
+
+static void prepare_rates(struct snd_pcm_hardware *hw,
+			  struct snd_oxfw_stream_formation *formations)
+{
+	unsigned int i;
+
+	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+		/* entry has no PCM channels */
+		if (formations[i].pcm == 0)
+			continue;
+
+		hw->rate_min = min(hw->rate_min, snd_oxfw_rate_table[i]);
+		hw->rate_max = max(hw->rate_max, snd_oxfw_rate_table[i]);
+		hw->rates |= snd_pcm_rate_to_rate_bit(snd_oxfw_rate_table[i]);
+	}
+
+	return;
 }
 
 static int oxfw_open(struct snd_pcm_substream *substream)
 {
-	static const struct snd_pcm_hardware hardware = {
+	static const struct snd_pcm_hardware hw = {
 		.info = SNDRV_PCM_INFO_MMAP |
-			SNDRV_PCM_INFO_MMAP_VALID |
 			SNDRV_PCM_INFO_BATCH |
 			SNDRV_PCM_INFO_INTERLEAVED |
+			/* for Open Sound System compatibility */
+			SNDRV_PCM_INFO_MMAP_VALID |
 			SNDRV_PCM_INFO_BLOCK_TRANSFER,
-		.formats = AMDTP_OUT_PCM_FORMAT_BITS,
-		.channels_min = 2,
-		.channels_max = 2,
+		/* set up later */
+		.rates = 0,
+		.rate_min = UINT_MAX,
+		.rate_max = 0,
+		/* set up later */
+		.channels_min = UINT_MAX,
+		.channels_max = 0,
 		.buffer_bytes_max = 4 * 1024 * 1024,
 		.period_bytes_min = 1,
 		.period_bytes_max = UINT_MAX,
@@ -101,31 +141,55 @@ static int oxfw_open(struct snd_pcm_substream *substream)
 	};
 	struct snd_oxfw *oxfw = substream->private_data;
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	bool used;
+	unsigned int rate;
 	int err;
 
-	err = cmp_connection_check_used(&oxfw->in_conn, &used);
-	if ((err < 0) || used)
-		goto end;
+	runtime->hw = hw;
 
-	runtime->hw = hardware;
+	/* add rule between channels and sampling rate */
+	prepare_rates(&runtime->hw, oxfw->rx_stream_formations);
+	prepare_channels(&runtime->hw, oxfw->rx_stream_formations);
+	runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
+	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+			    hw_rule_playback_channels, oxfw,
+			    SNDRV_PCM_HW_PARAM_RATE, -1);
+	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+			    hw_rule_playback_rate, oxfw,
+			    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 
-	err = oxfw->device_info->pcm_constraints(runtime);
-	if (err < 0)
-		goto end;
-	err = snd_pcm_limit_hw_rates(runtime);
-	if (err < 0)
-		goto end;
-
-	err = snd_pcm_hw_constraint_minmax(runtime,
-					   SNDRV_PCM_HW_PARAM_PERIOD_TIME,
-					   5000, UINT_MAX);
-	if (err < 0)
-		goto end;
-
+	/* AM824 in IEC 61883-6 can deliver 24bit data */
 	err = snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
 	if (err < 0)
 		goto end;
+
+	/*
+	 * AMDTP functionality in firewire-lib require periods to be aligned to
+	 * 16 bit, or 24bit inner 32bit.
+	 */
+	err = snd_pcm_hw_constraint_step(runtime, 0,
+					 SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
+	if (err < 0)
+		goto end;
+
+	/* time for period constraint */
+	err = snd_pcm_hw_constraint_minmax(runtime,
+					   SNDRV_PCM_HW_PARAM_PERIOD_TIME,
+					   5000, UINT_MAX);
+
+	/*
+	 * When any PCM stream are already running, the available sampling rate
+	 *  is limited at current value.
+	 */
+	if (amdtp_stream_pcm_running(&oxfw->rx_stream)) {
+		err = avc_general_get_sig_fmt(oxfw->unit, &rate,
+					      AVC_GENERAL_PLUG_DIR_IN, 0);
+		if (err < 0)
+			goto end;
+		substream->runtime->hw.rate_min = rate;
+		substream->runtime->hw.rate_max = rate;
+	}
+
+	snd_pcm_set_sync(substream);
 end:
 	return err;
 }

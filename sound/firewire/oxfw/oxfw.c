@@ -25,6 +25,20 @@ MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("snd-firewire-speakers");
 
+static const struct device_info griffin_firewave = {
+	.driver_name = "FireWave",
+	.mixer_channels = 6,
+	.mute_fb_id   = 0x01,
+	.volume_fb_id = 0x02,
+};
+
+static const struct device_info lacie_speakers = {
+	.driver_name = "FWSpeakers",
+	.mixer_channels = 1,
+	.mute_fb_id   = 0x01,
+	.volume_fb_id = 0x01,
+};
+
 static int name_card(struct snd_oxfw *oxfw)
 {
 	struct fw_device *fw_dev = fw_parent_device(oxfw->unit);
@@ -95,6 +109,13 @@ static int oxfw_probe(struct fw_unit *unit,
 	oxfw->device_info = (const struct device_info *)id->driver_data;
 	mutex_init(&oxfw->mutex);
 
+	if (oxfw->device_info == &griffin_firewave)
+		err = firewave_stream_discover(oxfw);
+	else
+		err = lacie_speakers_stream_discover(oxfw);
+	if (err < 0)
+		goto err_card;
+
 	err = name_card(oxfw);
 	if (err < 0)
 		goto err_card;
@@ -143,22 +164,6 @@ static void oxfw_remove(struct fw_unit *unit)
 	snd_card_disconnect(oxfw->card);
 	snd_card_free_when_closed(oxfw->card);
 }
-
-static const struct device_info griffin_firewave = {
-	.driver_name = "FireWave",
-	.pcm_constraints = firewave_constraints,
-	.mixer_channels = 6,
-	.mute_fb_id   = 0x01,
-	.volume_fb_id = 0x02,
-};
-
-static const struct device_info lacie_speakers = {
-	.driver_name = "FWSpeakers",
-	.pcm_constraints = lacie_speakers_constraints,
-	.mixer_channels = 1,
-	.mute_fb_id   = 0x01,
-	.volume_fb_id = 0x01,
-};
 
 static const struct ieee1394_device_id oxfw_id_table[] = {
 	{
