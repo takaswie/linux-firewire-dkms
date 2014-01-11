@@ -5,22 +5,7 @@
  * Licensed under the terms of the GNU General Public License, version 2.
  */
 
-#include <linux/device.h>
-#include <linux/firewire.h>
-#include <linux/firewire-constants.h>
-#include <linux/module.h>
-#include <linux/mod_devicetable.h>
-#include <linux/mutex.h>
-#include <linux/slab.h>
-#include <sound/control.h>
-#include <sound/core.h>
-#include <sound/initval.h>
-#include <sound/pcm.h>
-#include <sound/pcm_params.h>
-#include "../cmp.h"
-#include "../fcp.h"
-#include "../amdtp.h"
-#include "../lib.h"
+#include "oxfw.h"
 
 #define OXFORD_FIRMWARE_ID_ADDRESS	(CSR_REGISTER_BASE + 0x50000)
 /* 0x970?vvvv or 0x971?vvvv, where vvvv = firmware version */
@@ -34,29 +19,6 @@
 
 #define SPECIFIER_1394TA	0x00a02d
 #define VERSION_AVC		0x010001
-
-struct device_info {
-	const char *driver_name;
-	const char *short_name;
-	const char *long_name;
-	int (*pcm_constraints)(struct snd_pcm_runtime *runtime);
-	unsigned int mixer_channels;
-	u8 mute_fb_id;
-	u8 volume_fb_id;
-};
-
-struct snd_oxfw {
-	struct snd_card *card;
-	struct fw_unit *unit;
-	const struct device_info *device_info;
-	struct mutex mutex;
-	struct cmp_connection connection;
-	struct amdtp_stream stream;
-	bool mute;
-	s16 volume[6];
-	s16 volume_min;
-	s16 volume_max;
-};
 
 MODULE_DESCRIPTION("Oxford OXFW970/971 driver");
 MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
@@ -186,14 +148,6 @@ static int oxfw_close(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-static void oxfw_stop_stream(struct snd_oxfw *oxfw)
-{
-	if (amdtp_stream_running(&oxfw->stream)) {
-		amdtp_stream_stop(&oxfw->stream);
-		cmp_connection_break(&oxfw->connection);
-	}
-}
-
 static int oxfw_hw_params(struct snd_pcm_substream *substream,
 			   struct snd_pcm_hw_params *hw_params)
 {
@@ -201,7 +155,7 @@ static int oxfw_hw_params(struct snd_pcm_substream *substream,
 	int err;
 
 	mutex_lock(&oxfw->mutex);
-	oxfw_stop_stream(oxfw);
+	snd_oxfw_stream_stop(oxfw);
 	mutex_unlock(&oxfw->mutex);
 
 	err = snd_pcm_lib_alloc_vmalloc_buffer(substream,
@@ -209,12 +163,12 @@ static int oxfw_hw_params(struct snd_pcm_substream *substream,
 	if (err < 0)
 		goto error;
 
-	amdtp_stream_set_parameters(&oxfw->stream,
+	amdtp_stream_set_parameters(&oxfw->rx_stream,
 				    params_rate(hw_params),
 				    params_channels(hw_params),
 				    0);
 
-	amdtp_stream_set_pcm_format(&oxfw->stream,
+	amdtp_stream_set_pcm_format(&oxfw->rx_stream,
 				    params_format(hw_params));
 
 	err = avc_general_set_sig_fmt(oxfw->unit, params_rate(hw_params),
@@ -240,7 +194,7 @@ static int oxfw_hw_free(struct snd_pcm_substream *substream)
 	struct snd_oxfw *oxfw = substream->private_data;
 
 	mutex_lock(&oxfw->mutex);
-	oxfw_stop_stream(oxfw);
+	snd_oxfw_stream_stop(oxfw);
 	mutex_unlock(&oxfw->mutex);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
@@ -253,33 +207,15 @@ static int oxfw_prepare(struct snd_pcm_substream *substream)
 
 	mutex_lock(&oxfw->mutex);
 
-	if (amdtp_streaming_error(&oxfw->stream))
-		oxfw_stop_stream(oxfw);
+	snd_oxfw_stream_stop(oxfw);
 
-	if (!amdtp_stream_running(&oxfw->stream)) {
-		err = cmp_connection_establish(&oxfw->connection,
-			amdtp_stream_get_max_payload(&oxfw->stream));
-		if (err < 0)
-			goto err_mutex;
+	err = snd_oxfw_stream_start(oxfw);
+	if (err < 0)
+		goto end;
 
-		err = amdtp_stream_start(&oxfw->stream,
-					 oxfw->connection.resources.channel,
-					 oxfw->connection.speed);
-		if (err < 0)
-			goto err_connection;
-	}
-
+	amdtp_stream_pcm_prepare(&oxfw->rx_stream);
+end:
 	mutex_unlock(&oxfw->mutex);
-
-	amdtp_stream_pcm_prepare(&oxfw->stream);
-
-	return 0;
-
-err_connection:
-	cmp_connection_break(&oxfw->connection);
-err_mutex:
-	mutex_unlock(&oxfw->mutex);
-
 	return err;
 }
 
@@ -298,7 +234,7 @@ static int oxfw_trigger(struct snd_pcm_substream *substream, int cmd)
 	default:
 		return -EINVAL;
 	}
-	amdtp_stream_pcm_trigger(&oxfw->stream, pcm);
+	amdtp_stream_pcm_trigger(&oxfw->rx_stream, pcm);
 	return 0;
 }
 
@@ -306,7 +242,7 @@ static snd_pcm_uframes_t oxfw_pointer(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
-	return amdtp_stream_pcm_pointer(&oxfw->stream);
+	return amdtp_stream_pcm_pointer(&oxfw->rx_stream);
 }
 
 static int oxfw_create_pcm(struct snd_oxfw *oxfw)
@@ -624,9 +560,11 @@ static void oxfw_card_free(struct snd_card *card)
 {
 	struct snd_oxfw *oxfw = card->private_data;
 
-	amdtp_stream_destroy(&oxfw->stream);
-	cmp_connection_destroy(&oxfw->connection);
-	fw_unit_put(oxfw->unit);
+	mutex_lock(&oxfw->mutex);
+	snd_oxfw_stream_destroy(oxfw);
+	mutex_unlock(&oxfw->mutex);
+
+	fw_unit_put(oxfw->unit);	/* dec reference counter */
 	mutex_destroy(&oxfw->mutex);
 }
 
@@ -642,24 +580,13 @@ static int oxfw_probe(struct fw_unit *unit,
 	err = snd_card_create(-1, NULL, THIS_MODULE, sizeof(*oxfw), &card);
 	if (err < 0)
 		return err;
-	snd_card_set_dev(card, &unit->device);
-
-	oxfw = card->private_data;
-	oxfw->card = card;
-	mutex_init(&oxfw->mutex);
-	oxfw->unit = fw_unit_get(unit);
-	oxfw->device_info = (const struct device_info *)id->driver_data;
-
-	err = cmp_connection_init(&oxfw->connection, unit, CMP_INPUT, 0);
-	if (err < 0)
-		goto err_unit;
-
-	err = amdtp_stream_init(&oxfw->stream, unit, AMDTP_OUT_STREAM,
-				CIP_NONBLOCKING);
-	if (err < 0)
-		goto err_connection;
 
 	card->private_free = oxfw_card_free;
+	oxfw = card->private_data;
+	oxfw->card = card;
+	oxfw->unit = fw_unit_get(unit);	/* inc reference counter */
+	oxfw->device_info = (const struct device_info *)id->driver_data;
+	mutex_init(&oxfw->mutex);
 
 	strcpy(card->driver, oxfw->device_info->driver_name);
 	strcpy(card->shortname, oxfw->device_info->short_name);
@@ -672,28 +599,26 @@ static int oxfw_probe(struct fw_unit *unit,
 		 dev_name(&unit->device), 100 << fw_dev->max_speed);
 	strcpy(card->mixername, "OXFW970");
 
+	err = snd_oxfw_stream_init(oxfw);
+	if (err < 0)
+		goto err_card;
+
 	err = oxfw_create_pcm(oxfw);
 	if (err < 0)
-		goto error;
+		goto err_card;
 
 	err = oxfw_create_mixer(oxfw);
 	if (err < 0)
-		goto error;
+		goto err_card;
 
+	snd_card_set_dev(card, &unit->device);
 	err = snd_card_register(card);
 	if (err < 0)
-		goto error;
-
+		goto err_card;
 	dev_set_drvdata(&unit->device, oxfw);
 
 	return 0;
-
-err_connection:
-	cmp_connection_destroy(&oxfw->connection);
-err_unit:
-	fw_unit_put(oxfw->unit);
-	mutex_destroy(&oxfw->mutex);
-error:
+err_card:
 	snd_card_free(card);
 	return err;
 }
@@ -702,30 +627,20 @@ static void oxfw_bus_reset(struct fw_unit *unit)
 {
 	struct snd_oxfw *oxfw = dev_get_drvdata(&unit->device);
 
+	mutex_lock(&oxfw->mutex);
+
 	fcp_bus_reset(oxfw->unit);
+	snd_oxfw_stream_update(oxfw);
 
-	if (cmp_connection_update(&oxfw->connection) < 0) {
-		amdtp_stream_pcm_abort(&oxfw->stream);
-		mutex_lock(&oxfw->mutex);
-		oxfw_stop_stream(oxfw);
-		mutex_unlock(&oxfw->mutex);
-		return;
-	}
-
-	amdtp_stream_update(&oxfw->stream);
+	mutex_unlock(&oxfw->mutex);
 }
 
 static void oxfw_remove(struct fw_unit *unit)
 {
 	struct snd_oxfw *oxfw = dev_get_drvdata(&unit->device);
 
-	amdtp_stream_pcm_abort(&oxfw->stream);
+	snd_oxfw_stream_destroy(oxfw);
 	snd_card_disconnect(oxfw->card);
-
-	mutex_lock(&oxfw->mutex);
-	oxfw_stop_stream(oxfw);
-	mutex_unlock(&oxfw->mutex);
-
 	snd_card_free_when_closed(oxfw->card);
 }
 
