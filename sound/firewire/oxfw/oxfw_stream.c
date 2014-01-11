@@ -22,6 +22,20 @@ const unsigned int snd_oxfw_rate_table[SND_OXFW_STREAM_TABLE_ENTRIES] = {
 	[6] = 192000,
 };
 
+/*
+ * See Table 5.7 – Sampling frequency for Multi-bit Audio
+ * at AV/C Stream Format Information Specification 1.1 (Apr 2005, 1394TA)
+ */
+static const unsigned int avc_stream_rate_table[] = {
+	[0] = 0x02,
+	[1] = 0x03,
+	[2] = 0x04,
+	[3] = 0x0a,
+	[4] = 0x05,
+	[5] = 0x06,
+	[6] = 0x07,
+};
+
 int snd_oxfw_stream_init(struct snd_oxfw *oxfw)
 {
 	int err;
@@ -163,4 +177,186 @@ int lacie_speakers_stream_discover(struct snd_oxfw *oxfw)
 	oxfw->rx_stream_formations[6].pcm = 2;
 
 	return 0;
+}
+/*
+ * See Table 6.16 - AM824 Stream Format
+ *     Figure 6.19 - format_information field for AM824 Compound
+ * at AV/C Stream Format Information Specification 1.1 (Apr 2005, 1394TA)
+ */
+static int
+parse_stream_formation(u8 *buf, unsigned int len,
+		       struct snd_oxfw_stream_formation *formation,
+		       unsigned int *index)
+{
+	unsigned int e, channels, format;
+
+	/*
+	 * this module can support a hierarchy combination that:
+	 *  Root:	Audio and Music (0x90)
+	 *  Level 1:	AM824 Compound  (0x40)
+	 */
+	if ((buf[0] != 0x90) || (buf[1] != 0x40))
+		return -ENOSYS;
+
+	/* check the sampling rate */
+	for (*index = 0; *index < sizeof(avc_stream_rate_table); *index += 1) {
+		if (buf[2] == avc_stream_rate_table[*index])
+			break;
+	}
+	if (*index == sizeof(avc_stream_rate_table))
+		return -ENOSYS;
+
+	for (e = 0; e < buf[4]; e++) {
+		channels = buf[5 + e * 2];
+		format = buf[6 + e * 2];
+
+		switch (format) {
+		/* IEC 60958-3 */
+		case 0x00:
+		/* Multi Bit Linear Audio (Raw) */
+		case 0x06:
+			formation[*index].pcm += channels;
+			break;
+		/* MIDI comformant */
+		case 0x0d:
+			formation[*index].midi += channels;
+			break;
+		/* Multi Bit Linear Audio (DVD-audio) */
+		case 0x07:
+		/* IEC 61937-3 to 7 */
+		case 0x01:
+		case 0x02:
+		case 0x03:
+		case 0x04:
+		case 0x05:
+		/* One Bit Audio */
+		case 0x08:	/* (Plain) Raw */
+		case 0x09:	/* (Plain) SACD */
+		case 0x0a:	/* (Encoded) Raw */
+		case 0x0b:	/* (ENcoded) SACD */
+		/* High precision Multi-bit Linear Audio */
+		case 0x0c:
+		/* SMPTE Time-Code conformant */
+		case 0x0e:
+		/* Sample Count */
+		case 0x0f:
+		/* Anciliary Data */
+		case 0x10:
+		/* Synchronization Stream (Stereo Raw audio) */
+		case 0x40:
+		/* Don't care */
+		case 0xff:
+		default:
+			break;	/* not supported */
+		}
+	}
+
+	return 0;
+}
+
+static int
+assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
+			 unsigned int pid, u8 *buf, unsigned int *len,
+			 struct snd_oxfw_stream_formation *formations)
+{
+	unsigned int i, pcm_channels, midi_channels;
+	int err;
+
+	/* get formation at current sampling rate */
+	err = avc_stream_get_format_single(oxfw->unit, dir, pid, buf, len);
+	if ((err < 0) || (err == 0x80) /* NOT IMPLEMENTED */)
+		goto end;
+
+	/* parse and set stream formation */
+	err = parse_stream_formation(buf, *len, formations, &i);
+	if (err < 0)
+		goto end;
+
+	pcm_channels = formations[i].pcm;
+	midi_channels = formations[i].midi;
+
+	/* apply the formation for each available sampling rate */
+	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+		err = avc_general_inquiry_sig_fmt(oxfw->unit,
+						  snd_oxfw_rate_table[i],
+						  dir, pid);
+		if ((err < 0) || (err == 0x08) /* NOT IMPLEMENTED */)
+			continue;
+
+		formations[i].pcm = pcm_channels;
+		formations[i].midi = midi_channels;
+	}
+end:
+	return err;
+}
+
+static int
+fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
+		       unsigned short pid)
+{
+	u8 *buf;
+	struct snd_oxfw_stream_formation *formations;
+	unsigned int i, len, eid;
+	int err;
+
+	buf = kmalloc(AVC_GENERIC_FRAME_MAXIMUM_BYTES, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	formations = oxfw->rx_stream_formations;
+
+	/* initialize parameters here because of checking implementation */
+	eid = 0;
+	len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
+	memset(buf, 0, len);
+
+	/* get first entry */
+	err = avc_stream_get_format_list(oxfw->unit, dir, 0, buf, &len, eid);
+	if ((err < 0) || (len < 3)) {
+		/* LIST subfunction is not implemented */
+		err = assume_stream_formations(oxfw, dir, pid, buf, &len,
+					       formations);
+		goto end;
+	}
+
+	/* LIST subfunction is implemented */
+	do {
+		/* parse and set stream formation */
+		err = parse_stream_formation(buf, len, formations, &i);
+		if (err < 0)
+			continue;
+
+		/* get next entry */
+		len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
+		memset(buf, 0, len);
+		err = avc_stream_get_format_list(oxfw->unit, dir, 0,
+						 buf, &len, ++eid);
+		if ((err < 0) || (len < 3))
+			break;
+	} while (eid < SND_OXFW_STREAM_TABLE_ENTRIES);
+end:
+	kfree(buf);
+	return err;
+}
+
+int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
+{
+	u8 plugs[AVC_PLUG_INFO_BUF_COUNT];
+	int err;
+
+	/* the number of plugs for isoc in/out, ext in/out  */
+	err = avc_general_get_plug_info(oxfw->unit, 0x1f, 0x07, 0x00, plugs);
+	if (err < 0)
+		goto end;
+	if ((plugs[0] == 0) || (plugs[0] == 0)) {
+		err = -EIO;
+		goto end;
+	}
+
+	/* use iPCR[0] */
+	err = fill_stream_formations(oxfw, AVC_GENERAL_PLUG_DIR_IN, 0);
+	if (err < 0)
+		goto end;
+end:
+	return err;
 }

@@ -95,6 +95,7 @@ void snd_oxfw_stream_update(struct snd_oxfw *oxfw);
 
 int firewave_stream_discover(struct snd_oxfw *oxfw);
 int lacie_speakers_stream_discover(struct snd_oxfw *oxfw);
+int snd_oxfw_stream_discover(struct snd_oxfw *oxfw);
 
 int snd_oxfw_create_pcm(struct snd_oxfw *oxfw);
 

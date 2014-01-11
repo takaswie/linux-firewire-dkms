@@ -16,6 +16,8 @@
 
 #define VENDOR_GRIFFIN		0x001292
 #define VENDOR_LACIE		0x00d04b
+#define VEN_BEHRINGER		0x001564
+#define VEN_LOUD		0x000ff2
 
 #define SPECIFIER_1394TA	0x00a02d
 #define VERSION_AVC		0x010001
@@ -65,7 +67,12 @@ static int name_card(struct snd_oxfw *oxfw)
 		goto end;
 	be32_to_cpus(&firmware);
 
-	strcpy(oxfw->card->driver, oxfw->device_info->driver_name);
+	/* to apply card definitions */
+	if (oxfw->device_info)
+		strcpy(oxfw->card->driver, oxfw->device_info->driver_name);
+	else
+		strcpy(oxfw->card->driver, "OXFW");
+
 	strcpy(oxfw->card->shortname, model);
 
 	snprintf(oxfw->card->longname, sizeof(oxfw->card->longname),
@@ -111,8 +118,10 @@ static int oxfw_probe(struct fw_unit *unit,
 
 	if (oxfw->device_info == &griffin_firewave)
 		err = firewave_stream_discover(oxfw);
-	else
+	else if (oxfw->device_info == &lacie_speakers)
 		err = lacie_speakers_stream_discover(oxfw);
+	else
+		err = snd_oxfw_stream_discover(oxfw);
 	if (err < 0)
 		goto err_card;
 
@@ -128,9 +137,11 @@ static int oxfw_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto err_card;
 
-	err = snd_oxfw_create_mixer(oxfw);
-	if (err < 0)
-		goto err_card;
+	if (oxfw->device_info) {
+		err = snd_oxfw_create_mixer(oxfw);
+		if (err < 0)
+			goto err_card;
+	}
 
 	snd_oxfw_proc_init(oxfw);
 
@@ -190,6 +201,33 @@ static const struct ieee1394_device_id oxfw_id_table[] = {
 		.version      = VERSION_AVC,
 		.driver_data  = (kernel_ulong_t)&lacie_speakers,
 	},
+	/* Behringer,F-Control Audio 202 */
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= VEN_BEHRINGER,
+		.model_id	= 0x00fc22,
+	},
+	/* Mackie, Onyx-i series (former models) */
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= VEN_LOUD,
+		.model_id	= 0x081216,
+	},
+	/* Mackie, Onyx Satellite */
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= VEN_LOUD,
+		.model_id	= 0x00200f,
+	},
+	/* IDs are unknown but able to be supported */
+	/*  Mackie(Loud), d.2 pro */
+	/*  Mackie(Loud), d.4 pro */
+	/*  Mackie(Loud), U.420 */
+	/*  Mackie(Loud), U.420d */
+	/*  Mackie(Loud), Tapco Link.Firewire */
 	{ }
 };
 MODULE_DEVICE_TABLE(ieee1394, oxfw_id_table);
