@@ -280,7 +280,7 @@ static int pcm_open(struct snd_pcm_substream *substream)
 
 	err = snd_efw_command_get_clock_source(efw, &clock_source);
 	if (err < 0)
-		goto end;
+		goto err_locked;
 
 	/*
 	 * When source of clock is not internal or any PCM streams are running,
