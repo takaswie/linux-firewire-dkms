@@ -26,16 +26,18 @@ config SND_DICE
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-dice.
 
-config SND_FIREWIRE_SPEAKERS
-	tristate "FireWire speakers"
+config SND_OXFW
+	tristate "Oxford OXFW970/971 chipset support"
 	select SND_PCM
 	select SND_FIREWIRE_LIB
 	help
-	  Say Y here to include support for the Griffin FireWave Surround
-	  and the LaCie FireWire Speakers.
+	  Say Y here to include support for Firewire devices based on
+	  Oxford Semiconductor OXFW970/971 chipset.
+	   * Griffin Firewave
+	   * LaCie Firewire Speakers
 
 	  To compile this driver as a module, choose M here: the module
-	  will be called snd-firewire-speakers.
+	  will be called snd-oxfw.
 
 config SND_ISIGHT
 	tristate "Apple iSight microphone"
