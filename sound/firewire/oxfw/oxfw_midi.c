@@ -13,10 +13,17 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 	struct snd_oxfw *oxfw = substream->rmidi->private_data;
 	int err;
 
+	err = snd_oxfw_stream_lock_try(oxfw);
+	if (err < 0)
+		goto end;
+
 	mutex_lock(&oxfw->mutex);
 	err = snd_oxfw_stream_start(oxfw, &oxfw->tx_stream, 0);
 	mutex_unlock(&oxfw->mutex);
 
+	if (err < 0)
+		snd_oxfw_stream_lock_release(oxfw);
+end:
 	return err;
 }
 
@@ -25,10 +32,17 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 	struct snd_oxfw *oxfw = substream->rmidi->private_data;
 	int err;
 
+	err = snd_oxfw_stream_lock_try(oxfw);
+	if (err < 0)
+		goto end;
+
 	mutex_lock(&oxfw->mutex);
 	err = snd_oxfw_stream_start(oxfw, &oxfw->rx_stream, 0);
 	mutex_unlock(&oxfw->mutex);
 
+	if (err < 0)
+		snd_oxfw_stream_lock_release(oxfw);
+end:
 	return err;
 }
 
@@ -41,6 +55,7 @@ static int midi_capture_close(struct snd_rawmidi_substream *substream)
 		mutex_lock(&oxfw->mutex);
 		snd_oxfw_stream_stop(oxfw, &oxfw->tx_stream);
 		mutex_unlock(&oxfw->mutex);
+		snd_oxfw_stream_lock_release(oxfw);
 	}
 	return 0;
 }
@@ -54,6 +69,7 @@ static int midi_playback_close(struct snd_rawmidi_substream *substream)
 		mutex_lock(&oxfw->mutex);
 		snd_oxfw_stream_stop(oxfw, &oxfw->rx_stream);
 		mutex_unlock(&oxfw->mutex);
+		snd_oxfw_stream_lock_release(oxfw);
 	}
 	return 0;
 }
