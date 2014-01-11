@@ -36,6 +36,22 @@ const unsigned int snd_bebob_rate_table[SND_BEBOB_STRM_FMT_ENTRIES] = {
 	[8] = 192000,
 };
 
+/*
+ * See: Table 51: Extended Stream Format Info ‘Sampling Frequency’
+ * in Additional AVC commands (Nov 2003, BridgeCo)
+ */
+static const unsigned int bridgeco_freq_table[] = {
+	[0] = 0x00,
+	[1] = 0x01,
+	[2] = 0x02,
+	[3] = 0x03,
+	[4] = 0x04,
+	[5] = 0x0a,
+	[6] = 0x05,
+	[7] = 0x06,
+	[8] = 0x07,
+};
+
 static unsigned int
 get_formation_index(unsigned int rate)
 {
@@ -592,11 +608,31 @@ void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
 	mutex_unlock(&bebob->mutex);
 }
 
-static void
-set_stream_formation(u8 *buf, unsigned int len,
-		     struct snd_bebob_stream_formation *formation)
+/*
+ * See: Table 50: Extended Stream Format Info ‘Format Hierarchy Level 2’
+ * in Additional AVC commands (Nov 2003, BridgeCo)
+ */
+static int
+parse_stream_formation(u8 *buf, unsigned int len,
+		       struct snd_bebob_stream_formation *formation)
 {
-	unsigned int e, channels, format;
+	unsigned int i, e, channels, format;
+
+	/*
+	 * this module can support a hierarchy combination that:
+	 *  Root:	Audio and Music (0x90)
+	 *  Level 1:	AM824 Compound  (0x40)
+	 */
+	if ((buf[0] != 0x90) || (buf[1] != 0x40))
+		return -ENOSYS;
+
+	/* check sampling rate */
+	for (i = 0; i < sizeof(bridgeco_freq_table); i++) {
+		if (buf[2] == bridgeco_freq_table[i])
+			break;
+	}
+	if (i == sizeof(bridgeco_freq_table))
+		return -ENOSYS;
 
 	for (e = 0; e < buf[4]; e++) {
 		channels = buf[5 + e * 2];
@@ -607,11 +643,11 @@ set_stream_formation(u8 *buf, unsigned int len,
 		case 0x00:
 		/* PCM for Multi bit linear audio (raw) */
 		case 0x06:
-			formation->pcm += channels;
+			formation[i].pcm += channels;
 			break;
 		/* MIDI comformant (MMA/AMEI RP-027) */
 		case 0x0d:
-			formation->midi += channels;
+			formation[i].midi += channels;
 			break;
 		/* PCM for Multi bit linear audio (DVD-audio) */
 		case 0x07:
@@ -621,37 +657,32 @@ set_stream_formation(u8 *buf, unsigned int len,
 		case 0x03:
 		case 0x04:
 		case 0x05:
-		/* High precision multi bit linear audio */
+		/* One Bit Audio */
+		case 0x08:	/* (Plain) Raw */
+		case 0x09:	/* (Plain) SACD */
+		case 0x0a:	/* (Encoded) Raw */
+		case 0x0b:	/* (ENcoded) SACD */
+		/* High precision Multi-bit Linear Audio */
 		case 0x0c:
+		/* Synchronization Stream (Stereo Raw audio) */
+		case 0x40:
 		/* Don't care */
 		case 0xff:
 		default:
-			break;	/* not supported */
+			return -ENOSYS;	/* not supported */
 		}
 	}
 
-	return;
+	return 0;
 }
 
 static int
 fill_stream_formations(struct snd_bebob *bebob, enum avc_bridgeco_plug_dir dir,
 		       unsigned short pid)
 {
-	static const unsigned int freq_table[] = {
-		[0x00] = 0,	/*  22050 */
-		[0x01] = 1,	/*  24000 */
-		[0x02] = 2,	/*  32000 */
-		[0x03] = 3,	/*  44100 */
-		[0x04] = 4,	/*  48000 */
-		[0x05] = 6,	/*  96000 */
-		[0x06] = 7,	/* 176400 */
-		[0x07] = 8,	/* 192000 */
-		[0x0a] = 5	/*  88200 */
-	};
-
 	u8 *buf;
 	struct snd_bebob_stream_formation *formations;
-	unsigned int i, index, len, eid;
+	unsigned int len, eid;
 	u8 addr[AVC_BRIDGECO_ADDR_BYTES];
 	int err;
 
@@ -664,7 +695,7 @@ fill_stream_formations(struct snd_bebob *bebob, enum avc_bridgeco_plug_dir dir,
 	else
 		formations = bebob->tx_stream_formations;
 
-	for (eid = 0, index = 0; eid < SND_BEBOB_STRM_FMT_ENTRIES; eid++) {
+	for (eid = 0; eid < SND_BEBOB_STRM_FMT_ENTRIES; eid++) {
 		len = FORMAT_MAXIMUM_LENGTH;
 
 		memset(buf, 0, len);
@@ -676,25 +707,11 @@ fill_stream_formations(struct snd_bebob *bebob, enum avc_bridgeco_plug_dir dir,
 			goto end;
 		else if (len < 3)
 			break;
-		/*
-		 * this module can support a hierarchy combination that:
-		 *  Root:	Audio and Music (0x90)
-		 *  Level 1:	AM824 Compound  (0x40)
-		 */
-		else if ((buf[0] != 0x90) || (buf[1] != 0x40))
-			break;
-
-		/* check sampling rate */
-		index = -1;
-		for (i = 0; i < sizeof(freq_table); i++) {
-			if (i == buf[2])
-				index = freq_table[i];
-		}
-		if (index < 0)
-			break;
 
 		/* parse and set stream formation */
-		set_stream_formation(buf, len, &formations[index]);
+		err = parse_stream_formation(buf, len, formations);
+		if (err < 0)
+			goto end;
 	}
 end:
 	kfree(buf);
