@@ -127,6 +127,7 @@ bebob_card_free(struct snd_card *card)
 		mutex_unlock(&devices_mutex);
 	}
 
+	fw_unit_put(bebob->unit);	/* decrement reference counter */
 	mutex_destroy(&bebob->mutex);
 
 	return;
@@ -206,7 +207,7 @@ bebob_probe(struct fw_unit *unit,
 	bebob = card->private_data;
 	bebob->card = card;
 	bebob->device = fw_parent_device(unit);
-	bebob->unit = unit;
+	bebob->unit = fw_unit_get(unit); /* increment reference counter */
 	bebob->card_index = -1;
 	bebob->spec = spec;
 	mutex_init(&bebob->mutex);

@@ -161,6 +161,7 @@ efw_card_free(struct snd_card *card)
 		mutex_unlock(&devices_mutex);
 	}
 
+	fw_unit_put(efw->unit);	/* decrement reference counter */
 	mutex_destroy(&efw->mutex);
 
 	return;
@@ -202,7 +203,7 @@ efw_probe(struct fw_unit *unit,
 	efw = card->private_data;
 	efw->card = card;
 	efw->device = fw_parent_device(unit);
-	efw->unit = unit;
+	efw->unit = fw_unit_get(unit);	/* increment reference counter */
 	efw->card_index = -1;
 	mutex_init(&efw->mutex);
 	spin_lock_init(&efw->lock);
