@@ -66,12 +66,28 @@ static int hw_rule_channels(struct snd_pcm_hw_params *params,
 	return snd_interval_refine(c, &t);
 }
 
+static inline int hw_rule_capture_rate(struct snd_pcm_hw_params *params,
+				       struct snd_pcm_hw_rule *rule)
+{
+	struct snd_oxfw *oxfw = rule->private;
+	return hw_rule_rate(params, rule, oxfw,
+			    oxfw->tx_stream_formations);
+}
+
 static inline int hw_rule_playback_rate(struct snd_pcm_hw_params *params,
 					struct snd_pcm_hw_rule *rule)
 {
 	struct snd_oxfw *oxfw = rule->private;
 	return hw_rule_rate(params, rule, oxfw,
 			    oxfw->rx_stream_formations);
+}
+
+static inline int hw_rule_capture_channels(struct snd_pcm_hw_params *params,
+					   struct snd_pcm_hw_rule *rule)
+{
+	struct snd_oxfw *oxfw = rule->private;
+	return hw_rule_channels(params, rule, oxfw,
+				oxfw->tx_stream_formations);
 }
 
 static inline int hw_rule_playback_channels(struct snd_pcm_hw_params *params,
@@ -117,12 +133,14 @@ static void prepare_rates(struct snd_pcm_hardware *hw,
 	return;
 }
 
-static int oxfw_open(struct snd_pcm_substream *substream)
+static int init_hw_params(struct snd_oxfw *oxfw,
+			  struct snd_pcm_substream *substream)
 {
 	static const struct snd_pcm_hardware hw = {
 		.info = SNDRV_PCM_INFO_MMAP |
 			SNDRV_PCM_INFO_BATCH |
 			SNDRV_PCM_INFO_INTERLEAVED |
+			SNDRV_PCM_INFO_JOINT_DUPLEX |
 			/* for Open Sound System compatibility */
 			SNDRV_PCM_INFO_MMAP_VALID |
 			SNDRV_PCM_INFO_BLOCK_TRANSFER,
@@ -139,23 +157,33 @@ static int oxfw_open(struct snd_pcm_substream *substream)
 		.periods_min = 1,
 		.periods_max = UINT_MAX,
 	};
-	struct snd_oxfw *oxfw = substream->private_data;
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	unsigned int rate;
 	int err;
 
 	runtime->hw = hw;
 
 	/* add rule between channels and sampling rate */
-	prepare_rates(&runtime->hw, oxfw->rx_stream_formations);
-	prepare_channels(&runtime->hw, oxfw->rx_stream_formations);
-	runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
-	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
-			    hw_rule_playback_channels, oxfw,
-			    SNDRV_PCM_HW_PARAM_RATE, -1);
-	snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
-			    hw_rule_playback_rate, oxfw,
-			    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+		prepare_rates(&runtime->hw, oxfw->tx_stream_formations);
+		prepare_channels(&runtime->hw, oxfw->tx_stream_formations);
+		runtime->hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
+		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+				    hw_rule_capture_channels, oxfw,
+				    SNDRV_PCM_HW_PARAM_RATE, -1);
+		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+				    hw_rule_capture_rate, oxfw,
+				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	} else {
+		prepare_rates(&runtime->hw, oxfw->rx_stream_formations);
+		prepare_channels(&runtime->hw, oxfw->rx_stream_formations);
+		runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
+		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+				    hw_rule_playback_channels, oxfw,
+				    SNDRV_PCM_HW_PARAM_RATE, -1);
+		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+				    hw_rule_playback_rate, oxfw,
+				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	}
 
 	/* AM824 in IEC 61883-6 can deliver 24bit data */
 	err = snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
@@ -175,14 +203,27 @@ static int oxfw_open(struct snd_pcm_substream *substream)
 	err = snd_pcm_hw_constraint_minmax(runtime,
 					   SNDRV_PCM_HW_PARAM_PERIOD_TIME,
 					   5000, UINT_MAX);
+end:
+	return err;
+}
+
+static int oxfw_open(struct snd_pcm_substream *substream)
+{
+	struct snd_oxfw *oxfw = substream->private_data;
+	unsigned int rate;
+	int err;
+
+	err = init_hw_params(oxfw, substream);
+	if (err < 0)
+		goto end;
 
 	/*
 	 * When any PCM stream are already running, the available sampling rate
 	 *  is limited at current value.
 	 */
-	if (amdtp_stream_pcm_running(&oxfw->rx_stream)) {
-		err = avc_general_get_sig_fmt(oxfw->unit, &rate,
-					      AVC_GENERAL_PLUG_DIR_IN, 0);
+	if (amdtp_stream_pcm_running(&oxfw->tx_stream) ||
+	    amdtp_stream_pcm_running(&oxfw->rx_stream)) {
+		err = snd_oxfw_stream_get_rate(oxfw, &rate);
 		if (err < 0)
 			goto end;
 		substream->runtime->hw.rate_min = rate;
@@ -206,18 +247,28 @@ static int oxfw_hw_params(struct snd_pcm_substream *substream,
 						params_buffer_bytes(hw_params));
 }
 
-static int oxfw_hw_free(struct snd_pcm_substream *substream)
+static int oxfw_hw_free_capture(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
 	mutex_lock(&oxfw->mutex);
-	snd_oxfw_stream_stop(oxfw);
+	snd_oxfw_stream_stop(oxfw, &oxfw->tx_stream);
+	mutex_unlock(&oxfw->mutex);
+
+	return snd_pcm_lib_free_vmalloc_buffer(substream);
+}
+static int oxfw_hw_free_playback(struct snd_pcm_substream *substream)
+{
+	struct snd_oxfw *oxfw = substream->private_data;
+
+	mutex_lock(&oxfw->mutex);
+	snd_oxfw_stream_stop(oxfw, &oxfw->rx_stream);
 	mutex_unlock(&oxfw->mutex);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
 
-static int oxfw_prepare(struct snd_pcm_substream *substream)
+static int oxfw_prepare_capture(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -225,7 +276,25 @@ static int oxfw_prepare(struct snd_pcm_substream *substream)
 
 	mutex_lock(&oxfw->mutex);
 
-	err = snd_oxfw_stream_start(oxfw, runtime->rate);
+	err = snd_oxfw_stream_start(oxfw, &oxfw->tx_stream, runtime->rate);
+	if (err < 0)
+		goto end;
+
+	amdtp_stream_set_pcm_format(&oxfw->tx_stream, runtime->format);
+	amdtp_stream_pcm_prepare(&oxfw->tx_stream);
+end:
+	mutex_unlock(&oxfw->mutex);
+	return err;
+}
+static int oxfw_prepare_playback(struct snd_pcm_substream *substream)
+{
+	struct snd_oxfw *oxfw = substream->private_data;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	int err;
+
+	mutex_lock(&oxfw->mutex);
+
+	err = snd_oxfw_stream_start(oxfw, &oxfw->rx_stream, runtime->rate);
 	if (err < 0)
 		goto end;
 
@@ -236,7 +305,25 @@ end:
 	return err;
 }
 
-static int oxfw_trigger(struct snd_pcm_substream *substream, int cmd)
+static int oxfw_trigger_capture(struct snd_pcm_substream *substream, int cmd)
+{
+	struct snd_oxfw *oxfw = substream->private_data;
+	struct snd_pcm_substream *pcm;
+
+	switch (cmd) {
+	case SNDRV_PCM_TRIGGER_START:
+		pcm = substream;
+		break;
+	case SNDRV_PCM_TRIGGER_STOP:
+		pcm = NULL;
+		break;
+	default:
+		return -EINVAL;
+	}
+	amdtp_stream_pcm_trigger(&oxfw->tx_stream, pcm);
+	return 0;
+}
+static int oxfw_trigger_playback(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 	struct snd_pcm_substream *pcm;
@@ -255,35 +342,62 @@ static int oxfw_trigger(struct snd_pcm_substream *substream, int cmd)
 	return 0;
 }
 
-static snd_pcm_uframes_t oxfw_pointer(struct snd_pcm_substream *substream)
+static snd_pcm_uframes_t oxfw_pointer_capture(struct snd_pcm_substream *sbstm)
 {
-	struct snd_oxfw *oxfw = substream->private_data;
+	struct snd_oxfw *oxfw = sbstm->private_data;
+
+	return amdtp_stream_pcm_pointer(&oxfw->tx_stream);
+}
+static snd_pcm_uframes_t oxfw_pointer_playback(struct snd_pcm_substream *sbstm)
+{
+	struct snd_oxfw *oxfw = sbstm->private_data;
 
 	return amdtp_stream_pcm_pointer(&oxfw->rx_stream);
 }
 
 int snd_oxfw_create_pcm(struct snd_oxfw *oxfw)
 {
-	static struct snd_pcm_ops ops = {
+	static struct snd_pcm_ops capture_ops = {
 		.open      = oxfw_open,
 		.close     = oxfw_close,
 		.ioctl     = snd_pcm_lib_ioctl,
 		.hw_params = oxfw_hw_params,
-		.hw_free   = oxfw_hw_free,
-		.prepare   = oxfw_prepare,
-		.trigger   = oxfw_trigger,
-		.pointer   = oxfw_pointer,
+		.hw_free   = oxfw_hw_free_capture,
+		.prepare   = oxfw_prepare_capture,
+		.trigger   = oxfw_trigger_capture,
+		.pointer   = oxfw_pointer_capture,
+		.page      = snd_pcm_lib_get_vmalloc_page,
+		.mmap      = snd_pcm_lib_mmap_vmalloc,
+	};
+	static struct snd_pcm_ops playback_ops = {
+		.open      = oxfw_open,
+		.close     = oxfw_close,
+		.ioctl     = snd_pcm_lib_ioctl,
+		.hw_params = oxfw_hw_params,
+		.hw_free   = oxfw_hw_free_playback,
+		.prepare   = oxfw_prepare_playback,
+		.trigger   = oxfw_trigger_playback,
+		.pointer   = oxfw_pointer_playback,
 		.page      = snd_pcm_lib_get_vmalloc_page,
 		.mmap      = snd_pcm_lib_mmap_vmalloc,
 	};
 	struct snd_pcm *pcm;
+	unsigned int cap = 0;
 	int err;
 
-	err = snd_pcm_new(oxfw->card, oxfw->card->driver, 0, 1, 0, &pcm);
+	/* 44.1kHz is the most popular */
+	if (oxfw->tx_stream_formations[1].pcm > 0)
+		cap = 1;
+
+	err = snd_pcm_new(oxfw->card, oxfw->card->driver, 0, 1, cap, &pcm);
 	if (err < 0)
 		return err;
+
 	pcm->private_data = oxfw;
 	strcpy(pcm->name, oxfw->card->shortname);
-	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &ops);
+	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &playback_ops);
+	if (cap > 0)
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &capture_ops);
+
 	return 0;
 }

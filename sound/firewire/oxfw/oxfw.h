@@ -47,8 +47,12 @@ struct snd_oxfw {
 	struct mutex mutex;
 
 	struct snd_oxfw_stream_formation
+		tx_stream_formations[SND_OXFW_STREAM_TABLE_ENTRIES];
+	struct snd_oxfw_stream_formation
 		rx_stream_formations[SND_OXFW_STREAM_TABLE_ENTRIES];
+	struct cmp_connection out_conn;
 	struct cmp_connection in_conn;
+	struct amdtp_stream tx_stream;
 	struct amdtp_stream rx_stream;
 
 	bool mute;
@@ -87,11 +91,23 @@ int avc_general_inquiry_sig_fmt(struct fw_unit *unit, unsigned int rate,
 				enum avc_general_plug_dir dir,
 				unsigned short pid);
 
-int snd_oxfw_stream_init(struct snd_oxfw *oxfw);
-int snd_oxfw_stream_start(struct snd_oxfw *oxfw, unsigned int rate);
-void snd_oxfw_stream_stop(struct snd_oxfw *oxfw);
-void snd_oxfw_stream_destroy(struct snd_oxfw *oxfw);
-void snd_oxfw_stream_update(struct snd_oxfw *oxfw);
+int snd_oxfw_command_set_rate(struct snd_oxfw *oxfw,
+			       enum avc_general_plug_dir dir,
+			       unsigned int rate);
+int snd_oxfw_command_get_rate(struct snd_oxfw *oxfw,
+			       enum avc_general_plug_dir dir,
+			       unsigned int *rate);
+
+int snd_oxfw_stream_get_rate(struct snd_oxfw *oxfw, unsigned int *rate);
+int snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate);
+
+int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
+			  struct amdtp_stream *stream, unsigned int rate);
+void snd_oxfw_stream_stop(struct snd_oxfw *oxfw, struct amdtp_stream *stream);
+void snd_oxfw_stream_destroy(struct snd_oxfw *oxfw, struct amdtp_stream *stream);
+void snd_oxfw_stream_update(struct snd_oxfw *oxfw, struct amdtp_stream *stream);
+
+int snd_oxfw_streams_init(struct snd_oxfw *oxfw);
 
 int firewave_stream_discover(struct snd_oxfw *oxfw);
 int lacie_speakers_stream_discover(struct snd_oxfw *oxfw);

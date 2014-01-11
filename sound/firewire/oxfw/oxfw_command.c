@@ -120,3 +120,43 @@ end:
 	kfree(buf);
 	return err;
 }
+
+int snd_oxfw_command_set_rate(struct snd_oxfw *oxfw,
+			       enum avc_general_plug_dir dir,
+			       unsigned int rate)
+{
+	int err;
+
+	err = avc_general_set_sig_fmt(oxfw->unit, rate, dir, 0);
+	if (err < 0)
+		goto end;
+
+	/* ACCEPTED or INTERIM is OK */
+	if ((err != 0x0f) && (err != 0x09)) {
+		dev_err(&oxfw->unit->device,
+			"failed to set sampling rate\n");
+		err = -EIO;
+	}
+end:
+	return err;
+}
+
+int snd_oxfw_command_get_rate(struct snd_oxfw *oxfw,
+			       enum avc_general_plug_dir dir,
+			       unsigned int *rate)
+{
+	int err;
+
+	err = avc_general_get_sig_fmt(oxfw->unit, rate, dir, 0);
+	if (err < 0)
+		goto end;
+
+	/* IMPLEMENTED/STABLE is OK */
+	if (err != 0x0c) {
+		dev_err(&oxfw->unit->device,
+			"failed to get sampling rate\n");
+		err = -EIO;
+	}
+end:
+	return err;
+}

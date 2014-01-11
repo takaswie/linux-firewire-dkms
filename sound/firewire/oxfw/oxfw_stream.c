@@ -36,39 +36,101 @@ static const unsigned int avc_stream_rate_table[] = {
 	[6] = 0x07,
 };
 
-int snd_oxfw_stream_init(struct snd_oxfw *oxfw)
+int snd_oxfw_stream_get_rate(struct snd_oxfw *oxfw, unsigned int *rate)
+{
+	unsigned int tx_rate, rx_rate;
+	int err;
+
+	err = snd_oxfw_command_get_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT,
+					&tx_rate);
+	if (err < 0)
+		goto end;
+
+	err = snd_oxfw_command_get_rate(oxfw, AVC_GENERAL_PLUG_DIR_IN,
+					&rx_rate);
+	if (err < 0)
+		goto end;
+
+	*rate = rx_rate;
+	if (rx_rate == tx_rate)
+		goto end;
+
+	/* synchronize receive stream rate to transmit stream rate */
+	err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_IN,
+					rx_rate);
+end:
+	return err;
+}
+
+int snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate)
 {
 	int err;
 
-	err = cmp_connection_init(&oxfw->in_conn, oxfw->unit,
-				  CMP_INPUT, 0);
+	err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT, rate);
+	if (err < 0)
+		goto end;
+
+	err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_IN, rate);
+end:
+	return err;
+}
+
+static int stream_init(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
+{
+	struct cmp_connection *conn;
+	enum cmp_direction c_dir;
+	enum amdtp_stream_direction s_dir;
+	int err;
+
+	if (stream == &oxfw->tx_stream) {
+		conn = &oxfw->out_conn;
+		c_dir = CMP_OUTPUT;
+		s_dir = AMDTP_IN_STREAM;
+	} else {
+		conn = &oxfw->in_conn;
+		c_dir = CMP_INPUT;
+		s_dir = AMDTP_OUT_STREAM;
+	}
+
+	err = cmp_connection_init(conn, oxfw->unit, c_dir, 0);
 	if (err < 0) {
 		fw_unit_put(oxfw->unit);
 		goto end;
 	}
 
-	err = amdtp_stream_init(&oxfw->rx_stream, oxfw->unit,
-				AMDTP_OUT_STREAM, CIP_NONBLOCKING);
+	err = amdtp_stream_init(stream, oxfw->unit, s_dir, CIP_NONBLOCKING);
 	if (err < 0)
-		cmp_connection_destroy(&oxfw->in_conn);
+		cmp_connection_destroy(conn);
 end:
 	return err;
 }
 
-int snd_oxfw_stream_start(struct snd_oxfw *oxfw, unsigned int rate)
+int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
+			   struct amdtp_stream *stream,
+			   unsigned int rate)
 {
 	unsigned int i, curr_rate, pcm_channels, midi_ports;
+	struct cmp_connection *conn;
+	enum avc_general_plug_dir dir;
 	bool used;
 	int err;
 
 	/* already start or not */
-	if (amdtp_stream_running(&oxfw->rx_stream)) {
+	if (amdtp_stream_running(stream)) {
 		err = 0;
 		goto end;
 	}
 
+	if (stream == &oxfw->tx_stream) {
+		conn = &oxfw->out_conn;
+		dir = AVC_GENERAL_PLUG_DIR_OUT;
+	} else {
+		conn = &oxfw->in_conn;
+		dir = AVC_GENERAL_PLUG_DIR_IN;
+	}
+
 	/* check other's connection */
-	err = cmp_connection_check_used(&oxfw->in_conn, &used);
+	err = cmp_connection_check_used(conn, &used);
 	if (err < 0)
 		goto end;
 	else if (used) {
@@ -77,27 +139,13 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw, unsigned int rate)
 	};
 
 	/* arrange sampling rate */
-	err = avc_general_get_sig_fmt(oxfw->unit, &curr_rate,
-				      AVC_GENERAL_PLUG_DIR_IN, 0);
+	err = snd_oxfw_stream_get_rate(oxfw, &curr_rate);
 	if (err < 0)
 		goto end;
-	if (err != 0x0c /* IMPLEMENTED/STABLE */) {
-		dev_err(&oxfw->unit->device,
-			"failed to get sample rate\n");
-		err = -EIO;
-		goto end;
-	}
 	if (curr_rate != rate) {
-		err = avc_general_set_sig_fmt(oxfw->unit, rate,
-					      AVC_GENERAL_PLUG_DIR_IN, 0);
+		err = snd_oxfw_stream_set_rate(oxfw, rate);
 		if (err < 0)
 			goto end;
-		if (err != 0x09 /* ACCEPTED */) {
-			dev_err(&oxfw->unit->device,
-				"failed to set sample rate\n");
-			err = -EIO;
-			goto end;
-		}
 	}
 
 	/* set stream formation */
@@ -109,52 +157,66 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw, unsigned int rate)
 		err = -EINVAL;
 		goto end;
 	}
-	pcm_channels = oxfw->rx_stream_formations[i].pcm;
-	midi_ports = oxfw->rx_stream_formations[i].midi;
-	if ((pcm_channels == 0) && (midi_ports == 0)) {
+	if (stream == &oxfw->tx_stream) {
+		pcm_channels = oxfw->tx_stream_formations[i].pcm;
+		midi_ports = oxfw->tx_stream_formations[i].midi;
+	} else {
+		pcm_channels = oxfw->rx_stream_formations[i].pcm;
+		midi_ports = oxfw->rx_stream_formations[i].midi;
+	}
+	if (pcm_channels == 0) {
 		err = -EINVAL;
 		goto end;
 	}
-	amdtp_stream_set_parameters(&oxfw->rx_stream, rate,
-				    pcm_channels, midi_ports);
+	amdtp_stream_set_parameters(stream, rate, pcm_channels, midi_ports);
 
 	/* establish connection */
-	err = cmp_connection_establish(&oxfw->in_conn,
-			amdtp_stream_get_max_payload(&oxfw->rx_stream));
+	err = cmp_connection_establish(conn,
+			amdtp_stream_get_max_payload(stream));
 	if (err < 0)
 		goto end;
 
 	/* start stream */
-	err = amdtp_stream_start(&oxfw->rx_stream,
-				 oxfw->in_conn.resources.channel,
-				 oxfw->in_conn.speed);
+	err = amdtp_stream_start(stream,
+				 conn->resources.channel,
+				 conn->speed);
 	if (err < 0)
-		cmp_connection_break(&oxfw->in_conn);
+		cmp_connection_break(conn);
 end:
 	return err;
 }
 
-void snd_oxfw_stream_stop(struct snd_oxfw *oxfw)
+void snd_oxfw_stream_stop(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 {
-	if (amdtp_stream_running(&oxfw->rx_stream))
-		amdtp_stream_stop(&oxfw->rx_stream);
+	if (amdtp_stream_running(stream))
+		amdtp_stream_stop(stream);
 
-	cmp_connection_break(&oxfw->in_conn);
+	if (stream == &oxfw->tx_stream)
+		cmp_connection_break(&oxfw->out_conn);
+	else
+		cmp_connection_break(&oxfw->in_conn);
 }
 
-void snd_oxfw_stream_destroy(struct snd_oxfw *oxfw)
+void snd_oxfw_stream_destroy(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 {
-	amdtp_stream_pcm_abort(&oxfw->rx_stream);
-	snd_oxfw_stream_stop(oxfw);
+	amdtp_stream_pcm_abort(stream);
+	snd_oxfw_stream_stop(oxfw, stream);
 }
 
-void snd_oxfw_stream_update(struct snd_oxfw *oxfw)
+void snd_oxfw_stream_update(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 {
-	if (cmp_connection_update(&oxfw->in_conn) < 0) {
-		amdtp_stream_pcm_abort(&oxfw->rx_stream);
-		snd_oxfw_stream_stop(oxfw);
+	struct cmp_connection *conn;
+
+	if (stream == &oxfw->tx_stream)
+		conn = &oxfw->out_conn;
+	else
+		conn = &oxfw->in_conn;
+
+	if (cmp_connection_update(conn) < 0) {
+		amdtp_stream_pcm_abort(stream);
+		snd_oxfw_stream_stop(oxfw, stream);
 	} else {
-		amdtp_stream_update(&oxfw->rx_stream);
+		amdtp_stream_update(stream);
 	}
 }
 
@@ -178,6 +240,7 @@ int lacie_speakers_stream_discover(struct snd_oxfw *oxfw)
 
 	return 0;
 }
+
 /*
  * See Table 6.16 - AM824 Stream Format
  *     Figure 6.19 - format_information field for AM824 Compound
@@ -303,7 +366,10 @@ fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 	if (buf == NULL)
 		return -ENOMEM;
 
-	formations = oxfw->rx_stream_formations;
+	if (dir == AVC_GENERAL_PLUG_DIR_OUT)
+		formations = oxfw->tx_stream_formations;
+	else
+		formations = oxfw->rx_stream_formations;
 
 	/* initialize parameters here because of checking implementation */
 	eid = 0;
@@ -353,10 +419,30 @@ int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 		goto end;
 	}
 
+	/* use oPCR[0] */
+	err = fill_stream_formations(oxfw, AVC_GENERAL_PLUG_DIR_OUT, 0);
+	if (err < 0)
+		goto end;
+
 	/* use iPCR[0] */
 	err = fill_stream_formations(oxfw, AVC_GENERAL_PLUG_DIR_IN, 0);
 	if (err < 0)
 		goto end;
+end:
+	return err;
+}
+
+int snd_oxfw_streams_init(struct snd_oxfw *oxfw)
+{
+	int err;
+
+	err = stream_init(oxfw, &oxfw->rx_stream);
+	if (err < 0)
+		goto end;
+
+	/* 44.1kHz is the most popular */
+	if (oxfw->tx_stream_formations[1].pcm > 0)
+		err = stream_init(oxfw, &oxfw->tx_stream);
 end:
 	return err;
 }

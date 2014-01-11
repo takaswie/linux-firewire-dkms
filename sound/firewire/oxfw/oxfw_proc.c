@@ -16,6 +16,15 @@ proc_read_formation(struct snd_info_entry *entry,
 	struct snd_oxfw_stream_formation *formation;
 	unsigned int i;
 
+	snd_iprintf(buffer, "Output Stream from device:\n");
+	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
+	formation = oxfw->tx_stream_formations;
+	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+		snd_iprintf(buffer,
+			"\t%d\t%d\t%d\n", snd_oxfw_rate_table[i],
+			formation[i].pcm, formation[i].midi);
+	}
+
 	snd_iprintf(buffer, "Input Stream to device:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
 	formation = oxfw->rx_stream_formations;
@@ -32,11 +41,8 @@ proc_read_clock(struct snd_info_entry *entry,
 {
 	struct snd_oxfw *oxfw = entry->private_data;
 	unsigned int rate;
-	int err;
 
-	err = avc_general_get_sig_fmt(oxfw->unit, &rate,
-				      AVC_GENERAL_PLUG_DIR_IN, 0);
-	if ((err < 0) && (err == 0x09))
+	if (snd_oxfw_stream_get_rate(oxfw, &rate) >= 0)
 		snd_iprintf(buffer, "Sampling rate: %d\n", rate);
 }
 
