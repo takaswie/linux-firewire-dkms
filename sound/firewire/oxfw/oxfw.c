@@ -116,6 +116,7 @@ static int oxfw_probe(struct fw_unit *unit,
 	oxfw->unit = fw_unit_get(unit);	/* inc reference counter */
 	oxfw->device_info = (const struct device_info *)id->driver_data;
 	mutex_init(&oxfw->mutex);
+	spin_lock_init(&oxfw->lock);
 
 	if (oxfw->device_info == &griffin_firewave)
 		err = firewave_stream_discover(oxfw);
@@ -145,6 +146,12 @@ static int oxfw_probe(struct fw_unit *unit,
 	}
 
 	snd_oxfw_proc_init(oxfw);
+
+	if ((oxfw->midi_input_ports > 0) || (oxfw->midi_output_ports > 0)) {
+		err = snd_oxfw_create_midi(oxfw);
+		if (err < 0)
+			goto err_card;
+	}
 
 	snd_card_set_dev(card, &unit->device);
 	err = snd_card_register(card);

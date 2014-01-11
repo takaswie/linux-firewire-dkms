@@ -110,6 +110,7 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 			   unsigned int rate)
 {
 	unsigned int i, curr_rate, pcm_channels, midi_ports;
+	struct amdtp_stream *opposite = NULL;
 	struct cmp_connection *conn;
 	enum avc_general_plug_dir dir;
 	bool used;
@@ -142,10 +143,35 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 	err = snd_oxfw_stream_get_rate(oxfw, &curr_rate);
 	if (err < 0)
 		goto end;
+	if (rate == 0)
+		rate = curr_rate;
 	if (curr_rate != rate) {
+		/* in case that AMDTP streams includes just MIDI */
+		if (amdtp_stream_running(&oxfw->tx_stream)) {
+			snd_oxfw_stream_stop(oxfw, &oxfw->tx_stream);
+			if (stream != &oxfw->tx_stream)
+				opposite = &oxfw->tx_stream;
+		}
+		if (amdtp_stream_running(&oxfw->rx_stream)) {
+			snd_oxfw_stream_stop(oxfw, &oxfw->rx_stream);
+			if (stream != &oxfw->rx_stream)
+				opposite = &oxfw->rx_stream;
+		}
+
 		err = snd_oxfw_stream_set_rate(oxfw, rate);
 		if (err < 0)
 			goto end;
+
+		/*
+		 * NOTE:
+		 * No matter for recursive call because this opposite stream
+		 * will start at current sampling rate.
+		 */
+		if (opposite) {
+			err = snd_oxfw_stream_start(oxfw, opposite, 0);
+			if (err < 0)
+				goto end;
+		}
 	}
 
 	/* set stream formation */
@@ -408,6 +434,7 @@ end:
 int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 {
 	u8 plugs[AVC_PLUG_INFO_BUF_COUNT];
+	unsigned int i;
 	int err;
 
 	/* the number of plugs for isoc in/out, ext in/out  */
@@ -428,6 +455,14 @@ int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 	err = fill_stream_formations(oxfw, AVC_GENERAL_PLUG_DIR_IN, 0);
 	if (err < 0)
 		goto end;
+
+	/* if its stream has MIDI conformant data channel, add one MIDI port */
+	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+		if (oxfw->tx_stream_formations[i].midi > 0)
+			oxfw->midi_input_ports = 1;
+		else if (oxfw->rx_stream_formations[i].midi > 0)
+			oxfw->midi_output_ports = 1;
+	}
 end:
 	return err;
 }

@@ -19,6 +19,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/info.h>
+#include <sound/rawmidi.h>
 
 #include "../lib.h"
 #include "../fcp.h"
@@ -45,6 +46,7 @@ struct snd_oxfw {
 	struct fw_unit *unit;
 	const struct device_info *device_info;
 	struct mutex mutex;
+	spinlock_t lock;
 
 	struct snd_oxfw_stream_formation
 		tx_stream_formations[SND_OXFW_STREAM_TABLE_ENTRIES];
@@ -54,6 +56,9 @@ struct snd_oxfw {
 	struct cmp_connection in_conn;
 	struct amdtp_stream tx_stream;
 	struct amdtp_stream rx_stream;
+
+	unsigned int midi_input_ports;
+	unsigned int midi_output_ports;
 
 	bool mute;
 	s16 volume[6];
@@ -118,3 +123,5 @@ int snd_oxfw_create_pcm(struct snd_oxfw *oxfw);
 int snd_oxfw_create_mixer(struct snd_oxfw *oxfw);
 
 void snd_oxfw_proc_init(struct snd_oxfw *oxfw);
+
+int snd_oxfw_create_midi(struct snd_oxfw *oxfw);
