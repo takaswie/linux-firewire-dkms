@@ -322,7 +322,9 @@ static int pcm_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
 
+	mutex_lock(&efw->mutex);
 	snd_efw_stream_stop_duplex(efw);
+	mutex_unlock(&efw->mutex);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
@@ -333,6 +335,7 @@ static int pcm_capture_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
 
+	mutex_lock(&efw->mutex);
 	err = snd_efw_stream_start_duplex(efw, &efw->tx_stream, runtime->rate);
 	if (err < 0)
 		goto end;
@@ -340,6 +343,7 @@ static int pcm_capture_prepare(struct snd_pcm_substream *substream)
 	amdtp_stream_set_pcm_format(&efw->tx_stream, runtime->format);
 	amdtp_stream_pcm_prepare(&efw->tx_stream);
 end:
+	mutex_unlock(&efw->mutex);
 	return err;
 }
 static int pcm_playback_prepare(struct snd_pcm_substream *substream)
@@ -348,6 +352,7 @@ static int pcm_playback_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
 
+	mutex_lock(&efw->mutex);
 	err = snd_efw_stream_start_duplex(efw, &efw->rx_stream, runtime->rate);
 	if (err < 0)
 		goto end;
@@ -355,6 +360,7 @@ static int pcm_playback_prepare(struct snd_pcm_substream *substream)
 	amdtp_stream_set_pcm_format(&efw->rx_stream, runtime->format);
 	amdtp_stream_pcm_prepare(&efw->rx_stream);
 end:
+	mutex_unlock(&efw->mutex);
 	return err;
 }
 
