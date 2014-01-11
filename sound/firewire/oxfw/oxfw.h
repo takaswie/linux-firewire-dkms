@@ -119,7 +119,8 @@ int snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate);
 int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 			  struct amdtp_stream *stream, unsigned int rate);
 void snd_oxfw_stream_stop(struct snd_oxfw *oxfw, struct amdtp_stream *stream);
-void snd_oxfw_stream_destroy(struct snd_oxfw *oxfw, struct amdtp_stream *stream);
+void snd_oxfw_stream_destroy(struct snd_oxfw *oxfw,
+			     struct amdtp_stream *stream);
 void snd_oxfw_stream_update(struct snd_oxfw *oxfw, struct amdtp_stream *stream);
 
 int snd_oxfw_streams_init(struct snd_oxfw *oxfw);

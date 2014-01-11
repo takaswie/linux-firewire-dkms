@@ -336,7 +336,7 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		/* Don't care */
 		case 0xff:
 		default:
-			break;	/* not supported */
+			return -ENOSYS;	/* not supported */
 		}
 	}
 
