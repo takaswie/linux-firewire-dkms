@@ -202,42 +202,8 @@ static int oxfw_close(struct snd_pcm_substream *substream)
 static int oxfw_hw_params(struct snd_pcm_substream *substream,
 			   struct snd_pcm_hw_params *hw_params)
 {
-	struct snd_oxfw *oxfw = substream->private_data;
-	int err;
-
-	mutex_lock(&oxfw->mutex);
-	snd_oxfw_stream_stop(oxfw);
-	mutex_unlock(&oxfw->mutex);
-
-	err = snd_pcm_lib_alloc_vmalloc_buffer(substream,
-					       params_buffer_bytes(hw_params));
-	if (err < 0)
-		goto error;
-
-	amdtp_stream_set_parameters(&oxfw->rx_stream,
-				    params_rate(hw_params),
-				    params_channels(hw_params),
-				    0);
-
-	amdtp_stream_set_pcm_format(&oxfw->rx_stream,
-				    params_format(hw_params));
-
-	err = avc_general_set_sig_fmt(oxfw->unit, params_rate(hw_params),
-				      AVC_GENERAL_PLUG_DIR_IN, 0);
-	if (err < 0)
-		goto err_buffer;
-	if (err != 0x09 /* ACCEPTED */) {
-		dev_err(&oxfw->unit->device, "failed to set sample rate\n");
-		err = -EIO;
-		goto error;
-	}
-
-	return 0;
-
-err_buffer:
-	snd_pcm_lib_free_vmalloc_buffer(substream);
-error:
-	return err;
+	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
+						params_buffer_bytes(hw_params));
 }
 
 static int oxfw_hw_free(struct snd_pcm_substream *substream)
@@ -254,16 +220,16 @@ static int oxfw_hw_free(struct snd_pcm_substream *substream)
 static int oxfw_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
+	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
 
 	mutex_lock(&oxfw->mutex);
 
-	snd_oxfw_stream_stop(oxfw);
-
-	err = snd_oxfw_stream_start(oxfw);
+	err = snd_oxfw_stream_start(oxfw, runtime->rate);
 	if (err < 0)
 		goto end;
 
+	amdtp_stream_set_pcm_format(&oxfw->rx_stream, runtime->format);
 	amdtp_stream_pcm_prepare(&oxfw->rx_stream);
 end:
 	mutex_unlock(&oxfw->mutex);

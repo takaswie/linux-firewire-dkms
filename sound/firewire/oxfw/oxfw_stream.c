@@ -41,18 +41,76 @@ end:
 	return err;
 }
 
-int snd_oxfw_stream_start(struct snd_oxfw *oxfw)
+int snd_oxfw_stream_start(struct snd_oxfw *oxfw, unsigned int rate)
 {
-	int err = 0;
+	unsigned int i, curr_rate, pcm_channels, midi_ports;
+	bool used;
+	int err;
 
-	if (amdtp_stream_running(&oxfw->rx_stream))
+	/* already start or not */
+	if (amdtp_stream_running(&oxfw->rx_stream)) {
+		err = 0;
 		goto end;
+	}
 
+	/* check other's connection */
+	err = cmp_connection_check_used(&oxfw->in_conn, &used);
+	if (err < 0)
+		goto end;
+	else if (used) {
+		err = -EBUSY;
+		goto end;
+	};
+
+	/* arrange sampling rate */
+	err = avc_general_get_sig_fmt(oxfw->unit, &curr_rate,
+				      AVC_GENERAL_PLUG_DIR_IN, 0);
+	if (err < 0)
+		goto end;
+	if (err != 0x0c /* IMPLEMENTED/STABLE */) {
+		dev_err(&oxfw->unit->device,
+			"failed to get sample rate\n");
+		err = -EIO;
+		goto end;
+	}
+	if (curr_rate != rate) {
+		err = avc_general_set_sig_fmt(oxfw->unit, rate,
+					      AVC_GENERAL_PLUG_DIR_IN, 0);
+		if (err < 0)
+			goto end;
+		if (err != 0x09 /* ACCEPTED */) {
+			dev_err(&oxfw->unit->device,
+				"failed to set sample rate\n");
+			err = -EIO;
+			goto end;
+		}
+	}
+
+	/* set stream formation */
+	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+		if (snd_oxfw_rate_table[i] == rate)
+			break;
+	}
+	if (i == SND_OXFW_STREAM_TABLE_ENTRIES) {
+		err = -EINVAL;
+		goto end;
+	}
+	pcm_channels = oxfw->rx_stream_formations[i].pcm;
+	midi_ports = oxfw->rx_stream_formations[i].midi;
+	if ((pcm_channels == 0) && (midi_ports == 0)) {
+		err = -EINVAL;
+		goto end;
+	}
+	amdtp_stream_set_parameters(&oxfw->rx_stream, rate,
+				    pcm_channels, midi_ports);
+
+	/* establish connection */
 	err = cmp_connection_establish(&oxfw->in_conn,
-		amdtp_stream_get_max_payload(&oxfw->rx_stream));
+			amdtp_stream_get_max_payload(&oxfw->rx_stream));
 	if (err < 0)
 		goto end;
 
+	/* start stream */
 	err = amdtp_stream_start(&oxfw->rx_stream,
 				 oxfw->in_conn.resources.channel,
 				 oxfw->in_conn.speed);

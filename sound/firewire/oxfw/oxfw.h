@@ -58,7 +58,7 @@ struct snd_oxfw {
 };
 
 int snd_oxfw_stream_init(struct snd_oxfw *oxfw);
-int snd_oxfw_stream_start(struct snd_oxfw *oxfw);
+int snd_oxfw_stream_start(struct snd_oxfw *oxfw, unsigned int rate);
 void snd_oxfw_stream_stop(struct snd_oxfw *oxfw);
 void snd_oxfw_stream_destroy(struct snd_oxfw *oxfw);
 void snd_oxfw_stream_update(struct snd_oxfw *oxfw);
