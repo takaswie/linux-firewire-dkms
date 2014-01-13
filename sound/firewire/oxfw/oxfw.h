@@ -76,7 +76,10 @@ struct snd_oxfw {
 	wait_queue_head_t hwdep_wait;
 };
 
-/* AV/C Stream Format Information Specification 1.1 (Apr 2005, 1394TA) */
+/*
+ * AV/C Stream Format Information Specification 1.1 Working Draft
+ * (Apr 2005, 1394TA)
+ */
 #define AVC_GENERIC_FRAME_MAXIMUM_BYTES	512
 int avc_stream_get_format(struct fw_unit *unit,
 			  enum avc_general_plug_dir dir, unsigned int pid,
