@@ -7,6 +7,8 @@
  */
 #include "./fireworks.h"
 
+#define CALLBACK_TIMEOUT	100
+
 static int
 init_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 {
@@ -95,7 +97,7 @@ start_stream(struct snd_efw *efw, struct amdtp_stream *stream,
 		stop_stream(efw, stream);
 
 	/* wait first callback */
-	if (!amdtp_stream_wait_callback(stream)) {
+	if (!amdtp_stream_wait_callback(stream, CALLBACK_TIMEOUT)) {
 		stop_stream(efw, stream);
 		err = -ETIMEDOUT;
 		goto end;

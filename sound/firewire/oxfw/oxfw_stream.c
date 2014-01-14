@@ -7,6 +7,8 @@
 
 #include "oxfw.h"
 
+#define CALLBACK_TIMEOUT	200
+
 /*
  * According to their datasheet:
  *  OXFW970: 32.0/44.1/48.0/96.0 Khz, 8 audio channels I/O
@@ -206,6 +208,13 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 	err = amdtp_stream_start(stream,
 				 conn->resources.channel,
 				 conn->speed);
+	if (err < 0) {
+		cmp_connection_break(conn);
+		goto end;
+	}
+
+	/* wait first callback */
+	err = amdtp_stream_wait_callback(stream, CALLBACK_TIMEOUT);
 	if (err < 0)
 		cmp_connection_break(conn);
 end:

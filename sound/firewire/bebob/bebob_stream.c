@@ -8,6 +8,8 @@
 
 #include "./bebob.h"
 
+#define CALLBACK_TIMEOUT	600
+
 /*
  * NOTE;
  * For BeBoB streams, Both of input and output CMP connection is important.
@@ -515,7 +517,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		}
 
 		/* wait first callback */
-		if (!amdtp_stream_wait_callback(master)) {
+		if (!amdtp_stream_wait_callback(master, CALLBACK_TIMEOUT)) {
 			amdtp_stream_stop(master);
 			break_both_connections(bebob);
 			err = -ETIMEDOUT;
@@ -535,7 +537,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		}
 
 		/* wait first callback */
-		if (!amdtp_stream_wait_callback(slave)) {
+		if (!amdtp_stream_wait_callback(slave, CALLBACK_TIMEOUT)) {
 			amdtp_stream_stop(slave);
 			amdtp_stream_stop(master);
 			break_both_connections(bebob);

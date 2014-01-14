@@ -50,7 +50,6 @@
 /* TODO: make these configurable */
 #define INTERRUPT_INTERVAL	16
 #define QUEUE_LENGTH		48
-#define CALLBACK_TIMEOUT_MS	100
 
 #define IN_PACKET_HEADER_SIZE	4
 #define OUT_PACKET_HEADER_SIZE	0
@@ -930,7 +929,12 @@ static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
 {
 	struct amdtp_stream *s = private_data;
 
+	/*
+	 * For in-stream, first packet has come.
+	 * For out-stream, prepared to transmit first packet
+	 */
 	s->callbacked = true;
+	wake_up(&s->callback_wait);
 
 	if (s->direction == AMDTP_IN_STREAM)
 		context->callback.sc = in_stream_callback;
@@ -1144,17 +1148,17 @@ void amdtp_stream_pcm_abort(struct amdtp_stream *s)
 EXPORT_SYMBOL(amdtp_stream_pcm_abort);
 
 /**
- * amdtp_stream_wait_callback - block till callbacked or timeout
+ * amdtp_stream_wait_callback - sleep till callbacked or timeout
  * @s: the AMDTP stream
+ * @timeout: msec till timeout
  *
  * If this function return false, the AMDTP stream should be stopped.
  */
-bool amdtp_stream_wait_callback(struct amdtp_stream *s)
+bool amdtp_stream_wait_callback(struct amdtp_stream *s, unsigned int timeout)
 {
-	wait_event_timeout(s->callback_wait,
-			   s->callbacked == true,
-			   msecs_to_jiffies(CALLBACK_TIMEOUT_MS));
-	return s->callbacked;
+	return wait_event_timeout(s->callback_wait,
+				  s->callbacked == true,
+				  msecs_to_jiffies(timeout)) > 0;
 }
 EXPORT_SYMBOL(amdtp_stream_wait_callback);
 
