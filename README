@@ -1,20 +1,21 @@
-= Developing for snd-firewire-lib, snd-bebob and snd-fireworks =
+= Developing for snd-firewire-lib, snd-fireworks, snd-bebob and snd-oxfw =
 
-2013/11/24 坂本 貴史
+2014/01/14 坂本 貴史
 Takashi Sakamoto <o-takashi@sakamocchi.jp>
 
 == General ==
 
 This repository is a test for my patch candidates for ALSA firewire stack.
-You can install my snd-firewire-lib, snd-bebob and snd-fireworks by DKMS.
+You can install my snd-firewire-lib, snd-fireworks, snd-bebob and snd-oxfw by DKMS.
 
 
-== snd-firewire-lib, snd-bebob and snd-fireworks ==
+== snd-firewire-lib, snd-bebob, snd-fireworks and snd-oxfw ==
 
 These are device drivers utilize Advanced Linux Sound Architecture (ALSA) and Linux
 Firewire Subsystem (so called "juju").
- - snd-bebob: for devices based on BridgeCo's BeBoB chipset
- - snd-fireworks: for devices based on Echo Audio's Fireworks chipset
+ - snd-bebob: for devices based on BridgeCo's chipset and BeBoB firmware
+ - snd-fireworks: for devices based on Echo Audio's Fireworks module
+ - snd-oxfw: for devices based on Oxford Semiconductor OXFW970/971 chipset
  - snd-firewire-lib: for helper functions of AMDTP/CMP/FCP and AV/C commands
 
 There is a project in user land, "FFADO".
@@ -27,10 +28,13 @@ I test these drivers with:
  - snd-bebob: M-Audio Ozonic, Firewire Solo, Firewire Audiophile, Firewire 410,
  - snd-bebob: Firewire 1814
  - snd-fireworks: Echo AudioFire12, AudioFirePre8, AudioFire4
+ - snd-oxfw: Behringer F-Control 202
 
 My testers test these drivers with:
  - snd-bebob: Edirol FA-66 (great thanks to Fryderyk Dziarmagowski)
-
+ - snd-bebob: Edirol FA_66 (great thanks to Daniel Wagner)
+ - snd-bebob: BridgeCo AUdio A5 (great thanks to Daniel Wagner)
+ - snd-bebob: PreSonus FP10 (great thanks to David Henningsson)
 
 == Requirement ==
 
@@ -65,7 +69,7 @@ Install:
 
 Uninstall
 1. $ modprobe -r snd-bebob snd-fireworks snd-firewire-lib (superuser)
-2. $ dkms remove ans-firewire/3.11 --all (superuser)
+2. $ dkms remove snd-firewire/3.11 --all (superuser)
 3. $ rm /usr/src/snd-firewire-3.11 (superuser)
 4. $ rm snd-firewire-improve
 
@@ -75,12 +79,16 @@ I add proc interface to help debug. Please send the output to me with your
 experience.
 
 snd-bebob:
- - /proc/asound/cardX/#hardware
+ - /proc/asound/cardX/#firmware
  - /proc/asound/cardX/#formation
+ - /proc/asound/cardX/#clock
  - /proc/asound/cardX/#meter (if the device has)
 
 snd-fireworks:
- - /proc/asound/cardX/#hardware
+ - /proc/asound/cardX/#firmware
  - /proc/asound/cardX/#clock
  - /proc/asound/cardX/#meters
 
+snd-oxfw:
+ - /proc/asound/cardX/#formation
+ - /proc/asound/cardX/#clock
