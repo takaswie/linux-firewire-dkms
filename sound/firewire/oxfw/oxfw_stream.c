@@ -257,21 +257,21 @@ void snd_oxfw_stream_update(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 
 int firewave_stream_discover(struct snd_oxfw *oxfw)
 {
-	oxfw->rx_stream_formations[2].pcm = 6;
-	oxfw->rx_stream_formations[3].pcm = 6;
+	oxfw->rx_stream_formations[0].pcm = 6;
+	oxfw->rx_stream_formations[1].pcm = 6;
+	oxfw->rx_stream_formations[2].pcm = 2;
 	oxfw->rx_stream_formations[4].pcm = 2;
-	oxfw->rx_stream_formations[6].pcm = 2;
 
 	return 0;
 }
 
 int lacie_speakers_stream_discover(struct snd_oxfw *oxfw)
 {
+	oxfw->rx_stream_formations[0].pcm = 2;
+	oxfw->rx_stream_formations[1].pcm = 2;
 	oxfw->rx_stream_formations[2].pcm = 2;
 	oxfw->rx_stream_formations[3].pcm = 2;
 	oxfw->rx_stream_formations[4].pcm = 2;
-	oxfw->rx_stream_formations[5].pcm = 2;
-	oxfw->rx_stream_formations[6].pcm = 2;
 
 	return 0;
 }
