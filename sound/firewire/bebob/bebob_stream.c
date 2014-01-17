@@ -8,7 +8,7 @@
 
 #include "./bebob.h"
 
-#define CALLBACK_TIMEOUT	600
+#define CALLBACK_TIMEOUT	1000
 
 /*
  * NOTE;
