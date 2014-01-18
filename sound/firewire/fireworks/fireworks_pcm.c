@@ -173,50 +173,48 @@ pcm_init_hw_params(struct snd_efw *efw,
 		.info = SNDRV_PCM_INFO_MMAP |
 			SNDRV_PCM_INFO_BATCH |
 			SNDRV_PCM_INFO_INTERLEAVED |
-			SNDRV_PCM_INFO_SYNC_START |
-			SNDRV_PCM_INFO_FIFO_IN_FRAMES |
 			SNDRV_PCM_INFO_JOINT_DUPLEX |
 			/* for Open Sound System compatibility */
 			SNDRV_PCM_INFO_MMAP_VALID |
 			SNDRV_PCM_INFO_BLOCK_TRANSFER,
 		.rates = efw->supported_sampling_rate,
+		/* set up later */
 		.rate_min = UINT_MAX,
 		.rate_max = 0,
+		/* set up later */
 		.channels_min = UINT_MAX,
 		.channels_max = 0,
-		.buffer_bytes_max = 1024 * 1024 * 1024,
-		.period_bytes_min = 256,
-		.period_bytes_max = 1024 * 1024 * 1024 / 2,
-		.periods_min = 2,
-		.periods_max = 32,
-		.fifo_size = 0,
+		.buffer_bytes_max = 4 * 34 * 1024,
+		.period_bytes_min = 1,
+		.period_bytes_max = 4 * 34 * 1024,
+		.periods_min = 1,
+		.periods_max = UINT_MAX,
 	};
 
 	substream->runtime->hw = hardware;
-	substream->runtime->delay = substream->runtime->hw.fifo_size;
 
 	/* add rule between channels and sampling rate */
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32;
 		snd_pcm_hw_rule_add(substream->runtime, 0,
-				SNDRV_PCM_HW_PARAM_CHANNELS,
-				hw_rule_capture_channels, efw,
-				SNDRV_PCM_HW_PARAM_RATE, -1);
+				    SNDRV_PCM_HW_PARAM_CHANNELS,
+				    hw_rule_capture_channels, efw,
+				    SNDRV_PCM_HW_PARAM_RATE, -1);
 		snd_pcm_hw_rule_add(substream->runtime, 0,
-				SNDRV_PCM_HW_PARAM_RATE,
-				hw_rule_capture_rate, efw,
-				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+				    SNDRV_PCM_HW_PARAM_RATE,
+				    hw_rule_capture_rate, efw,
+				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 		pcm_channels = efw->pcm_capture_channels;
 	} else {
 		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
 		snd_pcm_hw_rule_add(substream->runtime, 0,
-				SNDRV_PCM_HW_PARAM_CHANNELS,
-				hw_rule_playback_channels, efw,
-				SNDRV_PCM_HW_PARAM_RATE, -1);
+				    SNDRV_PCM_HW_PARAM_CHANNELS,
+				    hw_rule_playback_channels, efw,
+				    SNDRV_PCM_HW_PARAM_RATE, -1);
 		snd_pcm_hw_rule_add(substream->runtime, 0,
-				SNDRV_PCM_HW_PARAM_RATE,
-				hw_rule_playback_rate, efw,
-				SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+				    SNDRV_PCM_HW_PARAM_RATE,
+				    hw_rule_playback_rate, efw,
+				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 		pcm_channels = efw->pcm_playback_channels;
 	}
 
@@ -234,11 +232,11 @@ pcm_init_hw_params(struct snd_efw *efw,
 		if (pcm_channels[mode] == 0)
 			continue;
 		substream->runtime->hw.channels_min =
-			min(substream->runtime->hw.channels_min,
-				pcm_channels[mode]);
+				min(substream->runtime->hw.channels_min,
+				    pcm_channels[mode]);
 		substream->runtime->hw.channels_max =
-			max(substream->runtime->hw.channels_max,
-				pcm_channels[mode]);
+				max(substream->runtime->hw.channels_max,
+				    pcm_channels[mode]);
 	}
 
 	/* AM824 in IEC 61883-6 can deliver 24bit data */
@@ -251,14 +249,7 @@ pcm_init_hw_params(struct snd_efw *efw,
 	 * 16 bit, or 24bit inner 32bit.
 	 */
 	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
-				SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
-	if (err < 0)
-		goto end;
-
-	/* time for period constraint */
-	err = snd_pcm_hw_constraint_minmax(substream->runtime,
-					SNDRV_PCM_HW_PARAM_PERIOD_TIME,
-					500, UINT_MAX);
+					 SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
 end:
 	return err;
 }
