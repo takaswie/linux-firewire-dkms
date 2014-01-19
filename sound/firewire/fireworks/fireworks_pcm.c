@@ -41,20 +41,24 @@ static unsigned int freq_table[] = {
 	[6] = 192000,
 };
 
-static inline int
-get_multiplier_mode_with_index(int index)
+static inline unsigned int
+get_multiplier_mode_with_index(unsigned int index)
 {
 	return ((int)index - 1) / 2;
 }
 
-int snd_efw_get_multiplier_mode(int sampling_rate)
+int snd_efw_get_multiplier_mode(unsigned int sampling_rate, unsigned int *mode)
 {
-	int i;
-	for (i = 0; i < sizeof(freq_table); i++)
-		if (freq_table[i] == sampling_rate)
-			return get_multiplier_mode_with_index(i);
+	unsigned int i;
 
-	return -1;
+	for (i = 0; i < sizeof(freq_table); i++) {
+		if (freq_table[i] == sampling_rate) {
+			*mode = get_multiplier_mode_with_index(i);
+			return 0;
+		}
+	}
+
+	return -EINVAL;
 }
 
 static int
@@ -69,8 +73,7 @@ hw_rule_rate(struct snd_pcm_hw_params *params,
 	struct snd_interval t = {
 		.min = UINT_MAX, .max = 0, .integer = 1
 	};
-	unsigned int rate_bit;
-	int mode, i;
+	unsigned int i, mode, rate_bit;
 
 	for (i = 0; i < ARRAY_SIZE(freq_table); i++) {
 		/* skip unsupported sampling rate */
@@ -102,9 +105,7 @@ hw_rule_channels(struct snd_pcm_hw_params *params,
 	struct snd_interval t = {
 		.min = UINT_MAX, .max = 0, .integer = 1
 	};
-
-	unsigned int rate_bit;
-	int mode, i;
+	unsigned int i, mode, rate_bit;
 
 	for (i = 0; i < ARRAY_SIZE(freq_table); i++) {
 		/* skip unsupported sampling rate */
@@ -164,9 +165,7 @@ static int
 pcm_init_hw_params(struct snd_efw *efw,
 		   struct snd_pcm_substream *substream)
 {
-	unsigned int *pcm_channels;
-	unsigned int rate_bit;
-	int mode, i;
+	unsigned int i, *pcm_channels, rate_bit, mode;
 	int err;
 
 	struct snd_pcm_hardware hardware = {

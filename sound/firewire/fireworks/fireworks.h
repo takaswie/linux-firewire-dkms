@@ -210,7 +210,7 @@ void snd_efw_proc_init(struct snd_efw *efw);
 int snd_efw_create_midi_devices(struct snd_efw *efw);
 
 int snd_efw_create_pcm_devices(struct snd_efw *efw);
-int snd_efw_get_multiplier_mode(int sampling_rate);
+int snd_efw_get_multiplier_mode(unsigned int sampling_rate, unsigned int *mode);
 
 int snd_efw_create_hwdep_device(struct snd_efw *efw);
 
