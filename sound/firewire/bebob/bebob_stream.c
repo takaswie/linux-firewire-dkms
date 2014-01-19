@@ -336,8 +336,14 @@ end:
 static void
 break_both_connections(struct snd_bebob *bebob)
 {
+	if (bebob->maudio_special_quirk)
+		msleep(200);
 	cmp_connection_break(&bebob->in_conn);
+
+	if (bebob->maudio_special_quirk)
+		msleep(200);
 	cmp_connection_break(&bebob->out_conn);
+
 	return;
 }
 
@@ -485,10 +491,14 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		 * NOTE:
 		 * If establishing connections at first, Yamaha GO46
 		 * (and maybe Terratec X24) don't generate sound.
+		 *
+		 * For firmware customized by M-Audio, refer to next NOTE.
 		 */
-		err = rate_spec->set(bebob, rate);
-		if (err < 0)
-			goto end;
+		if (!bebob->maudio_special_quirk) {
+			err = rate_spec->set(bebob, rate);
+			if (err < 0)
+				goto end;
+		}
 
 		err = make_both_connections(bebob, rate);
 		if (err < 0)
@@ -504,8 +514,8 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 
 		/*
 		 * NOTE:
-		 * The firmware customized by M-Audio uses this cue to start
-		 * transmit stream. This is not usual way.
+		 * The firmware customized by M-Audio uses these commands to
+		 * start transmitting stream. This is not usual way.
 		 */
 		if (bebob->maudio_special_quirk) {
 			err = rate_spec->set(bebob, rate);
