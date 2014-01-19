@@ -151,9 +151,9 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 		/* set up later */
 		.channels_min = UINT_MAX,
 		.channels_max = 0,
-		.buffer_bytes_max = 4 * 16 * 1024,
+		.buffer_bytes_max = 4 * 16 * 2048,
 		.period_bytes_min = 1,
-		.period_bytes_max = 4 * 16 * 1024,
+		.period_bytes_max = 4 * 16 * 2048,
 		.periods_min = 1,
 		.periods_max = UINT_MAX,
 	};
@@ -196,6 +196,10 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 	 */
 	err = snd_pcm_hw_constraint_step(runtime, 0,
 					 SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
+	if (err < 0)
+		goto end;
+	err = snd_pcm_hw_constraint_step(runtime, 0,
+					 SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 32);
 end:
 	return err;
 }
