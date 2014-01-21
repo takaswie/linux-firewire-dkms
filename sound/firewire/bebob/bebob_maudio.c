@@ -293,7 +293,7 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 		if (err >= 0)
 			break;
 		msleep(200);
-	} while(++trials < MAX_TRIALS);
+	} while (++trials < MAX_TRIALS);
 	if ((trials == MAX_TRIALS) && (err < 0)) {
 		dev_err(&bebob->unit->device,
 			"failed to initialize clock params\n");
