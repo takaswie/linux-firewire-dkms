@@ -95,7 +95,6 @@ snd_bebob_stream_set_rate(struct snd_bebob *bebob, unsigned int rate)
 {
 	int err;
 
-	/* TODO: move to strem_start? */
 	err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_OUT);
 	if (err < 0)
 		goto end;
