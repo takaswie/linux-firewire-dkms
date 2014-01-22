@@ -215,7 +215,7 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 	if (err < 0)
 		goto end;
 	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
-					 SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 32);
+					 SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 32);
 end:
 	return err;
 }
