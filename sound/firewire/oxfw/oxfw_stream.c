@@ -107,76 +107,14 @@ end:
 	return err;
 }
 
-int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
-			   struct amdtp_stream *stream,
-			   unsigned int rate)
+static int start_stream(struct snd_oxfw *oxfw,
+			struct amdtp_stream *stream, unsigned int rate)
 {
-	unsigned int i, curr_rate, pcm_channels, midi_ports;
-	struct amdtp_stream *opposite = NULL;
+	unsigned int i, pcm_channels, midi_ports;
 	struct cmp_connection *conn;
-	enum avc_general_plug_dir dir;
-	bool used;
 	int err;
 
-	/* already start or not */
-	if (amdtp_stream_running(stream)) {
-		err = 0;
-		goto end;
-	}
-
-	if (stream == &oxfw->tx_stream) {
-		conn = &oxfw->out_conn;
-		dir = AVC_GENERAL_PLUG_DIR_OUT;
-	} else {
-		conn = &oxfw->in_conn;
-		dir = AVC_GENERAL_PLUG_DIR_IN;
-	}
-
-	/* check other's connection */
-	err = cmp_connection_check_used(conn, &used);
-	if (err < 0)
-		goto end;
-	else if (used) {
-		err = -EBUSY;
-		goto end;
-	};
-
-	/* arrange sampling rate */
-	err = snd_oxfw_stream_get_rate(oxfw, &curr_rate);
-	if (err < 0)
-		goto end;
-	if (rate == 0)
-		rate = curr_rate;
-	if (curr_rate != rate) {
-		/* in case that AMDTP streams includes just MIDI */
-		if (amdtp_stream_running(&oxfw->tx_stream)) {
-			snd_oxfw_stream_stop(oxfw, &oxfw->tx_stream);
-			if (stream != &oxfw->tx_stream)
-				opposite = &oxfw->tx_stream;
-		}
-		if (amdtp_stream_running(&oxfw->rx_stream)) {
-			snd_oxfw_stream_stop(oxfw, &oxfw->rx_stream);
-			if (stream != &oxfw->rx_stream)
-				opposite = &oxfw->rx_stream;
-		}
-
-		err = snd_oxfw_stream_set_rate(oxfw, rate);
-		if (err < 0)
-			goto end;
-
-		/*
-		 * NOTE:
-		 * No matter for recursive call because this opposite stream
-		 * will start at current sampling rate.
-		 */
-		if (opposite) {
-			err = snd_oxfw_stream_start(oxfw, opposite, 0);
-			if (err < 0)
-				goto end;
-		}
-	}
-
-	/* set stream formation */
+	/* Get stream formation */
 	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
 		if (snd_oxfw_rate_table[i] == rate)
 			break;
@@ -188,23 +126,27 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 	if (stream == &oxfw->tx_stream) {
 		pcm_channels = oxfw->tx_stream_formations[i].pcm;
 		midi_ports = oxfw->tx_stream_formations[i].midi;
+		conn = &oxfw->out_conn;
 	} else {
 		pcm_channels = oxfw->rx_stream_formations[i].pcm;
 		midi_ports = oxfw->rx_stream_formations[i].midi;
+		conn = &oxfw->in_conn;
 	}
+
+	/* The stream should have one pcm channels at least */
 	if (pcm_channels == 0) {
 		err = -EINVAL;
 		goto end;
 	}
 	amdtp_stream_set_parameters(stream, rate, pcm_channels, midi_ports);
 
-	/* establish connection */
+	/* Establish connection */
 	err = cmp_connection_establish(conn,
-			amdtp_stream_get_max_payload(stream));
+				       amdtp_stream_get_max_payload(stream));
 	if (err < 0)
 		goto end;
 
-	/* start stream */
+	/* Start stream */
 	err = amdtp_stream_start(stream,
 				 conn->resources.channel,
 				 conn->speed);
@@ -213,10 +155,94 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 		goto end;
 	}
 
-	/* wait first callback */
+	/* Wait first callback */
 	err = amdtp_stream_wait_callback(stream, CALLBACK_TIMEOUT);
 	if (err < 0)
 		cmp_connection_break(conn);
+end:
+	return err;
+}
+
+static int check_connection_used_by_others(struct snd_oxfw *oxfw,
+					   struct amdtp_stream *stream)
+{
+	struct cmp_connection *conn;
+	bool used;
+	int err;
+
+	if (stream == &oxfw->tx_stream)
+		conn = &oxfw->out_conn;
+	else
+		conn = &oxfw->in_conn;
+
+	err = cmp_connection_check_used(conn, &used);
+	if ((err >= 0) && used && !amdtp_stream_running(stream))
+		err = -EBUSY;
+
+	return err;
+}
+
+int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
+			  struct amdtp_stream *stream, unsigned int rate)
+{
+	unsigned int curr_rate;
+	struct amdtp_stream *opposite;
+	struct cmp_connection *conn;
+	int err;
+
+	if (stream == &oxfw->tx_stream)
+		conn = &oxfw->out_conn;
+	else
+		conn = &oxfw->in_conn;
+
+	/* check connection for this stream */
+	err = check_connection_used_by_others(oxfw, stream);
+	if (err < 0)
+		goto end;
+
+	err = snd_oxfw_stream_get_rate(oxfw, &curr_rate);
+	if (err < 0)
+		goto end;
+
+	/* MIDI functionality starts streams at current sampling rate */
+	if (rate == 0)
+		rate = curr_rate;
+
+	/*
+	 * PCM functionality can restart streams when MIDI functionality
+	 * already started streams at different sampling rate.
+	 */
+	if (curr_rate != rate) {
+		/* get opposite stream */
+		if (stream == &oxfw->tx_stream)
+			opposite = &oxfw->rx_stream;
+		else
+			opposite = &oxfw->tx_stream;
+
+		/* Stop streams safely */
+		err = check_connection_used_by_others(oxfw, opposite);
+		if (err < 0)
+			goto end;
+		else if (!amdtp_stream_running(opposite))
+			opposite = NULL;
+		if (opposite)
+			snd_oxfw_stream_stop(oxfw, opposite);
+		if (amdtp_stream_running(stream))
+			snd_oxfw_stream_stop(oxfw, stream);
+
+		err = snd_oxfw_stream_set_rate(oxfw, rate);
+		if (err < 0)
+			goto end;
+
+		/* Start opposite stream as soon as possible */
+		if (opposite) {
+			err = start_stream(oxfw, opposite, rate);
+			if (err < 0)
+				goto end;
+		}
+	}
+
+	err = start_stream(oxfw, stream, rate);
 end:
 	return err;
 }
