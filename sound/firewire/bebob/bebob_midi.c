@@ -17,9 +17,13 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	err = snd_bebob_stream_start_duplex(bebob, &bebob->tx_stream, 0);
-	if (err < 0)
-		snd_bebob_stream_lock_release(bebob);
+	bebob->tx_midi_substreams++;
+	if (!amdtp_stream_running(&bebob->tx_stream)) {
+		err = snd_bebob_stream_start_duplex(bebob,
+						    &bebob->tx_stream, 0);
+		if (err < 0)
+			snd_bebob_stream_lock_release(bebob);
+	}
 end:
 	return err;
 }
@@ -33,17 +37,35 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	err = snd_bebob_stream_start_duplex(bebob, &bebob->rx_stream, 0);
-	if (err < 0)
-		snd_bebob_stream_lock_release(bebob);
+	bebob->rx_midi_substreams++;
+	if (!amdtp_stream_running(&bebob->rx_stream)) {
+		err = snd_bebob_stream_start_duplex(bebob,
+						    &bebob->rx_stream, 0);
+		if (err < 0)
+			snd_bebob_stream_lock_release(bebob);
+	}
 end:
 	return err;
 }
 
-static int midi_close(struct snd_rawmidi_substream *substream)
+static int midi_capture_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_bebob *bebob = substream->rmidi->private_data;
-	snd_bebob_stream_stop_duplex(bebob);
+
+	if (--bebob->tx_midi_substreams == 0)
+		snd_bebob_stream_stop_duplex(bebob);
+
+	snd_bebob_stream_lock_release(bebob);
+	return 0;
+}
+
+static int midi_playback_close(struct snd_rawmidi_substream *substream)
+{
+	struct snd_bebob *bebob = substream->rmidi->private_data;
+
+	if (--bebob->rx_midi_substreams == 0)
+		snd_bebob_stream_stop_duplex(bebob);
+
 	snd_bebob_stream_lock_release(bebob);
 	return 0;
 }
@@ -88,13 +110,13 @@ static void midi_playback_trigger(struct snd_rawmidi_substream *substrm, int up)
 
 static struct snd_rawmidi_ops midi_capture_ops = {
 	.open		= midi_capture_open,
-	.close		= midi_close,
+	.close		= midi_capture_close,
 	.trigger	= midi_capture_trigger,
 };
 
 static struct snd_rawmidi_ops midi_playback_ops = {
 	.open		= midi_playback_open,
-	.close		= midi_close,
+	.close		= midi_playback_close,
 	.trigger	= midi_playback_trigger,
 };
 

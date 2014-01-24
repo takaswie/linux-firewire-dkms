@@ -91,6 +91,8 @@ struct snd_bebob {
 	struct amdtp_stream tx_stream;
 	struct cmp_connection in_conn;
 	struct amdtp_stream rx_stream;
+	unsigned int tx_midi_substreams;
+	unsigned int rx_midi_substreams;
 
 	struct snd_bebob_stream_formation
 		tx_stream_formations[SND_BEBOB_STRM_FMT_ENTRIES];

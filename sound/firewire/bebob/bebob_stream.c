@@ -285,10 +285,10 @@ end:
 }
 
 static int
-check_connection_used_by_others(struct snd_bebob *bebob,
-				struct amdtp_stream *s, bool *used)
+check_connection_used_by_others(struct snd_bebob *bebob, struct amdtp_stream *s)
 {
 	struct cmp_connection *conn;
+	bool used;
 	int err;
 
 	if (s == &bebob->tx_stream)
@@ -296,9 +296,14 @@ check_connection_used_by_others(struct snd_bebob *bebob,
 	else
 		conn = &bebob->in_conn;
 
-	err = cmp_connection_check_used(conn, used);
-	if (err >= 0)
-		*used = (*used && !amdtp_stream_running(s));
+	err = cmp_connection_check_used(conn, &used);
+	if ((err >= 0) && used && !amdtp_stream_running(s)) {
+		dev_err(&bebob->unit->device,
+			"Connection established by others: %cPCR[%d]\n",
+			(conn->direction == CMP_OUTPUT) ? 'o' : 'i',
+			conn->pcr_index);
+		err = -EBUSY;
+	}
 
 	return err;
 }
@@ -374,10 +379,6 @@ start_stream(struct snd_bebob *bebob, struct amdtp_stream *stream,
 	struct cmp_connection *conn;
 	int err = 0;
 
-	/* already running */
-	if (amdtp_stream_running(stream))
-		goto end;
-
 	if (stream == &bebob->rx_stream)
 		conn = &bebob->in_conn;
 	else
@@ -431,7 +432,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
 	unsigned int curr_rate;
-	bool slave_flag, used;
+	bool slave_flag;
 	int err;
 
 	mutex_lock(&bebob->mutex);
@@ -440,46 +441,29 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	if (err < 0)
 		goto end;
 
-	if ((request == slave) || amdtp_stream_running(slave))
-		slave_flag = true;
-	else
-		slave_flag = false;
-
 	/*
 	 * Considering JACK/FFADO streaming:
 	 * TODO: This can be removed hwdep functionality becomes popular.
 	 */
-	err = check_connection_used_by_others(bebob, master, &used);
+	err = check_connection_used_by_others(bebob, master);
 	if (err < 0)
 		goto end;
-	if (used) {
-		dev_err(&bebob->unit->device,
-			"connections established by others: %d\n",
-			used);
-		err = -EBUSY;
-		goto end;
-	}
 
-	/* get current rate */
+	/* need to touch slave stream */
+	slave_flag = (request == slave) || amdtp_stream_running(slave);
+
+	/* stop streams if rate is different */
 	err = rate_spec->get(bebob, &curr_rate);
 	if (err < 0)
 		goto end;
 	if (rate == 0)
 		rate = curr_rate;
-
-	/* change sampling rate if needed */
 	if (rate != curr_rate) {
-		/* slave is just for MIDI stream */
-		if (amdtp_stream_running(slave) &&
-		    !amdtp_stream_pcm_running(slave))
+		if (amdtp_stream_running(slave))
 			amdtp_stream_stop(slave);
-
-		/* master is just for MIDI stream */
-		if (amdtp_stream_running(master) &&
-		    !amdtp_stream_pcm_running(master)) {
+		if (amdtp_stream_running(master))
 			amdtp_stream_stop(master);
-			break_both_connections(bebob);
-		}
+		break_both_connections(bebob);
 	}
 
 	/* master should be always running */
@@ -551,7 +535,6 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 			amdtp_stream_stop(master);
 			break_both_connections(bebob);
 			err = -ETIMEDOUT;
-			goto end;
 		}
 	}
 end:
@@ -563,6 +546,7 @@ int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
 {
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
+	unsigned int slave_midi_substreams;
 	int err;
 
 	mutex_lock(&bebob->mutex);
@@ -571,14 +555,21 @@ int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
 	if (err < 0)
 		goto end;
 
+	if (slave == &bebob->tx_stream)
+		slave_midi_substreams = bebob->tx_midi_substreams;
+	else
+		slave_midi_substreams = bebob->rx_midi_substreams;
+
 	if (amdtp_stream_pcm_running(slave) ||
-	    amdtp_stream_midi_running(slave))
+	    (slave_midi_substreams > 0))
 		goto end;
 
 	amdtp_stream_stop(slave);
 
-	if (amdtp_stream_pcm_running(master) ||
-	    amdtp_stream_midi_running(master))
+	if (amdtp_stream_pcm_running(&bebob->tx_stream) ||
+	    amdtp_stream_pcm_running(&bebob->rx_stream) ||
+	    (bebob->tx_midi_substreams == 0) ||
+	    (bebob->rx_midi_substreams == 0))
 		goto end;
 
 	amdtp_stream_stop(master);
@@ -597,10 +588,10 @@ void snd_bebob_stream_update_duplex(struct snd_bebob *bebob)
 		amdtp_stream_pcm_abort(&bebob->tx_stream);
 		break_both_connections(bebob);
 		mutex_unlock(&bebob->mutex);
+	} else {
+		amdtp_stream_update(&bebob->rx_stream);
+		amdtp_stream_update(&bebob->tx_stream);
 	}
-
-	amdtp_stream_update(&bebob->rx_stream);
-	amdtp_stream_update(&bebob->tx_stream);
 }
 
 void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)

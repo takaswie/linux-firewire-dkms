@@ -75,6 +75,8 @@ struct snd_efw {
 	struct amdtp_stream rx_stream;
 	struct cmp_connection out_conn;
 	struct cmp_connection in_conn;
+	unsigned int rx_midi_substreams;
+	unsigned int tx_midi_substreams;
 
 	/* hardware metering parameters */
 	unsigned int phys_out;

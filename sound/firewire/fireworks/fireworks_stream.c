@@ -32,11 +32,8 @@ init_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 		goto end;
 
 	err = amdtp_stream_init(stream, efw->unit, s_dir, CIP_BLOCKING);
-	if (err < 0) {
+	if (err < 0)
 		cmp_connection_destroy(conn);
-		goto end;
-	}
-
 end:
 	return err;
 }
@@ -51,8 +48,6 @@ stop_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 		cmp_connection_break(&efw->out_conn);
 	else
 		cmp_connection_break(&efw->in_conn);
-
-	return;
 }
 
 static int
@@ -62,12 +57,6 @@ start_stream(struct snd_efw *efw, struct amdtp_stream *stream,
 	struct cmp_connection *conn;
 	unsigned int mode, pcm_channels, midi_ports;
 	int err;
-
-	/* already running */
-	if (amdtp_stream_running(stream)) {
-		err = 0;
-		goto end;
-	}
 
 	err = snd_efw_get_multiplier_mode(sampling_rate, &mode);
 	if (err < 0)
@@ -102,7 +91,6 @@ start_stream(struct snd_efw *efw, struct amdtp_stream *stream,
 	if (!amdtp_stream_wait_callback(stream, CALLBACK_TIMEOUT)) {
 		stop_stream(efw, stream);
 		err = -ETIMEDOUT;
-		goto end;
 	}
 end:
 	return err;
@@ -123,20 +111,9 @@ update_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 		mutex_lock(&efw->mutex);
 		stop_stream(efw, stream);
 		mutex_unlock(&efw->mutex);
-		return;
+	} else {
+		amdtp_stream_update(stream);
 	}
-	amdtp_stream_update(stream);
-}
-
-static void
-destroy_stream(struct snd_efw *efw, struct amdtp_stream *stream)
-{
-	stop_stream(efw, stream);
-
-	if (stream == &efw->tx_stream)
-		cmp_connection_destroy(&efw->out_conn);
-	else
-		cmp_connection_destroy(&efw->in_conn);
 }
 
 static int
@@ -162,10 +139,10 @@ end:
 }
 
 static int
-check_connection_used_by_others(struct snd_efw *efw,
-				struct amdtp_stream *s, bool *used)
+check_connection_used_by_others(struct snd_efw *efw, struct amdtp_stream *s)
 {
 	struct cmp_connection *conn;
+	bool used;
 	int err;
 
 	if (s == &efw->tx_stream)
@@ -173,9 +150,14 @@ check_connection_used_by_others(struct snd_efw *efw,
 	else
 		conn = &efw->in_conn;
 
-	err = cmp_connection_check_used(conn, used);
-	if (err >= 0)
-		*used = (*used && !amdtp_stream_running(s));
+	err = cmp_connection_check_used(conn, &used);
+	if ((err >= 0) && used && !amdtp_stream_running(s)) {
+		dev_err(&efw->unit->device,
+			"Connection established by others: %cPCR[%d]\n",
+			(conn->direction == CMP_OUTPUT) ? 'o' : 'i',
+			conn->pcr_index);
+		err = -EBUSY;
+	}
 
 	return err;
 }
@@ -200,63 +182,53 @@ end:
 
 int snd_efw_stream_start_duplex(struct snd_efw *efw,
 				struct amdtp_stream *request,
-				int sampling_rate)
+				int rate)
 {
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
-	int err, curr_rate;
-	bool slave_flag, used;
+	unsigned int curr_rate;
+	bool slave_flag;
+	int err;
+
+	mutex_lock(&efw->mutex);
 
 	err = get_roles(efw, &sync_mode, &master, &slave);
 	if (err < 0)
 		goto end;
 
-	if ((request == slave) || amdtp_stream_running(slave))
-		slave_flag = true;
-	else
-		slave_flag = false;
-
 	/*
 	 * Considering JACK/FFADO streaming:
 	 * TODO: This can be removed hwdep functionality becomes popular.
 	 */
-	err = check_connection_used_by_others(efw, master, &used);
+	err = check_connection_used_by_others(efw, master);
 	if (err < 0)
 		goto end;
-	if (used) {
-		dev_err(&efw->unit->device,
-			"connections established by others: %d\n",
-			used);
-		err = -EBUSY;
-		goto end;
-	}
 
-	/* change sampling rate if possible */
+	/* need to touch slave stream */
+	slave_flag = (request == slave) || amdtp_stream_running(slave);
+
+	/* stop streams if rate is different */
 	err = snd_efw_command_get_sampling_rate(efw, &curr_rate);
 	if (err < 0)
 		goto end;
-	if (sampling_rate == 0)
-		sampling_rate = curr_rate;
-	if (sampling_rate != curr_rate) {
-		/* master is just for MIDI stream */
-		if (amdtp_stream_running(master) &&
-		    !amdtp_stream_pcm_running(master))
-			stop_stream(efw, master);
-
-		/* slave is just for MIDI stream */
-		if (amdtp_stream_running(slave) &&
-		    !amdtp_stream_pcm_running(slave))
+	if (rate == 0)
+		rate = curr_rate;
+	if (rate != curr_rate) {
+		if (amdtp_stream_running(slave))
 			stop_stream(efw, slave);
-
-		err = snd_efw_command_set_sampling_rate(efw, sampling_rate);
-		if (err < 0)
-			goto end;
+		if (amdtp_stream_running(master))
+			stop_stream(efw, master);
 	}
 
 	/*  master should be always running */
 	if (!amdtp_stream_running(master)) {
 		amdtp_stream_set_sync(sync_mode, master, slave);
-		err = start_stream(efw, master, sampling_rate);
+
+		err = snd_efw_command_set_sampling_rate(efw, rate);
+		if (err < 0)
+			goto end;
+
+		err = start_stream(efw, master, rate);
 		if (err < 0) {
 			dev_err(&efw->unit->device,
 				"fail to start AMDTP master stream:%d\n", err);
@@ -266,14 +238,15 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 
 	/* start slave if needed */
 	if (slave_flag && !amdtp_stream_running(slave)) {
-		err = start_stream(efw, slave, sampling_rate);
+		err = start_stream(efw, slave, rate);
 		if (err < 0) {
 			dev_err(&efw->unit->device,
 				"fail to start AMDTP slave stream:%d\n", err);
-			goto end;
+			stop_stream(efw, master);
 		}
 	}
 end:
+	mutex_unlock(&efw->mutex);
 	return err;
 }
 
@@ -281,23 +254,35 @@ int snd_efw_stream_stop_duplex(struct snd_efw *efw)
 {
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
+	unsigned int slave_midi_substreams;
 	int err;
+
+	mutex_lock(&efw->mutex);
 
 	err = get_roles(efw, &sync_mode, &master, &slave);
 	if (err < 0)
 		goto end;
 
+	if (slave == &efw->tx_stream)
+		slave_midi_substreams = efw->tx_midi_substreams;
+	else
+		slave_midi_substreams = efw->rx_midi_substreams;
+
 	if (amdtp_stream_pcm_running(slave) ||
-	    amdtp_stream_midi_running(slave))
+	    (slave_midi_substreams > 0))
 		goto end;
 
 	stop_stream(efw, slave);
 
-	if (!amdtp_stream_pcm_running(master) &&
-	    !amdtp_stream_midi_running(master))
-		stop_stream(efw, master);
+	if (amdtp_stream_pcm_running(&efw->tx_stream) ||
+	    amdtp_stream_pcm_running(&efw->rx_stream) ||
+	    (efw->tx_midi_substreams == 0) ||
+	    (efw->rx_midi_substreams == 0))
+		goto end;
 
+	stop_stream(efw, master);
 end:
+	mutex_unlock(&efw->mutex);
 	return err;
 }
 
@@ -309,13 +294,20 @@ void snd_efw_stream_update_duplex(struct snd_efw *efw)
 
 void snd_efw_stream_destroy_duplex(struct snd_efw *efw)
 {
+	mutex_lock(&efw->mutex);
+
 	if (amdtp_stream_pcm_running(&efw->rx_stream))
 		amdtp_stream_pcm_abort(&efw->rx_stream);
 	if (amdtp_stream_pcm_running(&efw->tx_stream))
 		amdtp_stream_pcm_abort(&efw->tx_stream);
 
-	destroy_stream(efw, &efw->rx_stream);
-	destroy_stream(efw, &efw->tx_stream);
+	stop_stream(efw, &efw->tx_stream);
+	cmp_connection_destroy(&efw->out_conn);
+
+	stop_stream(efw, &efw->rx_stream);
+	cmp_connection_destroy(&efw->in_conn);
+
+	mutex_unlock(&efw->mutex);
 }
 
 void snd_efw_stream_lock_changed(struct snd_efw *efw)

@@ -24,7 +24,6 @@
 #include <sound/pcm_params.h>
 #include <sound/info.h>
 #include <sound/rawmidi.h>
-//#include <sound/firewire.h>
 #include <sound/hwdep.h>
 
 #include "../lib.h"
@@ -62,6 +61,8 @@ struct snd_oxfw {
 	struct cmp_connection in_conn;
 	struct amdtp_stream tx_stream;
 	struct amdtp_stream rx_stream;
+	unsigned int tx_midi_substreams;
+	unsigned int rx_midi_substreams;
 
 	unsigned int midi_input_ports;
 	unsigned int midi_output_ports;

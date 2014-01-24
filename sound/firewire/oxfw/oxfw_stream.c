@@ -107,6 +107,17 @@ end:
 	return err;
 }
 
+static void stop_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
+{
+	if (amdtp_stream_running(stream))
+		amdtp_stream_stop(stream);
+
+	if (stream == &oxfw->tx_stream)
+		cmp_connection_break(&oxfw->out_conn);
+	else
+		cmp_connection_break(&oxfw->in_conn);
+}
+
 static int start_stream(struct snd_oxfw *oxfw,
 			struct amdtp_stream *stream, unsigned int rate)
 {
@@ -158,7 +169,7 @@ static int start_stream(struct snd_oxfw *oxfw,
 	/* Wait first callback */
 	err = amdtp_stream_wait_callback(stream, CALLBACK_TIMEOUT);
 	if (err < 0)
-		cmp_connection_break(conn);
+		stop_stream(oxfw, stream);
 end:
 	return err;
 }
@@ -176,8 +187,13 @@ static int check_connection_used_by_others(struct snd_oxfw *oxfw,
 		conn = &oxfw->in_conn;
 
 	err = cmp_connection_check_used(conn, &used);
-	if ((err >= 0) && used && !amdtp_stream_running(stream))
+	if ((err >= 0) && used && !amdtp_stream_running(stream)) {
+		dev_err(&oxfw->unit->device,
+			"Connection established by others: %cPCR[%d]\n",
+			(conn->direction == CMP_OUTPUT) ? 'o' : 'i',
+			conn->pcr_index);
 		err = -EBUSY;
+	}
 
 	return err;
 }
@@ -187,13 +203,9 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 {
 	unsigned int curr_rate;
 	struct amdtp_stream *opposite;
-	struct cmp_connection *conn;
 	int err;
 
-	if (stream == &oxfw->tx_stream)
-		conn = &oxfw->out_conn;
-	else
-		conn = &oxfw->in_conn;
+	mutex_lock(&oxfw->mutex);
 
 	/* check connection for this stream */
 	err = check_connection_used_by_others(oxfw, stream);
@@ -203,15 +215,8 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 	err = snd_oxfw_stream_get_rate(oxfw, &curr_rate);
 	if (err < 0)
 		goto end;
-
-	/* MIDI functionality starts streams at current sampling rate */
 	if (rate == 0)
 		rate = curr_rate;
-
-	/*
-	 * PCM functionality can restart streams when MIDI functionality
-	 * already started streams at different sampling rate.
-	 */
 	if (curr_rate != rate) {
 		/* get opposite stream */
 		if (stream == &oxfw->tx_stream)
@@ -226,9 +231,9 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 		else if (!amdtp_stream_running(opposite))
 			opposite = NULL;
 		if (opposite)
-			snd_oxfw_stream_stop(oxfw, opposite);
+			stop_stream(oxfw, opposite);
 		if (amdtp_stream_running(stream))
-			snd_oxfw_stream_stop(oxfw, stream);
+			stop_stream(oxfw, stream);
 
 		err = snd_oxfw_stream_set_rate(oxfw, rate);
 		if (err < 0)
@@ -242,26 +247,38 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 		}
 	}
 
-	err = start_stream(oxfw, stream, rate);
+	if (!amdtp_stream_running(stream))
+		err = start_stream(oxfw, stream, rate);
 end:
+	mutex_unlock(&oxfw->mutex);
 	return err;
 }
 
 void snd_oxfw_stream_stop(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 {
-	if (amdtp_stream_running(stream))
-		amdtp_stream_stop(stream);
+	unsigned int midi_substreams;
 
 	if (stream == &oxfw->tx_stream)
-		cmp_connection_break(&oxfw->out_conn);
+		midi_substreams = oxfw->tx_midi_substreams;
 	else
-		cmp_connection_break(&oxfw->in_conn);
+		midi_substreams = oxfw->rx_midi_substreams;
+
+	if (!amdtp_stream_pcm_running(stream) &&
+	    (midi_substreams == 0))
+		stop_stream(oxfw, stream);
 }
 
 void snd_oxfw_stream_destroy(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 {
 	amdtp_stream_pcm_abort(stream);
-	snd_oxfw_stream_stop(oxfw, stream);
+
+	mutex_lock(&oxfw->mutex);
+	stop_stream(oxfw, stream);
+	if (stream == &oxfw->tx_stream)
+		cmp_connection_destroy(&oxfw->out_conn);
+	else
+		cmp_connection_destroy(&oxfw->in_conn);
+	mutex_unlock(&oxfw->mutex);
 }
 
 void snd_oxfw_stream_update(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
@@ -275,7 +292,9 @@ void snd_oxfw_stream_update(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 
 	if (cmp_connection_update(conn) < 0) {
 		amdtp_stream_pcm_abort(stream);
-		snd_oxfw_stream_stop(oxfw, stream);
+		mutex_lock(&oxfw->mutex);
+		stop_stream(oxfw, stream);
+		mutex_unlock(&oxfw->mutex);
 	} else {
 		amdtp_stream_update(stream);
 	}

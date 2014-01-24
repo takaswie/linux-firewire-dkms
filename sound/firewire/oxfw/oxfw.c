@@ -90,11 +90,6 @@ static void oxfw_card_free(struct snd_card *card)
 {
 	struct snd_oxfw *oxfw = card->private_data;
 
-	mutex_lock(&oxfw->mutex);
-	snd_oxfw_stream_destroy(oxfw, &oxfw->rx_stream);
-	snd_oxfw_stream_destroy(oxfw, &oxfw->tx_stream);
-	mutex_unlock(&oxfw->mutex);
-
 	fw_unit_put(oxfw->unit);	/* dec reference counter */
 	mutex_destroy(&oxfw->mutex);
 }
@@ -174,13 +169,9 @@ static void oxfw_bus_reset(struct fw_unit *unit)
 {
 	struct snd_oxfw *oxfw = dev_get_drvdata(&unit->device);
 
-	mutex_lock(&oxfw->mutex);
-
 	fcp_bus_reset(oxfw->unit);
 	snd_oxfw_stream_update(oxfw, &oxfw->rx_stream);
 	snd_oxfw_stream_update(oxfw, &oxfw->tx_stream);
-
-	mutex_unlock(&oxfw->mutex);
 }
 
 static void oxfw_remove(struct fw_unit *unit)
@@ -189,6 +180,7 @@ static void oxfw_remove(struct fw_unit *unit)
 
 	snd_oxfw_stream_destroy(oxfw, &oxfw->rx_stream);
 	snd_oxfw_stream_destroy(oxfw, &oxfw->tx_stream);
+
 	snd_card_disconnect(oxfw->card);
 	snd_card_free_when_closed(oxfw->card);
 }

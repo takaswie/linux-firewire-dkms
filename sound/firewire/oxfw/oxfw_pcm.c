@@ -257,9 +257,7 @@ static int oxfw_hw_free_capture(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
-	mutex_lock(&oxfw->mutex);
 	snd_oxfw_stream_stop(oxfw, &oxfw->tx_stream);
-	mutex_unlock(&oxfw->mutex);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
@@ -267,9 +265,7 @@ static int oxfw_hw_free_playback(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
-	mutex_lock(&oxfw->mutex);
 	snd_oxfw_stream_stop(oxfw, &oxfw->rx_stream);
-	mutex_unlock(&oxfw->mutex);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
@@ -280,8 +276,6 @@ static int oxfw_prepare_capture(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
 
-	mutex_lock(&oxfw->mutex);
-
 	err = snd_oxfw_stream_start(oxfw, &oxfw->tx_stream, runtime->rate);
 	if (err < 0)
 		goto end;
@@ -289,7 +283,6 @@ static int oxfw_prepare_capture(struct snd_pcm_substream *substream)
 	amdtp_stream_set_pcm_format(&oxfw->tx_stream, runtime->format);
 	amdtp_stream_pcm_prepare(&oxfw->tx_stream);
 end:
-	mutex_unlock(&oxfw->mutex);
 	return err;
 }
 static int oxfw_prepare_playback(struct snd_pcm_substream *substream)
@@ -298,8 +291,6 @@ static int oxfw_prepare_playback(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
 
-	mutex_lock(&oxfw->mutex);
-
 	err = snd_oxfw_stream_start(oxfw, &oxfw->rx_stream, runtime->rate);
 	if (err < 0)
 		goto end;
@@ -307,7 +298,6 @@ static int oxfw_prepare_playback(struct snd_pcm_substream *substream)
 	amdtp_stream_set_pcm_format(&oxfw->rx_stream, runtime->format);
 	amdtp_stream_pcm_prepare(&oxfw->rx_stream);
 end:
-	mutex_unlock(&oxfw->mutex);
 	return err;
 }
 

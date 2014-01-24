@@ -17,11 +17,12 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	mutex_lock(&efw->mutex);
-	err = snd_efw_stream_start_duplex(efw, &efw->tx_stream, 0);
-	mutex_unlock(&efw->mutex);
-	if (err < 0)
-		snd_efw_stream_lock_release(efw);
+	efw->tx_midi_substreams++;
+	if (!amdtp_stream_running(&efw->tx_stream)) {
+		err = snd_efw_stream_start_duplex(efw, &efw->tx_stream, 0);
+		if (err < 0)
+			snd_efw_stream_lock_release(efw);
+	}
 end:
 	return err;
 }
@@ -35,21 +36,34 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	mutex_lock(&efw->mutex);
-	err = snd_efw_stream_start_duplex(efw, &efw->rx_stream, 0);
-	mutex_unlock(&efw->mutex);
-	if (err < 0)
-		snd_efw_stream_lock_release(efw);
+	efw->rx_midi_substreams++;
+	if (!amdtp_stream_running(&efw->rx_stream)) {
+		err = snd_efw_stream_start_duplex(efw, &efw->rx_stream, 0);
+		if (err < 0)
+			snd_efw_stream_lock_release(efw);
+	}
 end:
 	return err;
 }
 
-static int midi_close(struct snd_rawmidi_substream *substream)
+static int midi_capture_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_efw *efw = substream->rmidi->private_data;
-	mutex_lock(&efw->mutex);
-	snd_efw_stream_stop_duplex(efw);
-	mutex_unlock(&efw->mutex);
+
+	if (--efw->tx_midi_substreams == 0)
+		snd_efw_stream_stop_duplex(efw);
+
+	snd_efw_stream_lock_release(efw);
+	return 0;
+}
+
+static int midi_playback_close(struct snd_rawmidi_substream *substream)
+{
+	struct snd_efw *efw = substream->rmidi->private_data;
+
+	if (--efw->rx_midi_substreams == 0)
+		snd_efw_stream_stop_duplex(efw);
+
 	snd_efw_stream_lock_release(efw);
 	return 0;
 }
@@ -94,13 +108,13 @@ static void midi_playback_trigger(struct snd_rawmidi_substream *substrm, int up)
 
 static struct snd_rawmidi_ops midi_capture_ops = {
 	.open		= midi_capture_open,
-	.close		= midi_close,
+	.close		= midi_capture_close,
 	.trigger	= midi_capture_trigger,
 };
 
 static struct snd_rawmidi_ops midi_playback_ops = {
 	.open		= midi_playback_open,
-	.close		= midi_close,
+	.close		= midi_playback_close,
 	.trigger	= midi_playback_trigger,
 };
 
