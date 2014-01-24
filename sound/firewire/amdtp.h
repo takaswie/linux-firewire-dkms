@@ -161,8 +161,6 @@ static inline bool amdtp_stream_running(struct amdtp_stream *s)
 	return !IS_ERR(s->context);
 }
 
-bool amdtp_stream_midi_running(struct amdtp_stream *s);
-
 /**
  * amdtp_streaming_error - check for streaming error
  * @s: the AMDTP stream

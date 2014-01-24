@@ -1161,19 +1161,3 @@ bool amdtp_stream_wait_callback(struct amdtp_stream *s, unsigned int timeout)
 				  msecs_to_jiffies(timeout)) > 0;
 }
 EXPORT_SYMBOL(amdtp_stream_wait_callback);
-
-/**
- * amdtp_stream_midi_running - check any MIDI streams are running or not
- * @s: the AMDTP stream
- *
- * If this function returns true, any MIDI streams are running.
- */
-bool amdtp_stream_midi_running(struct amdtp_stream *s)
-{
-	int i;
-	for (i = 0; i < AMDTP_MAX_CHANNELS_FOR_MIDI * 8; i++)
-		if (!IS_ERR_OR_NULL(s->midi[i]))
-			return true;
-	return false;
-}
-EXPORT_SYMBOL(amdtp_stream_midi_running);
