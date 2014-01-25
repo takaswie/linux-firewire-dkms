@@ -452,6 +452,12 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	/* need to touch slave stream */
 	slave_flag = (request == slave) || amdtp_stream_running(slave);
 
+	/* packet queueing error */
+	if (amdtp_streaming_error(slave))
+		amdtp_stream_stop(slave);
+	if (amdtp_streaming_error(master))
+		amdtp_stream_stop(master);
+
 	/* stop streams if rate is different */
 	err = rate_spec->get(bebob, &curr_rate);
 	if (err < 0)

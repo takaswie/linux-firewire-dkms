@@ -207,11 +207,19 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 
 	mutex_lock(&oxfw->mutex);
 
-	/* check connection for this stream */
+	/*
+	 * Considering JACK/FFADO streaming:
+	 * TODO: This can be removed hwdep functionality becomes popular.
+	 */
 	err = check_connection_used_by_others(oxfw, stream);
 	if (err < 0)
 		goto end;
 
+	/* packet queueing error */
+	if (amdtp_streaming_error(stream))
+		stop_stream(oxfw, stream);
+
+	/* stop streams if rate is different */
 	err = snd_oxfw_stream_get_rate(oxfw, &curr_rate);
 	if (err < 0)
 		goto end;
@@ -228,7 +236,7 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 		err = check_connection_used_by_others(oxfw, opposite);
 		if (err < 0)
 			goto end;
-		else if (!amdtp_stream_running(opposite))
+		if (!amdtp_stream_running(opposite))
 			opposite = NULL;
 		if (opposite)
 			stop_stream(oxfw, opposite);

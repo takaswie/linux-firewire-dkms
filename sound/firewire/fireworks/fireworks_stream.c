@@ -207,6 +207,12 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 	/* need to touch slave stream */
 	slave_flag = (request == slave) || amdtp_stream_running(slave);
 
+	/* packet queueing error */
+	if (amdtp_streaming_error(slave))
+		stop_stream(efw, slave);
+	if (amdtp_streaming_error(master))
+		stop_stream(efw, master);
+
 	/* stop streams if rate is different */
 	err = snd_efw_command_get_sampling_rate(efw, &curr_rate);
 	if (err < 0)
@@ -220,7 +226,7 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 			stop_stream(efw, master);
 	}
 
-	/*  master should be always running */
+	/* master should be always running */
 	if (!amdtp_stream_running(master)) {
 		amdtp_stream_set_sync(sync_mode, master, slave);
 
