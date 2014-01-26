@@ -50,7 +50,7 @@ end:
 }
 
 int avc_audio_get_selector(struct fw_unit *unit, unsigned int subunit_id,
-			   unsigned int fb_id, unsigned int *num)
+			   unsigned int fb_id, unsigned int *num, bool quiet)
 {
 	u8 *buf;
 	int err;
@@ -76,9 +76,10 @@ int avc_audio_get_selector(struct fw_unit *unit, unsigned int subunit_id,
 	if (err < 0)
 		goto end;
 	if ((err < 6) || (buf[0] != 0x0c)) {
-		dev_err(&unit->device,
-			"failed to get selector %d: 0x%02X\n",
-			fb_id, buf[0]);
+		if (!quiet)
+			dev_err(&unit->device,
+				"failed to get selector %d: 0x%02X\n",
+				fb_id, buf[0]);
 		err = -EIO;
 		goto end;
 	}
@@ -314,7 +315,7 @@ end:
 }
 
 int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
-		       enum avc_general_plug_dir dir)
+		       enum avc_general_plug_dir dir, bool quiet)
 {
 	int err;
 
@@ -324,8 +325,9 @@ int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
 
 	/* IMPLEMENTED/STABLE is OK */
 	if (err != 0x0c) {
-		dev_err(&bebob->unit->device,
-			"failed to get sampling rate\n");
+		if (!quiet)
+			dev_err(&bebob->unit->device,
+				"failed to get sampling rate\n");
 		err = -EIO;
 	}
 end:

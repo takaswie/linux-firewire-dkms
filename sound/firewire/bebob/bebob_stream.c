@@ -72,11 +72,13 @@ snd_bebob_stream_get_rate(struct snd_bebob *bebob, unsigned int *curr_rate)
 	unsigned int tx_rate, rx_rate;
 	int err;
 
-	err = snd_bebob_get_rate(bebob, &tx_rate, AVC_GENERAL_PLUG_DIR_OUT);
+	err = snd_bebob_get_rate(bebob, &tx_rate, AVC_GENERAL_PLUG_DIR_OUT,
+				 false);
 	if (err < 0)
 		goto end;
 
-	err = snd_bebob_get_rate(bebob, &rx_rate, AVC_GENERAL_PLUG_DIR_IN);
+	err = snd_bebob_get_rate(bebob, &rx_rate, AVC_GENERAL_PLUG_DIR_IN,
+				 false);
 	if (err < 0)
 		goto end;
 

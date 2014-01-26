@@ -17,10 +17,10 @@ phase88_rack_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 	unsigned int enable_ext, enable_word;
 	int err;
 
-	err = avc_audio_get_selector(bebob->unit, 0, 0, &enable_ext);
+	err = avc_audio_get_selector(bebob->unit, 0, 0, &enable_ext, false);
 	if (err < 0)
 		goto end;
-	err = avc_audio_get_selector(bebob->unit, 0, 0, &enable_word);
+	err = avc_audio_get_selector(bebob->unit, 0, 0, &enable_word, false);
 	if (err < 0)
 		goto end;
 
@@ -35,7 +35,7 @@ static char *phase24_series_clk_src_labels[] = {
 static int
 phase24_series_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
-	return avc_audio_get_selector(bebob->unit, 0, 4, id);
+	return avc_audio_get_selector(bebob->unit, 0, 4, id, false);
 }
 
 struct snd_bebob_rate_spec phase_series_rate_spec = {

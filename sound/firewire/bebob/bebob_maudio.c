@@ -293,7 +293,7 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 		if (err >= 0)
 			break;
 	} while (++trials < MAX_TRIALS);
-	if ((trials == MAX_TRIALS) && (err < 0)) {
+	if (err < 0) {
 		dev_err(&bebob->unit->device,
 			"failed to initialize clock params\n");
 		goto end;
@@ -302,11 +302,11 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 	trials = 0;
 	do {
 		err = avc_audio_get_selector(bebob->unit, 0x00, 0x04,
-					     &bebob->dig_in_iface);
+					     &bebob->dig_in_iface, true);
 		if (err >= 0)
 			break;
 	} while (++trials < MAX_TRIALS);
-	if ((trials == MAX_TRIALS) && (err < 0)) {
+	if (err < 0) {
 		dev_err(&bebob->unit->device,
 			"failed to get current dig iface.");
 		goto end;
@@ -340,10 +340,14 @@ static int special_get_rate(struct snd_bebob *bebob, unsigned int *rate)
 
 	trials = 0;
 	do {
-		err = snd_bebob_get_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN);
+		err = snd_bebob_get_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN,
+					 true);
 		if (err >= 0)
 			break;
 	} while (++trials < MAX_TRIALS);
+	if (err < 0)
+		dev_err(&bebob->unit->device,
+			"failed to get sampling rate\n");
 
 	return err;
 }
@@ -354,7 +358,10 @@ static int special_set_rate(struct snd_bebob *bebob, unsigned int rate)
 		goto end;
 
 	err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN);
-	if (err >= 0)
+	if (err < 0)
+		goto end;
+
+	if (bebob->ctl_id_sync)
 		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       bebob->ctl_id_sync);
 end:
