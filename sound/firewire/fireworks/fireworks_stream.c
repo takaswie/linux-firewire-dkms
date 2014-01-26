@@ -282,8 +282,8 @@ int snd_efw_stream_stop_duplex(struct snd_efw *efw)
 
 	if (amdtp_stream_pcm_running(&efw->tx_stream) ||
 	    amdtp_stream_pcm_running(&efw->rx_stream) ||
-	    (efw->tx_midi_substreams == 0) ||
-	    (efw->rx_midi_substreams == 0))
+	    (efw->tx_midi_substreams > 0) ||
+	    (efw->rx_midi_substreams > 0))
 		goto end;
 
 	stop_stream(efw, master);

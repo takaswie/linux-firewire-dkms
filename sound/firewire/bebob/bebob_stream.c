@@ -574,8 +574,8 @@ int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
 
 	if (amdtp_stream_pcm_running(&bebob->tx_stream) ||
 	    amdtp_stream_pcm_running(&bebob->rx_stream) ||
-	    (bebob->tx_midi_substreams == 0) ||
-	    (bebob->rx_midi_substreams == 0))
+	    (bebob->tx_midi_substreams > 0) ||
+	    (bebob->rx_midi_substreams > 0))
 		goto end;
 
 	amdtp_stream_stop(master);
