@@ -292,7 +292,6 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 		err = special_clk_set_params(bebob, 0x03, 0x00, 0x00, 0x00);
 		if (err >= 0)
 			break;
-		msleep(200);
 	} while (++trials < MAX_TRIALS);
 	if ((trials == MAX_TRIALS) && (err < 0)) {
 		dev_err(&bebob->unit->device,
@@ -306,7 +305,6 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 					     &bebob->dig_in_iface);
 		if (err >= 0)
 			break;
-		msleep(200);
 	} while (++trials < MAX_TRIALS);
 	if ((trials == MAX_TRIALS) && (err < 0)) {
 		dev_err(&bebob->unit->device,
@@ -345,7 +343,6 @@ static int special_get_rate(struct snd_bebob *bebob, unsigned int *rate)
 		err = snd_bebob_get_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN);
 		if (err >= 0)
 			break;
-		msleep(100);
 	} while (++trials < MAX_TRIALS);
 
 	return err;
@@ -353,12 +350,10 @@ static int special_get_rate(struct snd_bebob *bebob, unsigned int *rate)
 static int special_set_rate(struct snd_bebob *bebob, unsigned int rate)
 {
 	int err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_OUT);
-	msleep(100);
 	if (err < 0)
 		goto end;
 
 	err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN);
-	msleep(100);
 	if (err >= 0)
 		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       bebob->ctl_id_sync);

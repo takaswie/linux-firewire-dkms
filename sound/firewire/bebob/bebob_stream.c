@@ -340,15 +340,8 @@ end:
 static void
 break_both_connections(struct snd_bebob *bebob)
 {
-	if (bebob->maudio_special_quirk)
-		msleep(200);
 	cmp_connection_break(&bebob->in_conn);
-
-	if (bebob->maudio_special_quirk)
-		msleep(200);
 	cmp_connection_break(&bebob->out_conn);
-
-	return;
 }
 
 static void
