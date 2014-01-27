@@ -107,14 +107,7 @@ struct snd_bebob {
 	wait_queue_head_t hwdep_wait;
 
 	/* for M-Audio special devices */
-	bool maudio_special_quirk;
-	bool maudio_is1814;
-	unsigned int clk_src;
-	unsigned int dig_in_iface;
-	unsigned int dig_in_fmt;
-	unsigned int dig_out_fmt;
-	unsigned int clk_lock;
-	struct snd_ctl_elem_id *ctl_id_sync;
+	void *maudio_special_quirk;
 };
 
 static inline int

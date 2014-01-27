@@ -380,7 +380,7 @@ start_stream(struct snd_bebob *bebob, struct amdtp_stream *stream,
 		conn = &bebob->out_conn;
 
 	/* channel mapping */
-	if (!bebob->maudio_special_quirk) {
+	if (bebob->maudio_special_quirk == NULL) {
 		err = map_stream(bebob, stream);
 		if (err < 0)
 			goto end;
@@ -478,7 +478,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		 *
 		 * For firmware customized by M-Audio, refer to next NOTE.
 		 */
-		if (!bebob->maudio_special_quirk) {
+		if (bebob->maudio_special_quirk == NULL) {
 			err = rate_spec->set(bebob, rate);
 			if (err < 0)
 				goto end;
@@ -501,7 +501,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 		 * The firmware customized by M-Audio uses these commands to
 		 * start transmitting stream. This is not usual way.
 		 */
-		if (bebob->maudio_special_quirk) {
+		if (bebob->maudio_special_quirk != NULL) {
 			err = rate_spec->set(bebob, rate);
 			if (err < 0) {
 				amdtp_stream_stop(master);

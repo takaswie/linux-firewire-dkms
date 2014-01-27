@@ -83,6 +83,16 @@
 /* for NRV */
 #define UNKNOWN_METER	"Unknown"
 
+struct special_params {
+	bool is1814;
+	unsigned int clk_src;
+	unsigned int dig_in_iface;
+	unsigned int dig_in_fmt;
+	unsigned int dig_out_fmt;
+	unsigned int clk_lock;
+	struct snd_ctl_elem_id *ctl_id_sync;
+};
+
 /*
  * For some M-Audio devices, this module just send cue to load firmware. After
  * loading, the device generates bus reset and newly detected.
@@ -167,6 +177,7 @@ special_clk_set_params(struct snd_bebob *bebob, unsigned int clk_src,
 		       unsigned int dig_in_fmt, unsigned int dig_out_fmt,
 		       unsigned int clk_lock)
 {
+	struct special_params *params = bebob->maudio_special_quirk;
 	int err;
 	u8 *buf;
 
@@ -205,14 +216,14 @@ special_clk_set_params(struct snd_bebob *bebob, unsigned int clk_src,
 		goto end;
 	}
 
-	bebob->clk_src		= buf[6];
-	bebob->dig_in_fmt	= buf[7];
-	bebob->dig_out_fmt	= buf[8];
-	bebob->clk_lock		= buf[9];
+	params->clk_src		= buf[6];
+	params->dig_in_fmt	= buf[7];
+	params->dig_out_fmt	= buf[8];
+	params->clk_lock	= buf[9];
 
-	if (bebob->ctl_id_sync)
+	if (params->ctl_id_sync)
 		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
-			       bebob->ctl_id_sync);
+			       params->ctl_id_sync);
 end:
 	kfree(buf);
 	return err;
@@ -220,17 +231,18 @@ end:
 static void
 special_stream_formation_set(struct snd_bebob *bebob)
 {
+	struct special_params *params = bebob->maudio_special_quirk;
 	unsigned int i;
 
 	/*
 	 * the stream formation is different depending on digital interface
 	 */
-	if (bebob->dig_in_fmt == 0x01) {
+	if (params->dig_in_fmt == 0x01) {
 		bebob->tx_stream_formations[3].pcm = 16;
 		bebob->tx_stream_formations[4].pcm = 16;
 		bebob->tx_stream_formations[5].pcm = 12;
 		bebob->tx_stream_formations[6].pcm = 12;
-		if (bebob->maudio_is1814) {
+		if (params->is1814) {
 			bebob->tx_stream_formations[7].pcm = 2;
 			bebob->tx_stream_formations[8].pcm = 2;
 		}
@@ -239,18 +251,18 @@ special_stream_formation_set(struct snd_bebob *bebob)
 		bebob->tx_stream_formations[4].pcm = 10;
 		bebob->tx_stream_formations[5].pcm = 10;
 		bebob->tx_stream_formations[6].pcm = 10;
-		if (bebob->maudio_is1814) {
+		if (params->is1814) {
 			bebob->tx_stream_formations[7].pcm = 2;
 			bebob->tx_stream_formations[8].pcm = 2;
 		}
 	}
 
-	if (bebob->dig_out_fmt == 0x01) {
+	if (params->dig_out_fmt == 0x01) {
 		bebob->rx_stream_formations[3].pcm = 12;
 		bebob->rx_stream_formations[4].pcm = 12;
 		bebob->rx_stream_formations[5].pcm = 8;
 		bebob->rx_stream_formations[6].pcm = 8;
-		if (bebob->maudio_is1814) {
+		if (params->is1814) {
 			bebob->rx_stream_formations[7].pcm = 4;
 			bebob->rx_stream_formations[8].pcm = 4;
 		}
@@ -259,7 +271,7 @@ special_stream_formation_set(struct snd_bebob *bebob)
 		bebob->rx_stream_formations[4].pcm = 6;
 		bebob->rx_stream_formations[5].pcm = 6;
 		bebob->rx_stream_formations[6].pcm = 6;
-		if (bebob->maudio_is1814) {
+		if (params->is1814) {
 			bebob->rx_stream_formations[7].pcm = 4;
 			bebob->rx_stream_formations[8].pcm = 4;
 		}
@@ -268,7 +280,7 @@ special_stream_formation_set(struct snd_bebob *bebob)
 	for (i = 3; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		bebob->tx_stream_formations[i].midi = 1;
 		bebob->rx_stream_formations[i].midi = 1;
-		if ((i > 7) && !bebob->maudio_is1814)
+		if ((i > 7) && !params->is1814)
 			break;
 	}
 }
@@ -278,11 +290,17 @@ int
 snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 {
 	unsigned int trials;
+	struct special_params *params;
 	int err;
+
+	params = kmalloc(sizeof(struct special_params), GFP_KERNEL);
+	if (params == NULL)
+		return -ENOMEM;
 
 	mutex_lock(&bebob->mutex);
 
-	bebob->maudio_is1814 = is1814;
+	bebob->maudio_special_quirk = (void *)params;
+	params->is1814 = is1814;
 
 	/* initialize these parameters because driver is not allowed to ask */
 	bebob->rx_stream.context = ERR_PTR(-1);
@@ -302,7 +320,7 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 	trials = 0;
 	do {
 		err = avc_audio_get_selector(bebob->unit, 0x00, 0x04,
-					     &bebob->dig_in_iface, true);
+					     &params->dig_in_iface, true);
 		if (err >= 0)
 			break;
 	} while (++trials < MAX_TRIALS);
@@ -318,16 +336,18 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 
 	special_stream_formation_set(bebob);
 
-	if (bebob->maudio_is1814) {
+	if (params->is1814) {
 		bebob->midi_input_ports = 1;
 		bebob->midi_output_ports = 1;
 	} else {
 		bebob->midi_input_ports = 2;
 		bebob->midi_output_ports = 2;
 	}
-
-	bebob->maudio_special_quirk = true;
 end:
+	if (err < 0) {
+		kfree(params);
+		bebob->maudio_special_quirk = NULL;
+	}
 	mutex_unlock(&bebob->mutex);
 	return err;
 }
@@ -353,7 +373,10 @@ static int special_get_rate(struct snd_bebob *bebob, unsigned int *rate)
 }
 static int special_set_rate(struct snd_bebob *bebob, unsigned int rate)
 {
-	int err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_OUT);
+	struct special_params *params = bebob->maudio_special_quirk;
+	int err;
+
+	err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_OUT);
 	if (err < 0)
 		goto end;
 
@@ -361,9 +384,9 @@ static int special_set_rate(struct snd_bebob *bebob, unsigned int rate)
 	if (err < 0)
 		goto end;
 
-	if (bebob->ctl_id_sync)
+	if (params->ctl_id_sync)
 		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
-			       bebob->ctl_id_sync);
+			       params->ctl_id_sync);
 end:
 	return err;
 }
@@ -372,10 +395,10 @@ end:
 static char *special_clk_labels[] = {
 	SND_BEBOB_CLOCK_INTERNAL " with Digital Mute", "Digital",
 	"Word Clock", SND_BEBOB_CLOCK_INTERNAL};
-static int special_clk_get(struct snd_bebob *bebob,
-			   unsigned int *id)
+static int special_clk_get(struct snd_bebob *bebob, unsigned int *id)
 {
-	*id = bebob->clk_src;
+	struct special_params *params = bebob->maudio_special_quirk;
+	*id = params->clk_src;
 	return 0;
 }
 static int special_clk_ctl_info(struct snd_kcontrol *kctl,
@@ -397,13 +420,15 @@ static int special_clk_ctl_get(struct snd_kcontrol *kctl,
 			       struct snd_ctl_elem_value *uval)
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
-	uval->value.enumerated.item[0] = bebob->clk_src;
+	struct special_params *params = bebob->maudio_special_quirk;
+	uval->value.enumerated.item[0] = params->clk_src;
 	return 0;
 }
 static int special_clk_ctl_put(struct snd_kcontrol *kctl,
 			       struct snd_ctl_elem_value *uval)
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
+	struct special_params *params = bebob->maudio_special_quirk;
 	int err, id;
 
 	mutex_lock(&bebob->mutex);
@@ -413,9 +438,9 @@ static int special_clk_ctl_put(struct snd_kcontrol *kctl,
 		return 0;
 
 	err = special_clk_set_params(bebob, id,
-				     bebob->dig_in_fmt,
-				     bebob->dig_out_fmt,
-				     bebob->clk_lock);
+				     params->dig_in_fmt,
+				     params->dig_out_fmt,
+				     params->clk_lock);
 	mutex_unlock(&bebob->mutex);
 
 	return err >= 0;
@@ -484,10 +509,11 @@ static int special_dig_in_iface_ctl_get(struct snd_kcontrol *kctl,
 					struct snd_ctl_elem_value *uval)
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
+	struct special_params *params = bebob->maudio_special_quirk;
 	int val;
 
 	/* encoded id for user value */
-	val = (bebob->dig_in_fmt << 1) | (bebob->dig_in_iface & 0x01);
+	val = (params->dig_in_fmt << 1) | (params->dig_in_iface & 0x01);
 
 	/* for ADAT Optical */
 	if (val > 2)
@@ -501,6 +527,7 @@ static int special_dig_in_iface_ctl_set(struct snd_kcontrol *kctl,
 					struct snd_ctl_elem_value *uval)
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
+	struct special_params *params = bebob->maudio_special_quirk;
 	unsigned int id, dig_in_fmt, dig_in_iface;
 	int err;
 
@@ -512,16 +539,16 @@ static int special_dig_in_iface_ctl_set(struct snd_kcontrol *kctl,
 	dig_in_fmt = (id >> 1) & 0x01;
 	dig_in_iface = id & 0x01;
 
-	err = special_clk_set_params(bebob, bebob->clk_src, dig_in_fmt,
-				     bebob->dig_out_fmt, bebob->clk_lock);
-	if ((err < 0) || (bebob->dig_in_fmt > 0)) /* ADAT */
+	err = special_clk_set_params(bebob, params->clk_src, dig_in_fmt,
+				     params->dig_out_fmt, params->clk_lock);
+	if ((err < 0) || (params->dig_in_fmt > 0)) /* ADAT */
 		goto end;
 
 	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, dig_in_iface);
 	if (err < 0)
 		goto end;
 
-	bebob->dig_in_iface = dig_in_iface;
+	params->dig_in_iface = dig_in_iface;
 end:
 	special_stream_formation_set(bebob);
 	mutex_unlock(&bebob->mutex);
@@ -555,8 +582,9 @@ static int special_dig_out_iface_ctl_get(struct snd_kcontrol *kctl,
 					 struct snd_ctl_elem_value *uval)
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
+	struct special_params *params = bebob->maudio_special_quirk;
 	mutex_lock(&bebob->mutex);
-	uval->value.enumerated.item[0] = bebob->dig_out_fmt;
+	uval->value.enumerated.item[0] = params->dig_out_fmt;
 	mutex_unlock(&bebob->mutex);
 	return 0;
 }
@@ -564,6 +592,7 @@ static int special_dig_out_iface_ctl_set(struct snd_kcontrol *kctl,
 					 struct snd_ctl_elem_value *uval)
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
+	struct special_params *params = bebob->maudio_special_quirk;
 	unsigned int id;
 	int err;
 
@@ -571,8 +600,8 @@ static int special_dig_out_iface_ctl_set(struct snd_kcontrol *kctl,
 
 	id = uval->value.enumerated.item[0];
 
-	err = special_clk_set_params(bebob, bebob->clk_src, bebob->dig_in_fmt,
-				     id, bebob->clk_lock);
+	err = special_clk_set_params(bebob, params->clk_src, params->dig_in_fmt,
+				     id, params->clk_lock);
 	if (err >= 0)
 		special_stream_formation_set(bebob);
 
@@ -591,6 +620,7 @@ static struct snd_kcontrol_new special_dig_out_iface_ctl = {
 static int snd_bebob_maudio_special_add_controls(struct snd_bebob *bebob)
 {
 	struct snd_kcontrol *kctl;
+	struct special_params *params = bebob->maudio_special_quirk;
 	int err;
 
 	kctl = snd_ctl_new1(&special_clk_ctl, bebob);
@@ -602,7 +632,7 @@ static int snd_bebob_maudio_special_add_controls(struct snd_bebob *bebob)
 	err = snd_ctl_add(bebob->card, kctl);
 	if (err < 0)
 		goto end;
-	bebob->ctl_id_sync = &kctl->id;
+	params->ctl_id_sync = &kctl->id;
 
 	kctl = snd_ctl_new1(&special_dig_in_iface_ctl, bebob);
 	err = snd_ctl_add(bebob->card, kctl);
