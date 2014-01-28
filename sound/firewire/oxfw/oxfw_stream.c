@@ -95,10 +95,8 @@ static int stream_init(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 	}
 
 	err = cmp_connection_init(conn, oxfw->unit, c_dir, 0);
-	if (err < 0) {
-		fw_unit_put(oxfw->unit);
+	if (err < 0)
 		goto end;
-	}
 
 	err = amdtp_stream_init(stream, oxfw->unit, s_dir, CIP_NONBLOCKING);
 	if (err < 0)

@@ -90,7 +90,6 @@ static void oxfw_card_free(struct snd_card *card)
 {
 	struct snd_oxfw *oxfw = card->private_data;
 
-	fw_unit_put(oxfw->unit);	/* dec reference counter */
 	mutex_destroy(&oxfw->mutex);
 }
 
@@ -108,7 +107,7 @@ static int oxfw_probe(struct fw_unit *unit,
 	card->private_free = oxfw_card_free;
 	oxfw = card->private_data;
 	oxfw->card = card;
-	oxfw->unit = fw_unit_get(unit);	/* inc reference counter */
+	oxfw->unit = unit;
 	oxfw->device_info = (const struct device_info *)id->driver_data;
 	mutex_init(&oxfw->mutex);
 	spin_lock_init(&oxfw->lock);
