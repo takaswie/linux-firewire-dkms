@@ -1,5 +1,5 @@
 /*
- * oxfw_hedep.c - a part of driver for OXFW970/971 based devices
+ * oxfw_hwdep.c - a part of driver for OXFW970/971 based devices
  *
  * Copyright (c) 2013 Takashi Sakamoto
  *

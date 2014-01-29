@@ -219,8 +219,8 @@ static int oxfw_open(struct snd_pcm_substream *substream)
 		goto err_locked;
 
 	/*
-	 * When any PCM stream are already running, the available sampling rate
-	 *  is limited at current value.
+	 * When any PCM streams are already running, the available sampling
+	 * rate is limited at current value.
 	 */
 	if (amdtp_stream_pcm_running(&oxfw->tx_stream) ||
 	    amdtp_stream_pcm_running(&oxfw->rx_stream)) {
