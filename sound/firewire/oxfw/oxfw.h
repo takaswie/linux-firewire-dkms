@@ -14,6 +14,7 @@
 #include <linux/slab.h>
 #include <linux/compat.h>
 
+/* TODO: when merging to upstream, this path should be changed. */
 #include "../../../include/uapi/sound/firewire.h"
 #include "../../../include/uapi/sound/asound.h"
 

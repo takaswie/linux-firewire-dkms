@@ -18,7 +18,7 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 
-/* TODO: when mering to upstream, this path should be changed. */
+/* TODO: when merging to upstream, this path should be changed. */
 #include "../../../include/uapi/sound/asound.h"
 #include "../../../include/uapi/sound/firewire.h"
 
