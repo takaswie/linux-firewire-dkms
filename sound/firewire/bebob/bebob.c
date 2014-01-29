@@ -405,8 +405,8 @@ static const struct ieee1394_device_id bebob_id_table[] = {
 	/* IDs are unknown but able to be supported */
 	/*  Apogee, Mini-ME Firewire */
 	/*  Apogee, Mini-DAC Firewire */
-	/*  Behringer, FCA 1616 */
-	/*  Behringer, FCA 610 */
+	/*  Behringer, F-Control Audio 1616 */
+	/*  Behringer, F-Control Audio 610 */
 	/*  Cakawalk, Sonar Power Studio 66 */
 	/*  CME, UF400e */
 	/*  ESI, Quotafire XL */
