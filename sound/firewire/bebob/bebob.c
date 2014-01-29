@@ -66,6 +66,7 @@ static unsigned int devices_used;
 static int
 name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 {
+	struct fw_device *fw_dev = fw_parent_device(bebob->unit);
 	char vendor[24] = {0};
 	char model[24] = {0};
 	u32 id;
@@ -74,7 +75,7 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 	int err;
 
 	/* get vendor name from root directory */
-	err = fw_csr_string(bebob->device->config_rom + 5, CSR_VENDOR,
+	err = fw_csr_string(fw_dev->config_rom + 5, CSR_VENDOR,
 			    vendor, sizeof(vendor));
 	if (err < 0)
 		goto end;
@@ -108,9 +109,8 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 	snprintf(bebob->card->longname, sizeof(bebob->card->longname),
 		 "%s %s (id:%d, rev:%d), GUID %08x%08x at %s, S%d",
 		 vendor, model, id, revision,
-		 data[0], data[1],
-		 dev_name(&bebob->unit->device),
-		 100 << bebob->device->max_speed);
+		 data[0], data[1], dev_name(&bebob->unit->device),
+		 100 << fw_dev->max_speed);
 	strcpy(bebob->card->mixername, model);
 end:
 	return err;
@@ -205,7 +205,6 @@ bebob_probe(struct fw_unit *unit,
 
 	bebob = card->private_data;
 	bebob->card = card;
-	bebob->device = fw_parent_device(unit);
 	bebob->unit = unit;
 	bebob->card_index = -1;
 	bebob->spec = spec;

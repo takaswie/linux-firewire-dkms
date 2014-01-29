@@ -75,7 +75,6 @@ struct snd_bebob_spec {
 
 struct snd_bebob {
 	struct snd_card *card;
-	struct fw_device *device;
 	struct fw_unit *unit;
 	int card_index;
 

@@ -71,6 +71,7 @@ static unsigned int devices_used;
 static int
 get_hardware_info(struct snd_efw *efw)
 {
+	struct fw_device *fw_dev = fw_parent_device(efw->unit);
 	struct snd_efw_hwinfo *hwinfo;
 	char version[12] = {0};
 	int err;
@@ -94,7 +95,7 @@ get_hardware_info(struct snd_efw *efw)
 		 "%s %s v%s, GUID %08x%08x at %s, S%d",
 		 hwinfo->vendor_name, hwinfo->model_name, version,
 		 hwinfo->guid_hi, hwinfo->guid_lo,
-		 dev_name(&efw->unit->device), 100 << efw->device->max_speed);
+		 dev_name(&efw->unit->device), 100 << fw_dev->max_speed);
 	strcpy(efw->card->mixername, hwinfo->model_name);
 
 	if (hwinfo->flags & BIT(FLAG_RESP_ADDR_CHANGABLE))
@@ -201,7 +202,6 @@ efw_probe(struct fw_unit *unit,
 
 	efw = card->private_data;
 	efw->card = card;
-	efw->device = fw_parent_device(unit);
 	efw->unit = unit;
 	efw->card_index = -1;
 	mutex_init(&efw->mutex);

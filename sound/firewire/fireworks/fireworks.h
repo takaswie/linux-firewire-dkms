@@ -53,7 +53,6 @@ struct snd_efw_phys_grp {
 
 struct snd_efw {
 	struct snd_card *card;
-	struct fw_device *device;
 	struct fw_unit *unit;
 	int card_index;
 
