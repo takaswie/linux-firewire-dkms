@@ -43,23 +43,23 @@ int snd_oxfw_stream_get_rate(struct snd_oxfw *oxfw, unsigned int *rate)
 	unsigned int tx_rate, rx_rate;
 	int err;
 
-	err = snd_oxfw_command_get_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT,
-					&tx_rate);
-	if (err < 0)
-		goto end;
-
 	err = snd_oxfw_command_get_rate(oxfw, AVC_GENERAL_PLUG_DIR_IN,
 					&rx_rate);
 	if (err < 0)
 		goto end;
-
 	*rate = rx_rate;
-	if (rx_rate == tx_rate)
-		goto end;
 
-	/* synchronize receive stream rate to transmit stream rate */
-	err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_IN,
-					rx_rate);
+	/* 44.1 kHz is the most popular */
+	if (oxfw->tx_stream_formations[1].pcm > 0) {
+		err = snd_oxfw_command_get_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT,
+						&tx_rate);
+		if ((err < 0) || (rx_rate == tx_rate))
+			goto end;
+
+		/* synchronize transmit stream rate to receive stream rate */
+		err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT,
+						rx_rate);
+	}
 end:
 	return err;
 }
@@ -68,11 +68,14 @@ int snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate)
 {
 	int err;
 
-	err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT, rate);
+	err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_IN, rate);
 	if (err < 0)
 		goto end;
 
-	err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_IN, rate);
+	/* 44.1 kHz is the most popular */
+	if (oxfw->tx_stream_formations[1].pcm > 0)
+		err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT,
+						rate);
 end:
 	return err;
 }
