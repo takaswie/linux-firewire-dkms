@@ -145,7 +145,6 @@ void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
 void amdtp_stream_pcm_prepare(struct amdtp_stream *s);
 unsigned long amdtp_stream_pcm_pointer(struct amdtp_stream *s);
 void amdtp_stream_pcm_abort(struct amdtp_stream *s);
-bool amdtp_stream_wait_callback(struct amdtp_stream *s, unsigned int timeout);
 
 extern const unsigned int amdtp_syt_intervals[CIP_SFC_COUNT];
 extern const unsigned int amdtp_rate_table[CIP_SFC_COUNT];
@@ -238,6 +237,21 @@ static inline void amdtp_stream_set_sync(enum cip_flags sync_mode,
 		master->sync_slave = ERR_PTR(-1);
 
 	slave->sync_slave = ERR_PTR(-1);
+}
+
+/**
+ * amdtp_stream_wait_callback - sleep till callbacked or timeout
+ * @s: the AMDTP stream
+ * @timeout: msec till timeout
+ *
+ * If this function return false, the AMDTP stream should be stopped.
+ */
+static inline bool amdtp_stream_wait_callback(struct amdtp_stream *s,
+					      unsigned int timeout)
+{
+	return wait_event_timeout(s->callback_wait,
+				  s->callbacked == true,
+				  msecs_to_jiffies(timeout)) > 0;
 }
 
 #endif

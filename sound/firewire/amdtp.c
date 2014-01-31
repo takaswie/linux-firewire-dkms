@@ -1146,18 +1146,3 @@ void amdtp_stream_pcm_abort(struct amdtp_stream *s)
 	}
 }
 EXPORT_SYMBOL(amdtp_stream_pcm_abort);
-
-/**
- * amdtp_stream_wait_callback - sleep till callbacked or timeout
- * @s: the AMDTP stream
- * @timeout: msec till timeout
- *
- * If this function return false, the AMDTP stream should be stopped.
- */
-bool amdtp_stream_wait_callback(struct amdtp_stream *s, unsigned int timeout)
-{
-	return wait_event_timeout(s->callback_wait,
-				  s->callbacked == true,
-				  msecs_to_jiffies(timeout)) > 0;
-}
-EXPORT_SYMBOL(amdtp_stream_wait_callback);
