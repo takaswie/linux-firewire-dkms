@@ -170,7 +170,8 @@ static void oxfw_bus_reset(struct fw_unit *unit)
 
 	fcp_bus_reset(oxfw->unit);
 	snd_oxfw_stream_update(oxfw, &oxfw->rx_stream);
-	snd_oxfw_stream_update(oxfw, &oxfw->tx_stream);
+	if (oxfw->tx_stream_formations[1].pcm > 0)
+		snd_oxfw_stream_update(oxfw, &oxfw->tx_stream);
 }
 
 static void oxfw_remove(struct fw_unit *unit)
@@ -178,7 +179,8 @@ static void oxfw_remove(struct fw_unit *unit)
 	struct snd_oxfw *oxfw = dev_get_drvdata(&unit->device);
 
 	snd_oxfw_stream_destroy(oxfw, &oxfw->rx_stream);
-	snd_oxfw_stream_destroy(oxfw, &oxfw->tx_stream);
+	if (oxfw->tx_stream_formations[1].pcm > 0)
+		snd_oxfw_stream_destroy(oxfw, &oxfw->tx_stream);
 
 	snd_card_disconnect(oxfw->card);
 	snd_card_free_when_closed(oxfw->card);

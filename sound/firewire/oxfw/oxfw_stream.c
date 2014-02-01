@@ -230,17 +230,22 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 		/* get opposite stream */
 		if (stream == &oxfw->tx_stream)
 			opposite = &oxfw->rx_stream;
-		else
+		else if (oxfw->tx_stream_formations[1].pcm > 0)
 			opposite = &oxfw->tx_stream;
-
-		/* Stop streams safely */
-		err = check_connection_used_by_others(oxfw, opposite);
-		if (err < 0)
-			goto end;
-		if (!amdtp_stream_running(opposite))
+		else
 			opposite = NULL;
-		if (opposite)
-			stop_stream(oxfw, opposite);
+
+		/* stop opposite stream safely */
+		if (opposite) {
+			err = check_connection_used_by_others(oxfw, opposite);
+			if (err < 0)
+				goto end;
+			if (!amdtp_stream_running(opposite))
+				opposite = NULL;
+			else
+				stop_stream(oxfw, opposite);
+		}
+
 		if (amdtp_stream_running(stream))
 			stop_stream(oxfw, stream);
 
