@@ -113,12 +113,7 @@ static int oxfw_probe(struct fw_unit *unit,
 	spin_lock_init(&oxfw->lock);
 	init_waitqueue_head(&oxfw->hwdep_wait);
 
-	if (oxfw->device_info == &griffin_firewave)
-		err = firewave_stream_discover(oxfw);
-	else if (oxfw->device_info == &lacie_speakers)
-		err = lacie_speakers_stream_discover(oxfw);
-	else
-		err = snd_oxfw_stream_discover(oxfw);
+	err = snd_oxfw_stream_discover(oxfw);
 	if (err < 0)
 		goto err_card;
 

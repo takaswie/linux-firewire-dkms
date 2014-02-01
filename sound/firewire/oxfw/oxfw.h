@@ -130,8 +130,6 @@ void snd_oxfw_stream_update(struct snd_oxfw *oxfw, struct amdtp_stream *stream);
 
 int snd_oxfw_streams_init(struct snd_oxfw *oxfw);
 
-int firewave_stream_discover(struct snd_oxfw *oxfw);
-int lacie_speakers_stream_discover(struct snd_oxfw *oxfw);
 int snd_oxfw_stream_discover(struct snd_oxfw *oxfw);
 
 void snd_oxfw_stream_lock_changed(struct snd_oxfw *oxfw);

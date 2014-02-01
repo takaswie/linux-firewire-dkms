@@ -314,27 +314,6 @@ void snd_oxfw_stream_update(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 	}
 }
 
-int firewave_stream_discover(struct snd_oxfw *oxfw)
-{
-	oxfw->rx_stream_formations[0].pcm = 6;
-	oxfw->rx_stream_formations[1].pcm = 6;
-	oxfw->rx_stream_formations[2].pcm = 2;
-	oxfw->rx_stream_formations[4].pcm = 2;
-
-	return 0;
-}
-
-int lacie_speakers_stream_discover(struct snd_oxfw *oxfw)
-{
-	oxfw->rx_stream_formations[0].pcm = 2;
-	oxfw->rx_stream_formations[1].pcm = 2;
-	oxfw->rx_stream_formations[2].pcm = 2;
-	oxfw->rx_stream_formations[3].pcm = 2;
-	oxfw->rx_stream_formations[4].pcm = 2;
-
-	return 0;
-}
-
 /*
  * See Table 6.16 - AM824 Stream Format
  *     Figure 6.19 - format_information field for AM824 Compound
@@ -509,20 +488,24 @@ int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 	err = avc_general_get_plug_info(oxfw->unit, 0x1f, 0x07, 0x00, plugs);
 	if (err < 0)
 		goto end;
-	if ((plugs[0] == 0) || (plugs[0] == 0)) {
-		err = -EIO;
+	if ((plugs[0] == 0) && (plugs[1] == 0)) {
+		err = -ENOSYS;
 		goto end;
 	}
 
-	/* use oPCR[0] */
-	err = fill_stream_formations(oxfw, AVC_GENERAL_PLUG_DIR_OUT, 0);
-	if (err < 0)
-		goto end;
+	/* use oPCR[0] if exists */
+	if (plugs[1] > 0) {
+		err = fill_stream_formations(oxfw, AVC_GENERAL_PLUG_DIR_OUT, 0);
+		if (err < 0)
+			goto end;
+	}
 
-	/* use iPCR[0] */
-	err = fill_stream_formations(oxfw, AVC_GENERAL_PLUG_DIR_IN, 0);
-	if (err < 0)
-		goto end;
+	/* use iPCR[0] if exists */
+	if (plugs[0] > 0) {
+		err = fill_stream_formations(oxfw, AVC_GENERAL_PLUG_DIR_IN, 0);
+		if (err < 0)
+			goto end;
+	}
 
 	/* if its stream has MIDI conformant data channel, add one MIDI port */
 	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
