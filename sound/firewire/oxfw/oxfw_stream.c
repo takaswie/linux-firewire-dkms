@@ -476,7 +476,7 @@ fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 		/* parse and set stream formation */
 		err = parse_stream_formation(buf, len, formations, &i);
 		if (err < 0)
-			continue;
+			break;
 
 		/* get next entry */
 		len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;

@@ -36,7 +36,7 @@ int avc_stream_get_format(struct fw_unit *unit,
 	buf[7] = 0xff & pid;	/* Plug ID */
 	buf[8] = 0xff;		/* Padding */
 	buf[9] = 0xff;		/* support status in response */
-	buf[10] = 0xff & eid;	/* entry ID */
+	buf[10] = 0xff & eid;	/* entry ID for LIST subfunction */
 	buf[11] = 0xff;		/* padding */
 
 	/* do transaction and check buf[1-7] are the same against command */
@@ -53,18 +53,24 @@ int avc_stream_get_format(struct fw_unit *unit,
 	} else if (buf[0] != 0x0c) {
 		err = -EINVAL;
 		goto end;
-	/* the content starts at 11th bytes */
-	} else if (err < 9) {
+	/* the content starts at 10th bytes */
+	} else if (err < 10) {
 		err = -EIO;
 		goto end;
+	/* LIST subfunction has entry ID */
 	} else if ((subfunc == 0xc1) && (buf[10] != eid)) {
 		err = -EIO;
 		goto end;
 	}
 
-	/* strip */
-	memmove(buf, buf + 10, err - 10);
-	*len = err - 10;
+	/* keep just stream format information */
+	if (eid == 0xff) {
+		memmove(buf, buf + 10, err - 10);
+		*len = err - 10;
+	} else {
+		memmove(buf, buf + 11, err - 11);
+		*len = err - 11;
+	}
 	err = 0;
 end:
 	return err;
