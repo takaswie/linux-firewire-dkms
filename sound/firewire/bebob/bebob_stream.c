@@ -547,7 +547,7 @@ int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
 {
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
-	unsigned int slave_midi_substreams;
+	unsigned int slave_substreams;
 	int err;
 
 	mutex_lock(&bebob->mutex);
@@ -557,20 +557,16 @@ int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
 		goto end;
 
 	if (slave == &bebob->tx_stream)
-		slave_midi_substreams = bebob->tx_midi_substreams;
+		slave_substreams = bebob->capture_substreams;
 	else
-		slave_midi_substreams = bebob->rx_midi_substreams;
+		slave_substreams = bebob->playback_substreams;
 
-	if (amdtp_stream_pcm_running(slave) ||
-	    (slave_midi_substreams > 0))
+	if (slave_substreams > 0)
 		goto end;
 
 	amdtp_stream_stop(slave);
 
-	if (amdtp_stream_pcm_running(&bebob->tx_stream) ||
-	    amdtp_stream_pcm_running(&bebob->rx_stream) ||
-	    (bebob->tx_midi_substreams > 0) ||
-	    (bebob->rx_midi_substreams > 0))
+	if ((bebob->capture_substreams > 0) || (bebob->playback_substreams > 0))
 		goto end;
 
 	amdtp_stream_stop(master);

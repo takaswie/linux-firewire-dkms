@@ -270,15 +270,14 @@ end:
 
 void snd_oxfw_stream_stop(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 {
-	unsigned int midi_substreams;
+	unsigned int substreams;
 
 	if (stream == &oxfw->tx_stream)
-		midi_substreams = oxfw->tx_midi_substreams;
+		substreams = oxfw->capture_substreams;
 	else
-		midi_substreams = oxfw->rx_midi_substreams;
+		substreams = oxfw->playback_substreams;
 
-	if (!amdtp_stream_pcm_running(stream) &&
-	    (midi_substreams == 0))
+	if (substreams == 0)
 		stop_stream(oxfw, stream);
 }
 

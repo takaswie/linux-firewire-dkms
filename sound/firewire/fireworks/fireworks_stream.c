@@ -260,7 +260,7 @@ int snd_efw_stream_stop_duplex(struct snd_efw *efw)
 {
 	struct amdtp_stream *master, *slave;
 	enum cip_flags sync_mode;
-	unsigned int slave_midi_substreams;
+	unsigned int slave_substreams;
 	int err;
 
 	mutex_lock(&efw->mutex);
@@ -270,20 +270,16 @@ int snd_efw_stream_stop_duplex(struct snd_efw *efw)
 		goto end;
 
 	if (slave == &efw->tx_stream)
-		slave_midi_substreams = efw->tx_midi_substreams;
+		slave_substreams = efw->capture_substreams;
 	else
-		slave_midi_substreams = efw->rx_midi_substreams;
+		slave_substreams = efw->playback_substreams;
 
-	if (amdtp_stream_pcm_running(slave) ||
-	    (slave_midi_substreams > 0))
+	if (slave_substreams > 0)
 		goto end;
 
 	stop_stream(efw, slave);
 
-	if (amdtp_stream_pcm_running(&efw->tx_stream) ||
-	    amdtp_stream_pcm_running(&efw->rx_stream) ||
-	    (efw->tx_midi_substreams > 0) ||
-	    (efw->rx_midi_substreams > 0))
+	if ((efw->capture_substreams > 0) || (efw->playback_substreams > 0))
 		goto end;
 
 	stop_stream(efw, master);

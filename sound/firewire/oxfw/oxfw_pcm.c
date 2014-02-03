@@ -246,9 +246,25 @@ static int oxfw_close(struct snd_pcm_substream *substream)
 	return 0;
 }
 
-static int oxfw_hw_params(struct snd_pcm_substream *substream,
-			   struct snd_pcm_hw_params *hw_params)
+static int oxfw_hw_params_capture(struct snd_pcm_substream *substream,
+				  struct snd_pcm_hw_params *hw_params)
 {
+	struct snd_oxfw *oxfw = substream->private_data;
+
+	oxfw->capture_substreams++;
+	amdtp_stream_set_pcm_format(&oxfw->tx_stream, params_format(hw_params));
+
+	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
+						params_buffer_bytes(hw_params));
+}
+static int oxfw_hw_params_playback(struct snd_pcm_substream *substream,
+				   struct snd_pcm_hw_params *hw_params)
+{
+	struct snd_oxfw *oxfw = substream->private_data;
+
+	oxfw->playback_substreams++;
+	amdtp_stream_set_pcm_format(&oxfw->rx_stream, params_format(hw_params));
+
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
 						params_buffer_bytes(hw_params));
 }
@@ -257,6 +273,7 @@ static int oxfw_hw_free_capture(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
+	oxfw->capture_substreams--;
 	snd_oxfw_stream_stop(oxfw, &oxfw->tx_stream);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
@@ -265,6 +282,7 @@ static int oxfw_hw_free_playback(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
+	oxfw->playback_substreams--;
 	snd_oxfw_stream_stop(oxfw, &oxfw->rx_stream);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
@@ -280,7 +298,6 @@ static int oxfw_prepare_capture(struct snd_pcm_substream *substream)
 	if (err < 0)
 		goto end;
 
-	amdtp_stream_set_pcm_format(&oxfw->tx_stream, runtime->format);
 	amdtp_stream_pcm_prepare(&oxfw->tx_stream);
 end:
 	return err;
@@ -295,7 +312,6 @@ static int oxfw_prepare_playback(struct snd_pcm_substream *substream)
 	if (err < 0)
 		goto end;
 
-	amdtp_stream_set_pcm_format(&oxfw->rx_stream, runtime->format);
 	amdtp_stream_pcm_prepare(&oxfw->rx_stream);
 end:
 	return err;
@@ -357,7 +373,7 @@ int snd_oxfw_create_pcm(struct snd_oxfw *oxfw)
 		.open      = oxfw_open,
 		.close     = oxfw_close,
 		.ioctl     = snd_pcm_lib_ioctl,
-		.hw_params = oxfw_hw_params,
+		.hw_params = oxfw_hw_params_capture,
 		.hw_free   = oxfw_hw_free_capture,
 		.prepare   = oxfw_prepare_capture,
 		.trigger   = oxfw_trigger_capture,
@@ -369,7 +385,7 @@ int snd_oxfw_create_pcm(struct snd_oxfw *oxfw)
 		.open      = oxfw_open,
 		.close     = oxfw_close,
 		.ioctl     = snd_pcm_lib_ioctl,
-		.hw_params = oxfw_hw_params,
+		.hw_params = oxfw_hw_params_playback,
 		.hw_free   = oxfw_hw_free_playback,
 		.prepare   = oxfw_prepare_playback,
 		.trigger   = oxfw_trigger_playback,

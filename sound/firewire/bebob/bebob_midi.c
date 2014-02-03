@@ -17,13 +17,11 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	bebob->tx_midi_substreams++;
-	if (!amdtp_stream_running(&bebob->tx_stream)) {
-		err = snd_bebob_stream_start_duplex(bebob,
-						    &bebob->tx_stream, 0);
-		if (err < 0)
-			snd_bebob_stream_lock_release(bebob);
-	}
+	bebob->capture_substreams++;
+	err = snd_bebob_stream_start_duplex(bebob,
+					    &bebob->tx_stream, 0);
+	if (err < 0)
+		snd_bebob_stream_lock_release(bebob);
 end:
 	return err;
 }
@@ -37,13 +35,11 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	bebob->rx_midi_substreams++;
-	if (!amdtp_stream_running(&bebob->rx_stream)) {
-		err = snd_bebob_stream_start_duplex(bebob,
-						    &bebob->rx_stream, 0);
-		if (err < 0)
-			snd_bebob_stream_lock_release(bebob);
-	}
+	bebob->playback_substreams++;
+	err = snd_bebob_stream_start_duplex(bebob,
+					    &bebob->rx_stream, 0);
+	if (err < 0)
+		snd_bebob_stream_lock_release(bebob);
 end:
 	return err;
 }
@@ -52,8 +48,8 @@ static int midi_capture_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_bebob *bebob = substream->rmidi->private_data;
 
-	if (--bebob->tx_midi_substreams == 0)
-		snd_bebob_stream_stop_duplex(bebob);
+	bebob->capture_substreams--;
+	snd_bebob_stream_stop_duplex(bebob);
 
 	snd_bebob_stream_lock_release(bebob);
 	return 0;
@@ -63,8 +59,8 @@ static int midi_playback_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_bebob *bebob = substream->rmidi->private_data;
 
-	if (--bebob->rx_midi_substreams == 0)
-		snd_bebob_stream_stop_duplex(bebob);
+	bebob->playback_substreams--;
+	snd_bebob_stream_stop_duplex(bebob);
 
 	snd_bebob_stream_lock_release(bebob);
 	return 0;
