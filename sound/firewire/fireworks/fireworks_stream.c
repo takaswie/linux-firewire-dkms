@@ -96,26 +96,6 @@ end:
 	return err;
 }
 
-static void
-update_stream(struct snd_efw *efw, struct amdtp_stream *stream)
-{
-	struct cmp_connection *conn;
-
-	if (&efw->tx_stream == stream)
-		conn = &efw->out_conn;
-	else
-		conn = &efw->in_conn;
-
-	if (cmp_connection_update(conn) < 0) {
-		amdtp_stream_pcm_abort(stream);
-		mutex_lock(&efw->mutex);
-		stop_stream(efw, stream);
-		mutex_unlock(&efw->mutex);
-	} else {
-		amdtp_stream_update(stream);
-	}
-}
-
 static int
 get_roles(struct snd_efw *efw, enum cip_flags *sync_mode,
 	  struct amdtp_stream **master, struct amdtp_stream **slave)
@@ -290,8 +270,19 @@ end:
 
 void snd_efw_stream_update_duplex(struct snd_efw *efw)
 {
-	update_stream(efw, &efw->rx_stream);
-	update_stream(efw, &efw->tx_stream);
+
+	if ((cmp_connection_update(&efw->out_conn) < 0) ||
+	    (cmp_connection_update(&efw->in_conn) < 0)) {
+		amdtp_stream_pcm_abort(&efw->rx_stream);
+		amdtp_stream_pcm_abort(&efw->tx_stream);
+		mutex_lock(&efw->mutex);
+		stop_stream(efw, &efw->rx_stream);
+		stop_stream(efw, &efw->tx_stream);
+		mutex_unlock(&efw->mutex);
+	} else {
+		amdtp_stream_update(&efw->rx_stream);
+		amdtp_stream_update(&efw->tx_stream);
+	}
 }
 
 void snd_efw_stream_destroy_duplex(struct snd_efw *efw)
