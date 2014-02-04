@@ -460,10 +460,8 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	if (rate == 0)
 		rate = curr_rate;
 	if (rate != curr_rate) {
-		if (amdtp_stream_running(slave))
-			amdtp_stream_stop(slave);
-		if (amdtp_stream_running(master))
-			amdtp_stream_stop(master);
+		amdtp_stream_stop(slave);
+		amdtp_stream_stop(master);
 		break_both_connections(bebob);
 	}
 
@@ -597,10 +595,8 @@ void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
 {
 	mutex_lock(&bebob->mutex);
 
-	if (amdtp_stream_pcm_running(&bebob->rx_stream))
-		amdtp_stream_pcm_abort(&bebob->rx_stream);
-	if (amdtp_stream_pcm_running(&bebob->tx_stream))
-		amdtp_stream_pcm_abort(&bebob->tx_stream);
+	amdtp_stream_pcm_abort(&bebob->rx_stream);
+	amdtp_stream_pcm_abort(&bebob->tx_stream);
 
 	amdtp_stream_stop(&bebob->rx_stream);
 	amdtp_stream_stop(&bebob->tx_stream);

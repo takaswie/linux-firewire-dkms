@@ -110,8 +110,7 @@ end:
 
 static void stop_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 {
-	if (amdtp_stream_running(stream))
-		amdtp_stream_stop(stream);
+	amdtp_stream_stop(stream);
 
 	if (stream == &oxfw->tx_stream)
 		cmp_connection_break(&oxfw->out_conn);
@@ -246,8 +245,7 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 				stop_stream(oxfw, opposite);
 		}
 
-		if (amdtp_stream_running(stream))
-			stop_stream(oxfw, stream);
+		stop_stream(oxfw, stream);
 
 		err = snd_oxfw_stream_set_rate(oxfw, rate);
 		if (err < 0)

@@ -41,8 +41,7 @@ end:
 static void
 stop_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 {
-	if (amdtp_stream_running(stream))
-		amdtp_stream_stop(stream);
+	amdtp_stream_stop(stream);
 
 	if (stream == &efw->tx_stream)
 		cmp_connection_break(&efw->out_conn);
@@ -200,10 +199,8 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 	if (rate == 0)
 		rate = curr_rate;
 	if (rate != curr_rate) {
-		if (amdtp_stream_running(slave))
-			stop_stream(efw, slave);
-		if (amdtp_stream_running(master))
-			stop_stream(efw, master);
+		stop_stream(efw, slave);
+		stop_stream(efw, master);
 	}
 
 	/* master should be always running */
@@ -289,10 +286,8 @@ void snd_efw_stream_destroy_duplex(struct snd_efw *efw)
 {
 	mutex_lock(&efw->mutex);
 
-	if (amdtp_stream_pcm_running(&efw->rx_stream))
-		amdtp_stream_pcm_abort(&efw->rx_stream);
-	if (amdtp_stream_pcm_running(&efw->tx_stream))
-		amdtp_stream_pcm_abort(&efw->tx_stream);
+	amdtp_stream_pcm_abort(&efw->rx_stream);
+	amdtp_stream_pcm_abort(&efw->tx_stream);
 
 	stop_stream(efw, &efw->tx_stream);
 	cmp_connection_destroy(&efw->out_conn);
