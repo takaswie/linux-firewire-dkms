@@ -36,8 +36,6 @@
 #define OPCR_SPEED_SHIFT	14
 #define OPCR_OVERHEAD_ID_MASK	0x00003C00
 #define OPCR_OVERHEAD_ID_SHIFT	10
-#define OPCR_PAYLOAD_MASK	0x000003FF
-#define OPCR_PAYLOAD_SHIFT	0
 
 enum bus_reset_handling {
 	ABORT_ON_BUS_RESET,
@@ -235,21 +233,12 @@ static __be32 opcr_set_modify(struct cmp_connection *c, __be32 opcr)
 			     OPCR_XSPEED_MASK |
 			     PCR_CHANNEL_MASK |
 			     OPCR_SPEED_MASK |
-			     OPCR_OVERHEAD_ID_MASK |
-			     OPCR_PAYLOAD_MASK);
+			     OPCR_OVERHEAD_ID_MASK);
 	opcr |= cpu_to_be32(1 << PCR_P2P_CONN_SHIFT);
 	opcr |= cpu_to_be32(xspd << OPCR_XSPEED_SHIFT);
 	opcr |= cpu_to_be32(c->resources.channel << PCR_CHANNEL_SHIFT);
 	opcr |= cpu_to_be32(spd << OPCR_SPEED_SHIFT);
 	opcr |= cpu_to_be32(get_overhead_id(c) << OPCR_OVERHEAD_ID_SHIFT);
-	/*
-	 * here zero is applied to payload field.
-	 * it means the maximum number of quadlets in an isochronous packet is
-	 * 1024 when spd is less than three, 1024 * 2 * xspd + 1 when spd is
-	 * equal to three. An arbitrary value can be set here but 0 is enough
-	 * for our purpose.
-	 */
-	opcr |= cpu_to_be32(0 << OPCR_PAYLOAD_SHIFT);
 
 	return opcr;
 }
@@ -257,7 +246,7 @@ static __be32 opcr_set_modify(struct cmp_connection *c, __be32 opcr)
 static int pcr_set_check(struct cmp_connection *c, __be32 pcr)
 {
 	if (pcr & cpu_to_be32(PCR_BCAST_CONN |
-			       PCR_P2P_CONN_MASK)) {
+			      PCR_P2P_CONN_MASK)) {
 		cmp_error(c, "plug is already in use\n");
 		return -EBUSY;
 	}
