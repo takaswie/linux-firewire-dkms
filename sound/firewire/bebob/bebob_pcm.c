@@ -302,7 +302,9 @@ pcm_capture_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
 
-	bebob->capture_substreams--;
+	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
+		bebob->capture_substreams--;
+
 	snd_bebob_stream_stop_duplex(bebob);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
@@ -312,7 +314,9 @@ pcm_playback_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_bebob *bebob = substream->private_data;
 
-	bebob->playback_substreams--;
+	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
+		bebob->playback_substreams--;
+
 	snd_bebob_stream_stop_duplex(bebob);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);

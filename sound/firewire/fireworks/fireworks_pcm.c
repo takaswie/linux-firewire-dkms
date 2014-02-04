@@ -332,7 +332,9 @@ static int pcm_capture_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
 
-	efw->capture_substreams--;
+	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
+		efw->capture_substreams--;
+
 	snd_efw_stream_stop_duplex(efw);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
@@ -341,7 +343,9 @@ static int pcm_playback_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_efw *efw = substream->private_data;
 
-	efw->playback_substreams--;
+	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
+		efw->playback_substreams--;
+
 	snd_efw_stream_stop_duplex(efw);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);

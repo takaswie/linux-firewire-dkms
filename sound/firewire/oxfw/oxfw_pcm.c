@@ -273,7 +273,9 @@ static int oxfw_hw_free_capture(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
-	oxfw->capture_substreams--;
+	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
+		oxfw->capture_substreams--;
+
 	snd_oxfw_stream_stop(oxfw, &oxfw->tx_stream);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
@@ -282,7 +284,9 @@ static int oxfw_hw_free_playback(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
-	oxfw->playback_substreams--;
+	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
+		oxfw->playback_substreams--;
+
 	snd_oxfw_stream_stop(oxfw, &oxfw->rx_stream);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
