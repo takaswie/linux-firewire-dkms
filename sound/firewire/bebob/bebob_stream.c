@@ -578,11 +578,13 @@ end:
 
 void snd_bebob_stream_update_duplex(struct snd_bebob *bebob)
 {
-	if ((cmp_connection_update(&bebob->in_conn) > 0) ||
-	    (cmp_connection_update(&bebob->out_conn) > 0)) {
-		mutex_lock(&bebob->mutex);
+	if ((cmp_connection_update(&bebob->in_conn) < 0) ||
+	    (cmp_connection_update(&bebob->out_conn) < 0)) {
 		amdtp_stream_pcm_abort(&bebob->rx_stream);
 		amdtp_stream_pcm_abort(&bebob->tx_stream);
+		mutex_lock(&bebob->mutex);
+		amdtp_stream_stop(&bebob->rx_stream);
+		amdtp_stream_stop(&bebob->tx_stream);
 		break_both_connections(bebob);
 		mutex_unlock(&bebob->mutex);
 	} else {
