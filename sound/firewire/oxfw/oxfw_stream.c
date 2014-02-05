@@ -275,8 +275,11 @@ void snd_oxfw_stream_stop(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 	else
 		substreams = oxfw->playback_substreams;
 
-	if (substreams == 0)
+	if (substreams == 0) {
+		mutex_lock(&oxfw->mutex);
 		stop_stream(oxfw, stream);
+		mutex_unlock(&oxfw->mutex);
+	}
 }
 
 void snd_oxfw_stream_destroy(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
