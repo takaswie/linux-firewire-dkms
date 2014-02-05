@@ -267,7 +267,6 @@ end:
 
 void snd_efw_stream_update_duplex(struct snd_efw *efw)
 {
-
 	if ((cmp_connection_update(&efw->out_conn) < 0) ||
 	    (cmp_connection_update(&efw->in_conn) < 0)) {
 		amdtp_stream_pcm_abort(&efw->rx_stream);
