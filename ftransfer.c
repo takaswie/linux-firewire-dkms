@@ -21,7 +21,7 @@
 
 #include <libffado/ffado.h>
 
-bool run = true;
+bool run;
 
 enum driver_type {
 	DRIVER_ALSA,
@@ -33,7 +33,8 @@ struct something {
 	unsigned int card;
 	unsigned int rtprio;
 	unsigned char guid[8];
-	char device[16];
+	char sdev[16];
+	char fdev[16];
 
 	unsigned int bits_per_sample;
 	unsigned int samples_per_frame;
@@ -43,8 +44,7 @@ struct something {
 	unsigned int seconds;
 	uint8_t *buffer;
 
-	unsigned int tone;
-	double prev_phase;
+	unsigned int verbose;
 };
 
 static int
@@ -81,19 +81,46 @@ card_open(void **handle, struct something *opts)
 	int err = 0;
 
 	if (opts->driver == DRIVER_ALSA) {
-		err = snd_pcm_open((snd_pcm_t **)handle, opts->device,
+		err = snd_pcm_open((snd_pcm_t **)handle, opts->sdev,
 				   SND_PCM_STREAM_PLAYBACK,
 				   SND_PCM_NO_AUTO_RESAMPLE |
 				   SND_PCM_NO_AUTO_CHANNELS |
 				   SND_PCM_NO_AUTO_FORMAT);
 	} else {
+		char target[16] = {0};
+		char *strings[1];
 		ffado_device_info_t info = {0};
 		ffado_options_t options = {0};
+		unsigned int i;
 
-		info.nb_device_spec_strings = 0;
-		//info.device_spec_strings = &opts->guid;
+		if (false) {
+			/*
+			 * libffado svn 2478 has a bug to match guids.
+			 * strtoll() can return 64bit value in C99/C++11 or later.
+			 */
+			target[0] = 'g';
+			target[1] = 'u';
+			target[2] = 'i';
+			target[3] = 'd';
+			target[4] = ':';
+			target[5] = opts->guid[0];
+			target[6] = opts->guid[1];
+			target[7] = opts->guid[2];
+			target[8] = opts->guid[3];
+			target[9] = opts->guid[4];
+			target[10] = opts->guid[5];
+			target[11] = opts->guid[6];
+			target[12] = opts->guid[7];
+		} else {
+			/* use port 0. node id is picked up from 'fw%d' */
+			snprintf(target, sizeof(target), "hw:0,%s", opts->fdev + 2);
+		}
 
-		options.verbose = 0;
+		strings[0] = target;
+		info.nb_device_spec_strings = 1;
+		info.device_spec_strings = strings;
+
+		options.verbose = opts->verbose;
 		options.sample_rate = opts->frames_per_second;
 		/* buffer params */
 		options.period_size = opts->frames_per_period;
@@ -237,6 +264,7 @@ card_process(void *handle, struct something *opts)
 	max_frames = opts->frames_per_second * opts->seconds;
 	total_frames = 0;
 
+	run = true;
 	while (run && (total_frames < max_frames)) {
 		frames = opts->frames_per_period;
 
@@ -323,8 +351,9 @@ get_first_card(struct something *opts)
 		err = snd_hwdep_ioctl(hw, SNDRV_FIREWIRE_IOCTL_GET_INFO,
 				      (void *)&info);
 		if (err >= 0) {
-			strcpy(opts->device, buf);
+			strcpy(opts->sdev, buf);
 			memcpy(opts->guid, info.guid, sizeof(info.guid));
+			memcpy(opts->fdev, info.device_name, sizeof(info.device_name));
 			snd_hwdep_close(hw);
 			return 0;
 		}
@@ -339,7 +368,6 @@ parse_options(int argc, char *argv[], struct something *opts)
 	const struct option long_options[] = {
 		{"driver",	1, NULL, 'd'},
 		{"fps",		1, NULL, 'r'},
-		{"tone",	1, NULL, 't'},
 		{"ppb",		1, NULL, 'b'},
 		{"fpp",		1, NULL, 'p'},
 		{"rtprio",	1, NULL, 'i'},
@@ -350,15 +378,15 @@ parse_options(int argc, char *argv[], struct something *opts)
 	/* default values */
 	opts->driver = DRIVER_ALSA;
 	opts->frames_per_second = 48000;
-	opts->tone = 440;
 	opts->frames_per_period = 512;
 	opts->periods_per_buffer = 2;
 	opts->seconds = 3;
 	opts->rtprio = 0;
+	opts->verbose = 0;
 
 	while (1) {
 		int c;
-		c = getopt_long(argc, argv, "d:r:t:b:p:s:", long_options, NULL);
+		c = getopt_long(argc, argv, "d:r:b:p:i:s:v:", long_options, NULL);
 		if (c < 0)
 			break;
 
@@ -369,9 +397,6 @@ parse_options(int argc, char *argv[], struct something *opts)
 			break;
 		case 'r':
 			opts->frames_per_second = atoi(optarg);
-			break;
-		case 't':
-			opts->tone = atoi(optarg);
 			break;
 		case 'b':
 			opts->periods_per_buffer = atoi(optarg);
@@ -384,6 +409,9 @@ parse_options(int argc, char *argv[], struct something *opts)
 			break;
 		case 's':
 			opts->seconds = atoi(optarg);
+			break;
+		case 'v':
+			opts->verbose = atoi(optarg);
 			break;
 		}
 	}
