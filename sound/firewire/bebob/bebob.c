@@ -128,8 +128,6 @@ bebob_card_free(struct snd_card *card)
 	}
 
 	mutex_destroy(&bebob->mutex);
-
-	return;
 }
 
 static const struct snd_bebob_spec *

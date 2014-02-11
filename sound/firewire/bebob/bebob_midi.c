@@ -81,8 +81,6 @@ static void midi_capture_trigger(struct snd_rawmidi_substream *substrm, int up)
 					  substrm->number, NULL);
 
 	spin_unlock_irqrestore(&bebob->lock, flags);
-
-	return;
 }
 
 static void midi_playback_trigger(struct snd_rawmidi_substream *substrm, int up)
@@ -100,8 +98,6 @@ static void midi_playback_trigger(struct snd_rawmidi_substream *substrm, int up)
 					  substrm->number, NULL);
 
 	spin_unlock_irqrestore(&bebob->lock, flags);
-
-	return;
 }
 
 static struct snd_rawmidi_ops midi_capture_ops = {

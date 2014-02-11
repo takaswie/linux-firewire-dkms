@@ -125,7 +125,7 @@ hw_rule_channels(struct snd_pcm_hw_params *params,
 	return snd_interval_refine(c, &t);
 }
 
-static int
+static inline int
 hw_rule_capture_rate(struct snd_pcm_hw_params *params,
 		     struct snd_pcm_hw_rule *rule)
 {
@@ -134,7 +134,7 @@ hw_rule_capture_rate(struct snd_pcm_hw_params *params,
 				efw->pcm_capture_channels);
 }
 
-static int
+static inline int
 hw_rule_playback_rate(struct snd_pcm_hw_params *params,
 		      struct snd_pcm_hw_rule *rule)
 {
@@ -143,7 +143,7 @@ hw_rule_playback_rate(struct snd_pcm_hw_params *params,
 				efw->pcm_playback_channels);
 }
 
-static int
+static inline int
 hw_rule_capture_channels(struct snd_pcm_hw_params *params,
 			 struct snd_pcm_hw_rule *rule)
 {
@@ -152,7 +152,7 @@ hw_rule_capture_channels(struct snd_pcm_hw_params *params,
 				efw->pcm_capture_channels);
 }
 
-static int
+static inline int
 hw_rule_playback_channels(struct snd_pcm_hw_params *params,
 			  struct snd_pcm_hw_rule *rule)
 {

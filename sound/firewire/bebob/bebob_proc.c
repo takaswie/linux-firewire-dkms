@@ -68,7 +68,6 @@ proc_read_hw_info(struct snd_info_entry *entry,
 
 end:
 	kfree(info);
-	return;
 }
 
 static void
@@ -104,7 +103,6 @@ proc_read_meters(struct snd_info_entry *entry,
 	}
 end:
 	kfree(buf);
-	return;
 }
 
 static void
@@ -132,8 +130,6 @@ proc_read_formation(struct snd_info_entry *entry,
 			"\t%d\t%d\t%d\n", snd_bebob_rate_table[i],
 			formation[i].pcm, formation[i].midi);
 	}
-
-	return;
 }
 
 static void
@@ -150,16 +146,15 @@ proc_read_clock(struct snd_info_entry *entry,
 		return;
 	snd_iprintf(buffer, "Sampling rate: %d\n", rate);
 
-	if (!clk_spec) {
-		if (snd_bebob_stream_check_internal_clock(bebob, &internal) < 0)
-			return;
+	if (clk_spec) {
+		if (clk_spec->get(bebob, &id) >= 0)
+			snd_iprintf(buffer, "Clock Source: %s\n",
+				    clk_spec->labels[id]);
+	} else if (snd_bebob_stream_check_internal_clock(bebob,
+							 &internal) >= 0) {
 		snd_iprintf(buffer, "Clock Source: %s (MSU-dest: %d)\n",
 			    (internal) ? "Internal" : "External",
 			    bebob->sync_input_plug);
-	} else {
-		if (clk_spec->get(bebob, &id) < 0)
-			return;
-		snd_iprintf(buffer, "Clock Source: %s\n", clk_spec->labels[id]);
 	}
 }
 
@@ -180,6 +175,4 @@ void snd_bebob_proc_init(struct snd_bebob *bebob)
 		if (!snd_card_proc_new(bebob->card, "#meter", &entry))
 			snd_info_set_text_ops(entry, bebob, proc_read_meters);
 	}
-
-	return;
 }

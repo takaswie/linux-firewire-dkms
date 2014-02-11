@@ -111,8 +111,6 @@ static void prepare_channels(struct snd_pcm_hardware *hw,
 		hw->channels_min = min(hw->channels_min, formations[i].pcm);
 		hw->channels_max = max(hw->channels_max, formations[i].pcm);
 	}
-
-	return;
 }
 
 static void prepare_rates(struct snd_pcm_hardware *hw,
@@ -129,8 +127,6 @@ static void prepare_rates(struct snd_pcm_hardware *hw,
 		hw->rate_max = max(hw->rate_max, snd_oxfw_rate_table[i]);
 		hw->rates |= snd_pcm_rate_to_rate_bit(snd_oxfw_rate_table[i]);
 	}
-
-	return;
 }
 
 static int init_hw_params(struct snd_oxfw *oxfw,

@@ -55,6 +55,4 @@ void snd_oxfw_proc_init(struct snd_oxfw *oxfw)
 
 	if (!snd_card_proc_new(oxfw->card, "#clock", &entry))
 		snd_info_set_text_ops(entry, oxfw, proc_read_clock);
-
-	return;
 }

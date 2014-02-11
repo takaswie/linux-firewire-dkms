@@ -163,8 +163,6 @@ efw_card_free(struct snd_card *card)
 	}
 
 	mutex_destroy(&efw->mutex);
-
-	return;
 }
 
 static int
@@ -257,8 +255,6 @@ static void efw_update(struct fw_unit *unit)
 
 	snd_efw_transaction_bus_reset(efw->unit);
 	snd_efw_stream_update_duplex(efw);
-
-	return;
 }
 
 static void efw_remove(struct fw_unit *unit)
@@ -270,7 +266,6 @@ static void efw_remove(struct fw_unit *unit)
 
 	snd_card_disconnect(efw->card);
 	snd_card_free_when_closed(efw->card);
-	return;
 }
 
 static const struct ieee1394_device_id efw_id_table[] = {
