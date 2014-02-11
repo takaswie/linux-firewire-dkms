@@ -131,14 +131,9 @@ hwdep_write(struct snd_hwdep *hwdep, const char __user *data, long count,
 	if (count < sizeof(struct snd_efw_transaction))
 		return -EINVAL;
 
-	buf = kmalloc(count, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	if (copy_from_user(buf, data, count)) {
-		count = -EFAULT;
-		goto end;
-	}
+	buf = memdup_user(data, count);
+	if (IS_ERR(buf))
+		return PTR_ERR(data);
 
 	/* check seqnum is not for kernel-land */
 	seqnum = ((struct snd_efw_transaction *)buf)->seqnum;
