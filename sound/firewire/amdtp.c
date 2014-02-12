@@ -875,9 +875,10 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 			if (index >= QUEUE_LENGTH)
 				index -= QUEUE_LENGTH;
 			buffer = s->buffer.packets[index].buffer;
-		} else
+		} else {
 			buffer = s->left_packets +
 				 amdtp_stream_get_max_payload(s) * j++;
+		}
 
 		if (i < remain_packets + packets - s->remain_packets) {
 			/* Process sync slave stream */
