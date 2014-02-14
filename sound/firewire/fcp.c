@@ -141,6 +141,10 @@ int avc_general_get_plug_info(struct fw_unit *unit, unsigned int subunit_type,
 	u8 *buf;
 	int err;
 
+	/* extended subunit in spec.4.2 is not supported */
+	if ((subunit_type == 0x1E) || (subunit_id == 5))
+		return -EINVAL;
+
 	buf = kzalloc(8, GFP_KERNEL);
 	if (buf == NULL)
 		return -ENOMEM;
