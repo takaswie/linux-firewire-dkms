@@ -18,9 +18,8 @@
 #include <linux/delay.h>
 #include <linux/slab.h>
 
-/* TODO: when merging to upstream, this path should be changed. */
-#include "../../../include/uapi/sound/asound.h"
-#include "../../../include/uapi/sound/firewire.h"
+/* TODO: remove when merging to upstream. */
+#include "../../../backport.h"
 
 #include <sound/core.h>
 #include <sound/initval.h>
@@ -29,6 +28,7 @@
 #include <sound/rawmidi.h>
 #include <sound/pcm_params.h>
 #include <sound/hwdep.h>
+//#include <sound/firewire.h>
 
 #include "../packets-buffer.h"
 #include "../iso-resources.h"

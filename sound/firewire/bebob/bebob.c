@@ -195,8 +195,8 @@ bebob_probe(struct fw_unit *unit,
 		goto end;
 	}
 
-	err = snd_card_create(index[card_index], id[card_index],
-			THIS_MODULE, sizeof(struct snd_bebob), &card);
+	err = snd_card_new(&unit->device, index[card_index], id[card_index],
+			   THIS_MODULE, sizeof(struct snd_bebob), &card);
 	if (err < 0)
 		goto end;
 	card->private_free = bebob_card_free;
@@ -246,7 +246,6 @@ bebob_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
-	snd_card_set_dev(card, &unit->device);
 	err = snd_card_register(card);
 	if (err < 0) {
 		snd_card_free(card);

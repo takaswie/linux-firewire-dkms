@@ -19,12 +19,12 @@
 #include <linux/spinlock.h>
 #include <linux/wait.h>
 
-/* TODO: when merging to upstream, this path should be changed. */
-#include "../../include/uapi/sound/asound.h"
-#include "../../include/uapi/sound/firewire.h"
+/* TODO: remove when merging to upstream. */
+#include "../../backport.h"
 
 #include <sound/control.h>
 #include <sound/core.h>
+//#include <sound/firewire.h>
 #include <sound/hwdep.h>
 #include <sound/info.h>
 #include <sound/initval.h>
@@ -547,7 +547,7 @@ static int dice_change_rate(struct dice *dice, unsigned int clock_rate)
 	__be32 value;
 	int err;
 
-	INIT_COMPLETION(dice->clock_accepted);
+	reinit_completion(&dice->clock_accepted);
 
 	value = cpu_to_be32(clock_rate | CLOCK_SOURCE_ARX1);
 	err = snd_fw_transaction(dice->unit, TCODE_WRITE_QUADLET_REQUEST,
@@ -1330,10 +1330,10 @@ static int dice_probe(struct fw_unit *unit, const struct ieee1394_device_id *id)
 	if (err < 0)
 		return err;
 
-	err = snd_card_create(-1, NULL, THIS_MODULE, sizeof(*dice), &card);
+	err = snd_card_new(&unit->device, -1, NULL, THIS_MODULE,
+			   sizeof(*dice), &card);
 	if (err < 0)
 		return err;
-	snd_card_set_dev(card, &unit->device);
 
 	dice = card->private_data;
 	dice->card = card;

@@ -14,6 +14,10 @@
 #include <linux/mod_devicetable.h>
 #include <linux/mutex.h>
 #include <linux/string.h>
+
+/* TODO: remove when merging to upstream. */
+#include "../../backport.h"
+
 #include <sound/control.h>
 #include <sound/core.h>
 #include <sound/initval.h>
@@ -631,10 +635,10 @@ static int isight_probe(struct fw_unit *unit,
 	struct isight *isight;
 	int err;
 
-	err = snd_card_create(-1, NULL, THIS_MODULE, sizeof(*isight), &card);
+	err = snd_card_new(&unit->device, -1, NULL, THIS_MODULE,
+			   sizeof(*isight), &card);
 	if (err < 0)
 		return err;
-	snd_card_set_dev(card, &unit->device);
 
 	isight = card->private_data;
 	isight->card = card;

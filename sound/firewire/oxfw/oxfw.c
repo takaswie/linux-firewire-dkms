@@ -100,7 +100,8 @@ static int oxfw_probe(struct fw_unit *unit,
 	struct snd_oxfw *oxfw;
 	int err;
 
-	err = snd_card_create(-1, NULL, THIS_MODULE, sizeof(*oxfw), &card);
+	err = snd_card_new(&unit->device, -1, NULL, THIS_MODULE,
+			   sizeof(*oxfw), &card);
 	if (err < 0)
 		return err;
 
@@ -147,7 +148,6 @@ static int oxfw_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto err_card;
 
-	snd_card_set_dev(card, &unit->device);
 	err = snd_card_register(card);
 	if (err < 0)
 		goto err_card;
