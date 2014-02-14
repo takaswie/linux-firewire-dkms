@@ -397,8 +397,7 @@ int snd_oxfw_create_pcm(struct snd_oxfw *oxfw)
 	unsigned int cap = 0;
 	int err;
 
-	/* 44.1kHz is the most popular */
-	if (oxfw->tx_stream_formations[1].pcm > 0)
+	if (oxfw->has_output)
 		cap = 1;
 
 	err = snd_pcm_new(oxfw->card, oxfw->card->driver, 0, 1, cap, &pcm);

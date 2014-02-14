@@ -54,6 +54,7 @@ struct snd_oxfw {
 	struct mutex mutex;
 	spinlock_t lock;
 
+	bool has_output;
 	struct snd_oxfw_stream_formation
 		tx_stream_formations[SND_OXFW_STREAM_TABLE_ENTRIES];
 	struct snd_oxfw_stream_formation

@@ -165,7 +165,7 @@ static void oxfw_bus_reset(struct fw_unit *unit)
 
 	fcp_bus_reset(oxfw->unit);
 	snd_oxfw_stream_update(oxfw, &oxfw->rx_stream);
-	if (oxfw->tx_stream_formations[1].pcm > 0)
+	if (oxfw->has_output)
 		snd_oxfw_stream_update(oxfw, &oxfw->tx_stream);
 }
 
@@ -174,7 +174,7 @@ static void oxfw_remove(struct fw_unit *unit)
 	struct snd_oxfw *oxfw = dev_get_drvdata(&unit->device);
 
 	snd_oxfw_stream_destroy(oxfw, &oxfw->rx_stream);
-	if (oxfw->tx_stream_formations[1].pcm > 0)
+	if (oxfw->has_output)
 		snd_oxfw_stream_destroy(oxfw, &oxfw->tx_stream);
 
 	snd_card_disconnect(oxfw->card);

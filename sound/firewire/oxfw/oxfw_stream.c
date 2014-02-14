@@ -49,8 +49,7 @@ int snd_oxfw_stream_get_rate(struct snd_oxfw *oxfw, unsigned int *rate)
 		goto end;
 	*rate = rx_rate;
 
-	/* 44.1 kHz is the most popular */
-	if (oxfw->tx_stream_formations[1].pcm > 0) {
+	if (oxfw->has_output) {
 		err = snd_oxfw_command_get_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT,
 						&tx_rate);
 		if ((err < 0) || (rx_rate == tx_rate))
@@ -72,8 +71,7 @@ int snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate)
 	if (err < 0)
 		goto end;
 
-	/* 44.1 kHz is the most popular */
-	if (oxfw->tx_stream_formations[1].pcm > 0)
+	if (oxfw->has_output)
 		err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT,
 						rate);
 end:
@@ -229,7 +227,7 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 		/* get opposite stream */
 		if (stream == &oxfw->tx_stream)
 			opposite = &oxfw->rx_stream;
-		else if (oxfw->tx_stream_formations[1].pcm > 0)
+		else if (oxfw->has_output)
 			opposite = &oxfw->tx_stream;
 		else
 			opposite = NULL;
@@ -498,6 +496,7 @@ int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 		err = fill_stream_formations(oxfw, AVC_GENERAL_PLUG_DIR_OUT, 0);
 		if (err < 0)
 			goto end;
+		oxfw->has_output = true;
 	}
 
 	/* use iPCR[0] if exists */
@@ -526,8 +525,7 @@ int snd_oxfw_streams_init(struct snd_oxfw *oxfw)
 	if (err < 0)
 		goto end;
 
-	/* 44.1kHz is the most popular */
-	if (oxfw->tx_stream_formations[1].pcm > 0)
+	if (oxfw->has_output)
 		err = stream_init(oxfw, &oxfw->tx_stream);
 end:
 	return err;
