@@ -147,6 +147,15 @@ snd_bebob_stream_check_internal_clock(struct snd_bebob *bebob, bool *internal)
 		goto end;
 
 	/*
+	 * If there are no input plugs, all of fields are 0xff.
+	 * Here check the first field. This field is used for direction.
+	 */
+	if (input[0] == 0xff) {
+		*internal = true;
+		goto end;
+	}
+
+	/*
 	 * If source of clock is internal CSR, Music Sub Unit Sync Input is
 	 * a destination of Music Sub Unit Sync Output.
 	 */
