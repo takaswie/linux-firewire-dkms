@@ -15,7 +15,9 @@ static inline int snd_card_new(struct device *parent, int idx, const char *xid,
 }
 
 /* commit 16735d022f72b20ddbb2274b8e109f69575e9b2b */
+#ifdef INIT_COMPLETION
 static inline void reinit_completion(struct completion *x)
 {
 	INIT_COMPLETION(*x);
 }
+#endif
