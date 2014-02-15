@@ -229,12 +229,13 @@ map_stream(struct snd_bebob *bebob, struct amdtp_stream *s)
 			switch (type) {
 			/* for MIDI conformant data channel */
 			case 0x0a:
-				location = midi + sec_loc;
-				if (location >= AMDTP_MAX_CHANNELS_FOR_MIDI) {
+				/* AMDTP_MAX_CHANNELS_FOR_MIDI is 1. */
+				if ((midi > 0) && (stm_pos != midi)) {
 					err = -ENOSYS;
 					goto end;
 				}
 				s->midi_position = stm_pos;
+				midi = stm_pos;
 				break;
 			/* for PCM data channel */
 			case 0x01:	/* Headphone */
