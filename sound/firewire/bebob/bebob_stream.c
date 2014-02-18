@@ -168,7 +168,7 @@ end:
 }
 
 static unsigned int
-map_stream(struct snd_bebob *bebob, struct amdtp_stream *s)
+map_data_channels(struct snd_bebob *bebob, struct amdtp_stream *s)
 {
 	unsigned int sec, sections, ch, channels;
 	unsigned int pcm, midi, location;
@@ -391,7 +391,7 @@ start_stream(struct snd_bebob *bebob, struct amdtp_stream *stream,
 
 	/* channel mapping */
 	if (bebob->maudio_special_quirk == NULL) {
-		err = map_stream(bebob, stream);
+		err = map_data_channels(bebob, stream);
 		if (err < 0)
 			goto end;
 	}
