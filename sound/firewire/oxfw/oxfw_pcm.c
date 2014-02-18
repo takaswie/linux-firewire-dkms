@@ -133,13 +133,12 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 			  struct snd_pcm_substream *substream)
 {
 	static const struct snd_pcm_hardware hw = {
-		.info = SNDRV_PCM_INFO_MMAP |
-			SNDRV_PCM_INFO_BATCH |
+		.info = SNDRV_PCM_INFO_BATCH |
+			SNDRV_PCM_INFO_BLOCK_TRANSFER |
 			SNDRV_PCM_INFO_INTERLEAVED |
 			SNDRV_PCM_INFO_JOINT_DUPLEX |
-			/* for Open Sound System compatibility */
-			SNDRV_PCM_INFO_MMAP_VALID |
-			SNDRV_PCM_INFO_BLOCK_TRANSFER,
+			SNDRV_PCM_INFO_MMAP |
+			SNDRV_PCM_INFO_MMAP_VALID,
 		/* set up later */
 		.rates = 0,
 		.rate_min = UINT_MAX,
@@ -147,10 +146,10 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 		/* set up later */
 		.channels_min = UINT_MAX,
 		.channels_max = 0,
-		.buffer_bytes_max = 4 * 16 * 2048,
+		.buffer_bytes_max = 4 * 16 * 2048 * 2,
 		.period_bytes_min = 1,
 		.period_bytes_max = 4 * 16 * 2048,
-		.periods_min = 1,
+		.periods_min = 2,
 		.periods_max = UINT_MAX,
 	};
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -196,6 +195,16 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 		goto end;
 	err = snd_pcm_hw_constraint_step(runtime, 0,
 					 SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 32);
+	if (err < 0)
+		goto end;
+
+	/*
+	 * Currently INTERRUPT_INTERVAL in amdtp.c is 16.
+	 * So snd_pcm_period_elapsed() can be called every 2m sec.
+	 */
+	err = snd_pcm_hw_constraint_minmax(runtime,
+					   SNDRV_PCM_HW_PARAM_PERIOD_TIME,
+					   2000, UINT_MAX);
 end:
 	return err;
 }
