@@ -41,7 +41,7 @@ struct device_info {
 	u8 volume_fb_id;
 };
 
-#define	SND_OXFW_STREAM_TABLE_ENTRIES	7
+#define	SND_OXFW_STREAM_TABLE_ENTRIES	6
 struct snd_oxfw_stream_formation {
 	unsigned int pcm;
 	unsigned int midi;

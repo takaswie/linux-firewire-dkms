@@ -20,8 +20,7 @@ const unsigned int snd_oxfw_rate_table[SND_OXFW_STREAM_TABLE_ENTRIES] = {
 	[2] = 48000,
 	[3] = 88200,
 	[4] = 96000,
-	[5] = 176400,
-	[6] = 192000,
+	[5] = 192000,
 };
 
 /*
@@ -34,8 +33,7 @@ static const unsigned int avc_stream_rate_table[] = {
 	[2] = 0x04,
 	[3] = 0x0a,
 	[4] = 0x05,
-	[5] = 0x06,
-	[6] = 0x07,
+	[5] = 0x07,
 };
 
 int snd_oxfw_stream_get_rate(struct snd_oxfw *oxfw, unsigned int *rate)
