@@ -12,15 +12,11 @@
 
 /*
  * NOTE;
- * For BeBoB streams, Both of input and output CMP connection is important.
+ * For BeBoB streams, Both of input and output CMP connection are important.
  *
- * [Communication with Windows driver] According to logs of IEEE1394 packets,
- * all models seem to make both of connections when booting.
- *
- * [Actual behavior] In some devices, each CMP connection starts to
- * transmit/receive a corresponding stream. But in the others, both of CMP
- * connection needs to start transmitting stream. An example of the latter is
- * 'M-Audio Firewire 410'.
+ * For most devices, each CMP connection starts to transmit/receive a
+ * corresponding streams. But for a few devices, both of CMP connection needs
+ * to start transmitting stream. An example is 'M-Audio Firewire 410'.
  */
 
 /* 128 is an arbitrary length but it seems to be enough */
