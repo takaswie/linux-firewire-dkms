@@ -23,15 +23,13 @@
 #define FORMAT_MAXIMUM_LENGTH 128
 
 const unsigned int snd_bebob_rate_table[SND_BEBOB_STRM_FMT_ENTRIES] = {
-	[0] = 22050,
-	[1] = 24000,
-	[2] = 32000,
-	[3] = 44100,
-	[4] = 48000,
-	[5] = 88200,
-	[6] = 96000,
-	[7] = 176400,
-	[8] = 192000,
+	[0] = 32000,
+	[1] = 44100,
+	[2] = 48000,
+	[3] = 88200,
+	[4] = 96000,
+	[5] = 176400,
+	[6] = 192000,
 };
 
 /*
@@ -39,15 +37,13 @@ const unsigned int snd_bebob_rate_table[SND_BEBOB_STRM_FMT_ENTRIES] = {
  * in Additional AVC commands (Nov 2003, BridgeCo)
  */
 static const unsigned int bridgeco_freq_table[] = {
-	[0] = 0x00,
-	[1] = 0x01,
-	[2] = 0x02,
-	[3] = 0x03,
-	[4] = 0x04,
-	[5] = 0x0a,
-	[6] = 0x05,
-	[7] = 0x06,
-	[8] = 0x07,
+	[0] = 0x02,
+	[1] = 0x03,
+	[2] = 0x04,
+	[3] = 0x0a,
+	[4] = 0x05,
+	[5] = 0x06,
+	[6] = 0x07,
 };
 
 static unsigned int

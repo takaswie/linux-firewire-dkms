@@ -43,7 +43,7 @@
 
 struct snd_bebob;
 
-#define SND_BEBOB_STRM_FMT_ENTRIES	9
+#define SND_BEBOB_STRM_FMT_ENTRIES	7
 struct snd_bebob_stream_formation {
 	unsigned int pcm;
 	unsigned int midi;
