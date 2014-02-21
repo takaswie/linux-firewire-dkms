@@ -1,7 +1,7 @@
 /*
  * oxfw_hwdep.c - a part of driver for OXFW970/971 based devices
  *
- * Copyright (c) 2013 Takashi Sakamoto
+ * Copyright (c) 2014 Takashi Sakamoto
  *
  * Licensed under the terms of the GNU General Public License, version 2.
  */
