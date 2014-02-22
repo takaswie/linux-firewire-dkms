@@ -283,7 +283,8 @@ pcm_capture_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_bebob *bebob = substream->private_data;
 
-	bebob->capture_substreams++;
+	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
+		bebob->capture_substreams++;
 	amdtp_stream_set_pcm_format(&bebob->tx_stream,
 				    params_format(hw_params));
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
@@ -295,7 +296,8 @@ pcm_playback_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_bebob *bebob = substream->private_data;
 
-	bebob->playback_substreams++;
+	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
+		bebob->playback_substreams++;
 	amdtp_stream_set_pcm_format(&bebob->rx_stream,
 				    params_format(hw_params));
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,

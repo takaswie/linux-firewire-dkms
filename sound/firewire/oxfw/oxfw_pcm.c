@@ -256,7 +256,8 @@ static int oxfw_hw_params_capture(struct snd_pcm_substream *substream,
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
-	oxfw->capture_substreams++;
+	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
+		oxfw->capture_substreams++;
 	amdtp_stream_set_pcm_format(&oxfw->tx_stream, params_format(hw_params));
 
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
@@ -267,7 +268,8 @@ static int oxfw_hw_params_playback(struct snd_pcm_substream *substream,
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
-	oxfw->playback_substreams++;
+	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
+		oxfw->playback_substreams++;
 	amdtp_stream_set_pcm_format(&oxfw->rx_stream, params_format(hw_params));
 
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
