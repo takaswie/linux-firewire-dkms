@@ -68,7 +68,7 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 {
 	struct fw_device *fw_dev = fw_parent_device(bebob->unit);
 	char vendor[24] = {0};
-	char model[24] = {0};
+	char model[32] = {0};
 	u32 id;
 	u32 data[2] = {0};
 	u32 revision;

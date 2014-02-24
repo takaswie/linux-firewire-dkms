@@ -45,7 +45,7 @@ static int name_card(struct snd_oxfw *oxfw)
 {
 	struct fw_device *fw_dev = fw_parent_device(oxfw->unit);
 	char vendor[24] = {0};
-	char model[24] = {0};
+	char model[32] = {0};
 	u32 firmware;
 	int err;
 
