@@ -137,12 +137,13 @@ proc_read_clock(struct snd_info_entry *entry,
 		struct snd_info_buffer *buffer)
 {
 	struct snd_bebob *bebob = entry->private_data;
+	struct snd_bebob_rate_spec *rate_spec = bebob->spec->rate;
 	struct snd_bebob_clock_spec *clk_spec = bebob->spec->clock;
 	unsigned int rate;
 	bool internal;
 	unsigned int id;
 
-	if (snd_bebob_stream_get_rate(bebob, &rate) < 0)
+	if (rate_spec->get(bebob, &rate) < 0)
 		return;
 	snd_iprintf(buffer, "Sampling rate: %d\n", rate);
 
