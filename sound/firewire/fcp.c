@@ -245,8 +245,9 @@ int fcp_avc_transaction(struct fw_unit *unit,
 					  : TCODE_WRITE_BLOCK_REQUEST;
 		ret = snd_fw_transaction(t.unit, tcode,
 					 CSR_REGISTER_BASE + CSR_FCP_COMMAND,
-					 (void *)command, command_size, 0);
-		if (ret < 0)
+					 (void *)command, command_size,
+					 FW_RETURN_TIMEOUT);
+		if ((ret < 0) && (ret != -ETIMEDOUT))
 			break;
 
 		wait_event_timeout(t.wait, t.state != STATE_PENDING,

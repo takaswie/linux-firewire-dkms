@@ -22,7 +22,7 @@
  * @length: length of @buffer
  * @flags: use %FW_FIXED_GENERATION and add the generation value to attempt the
  *         request only in that generation; use %FW_QUIET to suppress error
- *         messages
+ *         messages: use %FW_RETURN_TIMEOUT to avoid retry at RCODE_CANCELLED
  *
  * Submits an asynchronous request to the target device, and waits for the
  * response.  The node ID and the current generation are derived from @unit.
@@ -52,6 +52,10 @@ int snd_fw_transaction(struct fw_unit *unit, int tcode,
 
 		if (rcode == RCODE_GENERATION && (flags & FW_FIXED_GENERATION))
 			return -EAGAIN;
+
+		/* timeout */
+		if ((rcode == RCODE_CANCELLED) && (flags & FW_RETURN_TIMEOUT))
+			return -ETIMEDOUT;
 
 		if (rcode_is_permanent_error(rcode) || ++tries >= 3) {
 			if (!(flags & FW_QUIET))

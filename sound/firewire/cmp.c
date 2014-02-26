@@ -89,13 +89,32 @@ static int pcr_modify(struct cmp_connection *c,
 		err = snd_fw_transaction(
 				c->resources.unit, TCODE_LOCK_COMPARE_SWAP,
 				get_offset(c, false), buffer, 8,
-				FW_FIXED_GENERATION | c->resources.generation);
+				FW_FIXED_GENERATION | c->resources.generation |
+				FW_RETURN_TIMEOUT);
 
 		if (err < 0) {
 			if (err == -EAGAIN &&
 			    bus_reset_handling == SUCCEED_ON_BUS_RESET)
 				err = 0;
-			return err;
+
+			if (err != -ETIMEDOUT)
+				return err;
+
+			/* Check current PCR. */
+			err = snd_fw_transaction(
+				c->resources.unit, TCODE_READ_QUADLET_REQUEST,
+				get_offset(c, false), buffer, 4,
+				FW_FIXED_GENERATION | c->resources.generation);
+			if (err < 0)
+				return err;
+
+			/* The lock transaction may be failed, retry */
+			if (buffer[0] != buffer[1]) {
+				buffer[0] = c->last_pcr_value;
+				continue;
+			}
+
+			break;
 		}
 
 		if (buffer[0] == old_arg) /* success? */
