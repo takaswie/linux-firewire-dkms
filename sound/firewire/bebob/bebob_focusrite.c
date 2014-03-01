@@ -186,32 +186,6 @@ static char *saffire_le_meter_labels[] = {
 	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT,
 	STM_IN, STM_IN
 };
-static int
-saffire_le_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
-{
-	int err;
-
-	if (size < sizeof(saffire_le_meter_labels) * sizeof(u32))
-		return -EIO;
-
-	err = saffire_read_block(bebob, SAFFIRE_LE_OFFSET_METER, buf, size);
-	if (err < 0)
-		goto end;
-
-	swap(buf[1], buf[3]);
-	swap(buf[2], buf[3]);
-	swap(buf[3], buf[4]);
-
-	swap(buf[7], buf[10]);
-	swap(buf[8], buf[10]);
-	swap(buf[9], buf[11]);
-	swap(buf[11], buf[12]);
-
-	swap(buf[15], buf[16]);
-
-end:
-	return err;
-}
 static char *saffire_meter_labels[] = {
 	ANA_IN, ANA_IN,
 	STM_IN, STM_IN, STM_IN, STM_IN, STM_IN,
@@ -219,7 +193,38 @@ static char *saffire_meter_labels[] = {
 static int
 saffire_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 {
-	return saffire_read_block(bebob, SAFFIRE_OFFSET_METER, buf, size);
+	struct snd_bebob_meter_spec *spec = bebob->spec->meter;
+	unsigned int channels;
+	u64 offset;
+	int err;
+
+	if (spec->labels == saffire_le_meter_labels)
+		offset = SAFFIRE_LE_OFFSET_METER;
+	else
+		offset = SAFFIRE_OFFSET_METER;
+
+	channels = spec->num * 2;
+	if (size < channels * sizeof(u32));
+		return -EIO;
+
+	err = saffire_read_block(bebob, offset, buf, size);
+	if (err < 0)
+		goto end;
+
+	if (spec->labels == saffire_le_meter_labels) {
+		swap(buf[1], buf[3]);
+		swap(buf[2], buf[3]);
+		swap(buf[3], buf[4]);
+
+		swap(buf[7], buf[10]);
+		swap(buf[8], buf[10]);
+		swap(buf[9], buf[11]);
+		swap(buf[11], buf[12]);
+
+		swap(buf[15], buf[16]);
+	}
+end:
+	return err;
 }
 
 /* Saffire Pro 26 I/O  */
@@ -262,7 +267,7 @@ static struct snd_bebob_clock_spec saffire_both_clk_spec = {
 struct snd_bebob_meter_spec saffire_le_meter_spec = {
 	.num	= ARRAY_SIZE(saffire_le_meter_labels),
 	.labels	= saffire_le_meter_labels,
-	.get	= &saffire_le_meter_get,
+	.get	= &saffire_meter_get,
 };
 struct snd_bebob_spec saffire_le_spec = {
 	.clock	= &saffire_both_clk_spec,

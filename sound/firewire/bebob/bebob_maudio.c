@@ -676,7 +676,7 @@ special_meter_get(struct snd_bebob *bebob, u32 *target, unsigned int size)
 	if (err < 0)
 		goto end;
 
-	/* some channels are not used, and format is u16 */
+	/* Its format is u16 and some channels are unknown. */
 	i = 0;
 	for (c = 2; c < channels + 2; c++)
 		target[i++] = be16_to_cpu(buf[c]) << 16;
@@ -685,131 +685,30 @@ end:
 	return err;
 }
 
-/* Firewire 410 specific operations */
+/* last 4 bytes are omitted because it's clock info. */
 static char *fw410_meter_labels[] = {
 	ANA_IN, DIG_IN,
 	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT, DIG_OUT,
 	HP_OUT
 };
-static int
-fw410_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
-{
-
-	unsigned int c, channels;
-	int err;
-
-	/* last 4 bytes are omitted because it's clock info. */
-	channels = ARRAY_SIZE(fw410_meter_labels) * 2;
-	if (size < channels * sizeof(u32))
-		return -EINVAL;
-
-	err = get_meter(bebob, (void *)buf, size);
-	if (err < 0)
-		goto end;
-
-	for (c = 0; c < channels; c++)
-		be32_to_cpus(&buf[c]);
-end:
-	return err;
-}
-
-/* Firewire Audiophile specific operation */
 static char *audiophile_meter_labels[] = {
 	ANA_IN, DIG_IN,
 	ANA_OUT, ANA_OUT, DIG_OUT,
 	HP_OUT, AUX_OUT,
 };
-static int
-audiophile_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
-{
-	unsigned int c, channels;
-	int err;
-
-	/* last 4 bytes are omitted because it's clock info. */
-	channels = ARRAY_SIZE(audiophile_meter_labels) * 2;
-	if (size < channels * sizeof(u32))
-		return -EINVAL;
-
-	err = get_meter(bebob, (void *)buf, size);
-	if (err < 0)
-		goto end;
-
-	for (c = 0; c < channels; c++)
-		be32_to_cpus(&buf[c]);
-end:
-	return err;
-}
-
-/* Firewire Solo specific operation */
 static char *solo_meter_labels[] = {
 	ANA_IN, DIG_IN,
 	STRM_IN, STRM_IN,
 	ANA_OUT, DIG_OUT
 };
-static int
-solo_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
-{
-	unsigned int c;
-	int err;
-	u32 tmp;
 
-	/* last 4 bytes are omitted because it's clock info. */
-	if (size < ARRAY_SIZE(solo_meter_labels) * 2 * sizeof(u32))
-		return -EINVAL;
-
-	err = get_meter(bebob, (void *)buf, size);
-	if (err < 0)
-		goto end;
-
-	c = 0;
-	do
-		buf[c] = be32_to_cpu(buf[c]);
-	while (++c < 4);
-
-	/* swap stream channels because inverted */
-	tmp = be32_to_cpu(buf[c]);
-	buf[c] = be32_to_cpu(buf[c + 2]);
-	buf[c + 2] = tmp;
-	tmp = be32_to_cpu(buf[c + 1]);
-	buf[c + 1] = be32_to_cpu(buf[c + 3]);
-	buf[c + 3] = tmp;
-
-	c += 4;
-	do
-		be32_to_cpus(&buf[c]);
-	while (++c < 12);
-end:
-	return err;
-}
-
-/* Ozonic specific operation */
+/* no clock info */
 static char *ozonic_meter_labels[] = {
 	ANA_IN, ANA_IN,
 	STRM_IN, STRM_IN,
 	ANA_OUT, ANA_OUT
 };
-static int
-ozonic_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
-{
-	unsigned int c, channels;
-	int err;
-
-	channels = ARRAY_SIZE(ozonic_meter_labels) * 2;
-	if (size < channels * sizeof(u32))
-		return -EINVAL;
-
-	err = get_meter(bebob, (void *)buf, size);
-	if (err < 0)
-		goto end;
-
-	for (c = 0; c < channels; c++)
-		be32_to_cpus(&buf[c]);
-end:
-	return err;
-}
-
-/* NRV10 specific operation */
-/* TODO: need testers. these positions are based on my assumption */
+/* TODO: need testers. these positions are based on authour's assumption */
 static char *nrv10_meter_labels[] = {
 	ANA_IN, ANA_IN, ANA_IN, ANA_IN,
 	DIG_IN,
@@ -817,12 +716,13 @@ static char *nrv10_meter_labels[] = {
 	DIG_IN
 };
 static int
-nrv10_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
+normal_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 {
+	struct snd_bebob_meter_spec *spec = bebob->spec->meter;
 	unsigned int c, channels;
 	int err;
 
-	channels = ARRAY_SIZE(nrv10_meter_labels) * 2;
+	channels = spec->num * 2;
 	if (size < channels * sizeof(u32))
 		return -EINVAL;
 
@@ -832,6 +732,12 @@ nrv10_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 
 	for (c = 0; c < channels; c++)
 		be32_to_cpus(&buf[c]);
+
+	/* swap stream channels because inverted */
+	if (spec->labels == solo_meter_labels) {
+		swap(buf[4], buf[6]);
+		swap(buf[5], buf[7]);
+	}
 end:
 	return err;
 }
@@ -865,7 +771,7 @@ static struct snd_bebob_rate_spec usual_rate_spec = {
 static struct snd_bebob_meter_spec fw410_meter_spec = {
 	.num	= ARRAY_SIZE(fw410_meter_labels),
 	.labels	= fw410_meter_labels,
-	.get	= &fw410_meter_get
+	.get	= &normal_meter_get
 };
 struct snd_bebob_spec maudio_fw410_spec = {
 	.clock	= NULL,
@@ -877,7 +783,7 @@ struct snd_bebob_spec maudio_fw410_spec = {
 static struct snd_bebob_meter_spec audiophile_meter_spec = {
 	.num	= ARRAY_SIZE(audiophile_meter_labels),
 	.labels	= audiophile_meter_labels,
-	.get	= &audiophile_meter_get
+	.get	= &normal_meter_get
 };
 struct snd_bebob_spec maudio_audiophile_spec = {
 	.clock	= NULL,
@@ -889,7 +795,7 @@ struct snd_bebob_spec maudio_audiophile_spec = {
 static struct snd_bebob_meter_spec solo_meter_spec = {
 	.num	= ARRAY_SIZE(solo_meter_labels),
 	.labels	= solo_meter_labels,
-	.get	= &solo_meter_get
+	.get	= &normal_meter_get
 };
 struct snd_bebob_spec maudio_solo_spec = {
 	.clock	= NULL,
@@ -901,7 +807,7 @@ struct snd_bebob_spec maudio_solo_spec = {
 static struct snd_bebob_meter_spec ozonic_meter_spec = {
 	.num	= ARRAY_SIZE(ozonic_meter_labels),
 	.labels	= ozonic_meter_labels,
-	.get	= &ozonic_meter_get
+	.get	= &normal_meter_get
 };
 struct snd_bebob_spec maudio_ozonic_spec = {
 	.clock	= NULL,
@@ -913,7 +819,7 @@ struct snd_bebob_spec maudio_ozonic_spec = {
 static struct snd_bebob_meter_spec nrv10_meter_spec = {
 	.num	= ARRAY_SIZE(nrv10_meter_labels),
 	.labels	= nrv10_meter_labels,
-	.get	= &nrv10_meter_get
+	.get	= &normal_meter_get
 };
 struct snd_bebob_spec maudio_nrv10_spec = {
 	.clock	= NULL,
