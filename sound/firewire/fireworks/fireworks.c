@@ -34,7 +34,7 @@ MODULE_PARM_DESC(id, "ID string");
 module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "enable Fireworks sound card");
 module_param(resp_buf_size, uint, 0444);
-MODULE_PARM_DESC(resp_buf_size, "response buffer size (default 1024)");
+MODULE_PARM_DESC(resp_buf_size, "response buffer size (<= 4096, default 1024)");
 module_param(resp_buf_debug, bool, 0444);
 MODULE_PARM_DESC(resp_buf_debug, "store all responses to buffer");
 
@@ -186,6 +186,7 @@ efw_probe(struct fw_unit *unit,
 	}
 
 	/* prepare response buffer */
+	resp_buf_size = clamp(resp_buf_size, 1024U, 4096U);
 	resp_buf = kzalloc(resp_buf_size, GFP_KERNEL);
 	if (resp_buf == NULL) {
 		err = -ENOMEM;
