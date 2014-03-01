@@ -164,7 +164,7 @@ int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
 	/*
 	 * NOTE:
 	 * M-Audio Firewire 410 returns 0x09 (ACCEPTED) just after changing
-	 * signal format even if this command asks STATE. This is not in
+	 * signal format even if this command asks STATUS. This is not in
 	 * AV/C command specification.
 	 */
 	for (trial = 0; trial < BEBOB_COMMAND_MAX_TRIAL; trial++) {
