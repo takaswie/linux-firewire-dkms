@@ -186,17 +186,10 @@ static char *saffire_le_meter_labels[] = {
 	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT,
 	STM_IN, STM_IN
 };
-#define SWAP(a, b) \
-	do { \
-		tmp = a; \
-		a = b; \
-		b = tmp; \
-	} while (0)
 static int
 saffire_le_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 {
 	int err;
-	u32 tmp;
 
 	if (size < sizeof(saffire_le_meter_labels) * sizeof(u32))
 		return -EIO;
@@ -205,16 +198,16 @@ saffire_le_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 	if (err < 0)
 		goto end;
 
-	SWAP(buf[1], buf[3]);
-	SWAP(buf[2], buf[3]);
-	SWAP(buf[3], buf[4]);
+	swap(buf[1], buf[3]);
+	swap(buf[2], buf[3]);
+	swap(buf[3], buf[4]);
 
-	SWAP(buf[7], buf[10]);
-	SWAP(buf[8], buf[10]);
-	SWAP(buf[9], buf[11]);
-	SWAP(buf[11], buf[12]);
+	swap(buf[7], buf[10]);
+	swap(buf[8], buf[10]);
+	swap(buf[9], buf[11]);
+	swap(buf[11], buf[12]);
 
-	SWAP(buf[15], buf[16]);
+	swap(buf[15], buf[16]);
 
 end:
 	return err;

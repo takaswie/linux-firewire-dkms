@@ -768,18 +768,12 @@ static void handle_in_packet(struct amdtp_stream *s,
 }
 
 #define SWAP(tbl, m, n) \
-	t = tbl[n].id; \
-	tbl[n].id = tbl[m].id; \
-	tbl[m].id = t; \
-	t = tbl[n].dbc; \
-	tbl[n].dbc = tbl[m].dbc; \
-	tbl[m].dbc = t; \
-	t = tbl[n].payload_size; \
-	tbl[n].payload_size = tbl[m].payload_size; \
-	tbl[m].payload_size = t;
+	swap(tbl[m].id, tbl[n].id); \
+	swap(tbl[m].dbc, tbl[n].dbc); \
+	swap(tbl[m].payload_size, tbl[n].payload_size);
 static void packet_sort(struct sort_table *tbl, unsigned int len)
 {
-	unsigned int i, j, k, t;
+	unsigned int i, j, k;
 
 	i = 0;
 	do {
