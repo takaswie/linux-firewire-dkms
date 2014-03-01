@@ -1004,9 +1004,11 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		s->sort_table = kzalloc(sizeof(struct sort_table) *
 					QUEUE_LENGTH, GFP_KERNEL);
 		if (s->sort_table == NULL)
-			return -ENOMEM;
+			goto err_buffer;
 		s->left_packets = kzalloc(amdtp_stream_get_max_payload(s) *
 					  QUEUE_LENGTH / 4, GFP_KERNEL);
+		if (s->left_packets == NULL)
+			goto err_buffer;
 	}
 
 	s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
@@ -1051,6 +1053,12 @@ err_context:
 	fw_iso_context_destroy(s->context);
 	s->context = ERR_PTR(-1);
 err_buffer:
+	if (s->sort_table != NULL)
+		kfree(s->sort_table);
+	if (s->left_packets != NULL)
+		kfree(s->left_packets);
+	s->sort_table = NULL;
+	s->left_packets = NULL;
 	iso_packets_buffer_destroy(&s->buffer, s->unit);
 err_unlock:
 	mutex_unlock(&s->mutex);
@@ -1114,6 +1122,8 @@ void amdtp_stream_stop(struct amdtp_stream *s)
 		kfree(s->sort_table);
 	if (s->left_packets != NULL)
 		kfree(s->left_packets);
+	s->sort_table = NULL;
+	s->left_packets = NULL;
 
 	s->callbacked = false;
 
