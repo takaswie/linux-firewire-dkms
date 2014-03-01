@@ -39,7 +39,7 @@ module_param(resp_buf_debug, bool, 0444);
 MODULE_PARM_DESC(resp_buf_debug, "store all responses to buffer");
 
 static DEFINE_MUTEX(devices_mutex);
-static unsigned int devices_used;
+static DECLARE_BITMAP(devices_used, SNDRV_CARDS);
 
 #define VENDOR_LOUD			0x000ff2
 #define  MODEL_MACKIE_400F		0x00400f
@@ -158,7 +158,7 @@ efw_card_free(struct snd_card *card)
 
 	if (efw->card_index >= 0) {
 		mutex_lock(&devices_mutex);
-		devices_used &= ~BIT(efw->card_index);
+		clear_bit(efw->card_index, devices_used);
 		mutex_unlock(&devices_mutex);
 	}
 
@@ -178,7 +178,7 @@ efw_probe(struct fw_unit *unit,
 
 	/* check registered cards */
 	for (card_index = 0; card_index < SNDRV_CARDS; ++card_index)
-		if (!(devices_used & BIT(card_index)) && enable[card_index])
+		if (!test_bit(card_index, devices_used) && enable[card_index])
 			break;
 	if (card_index >= SNDRV_CARDS) {
 		err = -ENOENT;
@@ -237,7 +237,7 @@ efw_probe(struct fw_unit *unit,
 		goto error;
 
 	dev_set_drvdata(&unit->device, efw);
-	devices_used |= BIT(card_index);
+	set_bit(card_index, devices_used);
 	efw->card_index = card_index;
 end:
 	mutex_unlock(&devices_mutex);

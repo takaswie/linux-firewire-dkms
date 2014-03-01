@@ -30,7 +30,7 @@ module_param_array(enable, bool, NULL, 0444);
 MODULE_PARM_DESC(enable, "enable BeBoB sound card");
 
 static DEFINE_MUTEX(devices_mutex);
-static unsigned int devices_used;
+static DECLARE_BITMAP(devices_used, SNDRV_CARDS);
 
 /* Offsets from information register. */
 #define INFO_OFFSET_GUID		0x10
@@ -123,7 +123,7 @@ bebob_card_free(struct snd_card *card)
 
 	if (bebob->card_index >= 0) {
 		mutex_lock(&devices_mutex);
-		devices_used &= ~BIT(bebob->card_index);
+		clear_bit(bebob->card_index, devices_used);
 		mutex_unlock(&devices_mutex);
 	}
 
@@ -168,7 +168,7 @@ bebob_probe(struct fw_unit *unit,
 	mutex_lock(&devices_mutex);
 
 	for (card_index = 0; card_index < SNDRV_CARDS; card_index++) {
-		if (!(devices_used & BIT(card_index)) && enable[card_index])
+		if (!test_bit(card_index, devices_used) && enable[card_index])
 			break;
 	}
 	if (card_index >= SNDRV_CARDS) {
@@ -252,7 +252,7 @@ bebob_probe(struct fw_unit *unit,
 		goto error;
 	}
 	dev_set_drvdata(&unit->device, bebob);
-	devices_used |= BIT(card_index);
+	set_bit(card_index, devices_used);
 	bebob->card_index = card_index;
 end:
 	mutex_unlock(&devices_mutex);
