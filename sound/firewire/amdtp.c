@@ -767,10 +767,6 @@ static void handle_in_packet(struct amdtp_stream *s,
 		update_pcm_pointers(s, pcm, data_blocks);
 }
 
-#define SWAP(tbl, m, n) \
-	swap(tbl[m].id, tbl[n].id); \
-	swap(tbl[m].dbc, tbl[n].dbc); \
-	swap(tbl[m].payload_size, tbl[n].payload_size);
 static void packet_sort(struct sort_table *tbl, unsigned int len)
 {
 	unsigned int i, j, k;
@@ -780,7 +776,7 @@ static void packet_sort(struct sort_table *tbl, unsigned int len)
 		for (j = i + 1; j < len; j++) {
 			if (((tbl[i].dbc > tbl[j].dbc) &&
 			     (tbl[i].dbc - tbl[j].dbc < DBC_THRESHOLD))) {
-				SWAP(tbl, i, j);
+				swap(tbl[i], tbl[j]);
 			} else if ((tbl[j].dbc > tbl[i].dbc) &&
 				   (tbl[j].dbc - tbl[i].dbc >
 							DBC_THRESHOLD)) {
@@ -788,7 +784,7 @@ static void packet_sort(struct sort_table *tbl, unsigned int len)
 					if ((tbl[k].dbc > tbl[j].dbc) ||
 					    (tbl[j].dbc - tbl[k].dbc >
 							DBC_THRESHOLD)) {
-						SWAP(tbl, j, k);
+						swap(tbl[j], tbl[k]);
 					}
 					break;
 				}
