@@ -204,7 +204,7 @@ saffire_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 		offset = SAFFIRE_OFFSET_METER;
 
 	channels = spec->num * 2;
-	if (size < channels * sizeof(u32));
+	if (size < channels * sizeof(u32))
 		return -EIO;
 
 	err = saffire_read_block(bebob, offset, buf, size);
