@@ -213,8 +213,8 @@ void snd_efw_proc_init(struct snd_efw *efw)
 	struct snd_info_entry *root;
 
 	/*
-	 * All nodes are automatically removed following to link structure
-	 * at snd_card_disconnect().
+	 * All nodes are automatically removed at snd_card_disconnect(),
+	 * by following to link list.
 	 */
 	root = snd_info_create_card_entry(efw->card, "firewire",
 					  efw->card->proc_root);

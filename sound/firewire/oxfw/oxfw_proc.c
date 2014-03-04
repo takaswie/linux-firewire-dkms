@@ -66,8 +66,8 @@ void snd_oxfw_proc_init(struct snd_oxfw *oxfw)
 	struct snd_info_entry *root;
 
 	/*
-	 * All nodes are automatically removed following to link structure
-	 * at snd_card_disconnect().
+	 * All nodes are automatically removed at snd_card_disconnect(),
+	 * by following to link list.
 	 */
 	root = snd_info_create_card_entry(oxfw->card, "firewire",
 					  oxfw->card->proc_root);
