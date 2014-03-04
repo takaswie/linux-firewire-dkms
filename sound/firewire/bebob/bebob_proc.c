@@ -159,21 +159,43 @@ proc_read_clock(struct snd_info_entry *entry,
 	}
 }
 
-void snd_bebob_proc_init(struct snd_bebob *bebob)
+static void
+add_node(struct snd_bebob *bebob, struct snd_info_entry *root, const char *name,
+	 void (*op)(struct snd_info_entry *e, struct snd_info_buffer *b))
 {
 	struct snd_info_entry *entry;
 
-	if (!snd_card_proc_new(bebob->card, "#firmware", &entry))
-		snd_info_set_text_ops(entry, bebob, proc_read_hw_info);
+	entry = snd_info_create_card_entry(bebob->card, name, root);
+	if (entry == NULL)
+		return;
 
-	if (!snd_card_proc_new(bebob->card, "#formation", &entry))
-		snd_info_set_text_ops(entry, bebob, proc_read_formation);
+	snd_info_set_text_ops(entry, bebob, op);
+	if (snd_info_register(entry) < 0)
+		snd_info_free_entry(entry);
+}
 
-	if (!snd_card_proc_new(bebob->card, "#clock", &entry))
-		snd_info_set_text_ops(entry, bebob, proc_read_clock);
+void snd_bebob_proc_init(struct snd_bebob *bebob)
+{
+	struct snd_info_entry *root;
 
-	if (bebob->spec->meter != NULL) {
-		if (!snd_card_proc_new(bebob->card, "#meter", &entry))
-			snd_info_set_text_ops(entry, bebob, proc_read_meters);
+	/*
+	 * All nodes are automatically removed following to link structure
+	 * at snd_card_disconnect().
+	 */
+	root = snd_info_create_card_entry(bebob->card, "firewire",
+					  bebob->card->proc_root);
+	if (root == NULL)
+		return;
+	root->mode = S_IFDIR | S_IRUGO | S_IXUGO;
+	if (snd_info_register(root) < 0) {
+		snd_info_free_entry(root);
+		return;
 	}
+
+	add_node(bebob, root, "clock", proc_read_clock);
+	add_node(bebob, root, "firmware", proc_read_hw_info);
+	add_node(bebob, root, "formation", proc_read_formation);
+
+	if (bebob->spec->meter != NULL)
+		add_node(bebob, root, "meter", proc_read_meters);
 }

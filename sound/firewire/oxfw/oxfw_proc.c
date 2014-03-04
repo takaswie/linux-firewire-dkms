@@ -46,13 +46,39 @@ proc_read_clock(struct snd_info_entry *entry,
 		snd_iprintf(buffer, "Sampling rate: %d\n", rate);
 }
 
-void snd_oxfw_proc_init(struct snd_oxfw *oxfw)
+static void
+add_node(struct snd_oxfw *oxfw, struct snd_info_entry *root, const char *name,
+	 void (*op)(struct snd_info_entry *e, struct snd_info_buffer *b))
 {
 	struct snd_info_entry *entry;
 
-	if (!snd_card_proc_new(oxfw->card, "#formation", &entry))
-		snd_info_set_text_ops(entry, oxfw, proc_read_formation);
+	entry = snd_info_create_card_entry(oxfw->card, name, root);
+	if (entry == NULL)
+		return;
 
-	if (!snd_card_proc_new(oxfw->card, "#clock", &entry))
-		snd_info_set_text_ops(entry, oxfw, proc_read_clock);
+	snd_info_set_text_ops(entry, oxfw, op);
+	if (snd_info_register(entry) < 0)
+		snd_info_free_entry(entry);
+}
+
+void snd_oxfw_proc_init(struct snd_oxfw *oxfw)
+{
+	struct snd_info_entry *root;
+
+	/*
+	 * All nodes are automatically removed following to link structure
+	 * at snd_card_disconnect().
+	 */
+	root = snd_info_create_card_entry(oxfw->card, "firewire",
+					  oxfw->card->proc_root);
+	if (root == NULL)
+		return;
+	root->mode = S_IFDIR | S_IRUGO | S_IXUGO;
+	if (snd_info_register(root) < 0) {
+		snd_info_free_entry(root);
+		return;
+	}
+
+	add_node(oxfw, root, "clock", proc_read_clock);
+	add_node(oxfw, root, "formation", proc_read_formation);
 }
