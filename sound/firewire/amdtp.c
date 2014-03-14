@@ -77,7 +77,7 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	s->callbacked = false;
 	s->sync_slave = NULL;
 
-	s->blocks_for_midi = UINT_MAX;
+	s->rx_blocks_for_midi = UINT_MAX;
 
 	return 0;
 }
@@ -551,13 +551,8 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 		buffer[s->midi_position] = 0;
 		b = (u8 *)&buffer[s->midi_position];
 
-		/*
-		 * NOTE:
-		 * Fireworks ignores midi messages in more than first 8
-		 * data blocks of an packet.
-		 */
 		port = (s->data_block_counter + f) % 8;
-		if ((f >= s->blocks_for_midi) ||
+		if ((f >= s->rx_blocks_for_midi) ||
 		    (s->midi[port] == NULL) ||
 		    (snd_rawmidi_transmit(s->midi[port], b + 1, 1) <= 0))
 			b[0] = 0x80;
