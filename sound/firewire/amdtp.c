@@ -900,9 +900,9 @@ static void slave_stream_callback(struct fw_iso_context *context, u32 cycle,
 }
 
 /* this is executed one time */
-static void amdtp_stream_callback(struct fw_iso_context *context, u32 cycle,
-				  size_t header_length, void *header,
-				  void *private_data)
+static void amdtp_stream_first_callback(struct fw_iso_context *context,
+					u32 cycle, size_t header_length,
+					void *header, void *private_data)
 {
 	struct amdtp_stream *s = private_data;
 
@@ -995,7 +995,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 
 	s->context = fw_iso_context_create(fw_parent_device(s->unit)->card,
 					   type, channel, speed, header_size,
-					   amdtp_stream_callback, s);
+					   amdtp_stream_first_callback, s);
 	if (IS_ERR(s->context)) {
 		err = PTR_ERR(s->context);
 		if (err == -EBUSY)
