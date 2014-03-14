@@ -588,13 +588,9 @@ static void amdtp_pull_midi(struct amdtp_stream *s,
 		b = (u8 *)&buffer[s->midi_position];
 
 		len = b[0] - 0x80;
-		if (len < 1 || 3 < len)
-			continue;
+		if ((len > 1) &&  (3 < len) && (s->midi[port]))
+			snd_rawmidi_receive(s->midi[port], b + 1, len);
 
-		if (s->midi[port] == NULL)
-			continue;
-
-		snd_rawmidi_receive(s->midi[port], b + 1, len);
 		buffer += s->data_block_quadlets;
 	}
 }
