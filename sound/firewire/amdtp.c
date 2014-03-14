@@ -559,7 +559,7 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 	u8 *b;
 
 	for (f = 0; f < frames; f++) {
-		buffer[s->midi_position] = 0x00;
+		buffer[s->midi_position] = 0;
 		b = (u8 *)&buffer[s->midi_position];
 
 		/*
