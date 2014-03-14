@@ -633,7 +633,6 @@ static int queue_packet(struct amdtp_stream *s,
 				   s->buffer.packets[s->packet_index].offset);
 	if (err < 0) {
 		dev_err(&s->unit->device, "queueing error: %d\n", err);
-		s->packet_index = -1;
 		goto end;
 	}
 
@@ -693,6 +692,7 @@ static void handle_out_packet(struct amdtp_stream *s, unsigned int syt)
 
 	payload_length = 8 + data_blocks * 4 * s->data_block_quadlets;
 	if (queue_out_packet(s, payload_length, false) < 0) {
+		s->packet_index = -1;
 		amdtp_stream_pcm_abort(s);
 		return;
 	}
@@ -706,7 +706,7 @@ static void handle_in_packet(struct amdtp_stream *s,
 			     __be32 *buffer)
 {
 	u32 cip_header[2];
-	unsigned int data_blocks = 0;
+	unsigned int data_blocks, data_block_quadlets, data_block_counter;
 	struct snd_pcm_substream *pcm = NULL;
 
 	cip_header[0] = be32_to_cpu(buffer[0]);
@@ -725,39 +725,57 @@ static void handle_in_packet(struct amdtp_stream *s,
 		goto end;
 	}
 
-	/* ignore empty CIP packet or NO-DATA AMDTP packet */
+	/* Calculate data blocks */
 	if (payload_quadlets < 3 ||
 	    ((cip_header[1] & CIP_FDF_MASK) ==
-				(AMDTP_FDF_NO_DATA << CIP_FDF_SFC_SHIFT)))
-		goto end;
+				(AMDTP_FDF_NO_DATA << CIP_FDF_SFC_SHIFT))) {
+		data_blocks = 0;
+	} else {
+		data_block_quadlets =
+			(cip_header[0] & AMDTP_DBS_MASK) >> AMDTP_DBS_SHIFT;
+		/* avoid division by zero */
+		if (data_block_quadlets == 0) {
+			dev_info_ratelimited(&s->unit->device,
+				"Detect invalid value in dbs field: %08X\n",
+				cip_header[0]);
+			goto err;
+		}
 
-	/*
-	 * This module don't use the value of dbs and dbc beceause Echo
-	 * AudioFirePre8 reports inappropriate value.
-	 *
-	 * This model always reports a fixed value "8" as data block size at
-	 * any sampling rates but actually data block size is different.
-	 * Additionally the value of data block count always incremented by
-	 * "8" at any sampling rates but actually it's different.
-	 */
-	data_blocks = (payload_quadlets - 2) / s->data_block_quadlets;
-
-	buffer += 2;
-
-	pcm = ACCESS_ONCE(s->pcm);
-	if (pcm)
-		s->transfer_samples(s, pcm, buffer, data_blocks);
-
-	if (s->midi_ports)
-		amdtp_pull_midi(s, buffer, data_blocks);
-end:
-	if (queue_in_packet(s) < 0) {
-		s->packet_index = -1;
-		amdtp_stream_pcm_abort(s);
+		data_blocks = (payload_quadlets - 2) / data_block_quadlets;
 	}
+
+	/* Check data block counter continuity except for a first packet */
+	data_block_counter = cip_header[0] & AMDTP_DBC_MASK;
+	if (data_block_counter != s->data_block_counter) {
+		dev_info(&s->unit->device,
+			 "Detect discontinuity of CIP: %02X %02X\n",
+			 s->data_block_counter, data_block_counter);
+		goto err;
+	}
+
+	if (data_blocks > 0) {
+		buffer += 2;
+
+		pcm = ACCESS_ONCE(s->pcm);
+		if (pcm)
+			s->transfer_samples(s, pcm, buffer, data_blocks);
+
+		if (s->midi_ports)
+			amdtp_pull_midi(s, buffer, data_blocks);
+	}
+
+	s->data_block_counter = (data_block_counter + data_blocks) & 0xff;
+end:
+	if (queue_in_packet(s) < 0)
+		goto err;
 
 	if (pcm)
 		update_pcm_pointers(s, pcm, data_blocks);
+
+	return;
+err:
+	s->packet_index = -1;
+	amdtp_stream_pcm_abort(s);
 }
 
 static void out_stream_callback(struct fw_iso_context *context, u32 cycle,
@@ -890,6 +908,7 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		goto err_unlock;
 	}
 
+	s->data_block_counter = 0;
 	s->data_block_state = initial_state[s->sfc].data_block;
 	s->syt_offset_state = initial_state[s->sfc].syt_offset;
 	s->last_syt_offset = TICKS_PER_CYCLE;
@@ -936,7 +955,6 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	 * NOTE: TAG1 matches CIP. This just affects in stream.
 	 * Fireworks transmits NODATA packets with TAG0.
 	 */
-	s->data_block_counter = 0;
 	s->callbacked = false;
 	err = fw_iso_context_start(s->context, -1, 0,
 			FW_ISO_CONTEXT_MATCH_TAG0 | FW_ISO_CONTEXT_MATCH_TAG1);
