@@ -363,15 +363,16 @@ static void amdtp_write_s32(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int remaining_frames, i, c;
+	unsigned int channels, remaining_frames, i, c;
 	const u32 *src;
 
+	channels = s->pcm_channels;
 	src = (void *)runtime->dma_area +
 			frames_to_bytes(runtime, s->pcm_buffer_pointer);
 	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
 
 	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < s->pcm_channels; ++c) {
+		for (c = 0; c < channels; ++c) {
 			buffer[s->pcm_positions[c]] =
 					cpu_to_be32((*src >> 8) | 0x40000000);
 			src++;
@@ -387,15 +388,16 @@ static void amdtp_write_s16(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int remaining_frames, i, c;
+	unsigned int channels, remaining_frames, i, c;
 	const u16 *src;
 
+	channels = s->pcm_channels;
 	src = (void *)runtime->dma_area +
 			frames_to_bytes(runtime, s->pcm_buffer_pointer);
 	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
 
 	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < s->pcm_channels; ++c) {
+		for (c = 0; c < channels; ++c) {
 			buffer[s->pcm_positions[c]] =
 					cpu_to_be32((*src << 8) | 0x40000000);
 			src++;
@@ -473,15 +475,16 @@ static void amdtp_read_s32(struct amdtp_stream *s,
 			   __be32 *buffer, unsigned int frames)
 {
 	struct snd_pcm_runtime *runtime = pcm->runtime;
-	unsigned int remaining_frames, i, c;
+	unsigned int channels, remaining_frames, i, c;
 	u32 *dst;
 
+	channels = s->pcm_channels;
 	dst  = (void *)runtime->dma_area +
 			frames_to_bytes(runtime, s->pcm_buffer_pointer);
 	remaining_frames = runtime->buffer_size - s->pcm_buffer_pointer;
 
 	for (i = 0; i < frames; ++i) {
-		for (c = 0; c < s->pcm_channels; ++c) {
+		for (c = 0; c < channels; ++c) {
 			*dst = be32_to_cpu(buffer[s->pcm_positions[c]]) << 8;
 			dst++;
 		}
