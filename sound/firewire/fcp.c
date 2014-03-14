@@ -63,18 +63,16 @@ int avc_general_set_sig_fmt(struct fw_unit *unit, unsigned int rate,
 	/* do transaction and check buf[1-5] are the same against command */
 	err = fcp_avc_transaction(unit, buf, 8, buf, 8,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5));
+	if (err > 0 && err < 8)
+		err = -EIO;
+	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a) /* REJECTED */
+		err = -EINVAL;
 	if (err < 0)
 		goto end;
 
-	/* check length */
-	if (err != 8) {
-		dev_err(&unit->device, "failed to set sample rate\n");
-		err = -EIO;
-		goto end;
-	}
-
-	/* return response code */
-	err = buf[0];
+	err = 0;
 end:
 	kfree(buf);
 	return err;
@@ -108,26 +106,26 @@ int avc_general_get_sig_fmt(struct fw_unit *unit, unsigned int *rate,
 	/* do transaction and check buf[1-4] are the same against command */
 	err = fcp_avc_transaction(unit, buf, 8, buf, 8,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4));
+	if (err > 0 && err < 8)
+		err = -EIO;
+	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a) /* REJECTED */
+		err = -EINVAL;
+	else if (buf[0] == 0x0b) /* IN TRANSITION */
+		err = -EAGAIN;
 	if (err < 0)
 		goto end;
-
-	/* check length */
-	if (err != 8) {
-		dev_err(&unit->device, "failed to get sample rate\n");
-		err = -EIO;
-		goto end;
-	}
 
 	/* check sfc field and pick up rate */
 	sfc = 0x07 & buf[5];
 	if (sfc >= CIP_SFC_COUNT) {
-		err = -EINVAL;
+		err = -EAGAIN;	/* also in transition */
 		goto end;
 	}
-	*rate = amdtp_rate_table[sfc];
 
-	/* return response code */
-	err = buf[0];
+	*rate = amdtp_rate_table[sfc];
+	err = 0;
 end:
 	kfree(buf);
 	return err;
@@ -159,19 +157,23 @@ int avc_general_get_plug_info(struct fw_unit *unit, unsigned int subunit_type,
 	if (err < 0)
 		goto end;
 
-	/* check length */
-	if (err != 8) {
+	if (err != 8)
 		err = -EIO;
+	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a) /* REJECTED */
+		err = -EINVAL;
+	else if (buf[0] == 0x0b) /* IN TRANSITION */
+		err = -EAGAIN;
+	if (err < 0)
 		goto end;
-	}
 
 	info[0] = buf[4];
 	info[1] = buf[5];
 	info[2] = buf[6];
 	info[3] = buf[7];
 
-	/* return response code */
-	err = buf[0];
+	err = 0;
 end:
 	kfree(buf);
 	return err;
