@@ -225,16 +225,15 @@ static inline void amdtp_stream_set_sync(enum cip_flags sync_mode,
 					 struct amdtp_stream *master,
 					 struct amdtp_stream *slave)
 {
-	/* clear sync flag */
-	master->flags &= ~CIP_SYNC_TO_DEVICE;
-	slave->flags &= ~CIP_SYNC_TO_DEVICE;
-
 	if (sync_mode == CIP_SYNC_TO_DEVICE) {
 		master->flags |= CIP_SYNC_TO_DEVICE;
 		slave->flags |= CIP_SYNC_TO_DEVICE;
 		master->sync_slave = slave;
-	} else
+	} else {
+		master->flags &= ~CIP_SYNC_TO_DEVICE;
+		slave->flags &= ~CIP_SYNC_TO_DEVICE;
 		master->sync_slave = NULL;
+	}
 
 	slave->sync_slave = NULL;
 }
