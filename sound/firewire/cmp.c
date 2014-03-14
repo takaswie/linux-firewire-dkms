@@ -54,23 +54,20 @@ void cmp_error(struct cmp_connection *c, const char *fmt, ...)
 	va_end(va);
 }
 
-static unsigned long long get_offset(struct cmp_connection *c, bool master)
+static u64 mpr_address(struct cmp_connection *c)
 {
-	unsigned long long offset = CSR_REGISTER_BASE;
+	if (c->direction == CMP_INPUT)
+		return CSR_REGISTER_BASE + CSR_IMPR;
+	else
+		return CSR_REGISTER_BASE + CSR_OMPR;
+}
 
-	if (!master) {
-		if (c->direction == CMP_INPUT)
-			offset += CSR_IPCR(c->pcr_index);
-		else
-			offset += CSR_OPCR(c->pcr_index);
-	} else {
-		if (c->direction == CMP_INPUT)
-			offset += CSR_IMPR;
-		else
-			offset += CSR_OMPR;
-	}
-
-	return offset;
+static u64 pcr_address(struct cmp_connection *c)
+{
+	if (c->direction == CMP_INPUT)
+		return CSR_REGISTER_BASE + CSR_IPCR(c->pcr_index);
+	else
+		return CSR_REGISTER_BASE + CSR_OPCR(c->pcr_index);
 }
 
 static int pcr_modify(struct cmp_connection *c,
@@ -88,7 +85,7 @@ static int pcr_modify(struct cmp_connection *c,
 
 		err = snd_fw_transaction(
 				c->resources.unit, TCODE_LOCK_COMPARE_SWAP,
-				get_offset(c, false), buffer, 8,
+				pcr_address(c), buffer, 8,
 				FW_FIXED_GENERATION | c->resources.generation |
 				FW_RETURN_TIMEOUT);
 
@@ -103,7 +100,7 @@ static int pcr_modify(struct cmp_connection *c,
 			/* Check current PCR. */
 			err = snd_fw_transaction(
 				c->resources.unit, TCODE_READ_QUADLET_REQUEST,
-				get_offset(c, false), buffer, 4,
+				pcr_address(c), buffer, 4,
 				FW_FIXED_GENERATION | c->resources.generation);
 			if (err < 0)
 				return err;
@@ -147,8 +144,9 @@ int cmp_connection_init(struct cmp_connection *c,
 	u32 mpr;
 	int err;
 
+	c->direction = direction;
 	err = snd_fw_transaction(unit, TCODE_READ_QUADLET_REQUEST,
-				 get_offset(c, true), &mpr_be, 4, 0);
+				 mpr_address(c), &mpr_be, 4, 0);
 	if (err < 0)
 		return err;
 	mpr = be32_to_cpu(mpr_be);
@@ -167,7 +165,6 @@ int cmp_connection_init(struct cmp_connection *c,
 	c->max_speed = (mpr & MPR_SPEED_MASK) >> MPR_SPEED_SHIFT;
 	if (c->max_speed == SCODE_BETA)
 		c->max_speed += (mpr & MPR_XSPEED_MASK) >> MPR_XSPEED_SHIFT;
-	c->direction = direction;
 
 	return 0;
 }
@@ -184,7 +181,7 @@ int cmp_connection_check_used(struct cmp_connection *c, bool *used)
 
 	err = snd_fw_transaction(
 			c->resources.unit, TCODE_READ_QUADLET_REQUEST,
-			get_offset(c, false), &pcr, 4, 0);
+			pcr_address(c), &pcr, 4, 0);
 	if (err >= 0)
 		*used = (pcr & cpu_to_be32(PCR_BCAST_CONN | PCR_P2P_CONN_MASK));
 	return err;
