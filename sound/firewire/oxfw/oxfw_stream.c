@@ -42,21 +42,21 @@ int snd_oxfw_stream_get_rate(struct snd_oxfw *oxfw, unsigned int *rate)
 	unsigned int tx_rate, rx_rate;
 	int err;
 
-	err = snd_oxfw_command_get_rate(oxfw, AVC_GENERAL_PLUG_DIR_IN,
-					&rx_rate);
+	err = avc_general_get_sig_fmt(oxfw->unit, &rx_rate,
+				      AVC_GENERAL_PLUG_DIR_IN, 0);
 	if (err < 0)
 		goto end;
 	*rate = rx_rate;
 
 	if (oxfw->has_output) {
-		err = snd_oxfw_command_get_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT,
-						&tx_rate);
+		err = avc_general_get_sig_fmt(oxfw->unit, &tx_rate,
+						AVC_GENERAL_PLUG_DIR_OUT, 0);
 		if ((err < 0) || (rx_rate == tx_rate))
 			goto end;
 
 		/* synchronize transmit stream rate to receive stream rate */
-		err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT,
-						rx_rate);
+		err = avc_general_set_sig_fmt(oxfw->unit, rx_rate,
+					AVC_GENERAL_PLUG_DIR_OUT, 0);
 	}
 end:
 	return err;
@@ -66,13 +66,14 @@ int snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate)
 {
 	int err;
 
-	err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_IN, rate);
+	err = avc_general_set_sig_fmt(oxfw->unit, rate,
+				      AVC_GENERAL_PLUG_DIR_IN, 0);
 	if (err < 0)
 		goto end;
 
 	if (oxfw->has_output)
-		err = snd_oxfw_command_set_rate(oxfw, AVC_GENERAL_PLUG_DIR_OUT,
-						rate);
+		err = avc_general_set_sig_fmt(oxfw->unit, rate,
+					      AVC_GENERAL_PLUG_DIR_OUT, 0);
 end:
 	return err;
 }
