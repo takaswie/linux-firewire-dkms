@@ -254,10 +254,11 @@ void amdtp_stream_set_pcm_format(struct amdtp_stream *s,
 				s->transfer_samples = amdtp_write_s32_dualwire;
 			else
 				s->transfer_samples = amdtp_write_s32;
-		} else if (s->dual_wire) {
-			s->transfer_samples = amdtp_read_s32_dualwire;
 		} else {
-			s->transfer_samples = amdtp_read_s32;
+			if (s->dual_wire)
+				s->transfer_samples = amdtp_read_s32_dualwire;
+			else
+				s->transfer_samples = amdtp_read_s32;
 		}
 		break;
 	}
