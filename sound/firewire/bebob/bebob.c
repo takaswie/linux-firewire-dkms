@@ -283,8 +283,7 @@ static void bebob_remove(struct fw_unit *unit)
 	if (bebob == NULL)
 		return;
 
-	if (bebob->maudio_special_quirk != NULL)
-		kfree(bebob->maudio_special_quirk);
+	kfree(bebob->maudio_special_quirk);
 
 	snd_bebob_stream_destroy_duplex(bebob);
 	snd_card_disconnect(bebob->card);

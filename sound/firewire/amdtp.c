@@ -1045,10 +1045,8 @@ err_context:
 	fw_iso_context_destroy(s->context);
 	s->context = ERR_PTR(-1);
 err_buffer:
-	if (s->sort_table != NULL)
-		kfree(s->sort_table);
-	if (s->left_packets != NULL)
-		kfree(s->left_packets);
+	kfree(s->sort_table);
+	kfree(s->left_packets);
 	s->sort_table = NULL;
 	s->left_packets = NULL;
 	iso_packets_buffer_destroy(&s->buffer, s->unit);
@@ -1110,10 +1108,8 @@ void amdtp_stream_stop(struct amdtp_stream *s)
 	s->context = ERR_PTR(-1);
 	iso_packets_buffer_destroy(&s->buffer, s->unit);
 
-	if (s->sort_table != NULL)
-		kfree(s->sort_table);
-	if (s->left_packets != NULL)
-		kfree(s->left_packets);
+	kfree(s->sort_table);
+	kfree(s->left_packets);
 	s->sort_table = NULL;
 	s->left_packets = NULL;
 
