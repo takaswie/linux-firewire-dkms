@@ -570,12 +570,11 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 		port = (s->data_block_counter + f) % 8;
 		if ((f >= s->blocks_for_midi) ||
 		    (s->midi[port] == NULL) ||
-		    (snd_rawmidi_transmit(s->midi[port], b + 1, 1) <= 0)) {
+		    (snd_rawmidi_transmit(s->midi[port], b + 1, 1) <= 0))
 			b[0] = 0x80;
-			b[1] = 0x00;	/* confirm to be zero */
-		} else {
+		else
 			b[0] = 0x81;
-		}
+
 		buffer += s->data_block_quadlets;
 	}
 }
