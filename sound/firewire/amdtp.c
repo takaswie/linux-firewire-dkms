@@ -735,9 +735,9 @@ static void handle_in_packet(struct amdtp_stream *s,
 	}
 
 	/* ignore empty CIP packet or NO-DATA AMDTP packet */
-	if ((payload_quadlets < 3) ||
-	    (((cip_header[1] & CIP_FDF_MASK) >> CIP_FDF_SFC_SHIFT) ==
-							AMDTP_FDF_NO_DATA))
+	if (payload_quadlets < 3 ||
+	    ((cip_header[1] & CIP_FDF_MASK) ==
+				(AMDTP_FDF_NO_DATA << CIP_FDF_SFC_SHIFT)))
 		return;
 
 	/*
