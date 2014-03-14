@@ -668,7 +668,7 @@ static void handle_out_packet(struct amdtp_stream *s, unsigned int syt)
 {
 	__be32 *buffer;
 	unsigned int data_blocks, payload_length;
-	struct snd_pcm_substream *pcm = NULL;
+	struct snd_pcm_substream *pcm;
 
 	if (s->packet_index < 0)
 		return;
