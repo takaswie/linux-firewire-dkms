@@ -83,7 +83,7 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 
 	init_waitqueue_head(&s->callback_wait);
 	s->callbacked = false;
-	s->sync_slave = ERR_PTR(-1);
+	s->sync_slave = NULL;
 
 	s->sort_table = NULL;
 	s->left_packets = NULL;
@@ -860,9 +860,7 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 
 		if (i < remain_packets + packets - s->remain_packets) {
 			/* Process sync slave stream */
-			if ((s->flags & CIP_BLOCKING) &&
-			    (s->flags & CIP_SYNC_TO_DEVICE) &&
-			    s->sync_slave->callbacked) {
+			if (s->sync_slave && s->sync_slave->callbacked) {
 				syt = be32_to_cpu(buffer[1]) & CIP_SYT_MASK;
 				handle_out_packet(s->sync_slave, syt);
 			}
@@ -885,8 +883,7 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 	}
 
 	/* when sync to device, flush the packets for slave stream */
-	if ((s->flags & CIP_BLOCKING) &&
-	    (s->flags & CIP_SYNC_TO_DEVICE) && s->sync_slave->callbacked)
+	if (s->sync_slave && s->sync_slave->callbacked)
 		fw_iso_context_queue_flush(s->sync_slave->context);
 
 	fw_iso_context_queue_flush(s->context);

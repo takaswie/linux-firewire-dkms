@@ -234,9 +234,9 @@ static inline void amdtp_stream_set_sync(enum cip_flags sync_mode,
 		slave->flags |= CIP_SYNC_TO_DEVICE;
 		master->sync_slave = slave;
 	} else
-		master->sync_slave = ERR_PTR(-1);
+		master->sync_slave = NULL;
 
-	slave->sync_slave = ERR_PTR(-1);
+	slave->sync_slave = NULL;
 }
 
 /**
