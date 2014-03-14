@@ -921,8 +921,6 @@ static void amdtp_stream_first_callback(struct fw_iso_context *context,
 		context->callback.sc = out_stream_callback;
 
 	context->callback.sc(context, cycle, header_length, header, s);
-
-	return;
 }
 
 /**
