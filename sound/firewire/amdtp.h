@@ -119,10 +119,6 @@ struct amdtp_stream {
 	bool callbacked;
 	wait_queue_head_t callback_wait;
 	struct amdtp_stream *sync_slave;
-
-	void *sort_table;
-	void *left_packets;
-	unsigned int remain_packets;
 };
 
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
