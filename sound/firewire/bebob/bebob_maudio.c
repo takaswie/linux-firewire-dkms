@@ -40,8 +40,6 @@
  * functionality is between 0xffc700700000 to 0xffc70070009c.
  */
 
-#define MAX_TRIALS	3
-
 /* Offset from information register */
 #define INFO_OFFSET_SW_DATE	0x20
 
@@ -86,7 +84,6 @@
 struct special_params {
 	bool is1814;
 	unsigned int clk_src;
-	unsigned int dig_in_iface;
 	unsigned int dig_in_fmt;
 	unsigned int dig_out_fmt;
 	unsigned int clk_lock;
@@ -173,9 +170,9 @@ end:
  * clk_lock: 0x00:unlock, 0x01:lock
  */
 static int
-special_clk_set_params(struct snd_bebob *bebob, unsigned int clk_src,
-		       unsigned int dig_in_fmt, unsigned int dig_out_fmt,
-		       unsigned int clk_lock)
+avc_maudio_set_special_clk(struct snd_bebob *bebob, unsigned int clk_src,
+			   unsigned int dig_in_fmt, unsigned int dig_out_fmt,
+			   unsigned int clk_lock)
 {
 	struct special_params *params = bebob->maudio_special_quirk;
 	int err;
@@ -207,14 +204,14 @@ special_clk_set_params(struct snd_bebob *bebob, unsigned int clk_src,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
 				  BIT(5) | BIT(6) | BIT(7) | BIT(8) |
 				  BIT(9));
+	if ((err > 0) && (err < 10))
+		err = -EIO;
+	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a) /* REJECTED */
+		err = -EINVAL;
 	if (err < 0)
 		goto end;
-	if ((err < 6) || (buf[0] != 0x09)) {
-		dev_err(&bebob->unit->device,
-			"failed to set clock params\n");
-		err = -EIO;
-		goto end;
-	}
 
 	params->clk_src		= buf[6];
 	params->dig_in_fmt	= buf[7];
@@ -224,6 +221,8 @@ special_clk_set_params(struct snd_bebob *bebob, unsigned int clk_src,
 	if (params->ctl_id_sync)
 		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       params->ctl_id_sync);
+
+	err = 0;
 end:
 	kfree(buf);
 	return err;
@@ -285,11 +284,10 @@ special_stream_formation_set(struct snd_bebob *bebob)
 	}
 }
 
-static int snd_bebob_maudio_special_add_controls(struct snd_bebob *bebob);
+static int add_special_controls(struct snd_bebob *bebob);
 int
 snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 {
-	unsigned int trials;
 	struct special_params *params;
 	int err;
 
@@ -305,32 +303,14 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 	/* initialize these parameters because driver is not allowed to ask */
 	bebob->rx_stream.context = ERR_PTR(-1);
 	bebob->tx_stream.context = ERR_PTR(-1);
-	trials = 0;
-	do {
-		err = special_clk_set_params(bebob, 0x03, 0x00, 0x00, 0x00);
-		if (err >= 0)
-			break;
-	} while (++trials < MAX_TRIALS);
+	err = avc_maudio_set_special_clk(bebob, 0x03, 0x00, 0x00, 0x00);
 	if (err < 0) {
 		dev_err(&bebob->unit->device,
-			"failed to initialize clock params\n");
+			"failed to initialize clock params: %d\n", err);
 		goto end;
 	}
 
-	trials = 0;
-	do {
-		err = avc_audio_get_selector(bebob->unit, 0x00, 0x04,
-					     &params->dig_in_iface, true);
-		if (err >= 0)
-			break;
-	} while (++trials < MAX_TRIALS);
-	if (err < 0) {
-		dev_err(&bebob->unit->device,
-			"failed to get current dig iface.");
-		goto end;
-	}
-
-	err = snd_bebob_maudio_special_add_controls(bebob);
+	err = add_special_controls(bebob);
 	if (err < 0)
 		goto end;
 
@@ -355,19 +335,16 @@ end:
 /* Input plug shows actual rate. Output plug is needless for this purpose. */
 static int special_get_rate(struct snd_bebob *bebob, unsigned int *rate)
 {
-	unsigned int trials;
-	int err;
+	int err, trials;
 
 	trials = 0;
 	do {
-		err = snd_bebob_get_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN,
-					 true);
-		if (err >= 0)
-			break;
-	} while (++trials < MAX_TRIALS);
+		err = avc_general_get_sig_fmt(bebob->unit, rate,
+					      AVC_GENERAL_PLUG_DIR_IN, 0);
+	} while (err == -EAGAIN && ++trials < 3);
 	if (err < 0)
 		dev_err(&bebob->unit->device,
-			"failed to get sampling rate\n");
+			"failed to get sampling rate: %d\n", err);
 
 	return err;
 }
@@ -376,11 +353,13 @@ static int special_set_rate(struct snd_bebob *bebob, unsigned int rate)
 	struct special_params *params = bebob->maudio_special_quirk;
 	int err;
 
-	err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_OUT);
+	err = avc_general_set_sig_fmt(bebob->unit, rate,
+				      AVC_GENERAL_PLUG_DIR_OUT, 0);
 	if (err < 0)
 		goto end;
 
-	err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN);
+	err = avc_general_set_sig_fmt(bebob->unit, rate,
+				      AVC_GENERAL_PLUG_DIR_IN, 0);
 	if (err < 0)
 		goto end;
 
@@ -388,6 +367,9 @@ static int special_set_rate(struct snd_bebob *bebob, unsigned int rate)
 		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       params->ctl_id_sync);
 end:
+	if (err < 0)
+		dev_err(&bebob->unit->device,
+			"failed to set sampling rate: %d\n", err);
 	return err;
 }
 
@@ -437,10 +419,10 @@ static int special_clk_ctl_put(struct snd_kcontrol *kctl,
 	if (id >= ARRAY_SIZE(special_clk_labels))
 		return 0;
 
-	err = special_clk_set_params(bebob, id,
-				     params->dig_in_fmt,
-				     params->dig_out_fmt,
-				     params->clk_lock);
+	err = avc_maudio_set_special_clk(bebob, id,
+					 params->dig_in_fmt,
+					 params->dig_out_fmt,
+					 params->clk_lock);
 	mutex_unlock(&bebob->mutex);
 
 	return err >= 0;
@@ -510,18 +492,30 @@ static int special_dig_in_iface_ctl_get(struct snd_kcontrol *kctl,
 {
 	struct snd_bebob *bebob = snd_kcontrol_chip(kctl);
 	struct special_params *params = bebob->maudio_special_quirk;
-	int val;
+	unsigned int dig_in_iface;
+	int err, val;
+
+	mutex_lock(&bebob->mutex);
+
+	err = avc_audio_get_selector(bebob->unit, 0x00, 0x04,
+				     &dig_in_iface);
+	if (err < 0) {
+		dev_err(&bebob->unit->device,
+			"failed to get digital input interface: %d\n", err);
+		goto end;
+	}
 
 	/* encoded id for user value */
-	val = (params->dig_in_fmt << 1) | (params->dig_in_iface & 0x01);
+	val = (params->dig_in_fmt << 1) | (dig_in_iface & 0x01);
 
 	/* for ADAT Optical */
 	if (val > 2)
 		val = 2;
 
 	uval->value.enumerated.item[0] = val;
-
-	return 0;
+end:
+	mutex_unlock(&bebob->mutex);
+	return err;
 }
 static int special_dig_in_iface_ctl_set(struct snd_kcontrol *kctl,
 					struct snd_ctl_elem_value *uval)
@@ -539,16 +533,18 @@ static int special_dig_in_iface_ctl_set(struct snd_kcontrol *kctl,
 	dig_in_fmt = (id >> 1) & 0x01;
 	dig_in_iface = id & 0x01;
 
-	err = special_clk_set_params(bebob, params->clk_src, dig_in_fmt,
-				     params->dig_out_fmt, params->clk_lock);
+	err = avc_maudio_set_special_clk(bebob,
+					 params->clk_src,
+					 dig_in_fmt,
+					 params->dig_out_fmt,
+					 params->clk_lock);
 	if ((err < 0) || (params->dig_in_fmt > 0)) /* ADAT */
 		goto end;
 
 	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, dig_in_iface);
 	if (err < 0)
-		goto end;
-
-	params->dig_in_iface = dig_in_iface;
+		dev_err(&bebob->unit->device,
+			"failed to set digital input interface: %d\n", err);
 end:
 	special_stream_formation_set(bebob);
 	mutex_unlock(&bebob->mutex);
@@ -600,8 +596,10 @@ static int special_dig_out_iface_ctl_set(struct snd_kcontrol *kctl,
 
 	id = uval->value.enumerated.item[0];
 
-	err = special_clk_set_params(bebob, params->clk_src, params->dig_in_fmt,
-				     id, params->clk_lock);
+	err = avc_maudio_set_special_clk(bebob,
+					 params->clk_src,
+					 params->dig_in_fmt,
+					 id, params->clk_lock);
 	if (err >= 0)
 		special_stream_formation_set(bebob);
 
@@ -617,7 +615,7 @@ static struct snd_kcontrol_new special_dig_out_iface_ctl = {
 	.put	= special_dig_out_iface_ctl_set
 };
 
-static int snd_bebob_maudio_special_add_controls(struct snd_bebob *bebob)
+static int add_special_controls(struct snd_bebob *bebob)
 {
 	struct snd_kcontrol *kctl;
 	struct special_params *params = bebob->maudio_special_quirk;

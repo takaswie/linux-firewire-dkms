@@ -32,7 +32,11 @@ static char *clk_src_labels[] = {SND_BEBOB_CLOCK_INTERNAL, "SPDIF"};
 static int
 clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
-	return avc_audio_get_selector(bebob->unit, 0, 4, id, false);
+	int err = avc_audio_get_selector(bebob->unit, 0, 4, id);
+	if (err < 0)
+		dev_err(&bebob->unit->device,
+			"failed to get clock source: %d\n", err);
+	return err;
 }
 static struct snd_bebob_clock_spec clock_spec = {
 	.num	= ARRAY_SIZE(clk_src_labels),

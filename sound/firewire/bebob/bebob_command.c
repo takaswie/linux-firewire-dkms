@@ -8,9 +8,6 @@
 
 #include "./bebob.h"
 
-#define BEBOB_COMMAND_MAX_TRIAL	3
-#define BEBOB_COMMAND_WAIT_MSEC	100
-
 int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
 			   unsigned int fb_id, unsigned int num)
 {
@@ -35,22 +32,21 @@ int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(8));
-	if (err < 0)
-		goto end;
-	if ((err < 6) || (buf[0] != 0x09)) {
-		dev_err(&unit->device,
-			"failed to set selector %d: 0x%02X\n",
-			fb_id, buf[0]);
+	if (err > 0 && err < 9)
 		err = -EIO;
-		goto end;
-	}
-end:
+	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a) /* REJECTED */
+		err = -EINVAL;
+	else if (err > 0)
+		err = 0;
+
 	kfree(buf);
 	return err;
 }
 
 int avc_audio_get_selector(struct fw_unit *unit, unsigned int subunit_id,
-			   unsigned int fb_id, unsigned int *num, bool quiet)
+			   unsigned int fb_id, unsigned int *num)
 {
 	u8 *buf;
 	int err;
@@ -73,16 +69,16 @@ int avc_audio_get_selector(struct fw_unit *unit, unsigned int subunit_id,
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(8));
+	if (err > 0 && err < 9)
+		err = -EIO;
+	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a) /* REJECTED */
+		err = -EINVAL;
+	else if (buf[0] == 0x0b) /* IN TRANSITION */
+		err = -EAGAIN;
 	if (err < 0)
 		goto end;
-	if ((err < 6) || (buf[0] != 0x0c)) {
-		if (!quiet)
-			dev_err(&unit->device,
-				"failed to get selector %d: 0x%02X\n",
-				fb_id, buf[0]);
-		err = -EIO;
-		goto end;
-	}
 
 	*num = buf[7];
 	err = 0;
@@ -127,13 +123,16 @@ int avc_bridgeco_get_plug_type(struct fw_unit *unit,
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(9));
+	if (err > 0 && err < 8)
+		err = -EIO;
+	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a) /* REJECTED */
+		err = -EINVAL;
+	else if (buf[0] == 0x0b) /* IN TRANSITION */
+		err = -EAGAIN;
 	if (err < 0)
 		goto end;
-	/* IMPLEMENTED/STABLE is OK */
-	else if ((err < 6) || (buf[0] != 0x0c)) {
-		err = -EIO;
-		goto end;
-	}
 
 	*type = buf[10];
 	err = 0;
@@ -146,7 +145,6 @@ int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
 				 u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				 u8 *buf, unsigned int len)
 {
-	unsigned int trial;
 	int err;
 
 	/* check given buffer */
@@ -161,31 +159,20 @@ int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
 	/* info type is 'channel position' */
 	buf[9] = 0x03;
 
-	/*
-	 * NOTE:
-	 * M-Audio Firewire 410 returns 0x09 (ACCEPTED) just after changing
-	 * signal format even if this command asks STATUS. This is not in
-	 * AV/C command specification.
-	 */
-	for (trial = 0; trial < BEBOB_COMMAND_MAX_TRIAL; trial++) {
-		/* do transaction and check buf[1-7,9] are the same */
-		err = fcp_avc_transaction(unit, buf, 12, buf, 256,
-					  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
-					  BIT(5) | BIT(6) | BIT(7) | BIT(9));
-		if (err < 0)
-			goto end;
-		else if (err < 6) {
-			err = -EIO;
-			goto end;
-		} else if (buf[0] == 0x0c)
-			break;
-		else if (trial < BEBOB_COMMAND_MAX_TRIAL)
-			msleep(BEBOB_COMMAND_WAIT_MSEC);
-		else {
-			err = -EIO;
-			goto end;
-		}
-	}
+	/* do transaction and check buf[1-7,9] are the same */
+	err = fcp_avc_transaction(unit, buf, 12, buf, 256,
+				  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
+				  BIT(5) | BIT(6) | BIT(7) | BIT(9));
+	if (err > 0 && err < 8)
+		err = -EIO;
+	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a) /* REJECTED */
+		err = -EINVAL;
+	else if (buf[0] == 0x0b) /* IN TRANSITION */
+		err = -EAGAIN;
+	if (err < 0)
+		goto end;
 
 	/* strip command header */
 	memmove(buf, buf + 10, err - 10);
@@ -217,12 +204,16 @@ int avc_bridgeco_get_plug_section_type(struct fw_unit *unit,
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(9) | BIT(10));
+	if (err > 0 && err < 8)
+		err = -EIO;
+	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a) /* REJECTED */
+		err = -EINVAL;
+	else if (buf[0] == 0x0b) /* IN TRANSITION */
+		err = -EAGAIN;
 	if (err < 0)
 		goto end;
-	else if ((err < 12) && (buf[0] != 0x0c)) {
-		err = -EIO;
-		goto end;
-	}
 
 	*type = buf[11];
 	err = 0;
@@ -251,12 +242,16 @@ int avc_bridgeco_get_plug_input(struct fw_unit *unit,
 	err = fcp_avc_transaction(unit, buf, 16, buf, 16,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7));
+	if (err > 0 && err < 8)
+		err = -EIO;
+	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a) /* REJECTED */
+		err = -EINVAL;
+	else if (buf[0] == 0x0b) /* IN TRANSITION */
+		err = -EAGAIN;
 	if (err < 0)
 		goto end;
-	else if ((err < 18) && (buf[0] != 0x0c)) {
-		err = -EIO;
-		goto end;
-	}
 
 	memcpy(input, buf + 10, 5);
 end:
@@ -289,66 +284,28 @@ int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 				  BIT(6) | BIT(7) | BIT(10));
 	if (err < 0)
 		goto end;
+
 	/* reach the end of entries */
-	else if (buf[0] == 0x0a) {
+	if (buf[0] == 0x0a) {
 		err = 0;
 		*len = 0;
 		goto end;
 	} else if (buf[0] != 0x0c) {
 		err = -EINVAL;
-		goto end;
 	/* the header of this command is 11 bytes */
 	} else if (err < 12) {
 		err = -EIO;
-		goto end;
 	} else if (buf[10] != entryid) {
 		err = -EIO;
-		goto end;
 	}
+
+	if (err < 0)
+		goto end;
 
 	/* strip command header */
 	memmove(buf, buf + 11, err - 11);
 	*len = err - 11;
 	err = 0;
-end:
-	return err;
-}
-
-int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
-		       enum avc_general_plug_dir dir, bool quiet)
-{
-	int err;
-
-	err = avc_general_get_sig_fmt(bebob->unit, rate, dir, 0);
-	if (err < 0)
-		goto end;
-
-	/* IMPLEMENTED/STABLE is OK */
-	if (err != 0x0c) {
-		if (!quiet)
-			dev_err(&bebob->unit->device,
-				"failed to get sampling rate\n");
-		err = -EIO;
-	}
-end:
-	return err;
-}
-
-int snd_bebob_set_rate(struct snd_bebob *bebob, unsigned int rate,
-		       enum avc_general_plug_dir dir)
-{
-	int err;
-
-	err = avc_general_set_sig_fmt(bebob->unit, rate, dir, 0);
-	if (err < 0)
-		goto end;
-
-	/* ACCEPTED or INTERIM is OK */
-	if ((err != 0x0f) && (err != 0x09)) {
-		dev_err(&bebob->unit->device,
-			"failed to set sampling rate\n");
-		err = -EIO;
-	}
 end:
 	return err;
 }

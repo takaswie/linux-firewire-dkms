@@ -129,7 +129,7 @@ snd_bebob_read_quad(struct fw_unit *unit, u64 addr, u32 *buf)
 int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
 			   unsigned int fb_id, unsigned int num);
 int avc_audio_get_selector(struct fw_unit *unit, unsigned  int subunit_id,
-			   unsigned int fb_id, unsigned int *num, bool quiet);
+			   unsigned int fb_id, unsigned int *num);
 
 /*
  * AVC command extensions, AV/C Unit and Subunit, Revision 17
@@ -200,11 +200,6 @@ int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 				   u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				   unsigned int entryid, u8 *buf,
 				   unsigned int *len);
-
-int snd_bebob_get_rate(struct snd_bebob *bebob, unsigned int *rate,
-		       enum avc_general_plug_dir dir, bool quiet);
-int snd_bebob_set_rate(struct snd_bebob *bebob, unsigned int rate,
-		       enum avc_general_plug_dir dir);
 
 /* for AMDTP streaming */
 int snd_bebob_stream_get_rate(struct snd_bebob *bebob, unsigned int *rate);

@@ -61,16 +61,22 @@ get_formation_index(unsigned int rate)
 int
 snd_bebob_stream_get_rate(struct snd_bebob *bebob, unsigned int *curr_rate)
 {
-	unsigned int tx_rate, rx_rate;
+	unsigned int tx_rate, rx_rate, trials;
 	int err;
 
-	err = snd_bebob_get_rate(bebob, &tx_rate, AVC_GENERAL_PLUG_DIR_OUT,
-				 false);
+	trials = 0;
+	do {
+		err = avc_general_get_sig_fmt(bebob->unit, &tx_rate,
+					      AVC_GENERAL_PLUG_DIR_OUT, 0);
+	} while (err == -EAGAIN && ++trials < 3);
 	if (err < 0)
 		goto end;
 
-	err = snd_bebob_get_rate(bebob, &rx_rate, AVC_GENERAL_PLUG_DIR_IN,
-				 false);
+	trials = 0;
+	do {
+		err = avc_general_get_sig_fmt(bebob->unit, &rx_rate,
+					      AVC_GENERAL_PLUG_DIR_IN, 0);
+	} while (err == -EAGAIN && ++trials < 3);
 	if (err < 0)
 		goto end;
 
@@ -79,8 +85,12 @@ snd_bebob_stream_get_rate(struct snd_bebob *bebob, unsigned int *curr_rate)
 		goto end;
 
 	/* synchronize receive stream rate to transmit stream rate */
-	err = snd_bebob_set_rate(bebob, rx_rate, AVC_GENERAL_PLUG_DIR_IN);
+	err = avc_general_set_sig_fmt(bebob->unit, rx_rate,
+				      AVC_GENERAL_PLUG_DIR_IN, 0);
 end:
+	if (err < 0)
+		dev_err(&bebob->unit->device,
+			"failed to get sampling rate: %d\n", err);
 	return err;
 }
 
@@ -89,12 +99,17 @@ snd_bebob_stream_set_rate(struct snd_bebob *bebob, unsigned int rate)
 {
 	int err;
 
-	err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_OUT);
+	err = avc_general_set_sig_fmt(bebob->unit, rate,
+				      AVC_GENERAL_PLUG_DIR_OUT, 0);
 	if (err < 0)
 		goto end;
 
-	err = snd_bebob_set_rate(bebob, rate, AVC_GENERAL_PLUG_DIR_IN);
+	err = avc_general_set_sig_fmt(bebob->unit, rate,
+				      AVC_GENERAL_PLUG_DIR_IN, 0);
 end:
+	if (err < 0)
+		dev_err(&bebob->unit->device,
+			"failed to set sampling rate: %d\n", err);
 	return err;
 }
 
