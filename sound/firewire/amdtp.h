@@ -180,7 +180,7 @@ static inline bool amdtp_streaming_error(struct amdtp_stream *s)
  */
 static inline bool amdtp_stream_pcm_running(struct amdtp_stream *s)
 {
-	return !IS_ERR_OR_NULL(s->pcm);
+	return !!s->pcm;
 }
 
 /**
