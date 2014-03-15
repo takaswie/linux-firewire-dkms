@@ -86,9 +86,11 @@ get_hardware_info(struct snd_efw *efw)
 		goto end;
 
 	/* firmware version for communication chipset */
-	err = sprintf(version, "%u.%u",
+	err = snprintf(version, sizeof(version), "%u.%u",
 		      (hwinfo->arm_version >> 24) & 0xff,
 		      (hwinfo->arm_version >> 16) & 0xff);
+	if (err < 0)
+		goto end;
 
 	strcpy(efw->card->driver, "Fireworks");
 	strcpy(efw->card->shortname, hwinfo->model_name);
