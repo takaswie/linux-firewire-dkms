@@ -358,6 +358,12 @@ static int special_set_rate(struct snd_bebob *bebob, unsigned int rate)
 	if (err < 0)
 		goto end;
 
+	/*
+	 * Just after changing sampling rate for output, a followed command
+	 * for input is easy to fail. This is a workaround fot this issue.
+	 */
+	msleep(100);
+
 	err = avc_general_set_sig_fmt(bebob->unit, rate,
 				      AVC_GENERAL_PLUG_DIR_IN, 0);
 	if (err < 0)
