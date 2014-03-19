@@ -3,6 +3,8 @@
 
 #include <sound/core.h>
 
+void fw_schedule_bus_reset(struct fw_card *card, bool delay, bool short_reset);
+
 /* commit 393aa9c1cc514774332d7bc861307a76206e358d */
 static inline int snd_card_new(struct device *parent, int idx, const char *xid,
 			       struct module *module, int extra_size,
