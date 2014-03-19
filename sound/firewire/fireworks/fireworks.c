@@ -201,9 +201,11 @@ efw_probe(struct fw_unit *unit,
 			   THIS_MODULE, sizeof(struct snd_efw), &card);
 	if (err < 0)
 		goto end;
+	efw = card->private_data;
+	efw->card_index = card_index;
+	set_bit(card_index, devices_used);
 	card->private_free = efw_card_free;
 
-	efw = card->private_data;
 	efw->card = card;
 	efw->unit = unit;
 	efw->card_index = -1;
@@ -244,8 +246,6 @@ efw_probe(struct fw_unit *unit,
 		goto error;
 
 	dev_set_drvdata(&unit->device, efw);
-	set_bit(card_index, devices_used);
-	efw->card_index = card_index;
 end:
 	mutex_unlock(&devices_mutex);
 	return err;

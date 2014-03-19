@@ -199,9 +199,11 @@ bebob_probe(struct fw_unit *unit,
 			   THIS_MODULE, sizeof(struct snd_bebob), &card);
 	if (err < 0)
 		goto end;
+	bebob = card->private_data;
+	bebob->card_index = card_index;
+	set_bit(card_index, devices_used);
 	card->private_free = bebob_card_free;
 
-	bebob = card->private_data;
 	bebob->card = card;
 	bebob->unit = unit;
 	bebob->card_index = -1;
@@ -267,8 +269,6 @@ bebob_probe(struct fw_unit *unit,
 	}
 
 	dev_set_drvdata(&unit->device, bebob);
-	set_bit(card_index, devices_used);
-	bebob->card_index = card_index;
 end:
 	mutex_unlock(&devices_mutex);
 	return err;
