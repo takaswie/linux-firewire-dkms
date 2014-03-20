@@ -29,6 +29,9 @@
  *	The value of data_block_quadlets is used instead of reported value.
  * @CIP_SKIP_INIT_DBC_CHECK: Only for in-stream. The value of dbc in first
  *	packet is not continue from an initial value.
+ * @CIP_EMPTY_HAS_WRONG_DBC: Only for in-stream. The value of dbc in empty
+ *	packet is wrong but the others are correct. This is not effective with
+ *	CIP_DBC_IS_END_EVENT.
  */
 enum cip_flags {
 	CIP_NONBLOCKING		= 0x00,
@@ -39,6 +42,7 @@ enum cip_flags {
 	CIP_DBC_IS_END_EVENT	= 0x10,
 	CIP_WRONG_DBS		= 0x20,
 	CIP_SKIP_INIT_DBC_CHECK	= 0x40,
+	CIP_EMPTY_HAS_WRONG_DBC	= 0x80,
 };
 
 /**
