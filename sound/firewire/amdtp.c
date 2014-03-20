@@ -756,7 +756,7 @@ static void handle_in_packet(struct amdtp_stream *s,
 		lost = data_block_counter !=
 		       ((s->data_block_counter + dbc_interval) & 0xff);
 	}
-	if (lost) {
+	if (lost && s->data_block_counter != UINT_MAX) {
 		dev_info(&s->unit->device,
 			 "Detect discontinuity of CIP: %02X %02X\n",
 			 s->data_block_counter, data_block_counter);
@@ -922,7 +922,11 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 		goto err_unlock;
 	}
 
-	s->data_block_counter = 0;
+	if (s->direction == AMDTP_IN_STREAM &&
+	    s->flags & CIP_SKIP_INIT_DBC_CHECK)
+		s->data_block_counter = UINT_MAX;
+	else
+		s->data_block_counter = 0;
 	s->data_block_state = initial_state[s->sfc].data_block;
 	s->syt_offset_state = initial_state[s->sfc].syt_offset;
 	s->last_syt_offset = TICKS_PER_CYCLE;

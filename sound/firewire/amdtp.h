@@ -27,6 +27,8 @@
  *	corresponds to the end of event in the packet. Out of IEC 61883.
  * @CIP_WRONG_DBS: Only for in-stream. The value of dbs is wrong in in-packets.
  *	The value of data_block_quadlets is used instead of reported value.
+ * @CIP_SKIP_INIT_DBC_CHECK: Only for in-stream. The value of dbc in first
+ *	packet is not continue from an initial value.
  */
 enum cip_flags {
 	CIP_NONBLOCKING		= 0x00,
@@ -36,6 +38,7 @@ enum cip_flags {
 	CIP_EMPTY_WITH_TAG0	= 0x08,
 	CIP_DBC_IS_END_EVENT	= 0x10,
 	CIP_WRONG_DBS		= 0x20,
+	CIP_SKIP_INIT_DBC_CHECK	= 0x40,
 };
 
 /**

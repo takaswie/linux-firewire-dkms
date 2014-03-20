@@ -425,6 +425,8 @@ int snd_bebob_stream_init_duplex(struct snd_bebob *bebob)
 		destroy_both_connections(bebob);
 		goto end;
 	}
+	/* See comments in next function */
+	bebob->tx_stream.flags |= CIP_SKIP_INIT_DBC_CHECK;
 
 	err = amdtp_stream_init(&bebob->rx_stream, bebob->unit,
 				AMDTP_OUT_STREAM, CIP_BLOCKING);
@@ -464,7 +466,27 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	/* need to touch slave stream */
 	slave_flag = (request == slave) || amdtp_stream_running(slave);
 
-	/* packet queueing error */
+	/*
+	 * packet queueing error or detecting discontinuity
+	 *
+	 * Normal BeBoB firmware has a quirk at bus reset to transfers packets
+	 * with discontinuous value in dbc field.
+	 *
+	 * When this driver works with XRUN-recoverable applications, this
+	 * situation looks like .update() call following to start_duplex() call
+	 * (because applications will call snd_pcm_prepare() immediately).
+	 *
+	 * If breaking/re-establishing connections here, new streams are also
+	 * involved in bus reset and transfers packets with discontinuity.
+	 * Streams should be handled as a way defined in IEC 61883-1.
+	 *
+	 * But if breaking no connections here, AMDTP packets also has
+	 * discontinuity because isochronous context starts during
+	 * transmitting packets. This is a reason to use SKIP_INIT_DBC_CHECK
+	 * flag.
+	 *
+	 * As a result, when encounter bus reset, some packets are lost.
+	 */
 	if (amdtp_streaming_error(master)) {
 		amdtp_stream_stop(master);
 		amdtp_stream_stop(slave);
@@ -481,10 +503,8 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	if (rate != curr_rate) {
 		amdtp_stream_stop(master);
 		amdtp_stream_stop(slave);
-	}
-
-	if (!amdtp_stream_running(master) && !amdtp_stream_running(slave))
 		break_both_connections(bebob);
+	}
 
 	/* master should be always running */
 	if (!amdtp_stream_running(master)) {
@@ -597,19 +617,22 @@ end:
 
 void snd_bebob_stream_update_duplex(struct snd_bebob *bebob)
 {
+	/* vs. XRUN recovery due to discontinuity at bus reset */
+	mutex_lock(&bebob->mutex);
+
 	if ((cmp_connection_update(&bebob->in_conn) < 0) ||
 	    (cmp_connection_update(&bebob->out_conn) < 0)) {
 		amdtp_stream_pcm_abort(&bebob->rx_stream);
 		amdtp_stream_pcm_abort(&bebob->tx_stream);
-		mutex_lock(&bebob->mutex);
 		amdtp_stream_stop(&bebob->rx_stream);
 		amdtp_stream_stop(&bebob->tx_stream);
-		break_both_connections(bebob);
-		mutex_unlock(&bebob->mutex);
+		/* disconnections should be done by PCM/MIDI functionalities */
 	} else {
 		amdtp_stream_update(&bebob->rx_stream);
 		amdtp_stream_update(&bebob->tx_stream);
 	}
+
+	mutex_unlock(&bebob->mutex);
 }
 
 void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
