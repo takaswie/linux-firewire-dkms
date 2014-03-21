@@ -271,8 +271,8 @@ int cmp_connection_establish(struct cmp_connection *c,
 {
 	int err;
 
-	if (c->connected)
-		return 0;
+	if (WARN_ON(c->connected))
+		return -EISCONN;
 
 	c->speed = min(c->max_speed,
 		       fw_parent_device(c->resources.unit)->max_speed);

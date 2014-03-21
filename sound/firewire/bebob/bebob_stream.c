@@ -330,7 +330,10 @@ check_connection_used_by_others(struct snd_bebob *bebob, struct amdtp_stream *s)
 static int
 make_both_connections(struct snd_bebob *bebob, unsigned int rate)
 {
-	int index, pcm_channels, midi_channels, err;
+	int index, pcm_channels, midi_channels, err = 0;
+
+	if (bebob->connected)
+		goto end;
 
 	/* confirm params for both streams */
 	index = get_formation_index(rate);
@@ -350,8 +353,12 @@ make_both_connections(struct snd_bebob *bebob, unsigned int rate)
 		goto end;
 	err = cmp_connection_establish(&bebob->in_conn,
 			amdtp_stream_get_max_payload(&bebob->rx_stream));
-	if (err < 0)
+	if (err < 0) {
 		cmp_connection_break(&bebob->out_conn);
+		goto end;
+	}
+
+	bebob->connected = true;
 end:
 	return err;
 }
@@ -361,6 +368,8 @@ break_both_connections(struct snd_bebob *bebob)
 {
 	cmp_connection_break(&bebob->in_conn);
 	cmp_connection_break(&bebob->out_conn);
+
+	bebob->connected = false;
 }
 
 static void
