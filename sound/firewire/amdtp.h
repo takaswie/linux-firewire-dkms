@@ -30,8 +30,7 @@
  * @CIP_SKIP_INIT_DBC_CHECK: Only for in-stream. The value of dbc in first
  *	packet is not continue from an initial value.
  * @CIP_EMPTY_HAS_WRONG_DBC: Only for in-stream. The value of dbc in empty
- *	packet is wrong but the others are correct. This is not effective with
- *	CIP_DBC_IS_END_EVENT.
+ *	packet is wrong but the others are correct.
  */
 enum cip_flags {
 	CIP_NONBLOCKING		= 0x00,

@@ -745,9 +745,10 @@ static void handle_in_packet(struct amdtp_stream *s,
 
 	/* Check data block counter continuity except for a first packet */
 	data_block_counter = cip_header[0] & AMDTP_DBC_MASK;
+	if (data_blocks == 0 && (s->flags & CIP_EMPTY_HAS_WRONG_DBC))
+		data_block_counter = s->data_block_counter;
 	if (!(s->flags & CIP_DBC_IS_END_EVENT)) {
-		if (data_blocks > 0 || !(s->flags & CIP_EMPTY_HAS_WRONG_DBC))
-			lost = data_block_counter != s->data_block_counter;
+		lost = data_block_counter != s->data_block_counter;
 	} else {
 		if ((data_blocks > 0) && (s->tx_dbc_interval > 0))
 			dbc_interval = s->tx_dbc_interval;
@@ -777,7 +778,7 @@ static void handle_in_packet(struct amdtp_stream *s,
 
 	if (s->flags & CIP_DBC_IS_END_EVENT)
 		s->data_block_counter = data_block_counter;
-	else if (data_blocks > 0)
+	else
 		s->data_block_counter =
 				(data_block_counter + data_blocks) & 0xff;
 end:
