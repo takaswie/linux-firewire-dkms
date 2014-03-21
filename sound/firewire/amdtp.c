@@ -743,7 +743,7 @@ static void handle_in_packet(struct amdtp_stream *s,
 		data_blocks = (payload_quadlets - 2) / data_block_quadlets;
 	}
 
-	/* Check data block counter continuity except for a first packet */
+	/* Check data block counter continuity */
 	data_block_counter = cip_header[0] & AMDTP_DBC_MASK;
 	if (data_blocks == 0 && (s->flags & CIP_EMPTY_HAS_WRONG_DBC))
 		data_block_counter = s->data_block_counter;
