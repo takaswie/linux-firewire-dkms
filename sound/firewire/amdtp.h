@@ -28,7 +28,7 @@
  * @CIP_WRONG_DBS: Only for in-stream. The value of dbs is wrong in in-packets.
  *	The value of data_block_quadlets is used instead of reported value.
  * @CIP_SKIP_INIT_DBC_CHECK: Only for in-stream. The value of dbc in first
- *	packet is not continue from an initial value.
+ *	packet is not continuous from an initial value.
  * @CIP_EMPTY_HAS_WRONG_DBC: Only for in-stream. The value of dbc in empty
  *	packet is wrong but the others are correct.
  */

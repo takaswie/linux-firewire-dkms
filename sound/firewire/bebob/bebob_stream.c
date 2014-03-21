@@ -489,19 +489,21 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	 * with discontinuous value in dbc field.
 	 *
 	 * When this driver works with XRUN-recoverable applications, this
-	 * situation looks like .update() call following to start_duplex() call
-	 * (because applications will call snd_pcm_prepare() immediately).
+	 * situation looks like stream_update_duplex() call following to
+	 * stream_start_duplex() call (because applications will call
+	 * snd_pcm_prepare() immediately).
 	 *
 	 * If breaking/re-establishing connections here, new streams are also
 	 * involved in bus reset and transfers packets with discontinuity.
-	 * Streams should be handled as a way defined in IEC 61883-1.
+	 * Connections should be handled by a way defined in IEC 61883-1.
 	 *
 	 * But if breaking no connections here, AMDTP packets also has
 	 * discontinuity because isochronous context starts during
 	 * transmitting packets. This is a reason to use SKIP_INIT_DBC_CHECK
 	 * flag.
 	 *
-	 * As a result, when encounter bus reset, some packets are lost.
+	 * As a result, when encounter bus reset, some received packets are
+	 * lost and some data already in buffer for out-packet is also lost.
 	 */
 	if (amdtp_streaming_error(master)) {
 		amdtp_stream_stop(master);
