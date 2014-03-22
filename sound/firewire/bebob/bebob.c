@@ -256,12 +256,12 @@ bebob_probe(struct fw_unit *unit,
 		/*
 		 * This is a workaround. This bus reset seems to have an effect
 		 * to make devices correctly handling transactions. Without
-		 * this, the devices often send no response against driver's
-		 * request.
+		 * this, the devices have gap_count mismatch. This causes much
+		 * failure of transaction.
 		 *
 		 * Just after registration, user-land application receive
 		 * signals from dbus and starts I/Os. To avoid I/Os till the
-		 * bus reset, registration is done in next update().
+		 * future bus reset, registration is done in next update().
 		 */
 		bebob->deferred_registration = true;
 		fw_schedule_bus_reset(fw_parent_device(bebob->unit)->card,
