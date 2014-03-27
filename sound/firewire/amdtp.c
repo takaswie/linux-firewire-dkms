@@ -689,14 +689,9 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 	packets = header_length / IN_PACKET_HEADER_SIZE;
 
 	for (p = 0; p < packets; p++) {
-		if (s->packet_index < 0) {
-			/* abort sync slave */
-			if (s->sync_slave) {
-				s->sync_slave->packet_index = -1;
-				amdtp_stream_pcm_abort(s->sync_slave);
-			}
-			return;
-		}
+		if (s->packet_index < 0)
+			break;
+
 		buffer = s->buffer.packets[s->packet_index].buffer;
 
 		/* Process sync slave stream */
@@ -709,6 +704,16 @@ static void in_stream_callback(struct fw_iso_context *context, u32 cycle,
 		payload_quadlets =
 			(be32_to_cpu(headers[p]) >> ISO_DATA_LENGTH_SHIFT) / 4;
 		handle_in_packet(s, payload_quadlets, buffer);
+	}
+
+	/* Queueing error or detecting discontinuity */
+	if (s->packet_index < 0) {
+		/* Abort sync slave. */
+		if (s->sync_slave) {
+			s->sync_slave->packet_index = -1;
+			amdtp_stream_pcm_abort(s->sync_slave);
+		}
+		return;
 	}
 
 	/* when sync to device, flush the packets for slave stream */
