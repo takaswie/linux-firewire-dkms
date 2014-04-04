@@ -95,11 +95,13 @@ get_hardware_info(struct snd_efw *efw)
 
 	strcpy(efw->card->driver, "Fireworks");
 	strcpy(efw->card->shortname, hwinfo->model_name);
-	snprintf(efw->card->longname, sizeof(efw->card->longname),
-		 "%s %s v%s, GUID %08x%08x at %s, S%d",
-		 hwinfo->vendor_name, hwinfo->model_name, version,
-		 hwinfo->guid_hi, hwinfo->guid_lo,
-		 dev_name(&efw->unit->device), 100 << fw_dev->max_speed);
+	err = snprintf(efw->card->longname, sizeof(efw->card->longname),
+		       "%s %s v%s, GUID %08x%08x at %s, S%d",
+		       hwinfo->vendor_name, hwinfo->model_name, version,
+		       hwinfo->guid_hi, hwinfo->guid_lo,
+		       dev_name(&efw->unit->device), 100 << fw_dev->max_speed);
+	if (err < 0)
+		goto end;
 	strcpy(efw->card->mixername, hwinfo->model_name);
 
 	if (hwinfo->flags & BIT(FLAG_RESP_ADDR_CHANGABLE))
@@ -131,9 +133,25 @@ get_hardware_info(struct snd_efw *efw)
 	 && (192000 <= hwinfo->max_sample_rate))
 		efw->supported_sampling_rate |= SNDRV_PCM_RATE_192000;
 
+	/* MIDI ports, not MIDI conformant data channels */
+	if (hwinfo->midi_out_ports > SND_EFW_MAX_MIDI_OUT_PORTS ||
+	    hwinfo->midi_in_ports > SND_EFW_MAX_MIDI_IN_PORTS) {
+		err = -EIO;
+		goto end;
+	}
 	efw->midi_out_ports = hwinfo->midi_out_ports;
 	efw->midi_in_ports = hwinfo->midi_in_ports;
 
+	/* PCM data channels. Onyx 1200F seems to have the maximum number. */
+	if (hwinfo->amdtp_tx_pcm_channels    > 30 ||
+	    hwinfo->amdtp_tx_pcm_channels_2x > 30 ||
+	    hwinfo->amdtp_tx_pcm_channels_4x > 30 ||
+	    hwinfo->amdtp_rx_pcm_channels    > 34 ||
+	    hwinfo->amdtp_rx_pcm_channels_2x > 34 ||
+	    hwinfo->amdtp_rx_pcm_channels_4x > 34) {
+		err = -EIO;
+		goto end;
+	}
 	efw->pcm_capture_channels[0] = hwinfo->amdtp_tx_pcm_channels;
 	efw->pcm_capture_channels[1] = hwinfo->amdtp_tx_pcm_channels_2x;
 	efw->pcm_capture_channels[2] = hwinfo->amdtp_tx_pcm_channels_4x;
@@ -141,15 +159,21 @@ get_hardware_info(struct snd_efw *efw)
 	efw->pcm_playback_channels[1] = hwinfo->amdtp_rx_pcm_channels_2x;
 	efw->pcm_playback_channels[2] = hwinfo->amdtp_rx_pcm_channels_4x;
 
-	/* hardware metering */
-	efw->phys_out = hwinfo->phys_out;
+	/* Hardware metering. Onyx 1200F seems to have the maximum number. */
+	if (hwinfo->phys_in > 30 || hwinfo->phys_out  > 36 ||
+	    hwinfo->phys_in_grp_count  > HWINFO_MAX_CAPS_GROUPS ||
+	    hwinfo->phys_out_grp_count > HWINFO_MAX_CAPS_GROUPS) {
+		return -EIO;
+		goto end;
+	}
 	efw->phys_in = hwinfo->phys_in;
-	efw->phys_out_grp_count = hwinfo->phys_out_grp_count;
+	efw->phys_out = hwinfo->phys_out;
 	efw->phys_in_grp_count = hwinfo->phys_in_grp_count;
-	memcpy(&efw->phys_out_grps, hwinfo->phys_out_grps,
-	       sizeof(struct snd_efw_phys_grp) * HWINFO_MAX_CAPS_GROUPS);
+	efw->phys_out_grp_count = hwinfo->phys_out_grp_count;
 	memcpy(&efw->phys_in_grps, hwinfo->phys_in_grps,
-	       sizeof(struct snd_efw_phys_grp) * HWINFO_MAX_CAPS_GROUPS);
+	       sizeof(struct snd_efw_phys_grp) * hwinfo->phys_in_grp_count);
+	memcpy(&efw->phys_out_grps, hwinfo->phys_out_grps,
+	       sizeof(struct snd_efw_phys_grp) * hwinfo->phys_out_grp_count);
 end:
 	kfree(hwinfo);
 	return err;
