@@ -33,8 +33,6 @@
 
 #define MEMORY_SPACE_EFW_COMMAND	0xecc000000000
 #define MEMORY_SPACE_EFW_RESPONSE	0xecc080000000
-/* this is for juju convinience? */
-#define MEMORY_SPACE_EFW_END		0xecc080000200
 
 #define ERROR_RETRIES 3
 #define ERROR_DELAY_MS 5
@@ -306,7 +304,7 @@ void snd_efw_transaction_bus_reset(struct fw_unit *unit)
 }
 
 static struct fw_address_handler resp_register_handler = {
-	.length = MEMORY_SPACE_EFW_END - MEMORY_SPACE_EFW_RESPONSE,
+	.length = SND_EFW_RESPONSE_MAXIMUM_BYTES,
 	.address_callback = efw_response
 };
 
@@ -314,7 +312,8 @@ int snd_efw_transaction_register(void)
 {
 	static const struct fw_address_region resp_register_region = {
 		.start	= MEMORY_SPACE_EFW_RESPONSE,
-		.end	= MEMORY_SPACE_EFW_END
+		.end	= MEMORY_SPACE_EFW_RESPONSE +
+			  SND_EFW_RESPONSE_MAXIMUM_BYTES
 	};
 	return fw_core_add_address_handler(&resp_register_handler,
 					   &resp_register_region);

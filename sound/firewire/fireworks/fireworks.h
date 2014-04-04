@@ -43,6 +43,15 @@
 #define HWINFO_NAME_SIZE_BYTES		32
 #define HWINFO_MAX_CAPS_GROUPS		8
 
+/*
+ * This should be greater than maximum bytes for EFW response content.
+ * Currently response against command for isochronous channel mapping is
+ * confirmed to be the maximum one. But for flexibility, use maximum data
+ * payload for asynchronous primary packets at S100 (Cable base rate) in
+ * IEEE Std 1394-1995.
+ */
+#define SND_EFW_RESPONSE_MAXIMUM_BYTES	0x200U
+
 extern unsigned int resp_buf_size;
 extern bool resp_buf_debug;
 

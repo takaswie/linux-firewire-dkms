@@ -128,7 +128,8 @@ hwdep_write(struct snd_hwdep *hwdep, const char __user *data, long count,
 	u32 seqnum;
 	u8 *buf;
 
-	if (count < sizeof(struct snd_efw_transaction))
+	if (count < sizeof(struct snd_efw_transaction) ||
+	    SND_EFW_RESPONSE_MAXIMUM_BYTES < count)
 		return -EINVAL;
 
 	buf = memdup_user(data, count);
