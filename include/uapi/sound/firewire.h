@@ -2,6 +2,7 @@
 #define _UAPI_SOUND_FIREWIRE_H_INCLUDED
 
 #include <linux/ioctl.h>
+#include <linux/types.h>
 
 /* events can be read() from the hwdep device */
 
@@ -23,20 +24,20 @@ struct snd_firewire_event_dice_notification {
 	unsigned int notification; /* DICE-specific bits */
 };
 
-#define SND_EFW_TRANSACTION_SEQNUM_MAX	((uint32_t)(BIT(28) - 1))
+#define SND_EFW_TRANSACTION_SEQNUM_MAX	((__u32)(BIT(28) - 1))
 /* each field should be in big endian */
 struct snd_efw_transaction {
-	uint32_t length;
-	uint32_t version;
-	uint32_t seqnum;
-	uint32_t category;
-	uint32_t command;
-	uint32_t status;
-	uint32_t params[0];
+	__u32 length;
+	__u32 version;
+	__u32 seqnum;
+	__u32 category;
+	__u32 command;
+	__u32 status;
+	__u32 params[0];
 };
 struct snd_firewire_event_efw_response {
 	unsigned int type;
-	uint32_t response[0];	/* some responses */
+	__u32 response[0];	/* some responses */
 };
 
 union snd_firewire_event {

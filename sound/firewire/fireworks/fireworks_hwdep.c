@@ -137,7 +137,7 @@ hwdep_write(struct snd_hwdep *hwdep, const char __user *data, long count,
 		return PTR_ERR(data);
 
 	/* check seqnum is not for kernel-land */
-	seqnum = ((struct snd_efw_transaction *)buf)->seqnum;
+	seqnum = be32_to_cpu(((struct snd_efw_transaction *)buf)->seqnum);
 	if (seqnum + 2 > SND_EFW_TRANSACTION_SEQNUM_MAX) {
 		count = -EINVAL;
 		goto end;
