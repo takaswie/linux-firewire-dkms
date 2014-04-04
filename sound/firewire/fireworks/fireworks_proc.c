@@ -184,13 +184,13 @@ proc_read_queues_state(struct snd_info_entry *entry,
 	unsigned int consumed;
 
 	if (efw->pull_ptr > efw->push_ptr)
-		consumed = resp_buf_size -
+		consumed = snd_efw_resp_buf_size -
 			   (unsigned int)(efw->pull_ptr - efw->push_ptr);
 	else
 		consumed = (unsigned int)(efw->push_ptr - efw->pull_ptr);
 
 	snd_iprintf(buffer, "%d %d/%d\n",
-		    efw->resp_queues, consumed, resp_buf_size);
+		    efw->resp_queues, consumed, snd_efw_resp_buf_size);
 }
 
 static void

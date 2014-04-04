@@ -129,7 +129,7 @@ copy_resp_to_buf(struct snd_efw *efw, void *data, size_t length, int *rcode)
 	if (efw->push_ptr < efw->pull_ptr)
 		capacity = (unsigned int)(efw->pull_ptr - efw->push_ptr);
 	else
-		capacity = resp_buf_size -
+		capacity = snd_efw_resp_buf_size -
 			   (unsigned int)(efw->push_ptr - efw->pull_ptr);
 
 	/* confirm enough space for this response */
@@ -140,14 +140,14 @@ copy_resp_to_buf(struct snd_efw *efw, void *data, size_t length, int *rcode)
 
 	/* copy to ring buffer */
 	while (length > 0) {
-		till_end = resp_buf_size -
+		till_end = snd_efw_resp_buf_size -
 			   (unsigned int)(efw->push_ptr - efw->resp_buf);
 		till_end = min_t(unsigned int, length, till_end);
 
 		memcpy(efw->push_ptr, data, till_end);
 
 		efw->push_ptr += till_end;
-		if (efw->push_ptr >= efw->resp_buf + resp_buf_size)
+		if (efw->push_ptr >= efw->resp_buf + snd_efw_resp_buf_size)
 			efw->push_ptr = efw->resp_buf;
 
 		length -= till_end;
@@ -246,7 +246,7 @@ efw_response(struct fw_card *card, struct fw_request *request,
 	if (seqnum > SND_EFW_TRANSACTION_SEQNUM_MAX) {
 		handle_resp_for_kernel(card, generation, source,
 				       data, length, &rcode, seqnum);
-		if (resp_buf_debug)
+		if (snd_efw_resp_buf_debug)
 			handle_resp_for_user(card, generation, source,
 					     data, length, &dummy);
 	} else {

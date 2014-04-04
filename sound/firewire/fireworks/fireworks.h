@@ -52,8 +52,8 @@
  */
 #define SND_EFW_RESPONSE_MAXIMUM_BYTES	0x200U
 
-extern unsigned int resp_buf_size;
-extern bool resp_buf_debug;
+extern unsigned int snd_efw_resp_buf_size;
+extern bool snd_efw_resp_buf_debug;
 
 struct snd_efw_phys_grp {
 	u8 type;	/* see enum snd_efw_grp_type */

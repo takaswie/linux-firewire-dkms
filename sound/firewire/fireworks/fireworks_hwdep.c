@@ -48,7 +48,7 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 
 		/* copy from ring buffer to user buffer */
 		while (length > 0) {
-			till_end = resp_buf_size -
+			till_end = snd_efw_resp_buf_size -
 				(unsigned int)(efw->pull_ptr - efw->resp_buf);
 			till_end = min_t(unsigned int, length, till_end);
 
@@ -56,7 +56,7 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 				return -EFAULT;
 
 			efw->pull_ptr += till_end;
-			if (efw->pull_ptr >= efw->resp_buf + resp_buf_size)
+			if (efw->pull_ptr >= efw->resp_buf + snd_efw_resp_buf_size)
 				efw->pull_ptr = efw->resp_buf;
 
 			length -= till_end;
