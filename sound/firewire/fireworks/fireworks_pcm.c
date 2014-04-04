@@ -28,7 +28,7 @@
  *
  * The data in AMDTP channels for blank PCM channels are zero.
  */
-static unsigned int freq_table[] = {
+static const unsigned int freq_table[] = {
 	/* multiplier mode 0 */
 	[0] = 32000,
 	[1] = 44100,
@@ -64,7 +64,7 @@ int snd_efw_get_multiplier_mode(unsigned int sampling_rate, unsigned int *mode)
 static int
 hw_rule_rate(struct snd_pcm_hw_params *params,
 	     struct snd_pcm_hw_rule *rule,
-	     struct snd_efw *efw, unsigned int *channels)
+	     struct snd_efw *efw, const unsigned int *channels)
 {
 	struct snd_interval *r =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
@@ -96,7 +96,7 @@ hw_rule_rate(struct snd_pcm_hw_params *params,
 static int
 hw_rule_channels(struct snd_pcm_hw_params *params,
 		 struct snd_pcm_hw_rule *rule,
-		 struct snd_efw *efw, unsigned int *channels)
+		 struct snd_efw *efw, const unsigned int *channels)
 {
 	struct snd_interval *c =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
@@ -131,7 +131,7 @@ hw_rule_capture_rate(struct snd_pcm_hw_params *params,
 {
 	struct snd_efw *efw = rule->private;
 	return hw_rule_rate(params, rule, efw,
-				efw->pcm_capture_channels);
+			    efw->pcm_capture_channels);
 }
 
 static inline int
@@ -140,7 +140,7 @@ hw_rule_playback_rate(struct snd_pcm_hw_params *params,
 {
 	struct snd_efw *efw = rule->private;
 	return hw_rule_rate(params, rule, efw,
-				efw->pcm_playback_channels);
+			    efw->pcm_playback_channels);
 }
 
 static inline int
