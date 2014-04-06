@@ -320,7 +320,7 @@ static int pcm_capture_hw_params(struct snd_pcm_substream *substream,
 	struct snd_efw *efw = substream->private_data;
 
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
-		efw->capture_substreams++;
+		atomic_inc(&efw->capture_substreams);
 	amdtp_stream_set_pcm_format(&efw->tx_stream, params_format(hw_params));
 
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
@@ -332,7 +332,7 @@ static int pcm_playback_hw_params(struct snd_pcm_substream *substream,
 	struct snd_efw *efw = substream->private_data;
 
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
-		efw->playback_substreams++;
+		atomic_inc(&efw->playback_substreams);
 	amdtp_stream_set_pcm_format(&efw->rx_stream, params_format(hw_params));
 
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
@@ -344,7 +344,7 @@ static int pcm_capture_hw_free(struct snd_pcm_substream *substream)
 	struct snd_efw *efw = substream->private_data;
 
 	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
-		efw->capture_substreams--;
+		atomic_dec(&efw->capture_substreams);
 
 	snd_efw_stream_stop_duplex(efw);
 
@@ -355,7 +355,7 @@ static int pcm_playback_hw_free(struct snd_pcm_substream *substream)
 	struct snd_efw *efw = substream->private_data;
 
 	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
-		efw->playback_substreams--;
+		atomic_dec(&efw->playback_substreams);
 
 	snd_efw_stream_stop_duplex(efw);
 

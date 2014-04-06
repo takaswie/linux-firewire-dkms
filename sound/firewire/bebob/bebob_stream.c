@@ -615,27 +615,27 @@ end:
 void snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
 {
 	struct amdtp_stream *master, *slave;
-	unsigned int master_substreams, slave_substreams;
+	atomic_t *master_substreams, *slave_substreams;
 
 	mutex_lock(&bebob->mutex);
 
 	if (bebob->master == &bebob->rx_stream) {
 		slave  = &bebob->tx_stream;
 		master = &bebob->rx_stream;
-		slave_substreams  = bebob->capture_substreams;
-		master_substreams = bebob->playback_substreams;
+		slave_substreams  = &bebob->capture_substreams;
+		master_substreams = &bebob->playback_substreams;
 	} else {
 		slave  = &bebob->rx_stream;
 		master = &bebob->tx_stream;
-		slave_substreams  = bebob->playback_substreams;
-		master_substreams = bebob->capture_substreams;
+		slave_substreams  = &bebob->playback_substreams;
+		master_substreams = &bebob->capture_substreams;
 	}
 
-	if (slave_substreams == 0) {
+	if (atomic_read(slave_substreams) == 0) {
 		amdtp_stream_pcm_abort(slave);
 		amdtp_stream_stop(slave);
 
-		if (master_substreams == 0) {
+		if (atomic_read(master_substreams) == 0) {
 			amdtp_stream_pcm_abort(master);
 			amdtp_stream_stop(master);
 			break_both_connections(bebob);
