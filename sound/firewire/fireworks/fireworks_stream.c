@@ -32,8 +32,10 @@ init_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 		goto end;
 
 	err = amdtp_stream_init(stream, efw->unit, s_dir, CIP_BLOCKING);
-	if (err < 0)
+	if (err < 0) {
+		amdtp_stream_destroy(stream);
 		cmp_connection_destroy(conn);
+	}
 end:
 	return err;
 }
@@ -41,6 +43,7 @@ end:
 static void
 stop_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 {
+	amdtp_stream_pcm_abort(stream);
 	amdtp_stream_stop(stream);
 
 	if (stream == &efw->tx_stream)
@@ -83,8 +86,10 @@ start_stream(struct snd_efw *efw, struct amdtp_stream *stream,
 	err = amdtp_stream_start(stream,
 				 conn->resources.channel,
 				 conn->speed);
-	if (err < 0)
+	if (err < 0) {
 		stop_stream(efw, stream);
+		goto end;
+	}
 
 	/* wait first callback */
 	if (!amdtp_stream_wait_callback(stream, CALLBACK_TIMEOUT)) {
@@ -93,6 +98,19 @@ start_stream(struct snd_efw *efw, struct amdtp_stream *stream,
 	}
 end:
 	return err;
+}
+
+static void
+destroy_stream(struct snd_efw *efw, struct amdtp_stream *stream)
+{
+	stop_stream(efw, stream);
+
+	amdtp_stream_destroy(stream);
+
+	if (stream == &efw->tx_stream)
+		cmp_connection_destroy(&efw->out_conn);
+	else
+		cmp_connection_destroy(&efw->in_conn);
 }
 
 static int
@@ -160,11 +178,17 @@ int snd_efw_stream_init_duplex(struct snd_efw *efw)
 		efw->tx_stream.tx_dbc_interval = 8;
 
 	err = init_stream(efw, &efw->rx_stream);
-	if (err < 0)
+	if (err < 0) {
+		destroy_stream(efw, &efw->tx_stream);
 		goto end;
+	}
 
 	/* set IEC61883 compliant mode */
 	err = snd_efw_command_set_tx_mode(efw, SND_EFW_TRANSPORT_MODE_IEC61883);
+	if (err < 0) {
+		destroy_stream(efw, &efw->tx_stream);
+		destroy_stream(efw, &efw->rx_stream);
+	}
 end:
 	return err;
 }
@@ -279,8 +303,6 @@ void snd_efw_stream_update_duplex(struct snd_efw *efw)
 {
 	if ((cmp_connection_update(&efw->out_conn) < 0) ||
 	    (cmp_connection_update(&efw->in_conn) < 0)) {
-		amdtp_stream_pcm_abort(&efw->rx_stream);
-		amdtp_stream_pcm_abort(&efw->tx_stream);
 		mutex_lock(&efw->mutex);
 		stop_stream(efw, &efw->rx_stream);
 		stop_stream(efw, &efw->tx_stream);
@@ -295,14 +317,8 @@ void snd_efw_stream_destroy_duplex(struct snd_efw *efw)
 {
 	mutex_lock(&efw->mutex);
 
-	amdtp_stream_pcm_abort(&efw->rx_stream);
-	amdtp_stream_pcm_abort(&efw->tx_stream);
-
-	stop_stream(efw, &efw->tx_stream);
-	cmp_connection_destroy(&efw->out_conn);
-
-	stop_stream(efw, &efw->rx_stream);
-	cmp_connection_destroy(&efw->in_conn);
+	destroy_stream(efw, &efw->rx_stream);
+	destroy_stream(efw, &efw->tx_stream);
 
 	mutex_unlock(&efw->mutex);
 }

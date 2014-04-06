@@ -245,10 +245,6 @@ efw_probe(struct fw_unit *unit,
 	if (entry->model_id == MODEL_ECHO_AUDIOFIRE_9)
 		efw->is_af9 = true;
 
-	err = snd_efw_stream_init_duplex(efw);
-	if (err < 0)
-		goto error;
-
 	snd_efw_proc_init(efw);
 
 	if (efw->midi_out_ports || efw->midi_in_ports) {
@@ -266,9 +262,15 @@ efw_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
-	err = snd_card_register(card);
+	err = snd_efw_stream_init_duplex(efw);
 	if (err < 0)
 		goto error;
+
+	err = snd_card_register(card);
+	if (err < 0) {
+		snd_efw_stream_destroy_duplex(efw);
+		goto error;
+	}
 
 	dev_set_drvdata(&unit->device, efw);
 end:

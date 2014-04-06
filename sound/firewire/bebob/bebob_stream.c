@@ -432,6 +432,7 @@ int snd_bebob_stream_init_duplex(struct snd_bebob *bebob)
 	err = amdtp_stream_init(&bebob->tx_stream, bebob->unit,
 				AMDTP_IN_STREAM, CIP_BLOCKING);
 	if (err < 0) {
+		amdtp_stream_destroy(&bebob->tx_stream);
 		destroy_both_connections(bebob);
 		goto end;
 	}
@@ -450,6 +451,7 @@ int snd_bebob_stream_init_duplex(struct snd_bebob *bebob)
 				AMDTP_OUT_STREAM, CIP_BLOCKING);
 	if (err < 0) {
 		amdtp_stream_destroy(&bebob->tx_stream);
+		amdtp_stream_destroy(&bebob->rx_stream);
 		destroy_both_connections(bebob);
 	}
 end:
@@ -627,12 +629,15 @@ int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
 	if (slave_substreams > 0)
 		goto end;
 
+	amdtp_stream_pcm_abort(slave);
 	amdtp_stream_stop(slave);
 
 	if ((bebob->capture_substreams > 0) || (bebob->playback_substreams > 0))
 		goto end;
 
+	amdtp_stream_pcm_abort(master);
 	amdtp_stream_stop(master);
+
 	break_both_connections(bebob);
 end:
 	mutex_unlock(&bebob->mutex);
@@ -672,6 +677,10 @@ void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
 
 	amdtp_stream_stop(&bebob->rx_stream);
 	amdtp_stream_stop(&bebob->tx_stream);
+
+	amdtp_stream_destroy(&bebob->rx_stream);
+	amdtp_stream_destroy(&bebob->tx_stream);
+
 	destroy_both_connections(bebob);
 
 	mutex_unlock(&bebob->mutex);

@@ -227,10 +227,6 @@ bebob_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
-	err = snd_bebob_stream_init_duplex(bebob);
-	if (err < 0)
-		goto error;
-
 	snd_bebob_proc_init(bebob);
 
 	if ((bebob->midi_input_ports > 0) ||
@@ -248,10 +244,16 @@ bebob_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
+	err = snd_bebob_stream_init_duplex(bebob);
+	if (err < 0)
+		goto error;
+
 	if (!bebob->maudio_special_quirk) {
 		err = snd_card_register(card);
-		if (err < 0)
+		if (err < 0) {
+			snd_bebob_stream_destroy_duplex(bebob);
 			goto error;
+		}
 	} else {
 		/*
 		 * This is a workaround. This bus reset seems to have an effect
@@ -290,8 +292,10 @@ bebob_update(struct fw_unit *unit)
 	snd_bebob_stream_update_duplex(bebob);
 
 	if (bebob->deferred_registration) {
-		if (snd_card_register(bebob->card) < 0)
+		if (snd_card_register(bebob->card) < 0) {
+			snd_bebob_stream_destroy_duplex(bebob);
 			snd_card_free(bebob->card);
+		}
 		bebob->deferred_registration = false;
 	}
 }
