@@ -171,7 +171,7 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 			      bebob->tx_stream_formations);
 		prepare_channels(&substream->runtime->hw,
 				 bebob->tx_stream_formations);
-		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
+		substream->runtime->hw.formats = AMDTP_IN_PCM_FORMAT_BITS;
 		snd_pcm_hw_rule_add(substream->runtime, 0,
 				    SNDRV_PCM_HW_PARAM_CHANNELS,
 				    hw_rule_capture_channels, bebob,

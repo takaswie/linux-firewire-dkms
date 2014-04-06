@@ -193,7 +193,7 @@ pcm_init_hw_params(struct snd_efw *efw,
 
 	/* add rule between channels and sampling rate */
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S32;
+		substream->runtime->hw.formats = AMDTP_IN_PCM_FORMAT_BITS;
 		snd_pcm_hw_rule_add(substream->runtime, 0,
 				    SNDRV_PCM_HW_PARAM_CHANNELS,
 				    hw_rule_capture_channels, efw,
