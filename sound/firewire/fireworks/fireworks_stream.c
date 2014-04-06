@@ -114,25 +114,20 @@ destroy_stream(struct snd_efw *efw, struct amdtp_stream *stream)
 }
 
 static int
-get_roles(struct snd_efw *efw, enum cip_flags *sync_mode,
-	  struct amdtp_stream **master, struct amdtp_stream **slave)
+get_sync_mode(struct snd_efw *efw, enum cip_flags *sync_mode)
 {
 	enum snd_efw_clock_source clock_source;
 	int err;
 
 	err = snd_efw_command_get_clock_source(efw, &clock_source);
 	if (err < 0)
-		goto end;
+		return err;
 
-	if (clock_source != SND_EFW_CLOCK_SOURCE_SYTMATCH) {
-		*master = &efw->tx_stream;
-		*slave = &efw->rx_stream;
-		*sync_mode = CIP_SYNC_TO_DEVICE;
-	} else {
-		err = -ENOSYS;
-	}
-end:
-	return err;
+	if (clock_source == SND_EFW_CLOCK_SOURCE_SYTMATCH)
+		return -ENOSYS;
+
+	*sync_mode = CIP_SYNC_TO_DEVICE;
+	return 0;
 }
 
 static int
@@ -205,9 +200,16 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 
 	mutex_lock(&efw->mutex);
 
-	err = get_roles(efw, &sync_mode, &master, &slave);
+	err = get_sync_mode(efw, &sync_mode);
 	if (err < 0)
 		goto end;
+	if (sync_mode == CIP_SYNC_TO_DEVICE) {
+		master = &efw->tx_stream;
+		slave  = &efw->rx_stream;
+	} else {
+		master = &efw->rx_stream;
+		slave  = &efw->tx_stream;
+	}
 
 	/*
 	 * Considering JACK/FFADO streaming:
@@ -240,6 +242,7 @@ int snd_efw_stream_start_duplex(struct snd_efw *efw,
 	/* master should be always running */
 	if (!amdtp_stream_running(master)) {
 		amdtp_stream_set_sync(sync_mode, master, slave);
+		efw->master = master;
 
 		err = snd_efw_command_set_sampling_rate(efw, rate);
 		if (err < 0)
@@ -267,36 +270,33 @@ end:
 	return err;
 }
 
-int snd_efw_stream_stop_duplex(struct snd_efw *efw)
+void snd_efw_stream_stop_duplex(struct snd_efw *efw)
 {
 	struct amdtp_stream *master, *slave;
-	enum cip_flags sync_mode;
-	unsigned int slave_substreams;
-	int err;
+	unsigned int master_substreams, slave_substreams;
 
 	mutex_lock(&efw->mutex);
 
-	err = get_roles(efw, &sync_mode, &master, &slave);
-	if (err < 0)
-		goto end;
+	if (efw->master == &efw->rx_stream) {
+		slave  = &efw->tx_stream;
+		master = &efw->rx_stream;
+		slave_substreams  = efw->capture_substreams;
+		master_substreams = efw->playback_substreams;
+	} else {
+		slave  = &efw->rx_stream;
+		master = &efw->tx_stream;
+		slave_substreams  = efw->playback_substreams;
+		master_substreams = efw->capture_substreams;
+	}
 
-	if (slave == &efw->tx_stream)
-		slave_substreams = efw->capture_substreams;
-	else
-		slave_substreams = efw->playback_substreams;
+	if (slave_substreams == 0) {
+		stop_stream(efw, slave);
 
-	if (slave_substreams > 0)
-		goto end;
+		if (master_substreams == 0)
+			stop_stream(efw, master);
+	}
 
-	stop_stream(efw, slave);
-
-	if ((efw->capture_substreams > 0) || (efw->playback_substreams > 0))
-		goto end;
-
-	stop_stream(efw, master);
-end:
 	mutex_unlock(&efw->mutex);
-	return err;
 }
 
 void snd_efw_stream_update_duplex(struct snd_efw *efw)

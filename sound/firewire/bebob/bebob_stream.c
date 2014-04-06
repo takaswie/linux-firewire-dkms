@@ -383,14 +383,10 @@ destroy_both_connections(struct snd_bebob *bebob)
 }
 
 static int
-get_roles(struct snd_bebob *bebob, enum cip_flags *sync_mode,
-	  struct amdtp_stream **master, struct amdtp_stream **slave)
+get_sync_mode(struct snd_bebob *bebob, enum cip_flags *sync_mode)
 {
 	/* currently this module doesn't support SYT-Match mode */
 	*sync_mode = CIP_SYNC_TO_DEVICE;
-	*master = &bebob->tx_stream;
-	*slave = &bebob->rx_stream;
-
 	return 0;
 }
 
@@ -490,9 +486,16 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 
 	mutex_lock(&bebob->mutex);
 
-	err = get_roles(bebob, &sync_mode, &master, &slave);
+	err = get_sync_mode(bebob, &sync_mode);
 	if (err < 0)
 		goto end;
+	if (sync_mode == CIP_SYNC_TO_DEVICE) {
+		master = &bebob->tx_stream;
+		slave  = &bebob->rx_stream;
+	} else {
+		master = &bebob->rx_stream;
+		slave  = &bebob->tx_stream;
+	}
 
 	/*
 	 * Considering JACK/FFADO streaming:
@@ -535,6 +538,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	/* master should be always running */
 	if (!amdtp_stream_running(master)) {
 		amdtp_stream_set_sync(sync_mode, master, slave);
+		bebob->master = master;
 
 		/*
 		 * NOTE:
@@ -608,40 +612,37 @@ end:
 	return err;
 }
 
-int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
+void snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
 {
 	struct amdtp_stream *master, *slave;
-	enum cip_flags sync_mode;
-	unsigned int slave_substreams;
-	int err;
+	unsigned int master_substreams, slave_substreams;
 
 	mutex_lock(&bebob->mutex);
 
-	err = get_roles(bebob, &sync_mode, &master, &slave);
-	if (err < 0)
-		goto end;
+	if (bebob->master == &bebob->rx_stream) {
+		slave  = &bebob->tx_stream;
+		master = &bebob->rx_stream;
+		slave_substreams  = bebob->capture_substreams;
+		master_substreams = bebob->playback_substreams;
+	} else {
+		slave  = &bebob->rx_stream;
+		master = &bebob->tx_stream;
+		slave_substreams  = bebob->playback_substreams;
+		master_substreams = bebob->capture_substreams;
+	}
 
-	if (slave == &bebob->tx_stream)
-		slave_substreams = bebob->capture_substreams;
-	else
-		slave_substreams = bebob->playback_substreams;
+	if (slave_substreams == 0) {
+		amdtp_stream_pcm_abort(slave);
+		amdtp_stream_stop(slave);
 
-	if (slave_substreams > 0)
-		goto end;
+		if (master_substreams == 0) {
+			amdtp_stream_pcm_abort(master);
+			amdtp_stream_stop(master);
+			break_both_connections(bebob);
+		}
+	}
 
-	amdtp_stream_pcm_abort(slave);
-	amdtp_stream_stop(slave);
-
-	if ((bebob->capture_substreams > 0) || (bebob->playback_substreams > 0))
-		goto end;
-
-	amdtp_stream_pcm_abort(master);
-	amdtp_stream_stop(master);
-
-	break_both_connections(bebob);
-end:
 	mutex_unlock(&bebob->mutex);
-	return err;
 }
 
 void snd_bebob_stream_update_duplex(struct snd_bebob *bebob)

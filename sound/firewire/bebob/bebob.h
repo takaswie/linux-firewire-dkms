@@ -90,10 +90,11 @@ struct snd_bebob {
 	struct completion bus_reset;
 	bool connected;
 
-	struct cmp_connection out_conn;
+	struct amdtp_stream *master;
 	struct amdtp_stream tx_stream;
-	struct cmp_connection in_conn;
 	struct amdtp_stream rx_stream;
+	struct cmp_connection out_conn;
+	struct cmp_connection in_conn;
 	unsigned int capture_substreams;
 	unsigned int playback_substreams;
 
@@ -218,7 +219,7 @@ int snd_bebob_stream_init_duplex(struct snd_bebob *bebob);
 int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 				  struct amdtp_stream *stream,
 				   unsigned int sampling_rate);
-int snd_bebob_stream_stop_duplex(struct snd_bebob *bebob);
+void snd_bebob_stream_stop_duplex(struct snd_bebob *bebob);
 void snd_bebob_stream_update_duplex(struct snd_bebob *bebob);
 void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob);
 

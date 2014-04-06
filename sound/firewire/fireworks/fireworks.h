@@ -83,6 +83,7 @@ struct snd_efw {
 	unsigned int pcm_capture_channels[SND_EFW_MUITIPLIER_MODES];
 	unsigned int pcm_playback_channels[SND_EFW_MUITIPLIER_MODES];
 
+	struct amdtp_stream *master;
 	struct amdtp_stream tx_stream;
 	struct amdtp_stream rx_stream;
 	struct cmp_connection out_conn;
@@ -212,7 +213,7 @@ int snd_efw_stream_init_duplex(struct snd_efw *efw);
 int snd_efw_stream_start_duplex(struct snd_efw *efw,
 				struct amdtp_stream *request,
 				int sampling_rate);
-int snd_efw_stream_stop_duplex(struct snd_efw *efw);
+void snd_efw_stream_stop_duplex(struct snd_efw *efw);
 void snd_efw_stream_update_duplex(struct snd_efw *efw);
 void snd_efw_stream_destroy_duplex(struct snd_efw *efw);
 void snd_efw_stream_lock_changed(struct snd_efw *efw);
