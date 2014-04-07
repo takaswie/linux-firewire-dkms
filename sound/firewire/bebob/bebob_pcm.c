@@ -202,15 +202,24 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 		goto end;
 
 	/*
-	 * AMDTP functionality in firewire-lib require periods to be aligned to
-	 * 16 bit, or 24bit inner 32bit.
+	 * One AMDTP packet can include some frames. In blocking mode, the
+	 * number equals to SYT_INTERVAL. It's 8, 16, 32, depending on its
+	 * sampling rate.
+	 * It's preferrable that period/buffer boundary is aligned to this
+	 * number. Furthermore, for the most accurate PCM interrupt, it's
+	 * preferrable period/buffer boundary is aligned to
+	 * frames_per_packet * packets_per_interrupt.
+	 *
+	 * Currently for the most accurate PCM interrupt, two points are lack.
+	 * One is PCM rule, another is to join PCM substreams at the first
+	 * packet in an isochronous interrupt.
 	 */
 	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
-					 SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
+					 SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 32);
 	if (err < 0)
 		goto end;
 	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
-					 SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 32);
+					 SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 32);
 	if (err < 0)
 		goto end;
 
