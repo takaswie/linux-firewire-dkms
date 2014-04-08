@@ -324,6 +324,9 @@ parse_stream_formation(u8 *buf, unsigned int len,
 {
 	unsigned int e, channels, format;
 
+	if (len < 3)
+		return -EINVAL;
+
 	/*
 	 * this module can support a hierarchy combination that:
 	 *  Root:	Audio and Music (0x90)
@@ -397,7 +400,7 @@ assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 
 	/* get formation at current sampling rate */
 	err = avc_stream_get_format_single(oxfw->unit, dir, pid, buf, len);
-	if ((err < 0) || (err == 0x80) /* NOT IMPLEMENTED */)
+	if (err < 0)
 		goto end;
 
 	/* parse and set stream formation */
@@ -413,7 +416,7 @@ assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 		err = avc_general_inquiry_sig_fmt(oxfw->unit,
 						  snd_oxfw_rate_table[i],
 						  dir, pid);
-		if ((err < 0) || (err == 0x08) /* NOT IMPLEMENTED */)
+		if (err < 0)
 			continue;
 
 		formations[i].pcm = pcm_channels;
@@ -441,22 +444,22 @@ fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 	else
 		formations = oxfw->rx_stream_formations;
 
-	/* initialize parameters here because of checking implementation */
+	/* get first entry */
 	eid = 0;
 	len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
-	memset(buf, 0, len);
-
-	/* get first entry */
 	err = avc_stream_get_format_list(oxfw->unit, dir, 0, buf, &len, eid);
-	if ((err < 0) || (len < 3)) {
+	if (err == -ENOSYS) {
 		/* LIST subfunction is not implemented */
+		len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
 		err = assume_stream_formations(oxfw, dir, pid, buf, &len,
 					       formations);
+		goto end;
+	} else if (err < 0) {
 		goto end;
 	}
 
 	/* LIST subfunction is implemented */
-	do {
+	while (eid < SND_OXFW_STREAM_TABLE_ENTRIES) {
 		/* parse and set stream formation */
 		err = parse_stream_formation(buf, len, formations, &i);
 		if (err < 0)
@@ -464,12 +467,15 @@ fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 
 		/* get next entry */
 		len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
-		memset(buf, 0, len);
 		err = avc_stream_get_format_list(oxfw->unit, dir, 0,
 						 buf, &len, ++eid);
-		if ((err < 0) || (len < 3))
+		if (err < 0) {
+			/* No entries remained. */
+			if (err == -EINVAL)
+				err = 0;
 			break;
-	} while (eid < SND_OXFW_STREAM_TABLE_ENTRIES);
+		}
+	}
 end:
 	kfree(buf);
 	return err;

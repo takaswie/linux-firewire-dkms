@@ -16,12 +16,6 @@ int avc_stream_get_format(struct fw_unit *unit,
 	unsigned int subfunc;
 	int err;
 
-	/* check given buffer */
-	if ((buf == NULL) || (*len < 12)) {
-		err = -EINVAL;
-		goto end;
-	}
-
 	if (eid == 0xff)
 		subfunc = 0xc0;	/* SINGLE */
 	else
@@ -44,34 +38,29 @@ int avc_stream_get_format(struct fw_unit *unit,
 	err = fcp_avc_transaction(unit, buf, 12, buf, *len,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7));
-	if (err < 0) {
-		goto end;
-	/* reach the end of entries */
-	} else if (buf[0] == 0x0a) {
-		err = 0;
-		*len = 0;
-		goto end;
-	} else if (buf[0] != 0x0c) {
+	if ((err > 0) && (err < 10))
+		err = -EIO;
+	else if (buf[0] == 0x08)	/* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a)	/* REJECTED */
 		err = -EINVAL;
-		goto end;
-	/* the content starts at 10th bytes */
-	} else if (err < 10) {
-		err = -EIO;
-		goto end;
+	else if (buf[0] == 0x0b)	/* IN TRANSITION */
+		err = -EAGAIN;
 	/* LIST subfunction has entry ID */
-	} else if ((subfunc == 0xc1) && (buf[10] != eid)) {
+	else if ((subfunc == 0xc1) && (buf[10] != eid))
 		err = -EIO;
+	if (err < 0)
 		goto end;
-	}
 
 	/* keep just stream format information */
-	if (eid == 0xff) {
+	if (subfunc == 0xc0) {
 		memmove(buf, buf + 10, err - 10);
 		*len = err - 10;
 	} else {
 		memmove(buf, buf + 11, err - 11);
 		*len = err - 11;
 	}
+
 	err = 0;
 end:
 	return err;
@@ -111,18 +100,14 @@ int avc_general_inquiry_sig_fmt(struct fw_unit *unit, unsigned int rate,
 	/* do transaction and check buf[1-5] are the same against command */
 	err = fcp_avc_transaction(unit, buf, 8, buf, 8,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5));
+	if ((err > 0) && (err < 8))
+		err = -EIO;
+	else if (buf[0] == 0x08)	/* NOT IMPLEMENTED */
+		err = -ENOSYS;
 	if (err < 0)
 		goto end;
 
-	/* check length */
-	if (err != 8) {
-		dev_err(&unit->device, "failed to inquiry sample rate\n");
-		err = -EIO;
-		goto end;
-	}
-
-	/* return response code */
-	err = buf[0];
+	err = 0;
 end:
 	kfree(buf);
 	return err;
