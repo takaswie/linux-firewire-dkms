@@ -257,7 +257,7 @@ static int oxfw_hw_params_capture(struct snd_pcm_substream *substream,
 	struct snd_oxfw *oxfw = substream->private_data;
 
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
-		oxfw->capture_substreams++;
+		atomic_inc(&oxfw->capture_substreams);
 	amdtp_stream_set_pcm_format(&oxfw->tx_stream, params_format(hw_params));
 
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
@@ -269,7 +269,7 @@ static int oxfw_hw_params_playback(struct snd_pcm_substream *substream,
 	struct snd_oxfw *oxfw = substream->private_data;
 
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
-		oxfw->playback_substreams++;
+		atomic_inc(&oxfw->playback_substreams);
 	amdtp_stream_set_pcm_format(&oxfw->rx_stream, params_format(hw_params));
 
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
@@ -281,7 +281,7 @@ static int oxfw_hw_free_capture(struct snd_pcm_substream *substream)
 	struct snd_oxfw *oxfw = substream->private_data;
 
 	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
-		oxfw->capture_substreams--;
+		atomic_dec(&oxfw->capture_substreams);
 
 	snd_oxfw_stream_stop(oxfw, &oxfw->tx_stream);
 
@@ -292,7 +292,7 @@ static int oxfw_hw_free_playback(struct snd_pcm_substream *substream)
 	struct snd_oxfw *oxfw = substream->private_data;
 
 	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
-		oxfw->playback_substreams--;
+		atomic_dec(&oxfw->playback_substreams);
 
 	snd_oxfw_stream_stop(oxfw, &oxfw->rx_stream);
 

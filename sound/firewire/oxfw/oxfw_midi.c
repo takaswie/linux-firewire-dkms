@@ -17,7 +17,7 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	oxfw->capture_substreams++;
+	atomic_inc(&oxfw->capture_substreams);
 	err = snd_oxfw_stream_start(oxfw, &oxfw->tx_stream, 0);
 	if (err < 0)
 		snd_oxfw_stream_lock_release(oxfw);
@@ -34,7 +34,7 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 	if (err < 0)
 		goto end;
 
-	oxfw->playback_substreams++;
+	atomic_inc(&oxfw->playback_substreams);
 	err = snd_oxfw_stream_start(oxfw, &oxfw->rx_stream, 0);
 	if (err < 0)
 		snd_oxfw_stream_lock_release(oxfw);
@@ -46,7 +46,7 @@ static int midi_capture_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->rmidi->private_data;
 
-	oxfw->capture_substreams--;
+	atomic_dec(&oxfw->capture_substreams);
 	snd_oxfw_stream_stop(oxfw, &oxfw->tx_stream);
 
 	snd_oxfw_stream_lock_release(oxfw);
@@ -57,7 +57,7 @@ static int midi_playback_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->rmidi->private_data;
 
-	oxfw->playback_substreams--;
+	atomic_dec(&oxfw->playback_substreams);
 	snd_oxfw_stream_stop(oxfw, &oxfw->rx_stream);
 
 	snd_oxfw_stream_lock_release(oxfw);

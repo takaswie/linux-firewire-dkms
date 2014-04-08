@@ -266,14 +266,14 @@ end:
 
 void snd_oxfw_stream_stop(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 {
-	unsigned int substreams;
+	atomic_t *substreams;
 
 	if (stream == &oxfw->tx_stream)
-		substreams = oxfw->capture_substreams;
+		substreams = &oxfw->capture_substreams;
 	else
-		substreams = oxfw->playback_substreams;
+		substreams = &oxfw->playback_substreams;
 
-	if (substreams == 0) {
+	if (atomic_read(substreams) == 0) {
 		mutex_lock(&oxfw->mutex);
 		stop_stream(oxfw, stream);
 		mutex_unlock(&oxfw->mutex);

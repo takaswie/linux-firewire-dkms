@@ -63,8 +63,8 @@ struct snd_oxfw {
 	struct cmp_connection in_conn;
 	struct amdtp_stream tx_stream;
 	struct amdtp_stream rx_stream;
-	unsigned int capture_substreams;
-	unsigned int playback_substreams;
+	atomic_t capture_substreams;
+	atomic_t playback_substreams;
 
 	unsigned int midi_input_ports;
 	unsigned int midi_output_ports;
