@@ -20,16 +20,15 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule)
 	};
 	unsigned int i;
 
-	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
-		/* entry is invalid */
-		if (formations[i].pcm == 0)
+	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
+		if (formations[i].rate == 0)
 			continue;
 
 		if (!snd_interval_test(c, formations[i].pcm))
 			continue;
 
-		t.min = min(t.min, snd_oxfw_rate_table[i]);
-		t.max = max(t.max, snd_oxfw_rate_table[i]);
+		t.min = min(t.min, formations[i].rate);
+		t.max = max(t.max, formations[i].rate);
 
 	}
 	return snd_interval_refine(r, &t);
@@ -49,12 +48,11 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule)
 
 	unsigned int i;
 
-	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
-		/* entry is invalid */
-		if (formations[i].pcm == 0)
+	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
+		if (formations[i].rate == 0)
 			continue;
 
-		if (!snd_interval_test(r, snd_oxfw_rate_table[i]))
+		if (!snd_interval_test(r, formations[i].rate))
 			continue;
 
 		t.min = min(t.min, formations[i].pcm);
@@ -77,17 +75,16 @@ limit_channels_and_rates(struct snd_pcm_hardware *hw,
 	hw->rate_max = 0;
 	hw->rates = 0;
 
-	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
-		/* entry has no PCM channels */
-		if (formations[i].pcm == 0)
+	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
+		if (formations[i].rate == 0)
 			continue;
 
 		hw->channels_min = min(hw->channels_min, formations[i].pcm);
 		hw->channels_max = max(hw->channels_max, formations[i].pcm);
 
-		hw->rate_min = min(hw->rate_min, snd_oxfw_rate_table[i]);
-		hw->rate_max = max(hw->rate_max, snd_oxfw_rate_table[i]);
-		hw->rates |= snd_pcm_rate_to_rate_bit(snd_oxfw_rate_table[i]);
+		hw->rate_min = min(hw->rate_min, formations[i].rate);
+		hw->rate_max = max(hw->rate_max, formations[i].rate);
+		hw->rates |= snd_pcm_rate_to_rate_bit(formations[i].rate);
 	}
 }
 

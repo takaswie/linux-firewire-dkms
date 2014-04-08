@@ -19,18 +19,18 @@ proc_read_formation(struct snd_info_entry *entry,
 	snd_iprintf(buffer, "Output Stream from device:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
 	formation = oxfw->tx_stream_formations;
-	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
 		snd_iprintf(buffer,
-			"\t%d\t%d\t%d\n", snd_oxfw_rate_table[i],
+			"\t%d\t%d\t%d\n", formation[i].rate,
 			formation[i].pcm, formation[i].midi);
 	}
 
 	snd_iprintf(buffer, "Input Stream to device:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
 	formation = oxfw->rx_stream_formations;
-	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
 		snd_iprintf(buffer,
-			"\t%d\t%d\t%d\n", snd_oxfw_rate_table[i],
+			"\t%d\t%d\t%d\n", formation[i].rate,
 			formation[i].pcm, formation[i].midi);
 	}
 }

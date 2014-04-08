@@ -15,7 +15,7 @@
  *  OXFW970: 32.0/44.1/48.0/96.0 Khz, 8 audio channels I/O
  *  OXFW971: 32.0/44.1/48.0/88.2/96.0/192.0 kHz, 16 audio channels I/O, MIDI I/O
  */
-const unsigned int snd_oxfw_rate_table[SND_OXFW_STREAM_TABLE_ENTRIES] = {
+static const unsigned int oxfw_rate_table[] = {
 	[0] = 32000,
 	[1] = 44100,
 	[2] = 48000,
@@ -122,16 +122,22 @@ static void stop_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 static int start_stream(struct snd_oxfw *oxfw,
 			struct amdtp_stream *stream, unsigned int rate)
 {
+	struct snd_oxfw_stream_formation *formations;
 	unsigned int i, pcm_channels, midi_ports;
 	struct cmp_connection *conn;
 	int err;
 
+	if (stream == &oxfw->rx_stream)
+		formations = oxfw->rx_stream_formations;
+	else
+		formations = oxfw->tx_stream_formations;
+
 	/* Get stream formation */
-	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
-		if (snd_oxfw_rate_table[i] == rate)
+	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
+		if (formations[i].rate == rate)
 			break;
 	}
-	if (i == SND_OXFW_STREAM_TABLE_ENTRIES) {
+	if (i == SND_OXFW_STREAM_FORMAT_ENTRIES) {
 		err = -EINVAL;
 		goto end;
 	}
@@ -357,10 +363,9 @@ void snd_oxfw_stream_update_duplex(struct snd_oxfw *oxfw)
  */
 static int
 parse_stream_formation(u8 *buf, unsigned int len,
-		       struct snd_oxfw_stream_formation *formations,
-		       unsigned int *index)
+		       struct snd_oxfw_stream_formation *formation)
 {
-	unsigned int e, channels, format;
+	unsigned int i, e, channels, format;
 
 	if (len < 3)
 		return -EINVAL;
@@ -374,12 +379,15 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		return -ENOSYS;
 
 	/* check the sampling rate */
-	for (*index = 0; *index < sizeof(avc_stream_rate_table); *index += 1) {
-		if (buf[2] == avc_stream_rate_table[*index])
+	for (i = 0; i < sizeof(avc_stream_rate_table); i++) {
+		if (buf[2] == avc_stream_rate_table[i])
 			break;
 	}
-	if (*index == sizeof(avc_stream_rate_table))
+	if (i == sizeof(avc_stream_rate_table))
 		return -ENOSYS;
+
+	memset(formation, 0, sizeof(struct snd_oxfw_stream_formation));
+	formation->rate = oxfw_rate_table[i];
 
 	for (e = 0; e < buf[4]; e++) {
 		channels = buf[5 + e * 2];
@@ -390,11 +398,11 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		case 0x00:
 		/* Multi Bit Linear Audio (Raw) */
 		case 0x06:
-			formations[*index].pcm += channels;
+			formation->pcm += channels;
 			break;
 		/* MIDI Conformant */
 		case 0x0d:
-			formations[*index].midi += channels;
+			formation->midi += channels;
 			break;
 		/* IEC 61937-3 to 7 */
 		case 0x01:
@@ -425,8 +433,8 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		}
 	}
 
-	if (formations[*index].pcm  > AMDTP_MAX_CHANNELS_FOR_PCM ||
-	    formations[*index].midi > AMDTP_MAX_CHANNELS_FOR_MIDI)
+	if (formation->pcm  > AMDTP_MAX_CHANNELS_FOR_PCM ||
+	    formation->midi > AMDTP_MAX_CHANNELS_FOR_MIDI)
 		return -ENOSYS;
 
 	return 0;
@@ -437,7 +445,7 @@ assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 			 unsigned int pid, u8 *buf, unsigned int *len,
 			 struct snd_oxfw_stream_formation *formations)
 {
-	unsigned int i, pcm_channels, midi_channels;
+	unsigned int rate, pcm_channels, midi_channels, i, eid;
 	int err;
 
 	/* get formation at current sampling rate */
@@ -451,23 +459,30 @@ assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 	}
 
 	/* parse and set stream formation */
-	err = parse_stream_formation(buf, *len, formations, &i);
+	eid = 0;
+	err = parse_stream_formation(buf, *len, &formations[eid]);
 	if (err < 0)
 		goto end;
 
-	pcm_channels = formations[i].pcm;
-	midi_channels = formations[i].midi;
+	rate = formations[eid].rate;
+	pcm_channels = formations[eid].pcm;
+	midi_channels = formations[eid].midi;
 
 	/* apply the formation for each available sampling rate */
-	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+	for (i = 0; i < ARRAY_SIZE(oxfw_rate_table); i++) {
+		if (rate == oxfw_rate_table[i])
+			continue;
+
 		err = avc_general_inquiry_sig_fmt(oxfw->unit,
-						  snd_oxfw_rate_table[i],
+						  oxfw_rate_table[i],
 						  dir, pid);
 		if (err < 0)
 			continue;
 
-		formations[i].pcm = pcm_channels;
-		formations[i].midi = midi_channels;
+		eid++;
+		formations[eid].rate = oxfw_rate_table[i];
+		formations[eid].pcm = pcm_channels;
+		formations[eid].midi = midi_channels;
 	}
 
 	err = 0;
@@ -480,8 +495,8 @@ fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 		       unsigned short pid)
 {
 	u8 *buf;
-	struct snd_oxfw_stream_formation *formations;
-	unsigned int i, len, eid;
+	struct snd_oxfw_stream_formation *formations, tmp;
+	unsigned int i, len, eid = 0;
 	int err;
 
 	buf = kmalloc(AVC_GENERIC_FRAME_MAXIMUM_BYTES, GFP_KERNEL);
@@ -494,9 +509,8 @@ fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 		formations = oxfw->rx_stream_formations;
 
 	/* get first entry */
-	eid = 0;
 	len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
-	err = avc_stream_get_format_list(oxfw->unit, dir, 0, buf, &len, eid);
+	err = avc_stream_get_format_list(oxfw->unit, dir, 0, buf, &len, 0);
 	if (err == -ENOSYS) {
 		/* LIST subfunction is not implemented */
 		len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
@@ -512,9 +526,10 @@ fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 	}
 
 	/* LIST subfunction is implemented */
-	while (eid < SND_OXFW_STREAM_TABLE_ENTRIES) {
+	eid = 0;
+	while (eid < SND_OXFW_STREAM_FORMAT_ENTRIES) {
 		/* parse and set stream formation */
-		err = parse_stream_formation(buf, len, formations, &i);
+		err = parse_stream_formation(buf, len, &formations[eid]);
 		if (err < 0)
 			break;
 
@@ -535,6 +550,25 @@ fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 			break;
 		}
 	}
+
+	if (eid >= SND_OXFW_STREAM_FORMAT_ENTRIES)
+		goto end;
+
+	/* Griffin FireWave have another entry for current. */
+	len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
+	err = avc_stream_get_format_single(oxfw->unit, dir, 0, buf, &len);
+	if (err < 0)
+		goto end;
+	err = parse_stream_formation(buf, len, &tmp);
+	if (err < 0)
+		goto end;
+	/* Store this if no duplicates. */
+	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
+		if (memcmp(&formations[i], &tmp, sizeof(tmp)) == 0)
+			break;
+	}
+	if (i == SND_OXFW_STREAM_FORMAT_ENTRIES)
+		formations[eid] = tmp;
 end:
 	kfree(buf);
 	return err;
@@ -574,7 +608,7 @@ int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 	}
 
 	/* if its stream has MIDI conformant data channel, add one MIDI port */
-	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
+	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
 		if (oxfw->tx_stream_formations[i].midi > 0)
 			oxfw->midi_input_ports = 1;
 		else if (oxfw->rx_stream_formations[i].midi > 0)

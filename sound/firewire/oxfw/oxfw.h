@@ -42,12 +42,14 @@ struct device_info {
 	u8 volume_fb_id;
 };
 
-#define	SND_OXFW_STREAM_TABLE_ENTRIES	6
+/* This is an arbitrary number for convinience. */
+#define	SND_OXFW_STREAM_FORMAT_ENTRIES	10
 struct snd_oxfw_stream_formation {
+	unsigned int rate;
 	unsigned int pcm;
 	unsigned int midi;
 };
-extern const unsigned int snd_oxfw_rate_table[SND_OXFW_STREAM_TABLE_ENTRIES];
+
 struct snd_oxfw {
 	struct snd_card *card;
 	struct fw_unit *unit;
@@ -57,9 +59,9 @@ struct snd_oxfw {
 
 	bool has_output;
 	struct snd_oxfw_stream_formation
-		tx_stream_formations[SND_OXFW_STREAM_TABLE_ENTRIES];
+		tx_stream_formations[SND_OXFW_STREAM_FORMAT_ENTRIES];
 	struct snd_oxfw_stream_formation
-		rx_stream_formations[SND_OXFW_STREAM_TABLE_ENTRIES];
+		rx_stream_formations[SND_OXFW_STREAM_FORMAT_ENTRIES];
 	struct cmp_connection out_conn;
 	struct cmp_connection in_conn;
 	struct amdtp_stream tx_stream;
