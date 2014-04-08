@@ -377,7 +377,7 @@ static int pcm_capture_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
 
-	err = snd_efw_stream_start_duplex(efw, &efw->tx_stream, runtime->rate);
+	err = snd_efw_stream_start_duplex(efw, runtime->rate);
 	if (err >= 0)
 		amdtp_stream_pcm_prepare(&efw->tx_stream);
 
@@ -389,7 +389,7 @@ static int pcm_playback_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
 
-	err = snd_efw_stream_start_duplex(efw, &efw->rx_stream, runtime->rate);
+	err = snd_efw_stream_start_duplex(efw, runtime->rate);
 	if (err >= 0)
 		amdtp_stream_pcm_prepare(&efw->rx_stream);
 

@@ -454,16 +454,14 @@ end:
 	return err;
 }
 
-int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
-				  struct amdtp_stream *request,
-				  unsigned int rate)
+int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, int rate)
 {
 	struct snd_bebob_rate_spec *rate_spec = bebob->spec->rate;
 	struct amdtp_stream *master, *slave;
+	atomic_t *slave_substreams;
 	enum cip_flags sync_mode;
 	unsigned int curr_rate;
-	bool slave_flag;
-	int err;
+	int err = 0;
 
 	/*
 	 * Normal BeBoB firmware has a quirk at bus reset to transfers packets
@@ -486,15 +484,22 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 
 	mutex_lock(&bebob->mutex);
 
+	/* Need no substreams */
+	if (atomic_read(&bebob->playback_substreams) == 0 &&
+	    atomic_read(&bebob->capture_substreams)  == 0)
+		goto end;
+
 	err = get_sync_mode(bebob, &sync_mode);
 	if (err < 0)
 		goto end;
 	if (sync_mode == CIP_SYNC_TO_DEVICE) {
 		master = &bebob->tx_stream;
 		slave  = &bebob->rx_stream;
+		slave_substreams = &bebob->playback_substreams;
 	} else {
 		master = &bebob->rx_stream;
 		slave  = &bebob->tx_stream;
+		slave_substreams = &bebob->capture_substreams;
 	}
 
 	/*
@@ -504,9 +509,6 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	err = check_connection_used_by_others(bebob, master);
 	if (err < 0)
 		goto end;
-
-	/* need to touch slave stream */
-	slave_flag = (request == slave) || amdtp_stream_running(slave);
 
 	/*
 	 * packet queueing error or detecting discontinuity
@@ -589,7 +591,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
 	}
 
 	/* start slave if needed */
-	if (slave_flag && !amdtp_stream_running(slave)) {
+	if (atomic_read(slave_substreams) > 0 && !amdtp_stream_running(slave)) {
 		err = start_stream(bebob, slave, rate);
 		if (err < 0) {
 			dev_err(&bebob->unit->device,

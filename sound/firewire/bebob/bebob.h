@@ -216,9 +216,7 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob);
 int snd_bebob_stream_map(struct snd_bebob *bebob,
 			 struct amdtp_stream *stream);
 int snd_bebob_stream_init_duplex(struct snd_bebob *bebob);
-int snd_bebob_stream_start_duplex(struct snd_bebob *bebob,
-				  struct amdtp_stream *stream,
-				   unsigned int sampling_rate);
+int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, int rate);
 void snd_bebob_stream_stop_duplex(struct snd_bebob *bebob);
 void snd_bebob_stream_update_duplex(struct snd_bebob *bebob);
 void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob);
