@@ -78,7 +78,7 @@ end:
 	return err;
 }
 
-static int stream_init(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
+static int init_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 {
 	struct cmp_connection *conn;
 	enum cmp_direction c_dir;
@@ -100,14 +100,17 @@ static int stream_init(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 		goto end;
 
 	err = amdtp_stream_init(stream, oxfw->unit, s_dir, CIP_NONBLOCKING);
-	if (err < 0)
+	if (err < 0) {
+		amdtp_stream_destroy(stream);
 		cmp_connection_destroy(conn);
+	}
 end:
 	return err;
 }
 
 static void stop_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 {
+	amdtp_stream_pcm_abort(stream);
 	amdtp_stream_stop(stream);
 
 	if (stream == &oxfw->tx_stream)
@@ -172,6 +175,16 @@ end:
 	return err;
 }
 
+static void destroy_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
+{
+	stop_stream(oxfw, stream);
+
+	if (stream == &oxfw->tx_stream)
+		cmp_connection_destroy(&oxfw->out_conn);
+	else
+		cmp_connection_destroy(&oxfw->in_conn);
+}
+
 static int check_connection_used_by_others(struct snd_oxfw *oxfw,
 					   struct amdtp_stream *stream)
 {
@@ -196,11 +209,26 @@ static int check_connection_used_by_others(struct snd_oxfw *oxfw,
 	return err;
 }
 
-int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
-			  struct amdtp_stream *stream, unsigned int rate)
+int snd_oxfw_stream_init_duplex(struct snd_oxfw *oxfw)
+{
+	int err;
+
+	err = init_stream(oxfw, &oxfw->rx_stream);
+	if (err < 0)
+		goto end;
+
+	if (oxfw->has_output) {
+		err = init_stream(oxfw, &oxfw->tx_stream);
+		if (err < 0)
+			destroy_stream(oxfw, &oxfw->rx_stream);
+	}
+end:
+	return err;
+}
+
+int snd_oxfw_stream_start_duplex(struct snd_oxfw *oxfw, int rate)
 {
 	unsigned int curr_rate;
-	struct amdtp_stream *opposite;
 	int err;
 
 	mutex_lock(&oxfw->mutex);
@@ -209,13 +237,22 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 	 * Considering JACK/FFADO streaming:
 	 * TODO: This can be removed hwdep functionality becomes popular.
 	 */
-	err = check_connection_used_by_others(oxfw, stream);
+	err = check_connection_used_by_others(oxfw, &oxfw->rx_stream);
 	if (err < 0)
 		goto end;
+	if (oxfw->has_output) {
+		err = check_connection_used_by_others(oxfw, &oxfw->tx_stream);
+		if (err < 0)
+			goto end;
+	}
 
 	/* packet queueing error */
-	if (amdtp_streaming_error(stream))
-		stop_stream(oxfw, stream);
+	if (amdtp_streaming_error(&oxfw->rx_stream))
+		stop_stream(oxfw, &oxfw->rx_stream);
+	if (oxfw->has_output) {
+		if (amdtp_streaming_error(&oxfw->tx_stream))
+			stop_stream(oxfw, &oxfw->tx_stream);
+	}
 
 	/* stop streams if rate is different */
 	err = snd_oxfw_stream_get_rate(oxfw, &curr_rate);
@@ -224,92 +261,77 @@ int snd_oxfw_stream_start(struct snd_oxfw *oxfw,
 	if (rate == 0)
 		rate = curr_rate;
 	if (curr_rate != rate) {
-		/* get opposite stream */
-		if (stream == &oxfw->tx_stream)
-			opposite = &oxfw->rx_stream;
-		else if (oxfw->has_output)
-			opposite = &oxfw->tx_stream;
-		else
-			opposite = NULL;
+		if (oxfw->has_output)
+			stop_stream(oxfw, &oxfw->tx_stream);
 
-		/* stop opposite stream safely */
-		if (opposite) {
-			err = check_connection_used_by_others(oxfw, opposite);
-			if (err < 0)
-				goto end;
-			if (!amdtp_stream_running(opposite))
-				opposite = NULL;
-			else
-				stop_stream(oxfw, opposite);
-		}
-
-		stop_stream(oxfw, stream);
+		stop_stream(oxfw, &oxfw->rx_stream);
 
 		err = snd_oxfw_stream_set_rate(oxfw, rate);
 		if (err < 0)
 			goto end;
-
-		/* Start opposite stream as soon as possible */
-		if (opposite) {
-			err = start_stream(oxfw, opposite, rate);
-			if (err < 0)
-				goto end;
-		}
 	}
 
-	if (!amdtp_stream_running(stream))
-		err = start_stream(oxfw, stream, rate);
+	if (atomic_read(&oxfw->playback_substreams) &&
+	    !amdtp_stream_running(&oxfw->rx_stream)) {
+		err = start_stream(oxfw, &oxfw->rx_stream, rate);
+		if (err < 0)
+			goto end;
+	}
+
+	if (oxfw->has_output) {
+		if ((atomic_read(&oxfw->capture_substreams) > 0) &&
+		    !amdtp_stream_running(&oxfw->tx_stream))
+			err = start_stream(oxfw, &oxfw->tx_stream, rate);
+	}
 end:
 	mutex_unlock(&oxfw->mutex);
 	return err;
 }
 
-void snd_oxfw_stream_stop(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
+void snd_oxfw_stream_stop_duplex(struct snd_oxfw *oxfw)
 {
-	atomic_t *substreams;
-
-	if (stream == &oxfw->tx_stream)
-		substreams = &oxfw->capture_substreams;
-	else
-		substreams = &oxfw->playback_substreams;
-
-	if (atomic_read(substreams) == 0) {
-		mutex_lock(&oxfw->mutex);
-		stop_stream(oxfw, stream);
-		mutex_unlock(&oxfw->mutex);
-	}
-}
-
-void snd_oxfw_stream_destroy(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
-{
-	amdtp_stream_pcm_abort(stream);
-
 	mutex_lock(&oxfw->mutex);
-	stop_stream(oxfw, stream);
-	if (stream == &oxfw->tx_stream)
-		cmp_connection_destroy(&oxfw->out_conn);
-	else
-		cmp_connection_destroy(&oxfw->in_conn);
+
+	if (atomic_read(&oxfw->playback_substreams) == 0)
+		stop_stream(oxfw, &oxfw->rx_stream);
+
+	if (oxfw->has_output) {
+		if ((atomic_read(&oxfw->capture_substreams) == 0))
+			stop_stream(oxfw, &oxfw->tx_stream);
+	}
+
 	mutex_unlock(&oxfw->mutex);
 }
 
-void snd_oxfw_stream_update(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
+void snd_oxfw_stream_destroy_duplex(struct snd_oxfw *oxfw)
 {
-	struct cmp_connection *conn;
+	mutex_lock(&oxfw->mutex);
 
-	if (stream == &oxfw->tx_stream)
-		conn = &oxfw->out_conn;
+	destroy_stream(oxfw, &oxfw->rx_stream);
+
+	if (oxfw->has_output)
+		destroy_stream(oxfw, &oxfw->tx_stream);
+
+	mutex_unlock(&oxfw->mutex);
+}
+
+void snd_oxfw_stream_update_duplex(struct snd_oxfw *oxfw)
+{
+	mutex_lock(&oxfw->mutex);
+
+	if (cmp_connection_update(&oxfw->in_conn) < 0)
+		stop_stream(oxfw, &oxfw->rx_stream);
 	else
-		conn = &oxfw->in_conn;
+		amdtp_stream_update(&oxfw->rx_stream);
 
-	if (cmp_connection_update(conn) < 0) {
-		amdtp_stream_pcm_abort(stream);
-		mutex_lock(&oxfw->mutex);
-		stop_stream(oxfw, stream);
-		mutex_unlock(&oxfw->mutex);
-	} else {
-		amdtp_stream_update(stream);
+	if (oxfw->has_output) {
+		if (cmp_connection_update(&oxfw->out_conn) < 0)
+			stop_stream(oxfw, &oxfw->tx_stream);
+		else
+			amdtp_stream_update(&oxfw->tx_stream);
 	}
+
+	mutex_unlock(&oxfw->mutex);
 }
 
 /*
@@ -518,20 +540,6 @@ int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 		else if (oxfw->rx_stream_formations[i].midi > 0)
 			oxfw->midi_output_ports = 1;
 	}
-end:
-	return err;
-}
-
-int snd_oxfw_streams_init(struct snd_oxfw *oxfw)
-{
-	int err;
-
-	err = stream_init(oxfw, &oxfw->rx_stream);
-	if (err < 0)
-		goto end;
-
-	if (oxfw->has_output)
-		err = stream_init(oxfw, &oxfw->tx_stream);
 end:
 	return err;
 }
