@@ -784,17 +784,19 @@ fill_stream_formations(struct snd_bebob *bebob, enum avc_bridgeco_plug_dir dir,
 					    AVC_BRIDGECO_PLUG_UNIT_ISOC, pid);
 		err = avc_bridgeco_get_plug_strm_fmt(bebob->unit, addr,
 						     eid, buf, &len);
-		if (err < 0)
-			goto end;
-		else if (len < 3)
+		if (err < 0) {
+			/* No entries remained. */
+			if (err == -EINVAL)
+				err = 0;
 			break;
+		}
 
 		/* parse and set stream formation */
 		err = parse_stream_formation(buf, len, formations);
 		if (err < 0)
-			goto end;
+			break;
 	}
-end:
+
 	kfree(buf);
 	return err;
 }

@@ -254,6 +254,7 @@ int avc_bridgeco_get_plug_input(struct fw_unit *unit,
 		goto end;
 
 	memcpy(input, buf + 10, 5);
+	err = 0;
 end:
 	kfree(buf);
 	return err;
@@ -282,23 +283,16 @@ int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 	err = fcp_avc_transaction(unit, buf, 12, buf, *len,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(10));
-	if (err < 0)
-		goto end;
-
-	/* reach the end of entries */
-	if (buf[0] == 0x0a) {
-		err = 0;
-		*len = 0;
-		goto end;
-	} else if (buf[0] != 0x0c) {
+	if ((err > 0) && (err < 12))
+		err = -EIO;
+	else if (buf[0] == 0x08)        /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a)        /* REJECTED */
 		err = -EINVAL;
-	/* the header of this command is 11 bytes */
-	} else if (err < 12) {
+	else if (buf[0] == 0x0b)        /* IN TRANSITION */
+		err = -EAGAIN;
+	else if (buf[10] != entryid)
 		err = -EIO;
-	} else if (buf[10] != entryid) {
-		err = -EIO;
-	}
-
 	if (err < 0)
 		goto end;
 
