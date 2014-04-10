@@ -178,12 +178,11 @@ avc_bridgeco_fill_unit_addr(u8 buf[AVC_BRIDGECO_ADDR_BYTES],
 	buf[5] = 0xff;	/* reserved */
 }
 static inline void
-avc_bridgeco_fill_subunit_addr(u8 buf[AVC_BRIDGECO_ADDR_BYTES],
-			       unsigned int mode,
-			       enum avc_bridgeco_plug_dir dir,
-			       unsigned int pid)
+avc_bridgeco_fill_msu_addr(u8 buf[AVC_BRIDGECO_ADDR_BYTES],
+			   enum avc_bridgeco_plug_dir dir,
+			   unsigned int pid)
 {
-	buf[0] = 0xff & mode;	/* Subunit */
+	buf[0] = 0x60;	/* Music subunit */
 	buf[1] = dir;
 	buf[2] = AVC_BRIDGECO_PLUG_MODE_SUBUNIT;
 	buf[3] = 0xff & pid;
@@ -191,7 +190,7 @@ avc_bridgeco_fill_subunit_addr(u8 buf[AVC_BRIDGECO_ADDR_BYTES],
 	buf[5] = 0xff;	/* reserved */
 }
 int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
-				 u8 add[AVC_BRIDGECO_ADDR_BYTES],
+				 u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				 u8 *buf, unsigned int len);
 int avc_bridgeco_get_plug_type(struct fw_unit *unit,
 			       u8 addr[AVC_BRIDGECO_ADDR_BYTES],
