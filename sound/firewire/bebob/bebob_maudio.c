@@ -224,57 +224,29 @@ end:
 static void
 special_stream_formation_set(struct snd_bebob *bebob)
 {
+	static const unsigned int ch_table[2][2][3] = {
+		/* AMDTP_OUT_STREAM */
+		{{ 6,  6,  4},	/* SPDIF */
+		 {12,  8,  4}},	/* ADAT */
+		/* AMDTP_IN_STREAM */
+		{{10, 10,  2},	/* SPDIF */
+		 {16, 12,  2}}	/* ADAT */
+	};
 	struct special_params *params = bebob->maudio_special_quirk;
-	unsigned int i;
+	unsigned int i, max;
 
-	/*
-	 * the stream formation is different depending on digital interface
-	 */
-	if (params->dig_in_fmt == 0x01) {
-		bebob->tx_stream_formations[1].pcm = 16;
-		bebob->tx_stream_formations[2].pcm = 16;
-		bebob->tx_stream_formations[3].pcm = 12;
-		bebob->tx_stream_formations[4].pcm = 12;
-		if (params->is1814) {
-			bebob->tx_stream_formations[5].pcm = 2;
-			bebob->tx_stream_formations[6].pcm = 2;
-		}
-	} else {
-		bebob->tx_stream_formations[1].pcm = 10;
-		bebob->tx_stream_formations[2].pcm = 10;
-		bebob->tx_stream_formations[3].pcm = 10;
-		bebob->tx_stream_formations[4].pcm = 10;
-		if (params->is1814) {
-			bebob->tx_stream_formations[5].pcm = 2;
-			bebob->tx_stream_formations[6].pcm = 2;
-		}
-	}
+	max = SND_BEBOB_STRM_FMT_ENTRIES - 1;
+	if (!params->is1814)
+		max -= 2;
 
-	if (params->dig_out_fmt == 0x01) {
-		bebob->rx_stream_formations[1].pcm = 12;
-		bebob->rx_stream_formations[2].pcm = 12;
-		bebob->rx_stream_formations[3].pcm = 8;
-		bebob->rx_stream_formations[4].pcm = 8;
-		if (params->is1814) {
-			bebob->rx_stream_formations[5].pcm = 4;
-			bebob->rx_stream_formations[6].pcm = 4;
-		}
-	} else {
-		bebob->rx_stream_formations[1].pcm = 6;
-		bebob->rx_stream_formations[2].pcm = 6;
-		bebob->rx_stream_formations[3].pcm = 6;
-		bebob->rx_stream_formations[4].pcm = 6;
-		if (params->is1814) {
-			bebob->rx_stream_formations[5].pcm = 4;
-			bebob->rx_stream_formations[6].pcm = 4;
-		}
-	}
+	for (i = 0; i < max; i++) {
+		bebob->tx_stream_formations[i + 1].pcm =
+			ch_table[AMDTP_IN_STREAM][params->dig_in_fmt][i / 2];
+		bebob->tx_stream_formations[i + 1].midi = 1;
 
-	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
-		bebob->tx_stream_formations[i].midi = 1;
-		bebob->rx_stream_formations[i].midi = 1;
-		if ((i > 4) && !params->is1814)
-			break;
+		bebob->rx_stream_formations[i + 1].pcm =
+			ch_table[AMDTP_OUT_STREAM][params->dig_out_fmt][i / 2];
+		bebob->rx_stream_formations[i + 1].midi = 1;
 	}
 }
 
@@ -285,7 +257,7 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 	struct special_params *params;
 	int err;
 
-	params = kmalloc(sizeof(struct special_params), GFP_KERNEL);
+	params = kzalloc(sizeof(struct special_params), GFP_KERNEL);
 	if (params == NULL)
 		return -ENOMEM;
 
