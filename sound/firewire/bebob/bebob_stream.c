@@ -690,7 +690,7 @@ void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
 }
 
 /*
- * See: Table 50: Extended Stream Format Info ‘Format Hierarchy Level 2’
+ * See: Table 50: Extended Stream Format Info Format Hierarchy Level 2’
  * in Additional AVC commands (Nov 2003, BridgeCo)
  */
 static int
@@ -722,16 +722,16 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		switch (format) {
 		/* PCM for IEC 60958-3 */
 		case 0x00:
-		/* PCM for Multi bit linear audio (raw) */
-		case 0x06:
+		/* Multi bit linear audio */
+		case 0x06:	/* Raw */
+		case 0x07:	/* DVD-Audio */
+		case 0x0c:	/* High Precision */
 			formation[i].pcm += channels;
 			break;
-		/* MIDI comformant (MMA/AMEI RP-027) */
+		/* MIDI Comformant */
 		case 0x0d:
 			formation[i].midi += channels;
 			break;
-		/* PCM for Multi bit linear audio (DVD-audio) */
-		case 0x07:
 		/* IEC 61937-3 to 7 */
 		case 0x01:
 		case 0x02:
@@ -743,8 +743,6 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		case 0x09:	/* (Plain) SACD */
 		case 0x0a:	/* (Encoded) Raw */
 		case 0x0b:	/* (ENcoded) SACD */
-		/* High precision Multi-bit Linear Audio */
-		case 0x0c:
 		/* Synchronization Stream (Stereo Raw audio) */
 		case 0x40:
 		/* Don't care */
@@ -821,18 +819,19 @@ seek_msu_sync_input_plug(struct snd_bebob *bebob)
 		if (err < 0)
 			goto end;
 
-		if (type == AVC_BRIDGECO_PLUG_TYPE_SYNC)
+		if (type == AVC_BRIDGECO_PLUG_TYPE_SYNC) {
 			bebob->sync_input_plug = i;
+			break;
+		}
 	}
 end:
 	return err;
 }
 
-/* In this function, 2 means input and output */
 int snd_bebob_stream_discover(struct snd_bebob *bebob)
 {
-	u8 plugs[AVC_PLUG_INFO_BUF_BYTES], addr[AVC_BRIDGECO_ADDR_BYTES];
 	struct snd_bebob_clock_spec *clk_spec = bebob->spec->clock;
+	u8 plugs[AVC_PLUG_INFO_BUF_BYTES], addr[AVC_BRIDGECO_ADDR_BYTES];
 	enum avc_bridgeco_plug_type type;
 	unsigned int i;
 	int err;
@@ -843,43 +842,39 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 		goto end;
 
 	/*
-	 * This module supports one ISOC input plug and one ISOC output plug
-	 * then ignores the others.
+	 * This module supports at least one isoc input plug and one isoc
+	 * output plug.
 	 */
-	if (plugs[0] == 0) {
-		err = -EIO;
+	if ((plugs[0] == 0) || (plugs[1] == 0)) {
+		err = -ENOSYS;
 		goto end;
 	}
+
 	avc_bridgeco_fill_unit_addr(addr, AVC_BRIDGECO_PLUG_DIR_IN,
 				    AVC_BRIDGECO_PLUG_UNIT_ISOC, 0);
 	err = avc_bridgeco_get_plug_type(bebob->unit, addr, &type);
 	if (err < 0)
 		goto end;
 	else if (type != AVC_BRIDGECO_PLUG_TYPE_ISOC) {
-		err = -EIO;
+		err = -ENOSYS;
 		goto end;
 	}
+	err = fill_stream_formations(bebob, AVC_BRIDGECO_PLUG_DIR_IN, 0);
+	if (err < 0)
+		goto end;
 
-	if (plugs[1] == 0) {
-		err = -EIO;
-		goto end;
-	}
 	avc_bridgeco_fill_unit_addr(addr, AVC_BRIDGECO_PLUG_DIR_OUT,
 				    AVC_BRIDGECO_PLUG_UNIT_ISOC, 0);
 	err = avc_bridgeco_get_plug_type(bebob->unit, addr, &type);
 	if (err < 0)
 		goto end;
 	else if (type != AVC_BRIDGECO_PLUG_TYPE_ISOC) {
-		err = -EIO;
+		err = -ENOSYS;
 		goto end;
 	}
-
-	/* store formations */
-	for (i = 0; i < 2; i++) {
-		err = fill_stream_formations(bebob, i, 0);
-		if (err < 0)
-			goto end;
-	}
+	err = fill_stream_formations(bebob, AVC_BRIDGECO_PLUG_DIR_OUT, 0);
+	if (err < 0)
+		goto end;
 
 	/* count external input plugs for MIDI */
 	bebob->midi_input_ports = 0;
@@ -911,7 +906,6 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 end:
 	return err;
 }
-
 void snd_bebob_stream_lock_changed(struct snd_bebob *bebob)
 {
 	bebob->dev_lock_changed = true;
