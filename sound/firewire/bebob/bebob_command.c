@@ -28,7 +28,6 @@ int avc_audio_set_selector(struct fw_unit *unit, unsigned int subunit_id,
 	buf[7]  = 0xff & num;	/* input function block plug number */
 	buf[8]  = 0x01;		/* control selector is SELECTOR_CONTROL */
 
-	/* do transaction and check buf[1-8] are the same against command */
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(8));
@@ -65,7 +64,6 @@ int avc_audio_get_selector(struct fw_unit *unit, unsigned int subunit_id,
 	buf[7]  = 0xff;		/* input function block plug number */
 	buf[8]  = 0x01;		/* control selector is SELECTOR_CONTROL */
 
-	/* do transaction and check buf[1-6,8] are the same against command */
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(8));
@@ -88,19 +86,21 @@ end:
 }
 
 static inline void
-avc_bridgeco_fill_command_base(u8 *buf, unsigned int ctype, unsigned int opcode,
-			       unsigned int subfunction,
-			       u8 addr[AVC_BRIDGECO_ADDR_BYTES])
+avc_bridgeco_fill_extension_addr(u8 *buf, u8 *addr)
 {
-	buf[0] = 0x7 & ctype;
 	buf[1] = addr[0];
-	buf[2] = 0xff & opcode;
-	buf[3] = 0xff & subfunction;
-	buf[4] = addr[1];
-	buf[5] = addr[2];
-	buf[6] = addr[3];
-	buf[7] = addr[4];
-	buf[8] = addr[5];
+	memcpy(buf + 4, addr + 1, 5);
+}
+
+static inline void
+avc_bridgeco_fill_plug_info_extension_command(u8 *buf, u8 *addr,
+					      unsigned int itype)
+{
+	buf[0] = 0x01;	/* AV/C STATUS */
+	buf[2] = 0x02;	/* AV/C GENERAL PLUG INFO */
+	buf[3] = 0xc0;	/* BridgeCo extension */
+	avc_bridgeco_fill_extension_addr(buf, addr);
+	buf[9] = itype;	/* info type */
 }
 
 int avc_bridgeco_get_plug_type(struct fw_unit *unit,
@@ -114,12 +114,9 @@ int avc_bridgeco_get_plug_type(struct fw_unit *unit,
 	if (buf == NULL)
 		return -ENOMEM;
 
-	/* status for plug info with bridgeco extension */
-	avc_bridgeco_fill_command_base(buf, 0x01, 0x02, 0xc0, addr);
-	buf[9]  = 0x00;		/* info type is 'plug type' */
-	buf[10] = 0xff;		/* plug type in response */
+	/* Info type is 'plug type'. */
+	avc_bridgeco_fill_plug_info_extension_command(buf, addr, 0x00);
 
-	/* do transaction and check buf[1-7,9] are the same against command */
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(9));
@@ -153,13 +150,9 @@ int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
 		goto end;
 	}
 
-	/* status for plug info with bridgeco extension */
-	avc_bridgeco_fill_command_base(buf, 0x01, 0x02, 0xc0, addr);
+	/* Info type is 'channel position'. */
+	avc_bridgeco_fill_plug_info_extension_command(buf, addr, 0x03);
 
-	/* info type is 'channel position' */
-	buf[9] = 0x03;
-
-	/* do transaction and check buf[1-7,9] are the same */
 	err = fcp_avc_transaction(unit, buf, 12, buf, 256,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
 				  BIT(5) | BIT(6) | BIT(7) | BIT(9));
@@ -174,7 +167,7 @@ int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
 	if (err < 0)
 		goto end;
 
-	/* strip command header */
+	/* Pick up specific data. */
 	memmove(buf, buf + 10, err - 10);
 	err = 0;
 end:
@@ -183,7 +176,7 @@ end:
 
 int avc_bridgeco_get_plug_section_type(struct fw_unit *unit,
 				       u8 addr[AVC_BRIDGECO_ADDR_BYTES],
-				       unsigned int section_id, u8 *type)
+				       unsigned int id, u8 *type)
 {
 	u8 *buf;
 	int err;
@@ -193,14 +186,10 @@ int avc_bridgeco_get_plug_section_type(struct fw_unit *unit,
 	if (buf == NULL)
 		return -ENOMEM;
 
-	/* status for plug info with bridgeco extension */
-	avc_bridgeco_fill_command_base(buf, 0x01, 0x02, 0xc0, addr);
+	/* Info type is 'section info'. */
+	avc_bridgeco_fill_plug_info_extension_command(buf, addr, 0x07);
+	buf[10] = 0xff & ++id;	/* section id */
 
-	buf[9] = 0x07;		/* info type is 'section info' */
-	buf[10] = 0xff & (section_id + 1);	/* section id */
-	buf[11] = 0x00;		/* type in response */
-
-	/* do transaction and check buf[1-7,9,10] are the same */
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(9) | BIT(10));
@@ -232,13 +221,9 @@ int avc_bridgeco_get_plug_input(struct fw_unit *unit,
 	if (buf == NULL)
 		return -ENOMEM;
 
-	/* status for plug info with bridgeco extension */
-	avc_bridgeco_fill_command_base(buf, 0x01, 0x02, 0xc0, addr);
+	/* Info type is 'plug input'. */
+	avc_bridgeco_fill_plug_info_extension_command(buf, addr, 0x05);
 
-	/* info type is 'Plug Input Specific Data' */
-	buf[9] = 0x05;
-
-	/* do transaction and check buf[1-7] are the same */
 	err = fcp_avc_transaction(unit, buf, 16, buf, 16,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7));
@@ -261,9 +246,8 @@ end:
 }
 
 int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
-				   u8 addr[AVC_BRIDGECO_ADDR_BYTES],
-				   unsigned int entryid, u8 *buf,
-				   unsigned int *len)
+				   u8 addr[AVC_BRIDGECO_ADDR_BYTES], u8 *buf,
+				   unsigned int *len, unsigned int eid)
 {
 	int err;
 
@@ -273,13 +257,12 @@ int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 		goto end;
 	}
 
-	/* status for plug info with bridgeco extension */
-	avc_bridgeco_fill_command_base(buf, 0x01, 0x2f, 0xc1, addr);
+	buf[0] = 0x01;	/* AV/C STATUS */
+	buf[2] = 0x2f;	/* AV/C STREAM FORMAT SUPPORT */
+	buf[3] = 0xc1;	/* Bridgeco extension - List Request */
+	avc_bridgeco_fill_extension_addr(buf, addr);
+	buf[10] = 0xff & eid;	/* Entry ID */
 
-	buf[9] = 0xff;			/* stream status in response */
-	buf[10] = 0xff & entryid;	/* entry ID */
-
-	/* do transaction and check buf[1-7,10] are the same against command */
 	err = fcp_avc_transaction(unit, buf, 12, buf, *len,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(10));
@@ -291,12 +274,12 @@ int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 		err = -EINVAL;
 	else if (buf[0] == 0x0b)        /* IN TRANSITION */
 		err = -EAGAIN;
-	else if (buf[10] != entryid)
+	else if (buf[10] != eid)
 		err = -EIO;
 	if (err < 0)
 		goto end;
 
-	/* strip command header */
+	/* Pick up 'stream format info'. */
 	memmove(buf, buf + 11, err - 11);
 	*len = err - 11;
 	err = 0;

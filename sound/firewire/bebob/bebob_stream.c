@@ -782,8 +782,8 @@ fill_stream_formations(struct snd_bebob *bebob, enum avc_bridgeco_plug_dir dir,
 		memset(buf, 0, len);
 		avc_bridgeco_fill_unit_addr(addr, dir,
 					    AVC_BRIDGECO_PLUG_UNIT_ISOC, pid);
-		err = avc_bridgeco_get_plug_strm_fmt(bebob->unit, addr,
-						     eid, buf, &len);
+		err = avc_bridgeco_get_plug_strm_fmt(bebob->unit, addr, buf,
+						     &len, eid);
 		if (err < 0) {
 			/* No entries remained. */
 			if (err == -EINVAL)
@@ -804,7 +804,7 @@ fill_stream_formations(struct snd_bebob *bebob, enum avc_bridgeco_plug_dir dir,
 static int
 seek_msu_sync_input_plug(struct snd_bebob *bebob)
 {
-	u8 plugs[AVC_PLUG_INFO_BUF_COUNT], addr[AVC_BRIDGECO_ADDR_BYTES];
+	u8 plugs[AVC_PLUG_INFO_BUF_BYTES], addr[AVC_BRIDGECO_ADDR_BYTES];
 	unsigned int i, type;
 	int err;
 
@@ -831,7 +831,7 @@ end:
 /* In this function, 2 means input and output */
 int snd_bebob_stream_discover(struct snd_bebob *bebob)
 {
-	u8 plugs[AVC_PLUG_INFO_BUF_COUNT], addr[AVC_BRIDGECO_ADDR_BYTES];
+	u8 plugs[AVC_PLUG_INFO_BUF_BYTES], addr[AVC_BRIDGECO_ADDR_BYTES];
 	struct snd_bebob_clock_spec *clk_spec = bebob->spec->clock;
 	enum avc_bridgeco_plug_type type;
 	unsigned int i;

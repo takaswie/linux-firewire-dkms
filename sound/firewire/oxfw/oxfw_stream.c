@@ -478,7 +478,7 @@ end:
 
 int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 {
-	u8 plugs[AVC_PLUG_INFO_BUF_COUNT];
+	u8 plugs[AVC_PLUG_INFO_BUF_BYTES];
 	unsigned int i;
 	int err;
 

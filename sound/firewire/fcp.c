@@ -134,7 +134,7 @@ EXPORT_SYMBOL(avc_general_get_sig_fmt);
 
 int avc_general_get_plug_info(struct fw_unit *unit, unsigned int subunit_type,
 			      unsigned int subunit_id, unsigned int subfunction,
-			      u8 info[AVC_PLUG_INFO_BUF_COUNT])
+			      u8 info[AVC_PLUG_INFO_BUF_BYTES])
 {
 	u8 *buf;
 	int err;
@@ -154,9 +154,6 @@ int avc_general_get_plug_info(struct fw_unit *unit, unsigned int subunit_type,
 	buf[3] = 0xff & subfunction;
 
 	err = fcp_avc_transaction(unit, buf, 8, buf, 8, BIT(1) | BIT(2));
-	if (err < 0)
-		goto end;
-
 	if (err >= 0 && err < 8)
 		err = -EIO;
 	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */

@@ -17,13 +17,8 @@
  * and are recognized as new devices with the firmware.
  *
  * But with firmware version 5058 or later, the firmware is stored to flash
- * memory in the device and drivers can tell DM1000 to load the firmware by
- * sending a cue. This cue must be sent one time.
- *
- * If the firmware blobs are in alsa-firmware package, this driver can support
- * these devices with any firmware versions. (Then this driver need codes to
- * upload the firmware blob.) But for this, the license of firmware blob needs
- * to be considered.
+ * memory in the device and drivers can tell bootloader to load the firmware
+ * by sending a cue. This cue must be sent one time.
  *
  * For streaming, both of output and input streams are needed for Firewire 410
  * and Ozonic. The single stream is OK for the other devices even if the clock
@@ -158,7 +153,7 @@ check_clk_sync(struct snd_bebob *bebob, unsigned int size, bool *sync)
 	if (err < 0)
 		goto end;
 
-	/* if synced, this value is the same of SFC of FDF in CIP header */
+	/* if synced, this value is the same as SFC of FDF in CIP header */
 	*sync = (buf[size - 2] != 0xff);
 end:
 	kfree(buf);
@@ -199,7 +194,6 @@ avc_maudio_set_special_clk(struct snd_bebob *bebob, unsigned int clk_src,
 	buf[10] = 0x00;		/* padding  */
 	buf[11] = 0x00;		/* padding */
 
-	/* do transaction and check buf[1-9] are the same against command */
 	err = fcp_avc_transaction(bebob->unit, buf, 12, buf, 12,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
 				  BIT(5) | BIT(6) | BIT(7) | BIT(8) |

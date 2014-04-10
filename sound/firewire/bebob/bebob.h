@@ -197,14 +197,13 @@ int avc_bridgeco_get_plug_type(struct fw_unit *unit,
 			       enum avc_bridgeco_plug_type *type);
 int avc_bridgeco_get_plug_section_type(struct fw_unit *unit,
 				       u8 addr[AVC_BRIDGECO_ADDR_BYTES],
-				       unsigned int section_id, u8 *ctype);
+				       unsigned int id, u8 *type);
 int avc_bridgeco_get_plug_input(struct fw_unit *unit,
 				u8 addr[AVC_BRIDGECO_ADDR_BYTES],
 				u8 input[7]);
 int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
-				   u8 addr[AVC_BRIDGECO_ADDR_BYTES],
-				   unsigned int entryid, u8 *buf,
-				   unsigned int *len);
+				   u8 addr[AVC_BRIDGECO_ADDR_BYTES], u8 *buf,
+				   unsigned int *len, unsigned int eid);
 
 /* for AMDTP streaming */
 int snd_bebob_stream_get_rate(struct snd_bebob *bebob, unsigned int *rate);
