@@ -63,7 +63,7 @@ int avc_general_set_sig_fmt(struct fw_unit *unit, unsigned int rate,
 	/* do transaction and check buf[1-5] are the same against command */
 	err = fcp_avc_transaction(unit, buf, 8, buf, 8,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5));
-	if (err > 0 && err < 8)
+	if (err >= 0 && err < 8)
 		err = -EIO;
 	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
 		err = -ENOSYS;
@@ -106,7 +106,7 @@ int avc_general_get_sig_fmt(struct fw_unit *unit, unsigned int *rate,
 	/* do transaction and check buf[1-4] are the same against command */
 	err = fcp_avc_transaction(unit, buf, 8, buf, 8,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4));
-	if (err > 0 && err < 8)
+	if (err >= 0 && err < 8)
 		err = -EIO;
 	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
 		err = -ENOSYS;
@@ -157,7 +157,7 @@ int avc_general_get_plug_info(struct fw_unit *unit, unsigned int subunit_type,
 	if (err < 0)
 		goto end;
 
-	if (err != 8)
+	if (err >= 0 && err < 8)
 		err = -EIO;
 	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
 		err = -ENOSYS;

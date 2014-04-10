@@ -123,7 +123,7 @@ int avc_bridgeco_get_plug_type(struct fw_unit *unit,
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(9));
-	if (err > 0 && err < 8)
+	if ((err >= 0) && (err < 8))
 		err = -EIO;
 	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
 		err = -ENOSYS;
@@ -163,7 +163,7 @@ int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
 	err = fcp_avc_transaction(unit, buf, 12, buf, 256,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) |
 				  BIT(5) | BIT(6) | BIT(7) | BIT(9));
-	if (err > 0 && err < 8)
+	if ((err >= 0) && (err < 8))
 		err = -EIO;
 	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
 		err = -ENOSYS;
@@ -204,7 +204,7 @@ int avc_bridgeco_get_plug_section_type(struct fw_unit *unit,
 	err = fcp_avc_transaction(unit, buf, 12, buf, 12,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(9) | BIT(10));
-	if (err > 0 && err < 8)
+	if ((err >= 0) && (err < 8))
 		err = -EIO;
 	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
 		err = -ENOSYS;
@@ -242,7 +242,7 @@ int avc_bridgeco_get_plug_input(struct fw_unit *unit,
 	err = fcp_avc_transaction(unit, buf, 16, buf, 16,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7));
-	if (err > 0 && err < 8)
+	if ((err >= 0) && (err < 8))
 		err = -EIO;
 	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
 		err = -ENOSYS;
@@ -283,7 +283,7 @@ int avc_bridgeco_get_plug_strm_fmt(struct fw_unit *unit,
 	err = fcp_avc_transaction(unit, buf, 12, buf, *len,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(10));
-	if ((err > 0) && (err < 12))
+	if ((err >= 0) && (err < 12))
 		err = -EIO;
 	else if (buf[0] == 0x08)        /* NOT IMPLEMENTED */
 		err = -ENOSYS;
