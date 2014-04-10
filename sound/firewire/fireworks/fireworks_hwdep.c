@@ -56,7 +56,8 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 				return -EFAULT;
 
 			efw->pull_ptr += till_end;
-			if (efw->pull_ptr >= efw->resp_buf + snd_efw_resp_buf_size)
+			if (efw->pull_ptr >= efw->resp_buf +
+					     snd_efw_resp_buf_size)
 				efw->pull_ptr = efw->resp_buf;
 
 			length -= till_end;
