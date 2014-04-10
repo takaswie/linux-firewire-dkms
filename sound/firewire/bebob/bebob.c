@@ -300,7 +300,6 @@ bebob_update(struct fw_unit *unit)
 	}
 }
 
-
 static void bebob_remove(struct fw_unit *unit)
 {
 	struct snd_bebob *bebob = dev_get_drvdata(&unit->device);

@@ -117,12 +117,10 @@ saffirepro_both_clk_freq_get(struct snd_bebob *bebob, unsigned int *rate)
 	err = saffire_read_quad(bebob, SAFFIREPRO_RATE_NOREBOOT, &id);
 	if (err < 0)
 		goto end;
-	if (id >= ARRAY_SIZE(rates)) {
+	if (id >= ARRAY_SIZE(rates))
 		err = -EIO;
-		goto end;
-	}
-
-	*rate = rates[id];
+	else
+		*rate = rates[id];
 end:
 	return err;
 }
@@ -157,8 +155,9 @@ saffirepro_both_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 			*id = 2;
 		else if (value == SAFFIREPRO_CLOCK_SOURCE_SPDIF)
 			*id = 1;
-	} else if (value > 1)
+	} else if (value > 1) {
 		*id = value - 1;
+	}
 end:
 	return err;
 }
@@ -174,11 +173,9 @@ saffire_both_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 	u32 value;
 
 	err = saffire_read_quad(bebob, SAFFIRE_OFFSET_CLOCK_SOURCE, &value);
-	if (err < 0)
-		goto end;
+	if (err >= 0)
+		*id = 0xff & value;
 
-	*id = 0xff & value;
-end:
 	return err;
 };
 static char *saffire_le_meter_labels[] = {
@@ -208,10 +205,7 @@ saffire_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 		return -EIO;
 
 	err = saffire_read_block(bebob, offset, buf, size);
-	if (err < 0)
-		goto end;
-
-	if (spec->labels == saffire_le_meter_labels) {
+	if (err >= 0 && spec->labels == saffire_le_meter_labels) {
 		swap(buf[1], buf[3]);
 		swap(buf[2], buf[3]);
 		swap(buf[3], buf[4]);
@@ -223,15 +217,15 @@ saffire_meter_get(struct snd_bebob *bebob, u32 *buf, unsigned int size)
 
 		swap(buf[15], buf[16]);
 	}
-end:
+
 	return err;
 }
 
-/* Saffire Pro 26 I/O  */
 static struct snd_bebob_rate_spec saffirepro_both_rate_spec = {
 	.get	= &saffirepro_both_clk_freq_get,
 	.set	= &saffirepro_both_clk_freq_set,
 };
+/* Saffire Pro 26 I/O  */
 static struct snd_bebob_clock_spec saffirepro_26_clk_spec = {
 	.num	= ARRAY_SIZE(saffirepro_26_clk_src_labels),
 	.labels	= saffirepro_26_clk_src_labels,
@@ -254,7 +248,6 @@ struct snd_bebob_spec saffirepro_10_spec = {
 	.meter	= NULL
 };
 
-/* Saffire LE */
 static struct snd_bebob_rate_spec saffire_both_rate_spec = {
 	.get	= &snd_bebob_stream_get_rate,
 	.set	= &snd_bebob_stream_set_rate,
@@ -264,6 +257,7 @@ static struct snd_bebob_clock_spec saffire_both_clk_spec = {
 	.labels	= saffire_both_clk_src_labels,
 	.get	= &saffire_both_clk_src_get,
 };
+/* Saffire LE */
 struct snd_bebob_meter_spec saffire_le_meter_spec = {
 	.num	= ARRAY_SIZE(saffire_le_meter_labels),
 	.labels	= saffire_le_meter_labels,

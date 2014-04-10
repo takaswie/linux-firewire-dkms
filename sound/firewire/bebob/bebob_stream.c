@@ -16,7 +16,7 @@
  * For BeBoB streams, Both of input and output CMP connection are important.
  *
  * For most devices, each CMP connection starts to transmit/receive a
- * corresponding streams. But for a few devices, both of CMP connection needs
+ * corresponding stream. But for a few devices, both of CMP connection needs
  * to start transmitting stream. An example is 'M-Audio Firewire 410'.
  */
 

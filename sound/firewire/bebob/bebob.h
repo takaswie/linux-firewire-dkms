@@ -37,7 +37,7 @@
 #include "../amdtp.h"
 #include "../cmp.h"
 
-/* basic register addresses on DM1000 */
+/* basic register addresses on DM1000/DM1100/DM1500 */
 #define BEBOB_ADDR_REG_INFO	0xffffc8020000
 #define BEBOB_ADDR_REG_REQ	0xffffc8021000
 
