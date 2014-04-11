@@ -203,16 +203,9 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 
 	/*
 	 * One AMDTP packet can include some frames. In blocking mode, the
-	 * number equals to SYT_INTERVAL. It's 8, 16, 32, depending on its
-	 * sampling rate.
-	 * It's preferrable that period/buffer boundary is aligned to this
-	 * number. Furthermore, for the most accurate PCM interrupt, it's
-	 * preferrable period/buffer boundary is aligned to
-	 * frames_per_packet * packets_per_interrupt.
-	 *
-	 * Currently for the most accurate PCM interrupt, two points are lack.
-	 * One is PCM rule, another is to join PCM substreams at the first
-	 * packet in an isochronous interrupt.
+	 * number equals to SYT_INTERVAL. So the number is 8, 16 or 32,
+	 * depending on its sampling rate. For accurate PCM interrupt, it's
+	 * preferrable to aligh period/buffer sizes to LCM of these numbers.
 	 */
 	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
 					 SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 32);
