@@ -59,43 +59,43 @@ enum efc_cmd_hwctl {
 
 /* return values in response */
 enum efr_status {
-	EFC_RETVAL_OK			= 0,
-	EFC_RETVAL_BAD			= 1,
-	EFC_RETVAL_BAD_COMMAND		= 2,
-	EFC_RETVAL_COMM_ERR		= 3,
-	EFC_RETVAL_BAD_QUAD_COUNT	= 4,
-	EFC_RETVAL_UNSUPPORTED		= 5,
-	EFC_RETVAL_1394_TIMEOUT		= 6,
-	EFC_RETVAL_DSP_TIMEOUT		= 7,
-	EFC_RETVAL_BAD_RATE		= 8,
-	EFC_RETVAL_BAD_CLOCK		= 9,
-	EFC_RETVAL_BAD_CHANNEL		= 10,
-	EFC_RETVAL_BAD_PAN		= 11,
-	EFC_RETVAL_FLASH_BUSY		= 12,
-	EFC_RETVAL_BAD_MIRROR		= 13,
-	EFC_RETVAL_BAD_LED		= 14,
-	EFC_RETVAL_BAD_PARAMETER	= 15,
-	EFC_RETVAL_INCOMPLETE		= 0x80000000
+	EFR_STATUS_OK			= 0,
+	EFR_STATUS_BAD			= 1,
+	EFR_STATUS_BAD_COMMAND		= 2,
+	EFR_STATUS_COMM_ERR		= 3,
+	EFR_STATUS_BAD_QUAD_COUNT	= 4,
+	EFR_STATUS_UNSUPPORTED		= 5,
+	EFR_STATUS_1394_TIMEOUT		= 6,
+	EFR_STATUS_DSP_TIMEOUT		= 7,
+	EFR_STATUS_BAD_RATE		= 8,
+	EFR_STATUS_BAD_CLOCK		= 9,
+	EFR_STATUS_BAD_CHANNEL		= 10,
+	EFR_STATUS_BAD_PAN		= 11,
+	EFR_STATUS_FLASH_BUSY		= 12,
+	EFR_STATUS_BAD_MIRROR		= 13,
+	EFR_STATUS_BAD_LED		= 14,
+	EFR_STATUS_BAD_PARAMETER	= 15,
+	EFR_STATUS_INCOMPLETE		= 0x80000000
 };
 
 static const char *const efr_status_names[] = {
-	[EFC_RETVAL_OK]			= "OK",
-	[EFC_RETVAL_BAD]		= "bad",
-	[EFC_RETVAL_BAD_COMMAND]	= "bad command",
-	[EFC_RETVAL_COMM_ERR]		= "comm err",
-	[EFC_RETVAL_BAD_QUAD_COUNT]	= "bad quad count",
-	[EFC_RETVAL_UNSUPPORTED]	= "unsupported",
-	[EFC_RETVAL_1394_TIMEOUT]	= "1394 timeout",
-	[EFC_RETVAL_DSP_TIMEOUT]	= "DSP timeout",
-	[EFC_RETVAL_BAD_RATE]		= "bad rate",
-	[EFC_RETVAL_BAD_CLOCK]		= "bad clock",
-	[EFC_RETVAL_BAD_CHANNEL]	= "bad channel",
-	[EFC_RETVAL_BAD_PAN]		= "bad pan",
-	[EFC_RETVAL_FLASH_BUSY]		= "flash busy",
-	[EFC_RETVAL_BAD_MIRROR]		= "bad mirror",
-	[EFC_RETVAL_BAD_LED]		= "bad LED",
-	[EFC_RETVAL_BAD_PARAMETER]	= "bad parameter",
-	[EFC_RETVAL_BAD_PARAMETER + 1]	= "incomplete"
+	[EFR_STATUS_OK]			= "OK",
+	[EFR_STATUS_BAD]		= "bad",
+	[EFR_STATUS_BAD_COMMAND]	= "bad command",
+	[EFR_STATUS_COMM_ERR]		= "comm err",
+	[EFR_STATUS_BAD_QUAD_COUNT]	= "bad quad count",
+	[EFR_STATUS_UNSUPPORTED]	= "unsupported",
+	[EFR_STATUS_1394_TIMEOUT]	= "1394 timeout",
+	[EFR_STATUS_DSP_TIMEOUT]	= "DSP timeout",
+	[EFR_STATUS_BAD_RATE]		= "bad rate",
+	[EFR_STATUS_BAD_CLOCK]		= "bad clock",
+	[EFR_STATUS_BAD_CHANNEL]	= "bad channel",
+	[EFR_STATUS_BAD_PAN]		= "bad pan",
+	[EFR_STATUS_FLASH_BUSY]		= "flash busy",
+	[EFR_STATUS_BAD_MIRROR]		= "bad mirror",
+	[EFR_STATUS_BAD_LED]		= "bad LED",
+	[EFR_STATUS_BAD_PARAMETER]	= "bad parameter",
+	[EFR_STATUS_BAD_PARAMETER + 1]	= "incomplete"
 };
 
 static int
@@ -157,7 +157,7 @@ efw_transaction(struct snd_efw *efw, unsigned int category,
 	if ((header->version  < 1) ||
 	    (header->category != category) ||
 	    (header->command  != command) ||
-	    (header->status   != EFC_RETVAL_OK)) {
+	    (header->status   != EFR_STATUS_OK)) {
 		dev_err(&efw->unit->device, "EFC failed [%u/%u]: %s\n",
 			header->category, header->command,
 			efr_status_names[header->status]);
