@@ -133,7 +133,7 @@ get_hardware_info(struct snd_efw *efw)
 	 && (192000 <= hwinfo->max_sample_rate))
 		efw->supported_sampling_rate |= SNDRV_PCM_RATE_192000;
 
-	/* MIDI ports, not MIDI conformant data channels */
+	/* the number of MIDI ports, not of MIDI conformant data channels */
 	if (hwinfo->midi_out_ports > SND_EFW_MAX_MIDI_OUT_PORTS ||
 	    hwinfo->midi_in_ports > SND_EFW_MAX_MIDI_IN_PORTS) {
 		err = -EIO;
@@ -142,16 +142,6 @@ get_hardware_info(struct snd_efw *efw)
 	efw->midi_out_ports = hwinfo->midi_out_ports;
 	efw->midi_in_ports = hwinfo->midi_in_ports;
 
-	/* PCM data channels. Onyx 1200F seems to have the maximum number. */
-	if (hwinfo->amdtp_tx_pcm_channels    > 30 ||
-	    hwinfo->amdtp_tx_pcm_channels_2x > 30 ||
-	    hwinfo->amdtp_tx_pcm_channels_4x > 30 ||
-	    hwinfo->amdtp_rx_pcm_channels    > 34 ||
-	    hwinfo->amdtp_rx_pcm_channels_2x > 34 ||
-	    hwinfo->amdtp_rx_pcm_channels_4x > 34) {
-		err = -EIO;
-		goto end;
-	}
 	efw->pcm_capture_channels[0] = hwinfo->amdtp_tx_pcm_channels;
 	efw->pcm_capture_channels[1] = hwinfo->amdtp_tx_pcm_channels_2x;
 	efw->pcm_capture_channels[2] = hwinfo->amdtp_tx_pcm_channels_4x;
@@ -159,9 +149,8 @@ get_hardware_info(struct snd_efw *efw)
 	efw->pcm_playback_channels[1] = hwinfo->amdtp_rx_pcm_channels_2x;
 	efw->pcm_playback_channels[2] = hwinfo->amdtp_rx_pcm_channels_4x;
 
-	/* Hardware metering. Onyx 1200F seems to have the maximum number. */
-	if (hwinfo->phys_in > 30 || hwinfo->phys_out  > 36 ||
-	    hwinfo->phys_in_grp_count  > HWINFO_MAX_CAPS_GROUPS ||
+	/* Hardware metering. */
+	if (hwinfo->phys_in_grp_count  > HWINFO_MAX_CAPS_GROUPS ||
 	    hwinfo->phys_out_grp_count > HWINFO_MAX_CAPS_GROUPS) {
 		return -EIO;
 		goto end;
