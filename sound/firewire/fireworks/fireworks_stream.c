@@ -178,7 +178,7 @@ int snd_efw_stream_init_duplex(struct snd_efw *efw)
 		goto end;
 	}
 
-	/* set IEC61883 compliant mode */
+	/* set IEC61883 compliant mode (actually not fully compliant...) */
 	err = snd_efw_command_set_tx_mode(efw, SND_EFW_TRANSPORT_MODE_IEC61883);
 	if (err < 0) {
 		destroy_stream(efw, &efw->tx_stream);
