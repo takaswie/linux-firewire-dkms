@@ -39,7 +39,7 @@
 #define SND_EFW_MAX_MIDI_OUT_PORTS	2
 #define SND_EFW_MAX_MIDI_IN_PORTS	2
 
-#define SND_EFW_MUITIPLIER_MODES	3
+#define SND_EFW_MULTIPLIER_MODES	3
 #define HWINFO_NAME_SIZE_BYTES		32
 #define HWINFO_MAX_CAPS_GROUPS		8
 
@@ -80,8 +80,8 @@ struct snd_efw {
 	unsigned int midi_out_ports;
 
 	unsigned int supported_sampling_rate;
-	unsigned int pcm_capture_channels[SND_EFW_MUITIPLIER_MODES];
-	unsigned int pcm_playback_channels[SND_EFW_MUITIPLIER_MODES];
+	unsigned int pcm_capture_channels[SND_EFW_MULTIPLIER_MODES];
+	unsigned int pcm_playback_channels[SND_EFW_MULTIPLIER_MODES];
 
 	struct amdtp_stream *master;
 	struct amdtp_stream tx_stream;
