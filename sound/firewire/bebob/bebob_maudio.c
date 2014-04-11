@@ -226,11 +226,11 @@ special_stream_formation_set(struct snd_bebob *bebob)
 {
 	static const unsigned int ch_table[2][2][3] = {
 		/* AMDTP_OUT_STREAM */
-		{{ 6,  6,  4},	/* SPDIF */
-		 {12,  8,  4}},	/* ADAT */
+		{ {  6,  6,  4 },	/* SPDIF */
+		  { 12,  8,  4 } },	/* ADAT */
 		/* AMDTP_IN_STREAM */
-		{{10, 10,  2},	/* SPDIF */
-		 {16, 12,  2}}	/* ADAT */
+		{ { 10, 10,  2 },	/* SPDIF */
+		  { 16, 12,  2 } }	/* ADAT */
 	};
 	struct special_params *params = bebob->maudio_special_quirk;
 	unsigned int i, max;
