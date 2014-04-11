@@ -593,7 +593,7 @@ static int dice_hw_params(struct snd_pcm_substream *substream,
 	 */
 	channels = params_channels(hw_params);
 	if (rate_index > 4) {
-		if (channels >= AMDTP_MAX_CHANNELS_FOR_PCM / 2) {
+		if (channels > AMDTP_MAX_CHANNELS_FOR_PCM / 2) {
 			err = -ENOSYS;
 			return err;
 		}
