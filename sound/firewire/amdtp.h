@@ -54,6 +54,7 @@ enum cip_sfc {
 };
 
 #define AMDTP_IN_PCM_FORMAT_BITS	SNDRV_PCM_FMTBIT_S32
+
 #define AMDTP_OUT_PCM_FORMAT_BITS	(SNDRV_PCM_FMTBIT_S16 | \
 					 SNDRV_PCM_FMTBIT_S32)
 
@@ -182,10 +183,10 @@ static inline bool amdtp_streaming_error(struct amdtp_stream *s)
 }
 
 /**
- * amdtp_stream_pcm_running - check PCM stream is running or not
+ * amdtp_stream_pcm_running - check PCM substream is running or not
  * @s: the AMDTP stream
  *
- * If this function returns true, PCM stream in the stream is running.
+ * If this function returns true, PCM substream in the AMDTP stream is running.
  */
 static inline bool amdtp_stream_pcm_running(struct amdtp_stream *s)
 {
