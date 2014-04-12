@@ -480,7 +480,10 @@ static int queue_packet(struct amdtp_stream *s,
 			unsigned int payload_length, bool skip)
 {
 	struct fw_iso_packet p = {0};
-	int err;
+	int err = 0;
+
+	if (IS_ERR(s->context))
+		goto end;
 
 	p.interrupt = IS_ALIGNED(s->packet_index + 1, INTERRUPT_INTERVAL);
 	p.tag = TAG_CIP;
