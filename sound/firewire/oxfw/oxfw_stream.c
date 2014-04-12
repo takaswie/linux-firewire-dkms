@@ -345,31 +345,30 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		format = buf[6 + e * 2];
 
 		switch (format) {
-		/* IEC 60958-3 */
+		/* IEC 60958-3, currently handle as MBLA */
 		case 0x00:
 		/* Multi Bit Linear Audio (Raw) */
 		case 0x06:
 			formation[*index].pcm += channels;
 			break;
-		/* MIDI comformant */
+		/* MIDI conformant */
 		case 0x0d:
 			formation[*index].midi += channels;
 			break;
-		/* Multi Bit Linear Audio (DVD-audio) */
-		case 0x07:
 		/* IEC 61937-3 to 7 */
 		case 0x01:
 		case 0x02:
 		case 0x03:
 		case 0x04:
 		case 0x05:
+		/* Multi Bit Linear Audio */
+		case 0x07:	/* DVD-Audio */
+		case 0x0c:	/* High Precision */
 		/* One Bit Audio */
 		case 0x08:	/* (Plain) Raw */
 		case 0x09:	/* (Plain) SACD */
 		case 0x0a:	/* (Encoded) Raw */
-		case 0x0b:	/* (ENcoded) SACD */
-		/* High precision Multi-bit Linear Audio */
-		case 0x0c:
+		case 0x0b:	/* (Encoded) SACD */
 		/* SMPTE Time-Code conformant */
 		case 0x0e:
 		/* Sample Count */
