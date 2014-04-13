@@ -692,6 +692,7 @@ void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
 /*
  * See: Table 50: Extended Stream Format Info Format Hierarchy Level 2’
  * in Additional AVC commands (Nov 2003, BridgeCo)
+ * Also 'Clause 12 AM824 sequence adaption layers' in IEC 61883-6:2005
  */
 static int
 parse_stream_formation(u8 *buf, unsigned int len,
@@ -743,7 +744,7 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		case 0x08:	/* (Plain) Raw */
 		case 0x09:	/* (Plain) SACD */
 		case 0x0a:	/* (Encoded) Raw */
-		case 0x0b:	/* (ENcoded) SACD */
+		case 0x0b:	/* (Encoded) SACD */
 		/* Synchronization Stream (Stereo Raw audio) */
 		case 0x40:
 		/* Don't care */
@@ -777,8 +778,6 @@ fill_stream_formations(struct snd_bebob *bebob, enum avc_bridgeco_plug_dir dir,
 
 	for (eid = 0; eid < SND_BEBOB_STRM_FMT_ENTRIES; eid++) {
 		len = FORMAT_MAXIMUM_LENGTH;
-
-		memset(buf, 0, len);
 		avc_bridgeco_fill_unit_addr(addr, dir,
 					    AVC_BRIDGECO_PLUG_UNIT_ISOC, pid);
 		err = avc_bridgeco_get_plug_strm_fmt(bebob->unit, addr, buf,

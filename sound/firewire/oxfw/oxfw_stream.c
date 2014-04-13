@@ -337,7 +337,8 @@ void snd_oxfw_stream_update_duplex(struct snd_oxfw *oxfw)
 /*
  * See Table 6.16 - AM824 Stream Format
  *     Figure 6.19 - format_information field for AM824 Compound
- * at AV/C Stream Format Information Specification 1.1 (Apr 2005, 1394TA)
+ * in AV/C Stream Format Information Specification 1.1 (Apr 2005, 1394TA)
+ * Also 'Clause 12 AM824 sequence adaption layers' in IEC 61883-6:2005
  */
 static int
 parse_stream_formation(u8 *buf, unsigned int len,
@@ -376,7 +377,7 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		case 0x06:
 			formation[*index].pcm += channels;
 			break;
-		/* MIDI conformant */
+		/* MIDI Conformant */
 		case 0x0d:
 			formation[*index].midi += channels;
 			break;
