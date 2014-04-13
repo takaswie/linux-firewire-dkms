@@ -8,7 +8,7 @@
 
 /*
  * BeBoB is 'BridgeCo enhanced Breakout Box'. This is installed to firewire
- * devices with DM1000/1000E/1100/1500 chipset. It gives common way for host
+ * devices with DM1000/DM1100/DM1500 chipset. It gives common way for host
  * system to handle BeBoB based devices.
  */
 

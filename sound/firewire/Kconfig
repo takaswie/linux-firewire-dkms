@@ -87,14 +87,14 @@ config SND_FIREWORKS
 	  will be called snd-fireworks.
 
 config SND_BEBOB
-	tristate "BridgeCo DM1000/DM1000E/DM1100/1500 with BeBoB firmware"
+	tristate "BridgeCo DM1000/DM1100/DM1500 with BeBoB firmware"
 	select SND_FIREWIRE_LIB
 	select SND_RAWMIDI
 	select SND_PCM
 	select SND_HWDEP
         help
 	 Say Y here to include support for FireWire devices based
-	 on BridgeCo DM1000/1500 with BeBoB firmware:
+	 on BridgeCo DM1000/DM1100/DM1500 with BeBoB firmware:
 	  * Edirol FA-66/FA-101
 	  * PreSonus FIREBOX/FIREPOD/FP10/Inspire1394
 	  * BridgeCo RDAudio1/Audio5
