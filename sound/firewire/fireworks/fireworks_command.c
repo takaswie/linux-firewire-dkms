@@ -1,7 +1,7 @@
 /*
  * fireworks_command.c - a part of driver for Fireworks based devices
  *
- * Copyright (c) 2013 Takashi Sakamoto <o-takashi@sakmocchi.jp>
+ * Copyright (c) 2013-2014 Takashi Sakamoto
  *
  * Licensed under the terms of the GNU General Public License, version 2.
  */
