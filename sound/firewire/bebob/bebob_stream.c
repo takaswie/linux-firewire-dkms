@@ -785,7 +785,7 @@ fill_stream_formations(struct snd_bebob *bebob, enum avc_bridgeco_plug_dir dir,
 						     &len, eid);
 		if (err < 0) {
 			/* No entries remained. */
-			if (err == -EINVAL)
+			if (eid > 0 && err == -EINVAL)
 				err = 0;
 			break;
 		}
