@@ -69,7 +69,7 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule,
 
 static inline int
 hw_rule_capture_rate(struct snd_pcm_hw_params *params,
-				struct snd_pcm_hw_rule *rule)
+		     struct snd_pcm_hw_rule *rule)
 {
 	struct snd_bebob *bebob = rule->private;
 	return hw_rule_rate(params, rule, bebob,
@@ -78,7 +78,7 @@ hw_rule_capture_rate(struct snd_pcm_hw_params *params,
 
 static inline int
 hw_rule_playback_rate(struct snd_pcm_hw_params *params,
-				struct snd_pcm_hw_rule *rule)
+		      struct snd_pcm_hw_rule *rule)
 {
 	struct snd_bebob *bebob = rule->private;
 	return hw_rule_rate(params, rule, bebob,
@@ -87,7 +87,7 @@ hw_rule_playback_rate(struct snd_pcm_hw_params *params,
 
 static inline int
 hw_rule_capture_channels(struct snd_pcm_hw_params *params,
-				struct snd_pcm_hw_rule *rule)
+			 struct snd_pcm_hw_rule *rule)
 {
 	struct snd_bebob *bebob = rule->private;
 	return hw_rule_channels(params, rule, bebob,
@@ -96,7 +96,7 @@ hw_rule_capture_channels(struct snd_pcm_hw_params *params,
 
 static inline int
 hw_rule_playback_channels(struct snd_pcm_hw_params *params,
-				struct snd_pcm_hw_rule *rule)
+			  struct snd_pcm_hw_rule *rule)
 {
 	struct snd_bebob *bebob = rule->private;
 	return hw_rule_channels(params, rule, bebob,
@@ -104,8 +104,8 @@ hw_rule_playback_channels(struct snd_pcm_hw_params *params,
 }
 
 static void
-prepare_channels(struct snd_pcm_hardware *hw,
-	  struct snd_bebob_stream_formation *formations)
+limit_channels(struct snd_pcm_hardware *hw,
+	       struct snd_bebob_stream_formation *formations)
 {
 	unsigned int i;
 
@@ -120,8 +120,8 @@ prepare_channels(struct snd_pcm_hardware *hw,
 }
 
 static void
-prepare_rates(struct snd_pcm_hardware *hw,
-	  struct snd_bebob_stream_formation *formations)
+limit_rates(struct snd_pcm_hardware *hw,
+	    struct snd_bebob_stream_formation *formations)
 {
 	unsigned int i;
 
@@ -138,7 +138,7 @@ prepare_rates(struct snd_pcm_hardware *hw,
 
 static int
 pcm_init_hw_params(struct snd_bebob *bebob,
-			struct snd_pcm_substream *substream)
+		   struct snd_pcm_substream *substream)
 {
 	int err;
 
@@ -167,10 +167,10 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 
 	/* add rule between channels and sampling rate */
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		prepare_rates(&substream->runtime->hw,
-			      bebob->tx_stream_formations);
-		prepare_channels(&substream->runtime->hw,
-				 bebob->tx_stream_formations);
+		limit_rates(&substream->runtime->hw,
+			    bebob->tx_stream_formations);
+		limit_channels(&substream->runtime->hw,
+			       bebob->tx_stream_formations);
 		substream->runtime->hw.formats = AMDTP_IN_PCM_FORMAT_BITS;
 		snd_pcm_hw_rule_add(substream->runtime, 0,
 				    SNDRV_PCM_HW_PARAM_CHANNELS,
@@ -181,10 +181,10 @@ pcm_init_hw_params(struct snd_bebob *bebob,
 				    hw_rule_capture_rate, bebob,
 				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 	} else {
-		prepare_rates(&substream->runtime->hw,
-			      bebob->rx_stream_formations);
-		prepare_channels(&substream->runtime->hw,
-				 bebob->rx_stream_formations);
+		limit_rates(&substream->runtime->hw,
+			    bebob->rx_stream_formations);
+		limit_channels(&substream->runtime->hw,
+			       bebob->rx_stream_formations);
 		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
 		snd_pcm_hw_rule_add(substream->runtime, 0,
 				    SNDRV_PCM_HW_PARAM_CHANNELS,
