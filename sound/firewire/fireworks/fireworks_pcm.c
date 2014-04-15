@@ -134,6 +134,7 @@ pcm_init_hw_params(struct snd_efw *efw,
 		   struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct amdtp_stream *s;
 	unsigned int *pcm_channels;
 	int err;
 
@@ -155,9 +156,11 @@ pcm_init_hw_params(struct snd_efw *efw,
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		runtime->hw.formats = AMDTP_IN_PCM_FORMAT_BITS;
+		s = &efw->tx_stream;
 		pcm_channels = efw->pcm_capture_channels;
 	} else {
 		runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
+		s = &efw->rx_stream;
 		pcm_channels = efw->pcm_playback_channels;
 	}
 
@@ -179,33 +182,7 @@ pcm_init_hw_params(struct snd_efw *efw,
 	if (err < 0)
 		goto end;
 
-	/* AM824 in IEC 61883-6 can deliver 24bit data */
-	err = snd_pcm_hw_constraint_msbits(substream->runtime, 0, 32, 24);
-	if (err < 0)
-		goto end;
-
-	/*
-	 * One AMDTP packet can include some frames. In blocking mode, the
-	 * number equals to SYT_INTERVAL. So the number is 8, 16 or 32,
-	 * depending on its sampling rate. For accurate PCM interrupt, it's
-	 * preferrable to aligh period/buffer sizes to LCM of these numbers.
-	 */
-	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
-					 SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 32);
-	if (err < 0)
-		goto end;
-	err = snd_pcm_hw_constraint_step(substream->runtime, 0,
-					 SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 32);
-	if (err < 0)
-		goto end;
-
-	/*
-	 * Currently INTERRUPT_INTERVAL in amdtp.c is 16.
-	 * So snd_pcm_period_elapsed() can be called every 2m sec.
-	 */
-	err = snd_pcm_hw_constraint_minmax(substream->runtime,
-					   SNDRV_PCM_HW_PARAM_PERIOD_TIME,
-					   2000, UINT_MAX);
+	err = amdtp_stream_add_pcm_hw_constraints(s, runtime);
 end:
 	return err;
 }

@@ -13,6 +13,7 @@
 #include <linux/slab.h>
 #include <linux/sched.h>
 #include <sound/pcm.h>
+#include <sound/pcm_params.h>
 #include <sound/rawmidi.h>
 #include "amdtp.h"
 
@@ -116,6 +117,55 @@ const unsigned int amdtp_rate_table[] = {
 	[CIP_SFC_192000] = 192000,
 };
 EXPORT_SYMBOL(amdtp_rate_table);
+
+/**
+ * amdtp_stream_add_pcm_hw_constraints - add hw constraints for PCM substream
+ * @s:		the AMDTP stream, which must be initialized.
+ * @runtime:	the PCM substream runtime
+ */
+int amdtp_stream_add_pcm_hw_constraints(struct amdtp_stream *s,
+					struct snd_pcm_runtime *runtime)
+{
+	int err;
+
+	/* AM824 in IEC 61883-6 can deliver 24bit data */
+	err = snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
+	if (err < 0)
+		goto end;
+
+	/*
+	 * Currently INTERRUPT_INTERVAL is 16 and equals 2msec. So
+	 * So snd_pcm_period_elapsed() can be called every 2m sec.
+	 */
+	err = snd_pcm_hw_constraint_minmax(runtime,
+					   SNDRV_PCM_HW_PARAM_PERIOD_TIME,
+					   INTERRUPT_INTERVAL * 1000000 / 8000,
+					   UINT_MAX);
+	if (err < 0)
+		goto end;
+
+	/* Non-Blocking stream has no more constraints */
+	if (!(s->flags & CIP_BLOCKING))
+		goto end;
+
+	/*
+	 * One AMDTP packet can include some frames. In blocking mode, the
+	 * number equals to SYT_INTERVAL. So the number is 8, 16 or 32,
+	 * depending on its sampling rate. For accurate PCM interrupt, it's
+	 * preferrable to aligh period/buffer sizes to LCM of these numbers.
+	 *
+	 * TODO: These constraints can be improved with propper rules.
+	 */
+	err = snd_pcm_hw_constraint_step(runtime, 0,
+					 SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 32);
+	if (err < 0)
+		goto end;
+	err = snd_pcm_hw_constraint_step(runtime, 0,
+					 SNDRV_PCM_HW_PARAM_BUFFER_SIZE, 32);
+end:
+	return err;
+}
+EXPORT_SYMBOL(amdtp_stream_add_pcm_hw_constraints);
 
 /**
  * amdtp_stream_set_parameters - set stream parameters

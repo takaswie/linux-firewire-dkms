@@ -95,6 +95,7 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 			  struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct amdtp_stream *s;
 	struct snd_oxfw_stream_formation *formations;
 	int err;
 
@@ -116,9 +117,11 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		runtime->hw.formats = AMDTP_IN_PCM_FORMAT_BITS;
+		s = &oxfw->tx_stream;
 		formations = oxfw->tx_stream_formations;
 	} else {
 		runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
+		s = &oxfw->rx_stream;
 		formations = oxfw->rx_stream_formations;
 	}
 
@@ -136,18 +139,7 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 	if (err < 0)
 		goto end;
 
-	/* AM824 in IEC 61883-6 can deliver 24bit data */
-	err = snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
-	if (err < 0)
-		goto end;
-
-	/*
-	 * Currently INTERRUPT_INTERVAL in amdtp.c is 16.
-	 * So snd_pcm_period_elapsed() can be called every 2m sec.
-	 */
-	err = snd_pcm_hw_constraint_minmax(runtime,
-					   SNDRV_PCM_HW_PARAM_PERIOD_TIME,
-					   2000, UINT_MAX);
+	err = amdtp_stream_add_pcm_hw_constraints(s, runtime);
 end:
 	return err;
 }
