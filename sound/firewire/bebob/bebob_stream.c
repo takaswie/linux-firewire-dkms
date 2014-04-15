@@ -9,7 +9,7 @@
 #include "./bebob.h"
 
 #define CALLBACK_TIMEOUT	1000
-#define ISOCH_RESOURCE_DELAY	1000
+#define FW_ISO_RESOURCE_DELAY	1000
 
 /*
  * NOTE;
@@ -461,25 +461,23 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, int rate)
 	atomic_t *slave_substreams;
 	enum cip_flags sync_mode;
 	unsigned int curr_rate;
+	bool updated = false;
 	int err = 0;
 
 	/*
-	 * Normal BeBoB firmware has a quirk at bus reset to transfers packets
+	 * Normal BeBoB firmware has a quirk at bus reset to transmits packets
 	 * with discontinuous value in dbc field.
 	 *
-	 * This 'struct completion' is used to serialize .update() and
-	 * snd_pcm_prepare(). At first, .update() is called to update
-	 * connections. Secondly, following codes handle streaming error.
-	 *
-	 * Just for queueing error, please wait ISOCH_RESOURCE_DELAY.
+	 * This 'struct completion' is used to call .update() at first to update
+	 * connections/streams. Next following codes handle streaming error.
 	 */
-	if (amdtp_streaming_error(&bebob->tx_stream) &&
-	    amdtp_streaming_error(&bebob->rx_stream)) {
+	if (amdtp_streaming_error(&bebob->tx_stream)) {
 		if (completion_done(&bebob->bus_reset))
 			reinit_completion(&bebob->bus_reset);
 
-		wait_for_completion_interruptible_timeout(&bebob->bus_reset,
-				msecs_to_jiffies(ISOCH_RESOURCE_DELAY));
+		updated = (wait_for_completion_interruptible_timeout(
+				&bebob->bus_reset,
+				msecs_to_jiffies(FW_ISO_RESOURCE_DELAY)) > 0);
 	}
 
 	mutex_lock(&bebob->mutex);
@@ -513,17 +511,16 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, int rate)
 	/*
 	 * packet queueing error or detecting discontinuity
 	 *
-	 * At bus reset, connections should not be broken here. Following
-	 * codes re-establishing them and new streams includes discontinuity.
-	 * There is a need to start streams during transmitting packets. This
-	 * is a reason to use SKIP_INIT_DBC_CHECK flag.
+	 * At bus reset, connections should not be broken here. So streams need
+	 * to be re-started. This is a reason to use SKIP_INIT_DBC_CHECK flag.
 	 */
-	if (amdtp_streaming_error(master)) {
+	if (amdtp_streaming_error(master))
 		amdtp_stream_stop(master);
-		amdtp_stream_stop(slave);
-	}
 	if (amdtp_streaming_error(slave))
 		amdtp_stream_stop(slave);
+	if (!updated &&
+	    !amdtp_stream_running(master) && !amdtp_stream_running(slave))
+		break_both_connections(bebob);
 
 	/* stop streams if rate is different */
 	err = rate_spec->get(bebob, &curr_rate);
