@@ -903,6 +903,7 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 end:
 	return err;
 }
+
 void snd_bebob_stream_lock_changed(struct snd_bebob *bebob)
 {
 	bebob->dev_lock_changed = true;
