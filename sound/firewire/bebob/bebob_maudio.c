@@ -346,7 +346,7 @@ end:
 }
 
 /* Clock source control for special firmware */
-static char *special_clk_labels[] = {
+static char *const special_clk_labels[] = {
 	SND_BEBOB_CLOCK_INTERNAL " with Digital Mute", "Digital",
 	"Word Clock", SND_BEBOB_CLOCK_INTERNAL};
 static int special_clk_get(struct snd_bebob *bebob, unsigned int *id)
@@ -441,7 +441,7 @@ static struct snd_kcontrol_new special_sync_ctl = {
 };
 
 /* Digital interface control for special firmware */
-static char *special_dig_iface_labels[] = {
+static char *const special_dig_iface_labels[] = {
 	"S/PDIF Optical", "S/PDIF Coaxial", "ADAT Optical"
 };
 static int special_dig_in_iface_ctl_info(struct snd_kcontrol *kctl,
@@ -616,7 +616,7 @@ end:
 }
 
 /* Hardware metering for special firmware */
-static char *special_meter_labels[] = {
+static char *const special_meter_labels[] = {
 	ANA_IN, ANA_IN, ANA_IN, ANA_IN,
 	SPDIF_IN,
 	ADAT_IN, ADAT_IN, ADAT_IN, ADAT_IN,
@@ -656,30 +656,30 @@ end:
 }
 
 /* last 4 bytes are omitted because it's clock info. */
-static char *fw410_meter_labels[] = {
+static char *const fw410_meter_labels[] = {
 	ANA_IN, DIG_IN,
 	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT, DIG_OUT,
 	HP_OUT
 };
-static char *audiophile_meter_labels[] = {
+static char *const audiophile_meter_labels[] = {
 	ANA_IN, DIG_IN,
 	ANA_OUT, ANA_OUT, DIG_OUT,
 	HP_OUT, AUX_OUT,
 };
-static char *solo_meter_labels[] = {
+static char *const solo_meter_labels[] = {
 	ANA_IN, DIG_IN,
 	STRM_IN, STRM_IN,
 	ANA_OUT, DIG_OUT
 };
 
 /* no clock info */
-static char *ozonic_meter_labels[] = {
+static char *const ozonic_meter_labels[] = {
 	ANA_IN, ANA_IN,
 	STRM_IN, STRM_IN,
 	ANA_OUT, ANA_OUT
 };
 /* TODO: need testers. these positions are based on authour's assumption */
-static char *nrv10_meter_labels[] = {
+static char *const nrv10_meter_labels[] = {
 	ANA_IN, ANA_IN, ANA_IN, ANA_IN,
 	DIG_IN,
 	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT,

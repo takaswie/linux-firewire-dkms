@@ -101,11 +101,11 @@ saffire_write_quad(struct snd_bebob *bebob, u64 offset, u32 value)
 				  &data, sizeof(__be32), 0);
 }
 
-static char *saffirepro_26_clk_src_labels[] = {
+static char *const saffirepro_26_clk_src_labels[] = {
 	SND_BEBOB_CLOCK_INTERNAL, "S/PDIF", "ADAT1", "ADAT2", "Word Clock"
 };
 
-static char *saffirepro_10_clk_src_labels[] = {
+static char *const saffirepro_10_clk_src_labels[] = {
 	SND_BEBOB_CLOCK_INTERNAL, "S/PDIF", "Word Clock"
 };
 static int
@@ -163,7 +163,7 @@ end:
 }
 
 struct snd_bebob_spec saffire_le_spec;
-static char *saffire_both_clk_src_labels[] = {
+static char *const saffire_both_clk_src_labels[] = {
 	SND_BEBOB_CLOCK_INTERNAL, "S/PDIF"
 };
 static int
@@ -178,12 +178,12 @@ saffire_both_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 
 	return err;
 };
-static char *saffire_le_meter_labels[] = {
+static char *const saffire_le_meter_labels[] = {
 	ANA_IN, ANA_IN, DIG_IN,
 	ANA_OUT, ANA_OUT, ANA_OUT, ANA_OUT,
 	STM_IN, STM_IN
 };
-static char *saffire_meter_labels[] = {
+static char *const saffire_meter_labels[] = {
 	ANA_IN, ANA_IN,
 	STM_IN, STM_IN, STM_IN, STM_IN, STM_IN,
 };
