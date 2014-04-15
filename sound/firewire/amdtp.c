@@ -612,7 +612,10 @@ static void handle_in_packet(struct amdtp_stream *s,
 	if (data_blocks == 0 && (s->flags & CIP_EMPTY_HAS_WRONG_DBC) &&
 	    s->data_block_counter != UINT_MAX)
 		data_block_counter = s->data_block_counter;
-	if (!(s->flags & CIP_DBC_IS_END_EVENT)) {
+
+	if (s->data_block_counter == UINT_MAX) {
+		lost = false;
+	} else if (!(s->flags & CIP_DBC_IS_END_EVENT)) {
 		lost = data_block_counter != s->data_block_counter;
 	} else {
 		if ((data_blocks > 0) && (s->tx_dbc_interval > 0))
@@ -623,7 +626,9 @@ static void handle_in_packet(struct amdtp_stream *s,
 		lost = data_block_counter !=
 		       ((s->data_block_counter + dbc_interval) & 0xff);
 	}
-	if (lost && s->data_block_counter != UINT_MAX) {
+
+	if (lost &&
+	    (!(s->flags & CIP_SKIP_DBC_ZERO_CHECK) || data_block_counter > 0)) {
 		dev_info(&s->unit->device,
 			 "Detect discontinuity of CIP: %02X %02X\n",
 			 s->data_block_counter, data_block_counter);
