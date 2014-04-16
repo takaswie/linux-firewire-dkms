@@ -164,12 +164,6 @@ int snd_efw_create_midi_devices(struct snd_efw *efw)
 		str = &rmidi->streams[SNDRV_RAWMIDI_STREAM_OUTPUT];
 
 		set_midi_substream_names(efw, str);
-
-		/*
-		 * Fireworks ignores MIDI messages in more than first 8 data
-		 * blocks of an received AMDTP packet.
-		 */
-		efw->rx_stream.rx_blocks_for_midi = 8;
 	}
 
 	if ((efw->midi_out_ports > 0) && (efw->midi_in_ports > 0))
