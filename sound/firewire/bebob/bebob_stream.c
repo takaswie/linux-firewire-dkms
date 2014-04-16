@@ -107,6 +107,14 @@ snd_bebob_stream_set_rate(struct snd_bebob *bebob, unsigned int rate)
 
 	err = avc_general_set_sig_fmt(bebob->unit, rate,
 				      AVC_GENERAL_PLUG_DIR_IN, 0);
+	if (err < 0)
+		goto end;
+
+	/*
+	 * Some devices need a bit time for transition.
+	 * 300msec is got by some experimentals.
+	 */
+	msleep(300);
 end:
 	if (err < 0)
 		dev_err(&bebob->unit->device,
