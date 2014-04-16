@@ -40,7 +40,7 @@ hwdep_read_resp_buf(struct snd_efw *efw, char __user *buf, long remained,
 	/* write into buffer as many responses as possible */
 	while (efw->resp_queues > 0) {
 		t = (struct snd_efw_transaction *)(efw->pull_ptr);
-		length = be32_to_cpu(t->length) * sizeof(u32);
+		length = be32_to_cpu(t->length) * sizeof(__be32);
 
 		/* confirm enough space for this response */
 		if (remained < length)

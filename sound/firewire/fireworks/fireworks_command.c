@@ -101,18 +101,18 @@ static const char *const efr_status_names[] = {
 static int
 efw_transaction(struct snd_efw *efw, unsigned int category,
 		unsigned int command,
-		const __be32 *params, unsigned int param_quads,
-		const __be32 *resp, unsigned int resp_quads)
+		const __be32 *params, unsigned int param_bytes,
+		const __be32 *resp, unsigned int resp_bytes)
 {
 	struct snd_efw_transaction *header;
 	__be32 *buf;
 	u32 seqnum;
-	unsigned int i, buf_bytes, cmd_bytes;
+	unsigned int buf_bytes, cmd_bytes;
 	int err;
 
 	/* calculate buffer size*/
 	buf_bytes = sizeof(struct snd_efw_transaction) +
-		    max(param_quads, resp_quads) * sizeof(u32);
+		    max(param_bytes, resp_bytes);
 
 	/* keep buffer */
 	buf = kzalloc(buf_bytes, GFP_KERNEL);
@@ -130,50 +130,45 @@ efw_transaction(struct snd_efw *efw, unsigned int category,
 	spin_unlock(&efw->lock);
 
 	/* fill transaction header fields */
-	cmd_bytes = sizeof(struct snd_efw_transaction) +
-		    param_quads * sizeof(u32);
+	cmd_bytes = sizeof(struct snd_efw_transaction) + param_bytes;
 	header = (struct snd_efw_transaction *)buf;
-	header->length	 = cmd_bytes / sizeof(u32);
-	header->version	 = 1;
-	header->seqnum	 = seqnum;
-	header->category = category;
-	header->command	 = command;
+	header->length	 = cpu_to_be32(cmd_bytes / sizeof(__be32));
+	header->version	 = cpu_to_be32(1);
+	header->seqnum	 = cpu_to_be32(seqnum);
+	header->category = cpu_to_be32(category);
+	header->command	 = cpu_to_be32(command);
 	header->status	 = 0;
-	for (i = 0; i < sizeof(struct snd_efw_transaction) / sizeof(u32); i++)
-		cpu_to_be32s(&buf[i]);
 
 	/* fill transaction command parameters */
-	for (i = 0; i < param_quads; i++)
-		header->params[i] = params[i];
+	memcpy(header->params, params, param_bytes);
 
 	err = snd_efw_transaction_run(efw->unit, buf, cmd_bytes,
-				      buf, buf_bytes, seqnum);
+				      buf, buf_bytes);
 	if (err < 0)
 		goto end;
 
 	/* check transaction header fields */
-	for (i = 0; i < sizeof(struct snd_efw_transaction) / sizeof(u32); i++)
-		be32_to_cpus(&buf[i]);
-	if ((header->version  < 1) ||
-	    (header->category != category) ||
-	    (header->command  != command) ||
-	    (header->status   != EFR_STATUS_OK)) {
+	if ((be32_to_cpu(header->version) < 1) ||
+	    (be32_to_cpu(header->category) != category) ||
+	    (be32_to_cpu(header->command) != command) ||
+	    (be32_to_cpu(header->status) != EFR_STATUS_OK)) {
 		dev_err(&efw->unit->device, "EFC failed [%u/%u]: %s\n",
-			header->category, header->command,
-			efr_status_names[header->status]);
+			be32_to_cpu(header->category),
+			be32_to_cpu(header->command),
+			efr_status_names[be32_to_cpu(header->status)]);
 		err = -EIO;
 		goto end;
 	}
 
+	if (resp == NULL)
+		goto end;
+
 	/* fill transaction response parameters */
-	if (resp != NULL) {
-		memset((void *)resp, 0, resp_quads * sizeof(u32));
-		resp_quads = min_t(unsigned int, resp_quads,
-				   header->length -
-				    sizeof(struct snd_efw_transaction) /
-				    sizeof(u32));
-		memcpy((void *)resp, &buf[6], resp_quads * sizeof(u32));
-	}
+	memset((void *)resp, 0, resp_bytes);
+	resp_bytes = min_t(unsigned int, resp_bytes,
+			   be32_to_cpu(header->length) * sizeof(__be32) -
+				sizeof(struct snd_efw_transaction));
+	memcpy((void *)resp, &buf[6], resp_bytes);
 end:
 	kfree(buf);
 	return err;
@@ -205,7 +200,7 @@ int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 
 	return efw_transaction(efw, EFC_CAT_HWCTL,
 			       EFC_CMD_HWINFO_SET_RESP_ADDR,
-			       addr, 2, NULL, 0);
+			       addr, sizeof(addr), NULL, 0);
 }
 
 /*
@@ -219,7 +214,7 @@ int snd_efw_command_set_tx_mode(struct snd_efw *efw,
 	__be32 param = cpu_to_be32(mode);
 	return efw_transaction(efw, EFC_CAT_TRANSPORT,
 			       EFC_CMD_TRANSPORT_SET_TX_MODE,
-			       &param, 1, NULL, 0);
+			       &param, sizeof(param), NULL, 0);
 }
 
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
@@ -229,8 +224,7 @@ int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 
 	err  = efw_transaction(efw, EFC_CAT_HWINFO,
 			       EFC_CMD_HWINFO_GET_CAPS,
-			       NULL, 0, (__be32 *)hwinfo,
-			       sizeof(*hwinfo) / sizeof(u32));
+			       NULL, 0, (__be32 *)hwinfo, sizeof(*hwinfo));
 	if (err < 0)
 		goto end;
 
@@ -277,7 +271,7 @@ int snd_efw_command_get_phys_meters(struct snd_efw *efw,
 
 	err = efw_transaction(efw, EFC_CAT_HWINFO,
 			      EFC_CMD_HWINFO_GET_POLLED,
-			      NULL, 0, (__be32 *)meters, len / sizeof(u32));
+			      NULL, 0, (__be32 *)meters, len);
 	if (err >= 0)
 		for (i = 0; i < len / sizeof(u32); i++)
 			be32_to_cpus(&buf[i]);
@@ -293,8 +287,7 @@ command_get_clock(struct snd_efw *efw, struct efc_clock *clock)
 	err = efw_transaction(efw, EFC_CAT_HWCTL,
 			      EFC_CMD_HWCTL_GET_CLOCK,
 			      NULL, 0,
-			      (__be32 *)clock,
-			      sizeof(struct efc_clock) / sizeof(u32));
+			      (__be32 *)clock, sizeof(struct efc_clock));
 	if (err >= 0) {
 		be32_to_cpus(&clock->source);
 		be32_to_cpus(&clock->sampling_rate);
@@ -340,8 +333,7 @@ command_set_clock(struct snd_efw *efw,
 
 	err = efw_transaction(efw, EFC_CAT_HWCTL,
 			      EFC_CMD_HWCTL_SET_CLOCK,
-			      (__be32 *)&clock,
-			      sizeof(struct efc_clock) / sizeof(u32),
+			      (__be32 *)&clock, sizeof(struct efc_clock),
 			      NULL, 0);
 	if (err < 0)
 		goto end;
@@ -375,8 +367,7 @@ int snd_efw_command_set_clock_source(struct snd_efw *efw,
 	return command_set_clock(efw, source, UINT_MAX);
 }
 
-int snd_efw_command_get_sampling_rate(struct snd_efw *efw,
-				      unsigned int *rate)
+int snd_efw_command_get_sampling_rate(struct snd_efw *efw, unsigned int *rate)
 {
 	int err;
 	struct efc_clock clock = {0};
@@ -388,9 +379,7 @@ int snd_efw_command_get_sampling_rate(struct snd_efw *efw,
 	return err;
 }
 
-int
-snd_efw_command_set_sampling_rate(struct snd_efw *efw,
-				  unsigned int rate)
+int snd_efw_command_set_sampling_rate(struct snd_efw *efw, unsigned int rate)
 {
 	return command_set_clock(efw, UINT_MAX, rate);
 }

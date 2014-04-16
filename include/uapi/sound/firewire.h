@@ -27,17 +27,17 @@ struct snd_firewire_event_dice_notification {
 #define SND_EFW_TRANSACTION_SEQNUM_MAX	((__u32)(BIT(28) - 1))
 /* each field should be in big endian */
 struct snd_efw_transaction {
-	__u32 length;
-	__u32 version;
-	__u32 seqnum;
-	__u32 category;
-	__u32 command;
-	__u32 status;
-	__u32 params[0];
+	__be32 length;
+	__be32 version;
+	__be32 seqnum;
+	__be32 category;
+	__be32 command;
+	__be32 status;
+	__be32 params[0];
 };
 struct snd_firewire_event_efw_response {
 	unsigned int type;
-	__u32 response[0];	/* some responses */
+	__be32 response[0];	/* some responses */
 };
 
 union snd_firewire_event {

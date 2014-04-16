@@ -115,7 +115,7 @@ int snd_efw_transaction_cmd(struct fw_unit *unit,
 			    const void *cmd, unsigned int size);
 int snd_efw_transaction_run(struct fw_unit *unit,
 			    const void *cmd, unsigned int cmd_size,
-			    void *resp, unsigned int resp_size, u32 seqnum);
+			    void *resp, unsigned int resp_size);
 int snd_efw_transaction_register(void);
 void snd_efw_transaction_unregister(void);
 void snd_efw_transaction_bus_reset(struct fw_unit *unit);

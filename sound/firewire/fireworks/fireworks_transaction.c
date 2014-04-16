@@ -70,7 +70,7 @@ int snd_efw_transaction_cmd(struct fw_unit *unit,
 
 int snd_efw_transaction_run(struct fw_unit *unit,
 			    const void *cmd, unsigned int cmd_size,
-			    void *resp, unsigned int resp_size, u32 seqnum)
+			    void *resp, unsigned int resp_size)
 {
 	struct transaction_queue t;
 	unsigned int tries;
@@ -79,7 +79,7 @@ int snd_efw_transaction_run(struct fw_unit *unit,
 	t.unit = unit;
 	t.buf = resp;
 	t.size = resp_size;
-	t.seqnum = seqnum + 1;
+	t.seqnum = be32_to_cpu(((struct snd_efw_transaction *)cmd)->seqnum) + 1;
 	t.state = STATE_PENDING;
 	init_waitqueue_head(&t.wait);
 
