@@ -74,14 +74,13 @@ static int name_card(struct snd_oxfw *oxfw)
 		strcpy(oxfw->card->driver, "OXFW");
 
 	strcpy(oxfw->card->shortname, model);
+	strcpy(oxfw->card->mixername, model);
 
-	snprintf(oxfw->card->longname, sizeof(oxfw->card->longname),
-		 "%s %s (OXFW%x %04x), GUID %08x%08x at %s, S%d",
-		 vendor, model, firmware >> 20, firmware & 0xffff,
-		 fw_dev->config_rom[3], fw_dev->config_rom[4],
-		 dev_name(&oxfw->unit->device), 100 << fw_dev->max_speed);
-
-	strcpy(oxfw->card->mixername, oxfw->card->shortname);
+	err = snprintf(oxfw->card->longname, sizeof(oxfw->card->longname),
+		       "%s %s (OXFW%x %04x), GUID %08x%08x at %s, S%d",
+		       vendor, model, firmware >> 20, firmware & 0xffff,
+		       fw_dev->config_rom[3], fw_dev->config_rom[4],
+		       dev_name(&oxfw->unit->device), 100 << fw_dev->max_speed);
 end:
 	return err;
 }

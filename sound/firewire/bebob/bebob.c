@@ -106,12 +106,12 @@ name_device(struct snd_bebob *bebob, unsigned int vendor_id)
 
 	strcpy(bebob->card->driver, "BeBoB");
 	strcpy(bebob->card->shortname, model);
-	snprintf(bebob->card->longname, sizeof(bebob->card->longname),
-		 "%s %s (id:%d, rev:%d), GUID %08x%08x at %s, S%d",
-		 vendor, model, id, revision,
-		 data[0], data[1], dev_name(&bebob->unit->device),
-		 100 << fw_dev->max_speed);
 	strcpy(bebob->card->mixername, model);
+	err = snprintf(bebob->card->longname, sizeof(bebob->card->longname),
+		       "%s %s (id:%d, rev:%d), GUID %08x%08x at %s, S%d",
+		       vendor, model, id, revision,
+		       data[0], data[1], dev_name(&bebob->unit->device),
+		        100 << fw_dev->max_speed);
 end:
 	return err;
 }
