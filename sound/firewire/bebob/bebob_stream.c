@@ -728,6 +728,9 @@ parse_stream_formation(u8 *buf, unsigned int len,
 	if (i == sizeof(bridgeco_freq_table))
 		return -ENOSYS;
 
+	/* Avoid double count by different entries for the same rate. */
+	memset(&formation[i], 0, sizeof(struct snd_bebob_stream_formation));
+
 	for (e = 0; e < buf[4]; e++) {
 		channels = buf[5 + e * 2];
 		format = buf[6 + e * 2];
