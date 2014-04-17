@@ -152,7 +152,7 @@ efw_transaction(struct snd_efw *efw, unsigned int category,
 	    (be32_to_cpu(header->category) != category) ||
 	    (be32_to_cpu(header->command) != command) ||
 	    (be32_to_cpu(header->status) != EFR_STATUS_OK)) {
-		dev_err(&efw->unit->device, "EFC failed [%u/%u]: %s\n",
+		dev_err(&efw->unit->device, "EFW command failed [%u/%u]: %s\n",
 			be32_to_cpu(header->category),
 			be32_to_cpu(header->command),
 			efr_status_names[be32_to_cpu(header->status)]);
@@ -183,9 +183,9 @@ int snd_efw_command_identify(struct snd_efw *efw)
 }
 
 /*
- * The address in host system for EFC response is changable when the device
- * supports. struct hwinfo.flags includes its flag. The default is
- * INITIAL_MEMORY_SPACE_EFC_RESPONSE
+ * The address in host system for transaction response is changable when the
+ * device supports. struct hwinfo.flags includes its flag. The default is
+ * MEMORY_SPACE_EFW_RESPONSE.
  */
 int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 				  u16 addr_high, u32 addr_low)

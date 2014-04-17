@@ -102,7 +102,7 @@ int snd_efw_transaction_run(struct fw_unit *unit,
 		} else if (t.state == STATE_BUS_RESET) {
 			msleep(ERROR_DELAY_MS);
 		} else if (++tries >= ERROR_RETRIES) {
-			dev_err(&t.unit->device, "EFC command timed out\n");
+			dev_err(&t.unit->device, "EFW transaction timed out\n");
 			ret = -EIO;
 			break;
 		}
