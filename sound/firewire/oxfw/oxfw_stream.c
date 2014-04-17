@@ -445,6 +445,8 @@ assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 		formations[i].pcm = pcm_channels;
 		formations[i].midi = midi_channels;
 	}
+
+	err = 0;
 end:
 	return err;
 }
