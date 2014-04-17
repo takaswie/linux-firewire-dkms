@@ -28,6 +28,7 @@ MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("snd-firewire-speakers");
 
 static const struct device_info griffin_firewave = {
+	.vendor_name = "Griffin",
 	.driver_name = "FireWave",
 	.mixer_channels = 6,
 	.mute_fb_id   = 0x01,
@@ -35,6 +36,7 @@ static const struct device_info griffin_firewave = {
 };
 
 static const struct device_info lacie_speakers = {
+	.vendor_name = "LaCie",
 	.driver_name = "FWSpeakers",
 	.mixer_channels = 1,
 	.mute_fb_id   = 0x01,
@@ -46,6 +48,7 @@ static int name_card(struct snd_oxfw *oxfw)
 	struct fw_device *fw_dev = fw_parent_device(oxfw->unit);
 	char vendor[24] = {0};
 	char model[32] = {0};
+	const char *d, *v, *m;
 	u32 firmware;
 	int err;
 
@@ -68,17 +71,23 @@ static int name_card(struct snd_oxfw *oxfw)
 	be32_to_cpus(&firmware);
 
 	/* to apply card definitions */
-	if (oxfw->device_info)
-		strcpy(oxfw->card->driver, oxfw->device_info->driver_name);
-	else
-		strcpy(oxfw->card->driver, "OXFW");
+	if (oxfw->device_info) {
+		d = oxfw->device_info->driver_name;
+		v = oxfw->device_info->vendor_name;
+		m = oxfw->device_info->driver_name;
+	} else {
+		d = "OXFW";
+		v = vendor;
+		m = model;
+	}
 
-	strcpy(oxfw->card->shortname, model);
-	strcpy(oxfw->card->mixername, model);
+	strcpy(oxfw->card->driver, d);
+	strcpy(oxfw->card->shortname, m);
+	strcpy(oxfw->card->mixername, m);
 
 	err = snprintf(oxfw->card->longname, sizeof(oxfw->card->longname),
 		       "%s %s (OXFW%x %04x), GUID %08x%08x at %s, S%d",
-		       vendor, model, firmware >> 20, firmware & 0xffff,
+		       v, m, firmware >> 20, firmware & 0xffff,
 		       fw_dev->config_rom[3], fw_dev->config_rom[4],
 		       dev_name(&oxfw->unit->device), 100 << fw_dev->max_speed);
 end:
