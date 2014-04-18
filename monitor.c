@@ -2,7 +2,6 @@
 
 #include <stdio.h>
 #include <stdbool.h>
-#include <stdint.h>
 #include <string.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -39,7 +38,7 @@ static void print_event_dice(struct snd_firewire_event_dice_notification *msg)
 
 static void print_event_efw(struct snd_firewire_event_efw_response *evt, int count)
 {
-	uint32_t *resp;
+	__u32 *resp;
 	struct snd_efw_transaction *t;
 	unsigned int i, index, length, params;
 
@@ -59,13 +58,13 @@ static void print_event_efw(struct snd_firewire_event_efw_response *evt, int cou
 		printf("Command:\t%d\n", be32toh(t->command));
 		printf("Status:\t\t%d\n", be32toh(t->status));
 
-		params = length - sizeof(struct snd_efw_transaction) / sizeof(uint32_t);
+		params = length - sizeof(struct snd_efw_transaction) / sizeof(__u32);
 		if (params > 0)
 			for (i = 0; i < params; i++)
 				printf("params[%d]:\t%08X\n", i, be32toh(t->params[i]));
 
 		resp += length;
-		count -= length * sizeof(uint32_t);
+		count -= length * sizeof(__u32);
 	}
 }
 
@@ -90,6 +89,7 @@ static int read_event(int fd)
 	return 0;
 }
 
+static __u32 seqnum = SND_EFW_TRANSACTION_USER_SEQNUM_MAX - 6;
 static int write_event(int fd)
 {
 	int count;
@@ -99,14 +99,18 @@ static int write_event(int fd)
 	t = (struct snd_efw_transaction *)buf;
 	t->length	= htobe32(6);
 	t->version	= htobe32(1);
-	t->seqnum	= htobe32(0);
+	t->seqnum	= htobe32(seqnum);
 	t->category	= htobe32(3);
 	t->command	= htobe32(5);
 	t->status	= htobe32(0);
 
 	count = write(fd, buf, sizeof(struct snd_efw_transaction));
 	if (count < 0)
-		printf("err: %d\n", count);
+		return -1;
+
+	seqnum += 2;
+	if (seqnum > SND_EFW_TRANSACTION_USER_SEQNUM_MAX)
+		seqnum = 0;
 
 	return count;
 }
@@ -117,55 +121,57 @@ static int main_loop(int fd)
 {
 	int epfd, count, i, err;
 	time_t now;
-	struct epoll_event ev, events[EVENTS];
+	struct epoll_event ev;
+	struct epoll_event events[EVENTS];
 
 	epfd = epoll_create(EVENTS);
-	if (epfd < 0) {
-		printf("error: %s\n", strerror(errno));
-		err = errno;
+	if (epfd < 0)
 		goto end;
-	}
 
 	memset(&ev, 0, sizeof(struct epoll_event));
 	ev.events = EPOLLIN;
 	ev.data.fd = fd;
 
-	if (fireworks)
-		ev.events |= EPOLLOUT;
-
 	if (epoll_ctl(epfd, EPOLL_CTL_ADD, fd, &ev) < 0)
-		return errno;
+		goto end;
 
 	while (1) {
+		/* Send a command every 2 sec for Fireworks. */
+		if (fireworks) {
+			if (time(&now) < 0)
+				goto end;
+
+			memset(&ev, 0, sizeof(struct epoll_event));
+			ev.events = EPOLLIN;
+			ev.data.fd = fd;
+
+			if (now > cmd_deffer)
+				ev.events |= EPOLLOUT;
+
+			if (epoll_ctl(epfd, EPOLL_CTL_MOD, fd, &ev) < 0)
+				goto end;
+		}
+
 		count = epoll_wait(epfd, events, EVENTS, 200);
 		if (count == 0)
 			continue;
-		else if (count < 0) {
-			err = errno;
-			break;
-		}
+		if (count < 0)
+			goto end;
 
 		for (i = 0; i < count; i++) {
 			if (events[i].events & EPOLLOUT) {
-				if (time(&now) < 0)
-					break;
-				if (now > cmd_deffer) {
-					if (write_event(events[i].data.fd) < 0) {
-						err = errno;
-						break;
-					}
-					cmd_deffer = now + 3;
-				}
+				if (write_event(events[i].data.fd) < 0)
+					goto end;
+				cmd_deffer = now + 2;
 			}
 			if (events[i].events & EPOLLIN) {
-				if (read_event(events[i].data.fd) < 0) {
-					err = errno;
-					break;
-				}
+				if (read_event(events[i].data.fd) < 0)
+					goto end;
 			}
 		}
 	}
 end:
+	err = errno;
 	close(epfd);
 	return err;
 }
@@ -203,6 +209,8 @@ int main(int argc, void *argv[])
 		fireworks = true;
 
 	err = main_loop(fd);
+	if (err != 0)
+		printf("%s\n", strerror(err));
 	close(fd);
 	return err;
 }
