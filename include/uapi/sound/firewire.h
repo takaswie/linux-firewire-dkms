@@ -24,7 +24,7 @@ struct snd_firewire_event_dice_notification {
 	unsigned int notification; /* DICE-specific bits */
 };
 
-#define SND_EFW_TRANSACTION_SEQNUM_MAX	((__u32)(BIT(28) - 1))
+#define SND_EFW_TRANSACTION_USER_SEQNUM_MAX	((__u32)((__u16)~0) - 1)
 /* each field should be in big endian */
 struct snd_efw_transaction {
 	__be32 length;

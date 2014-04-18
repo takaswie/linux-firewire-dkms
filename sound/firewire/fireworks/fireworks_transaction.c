@@ -243,7 +243,7 @@ efw_response(struct fw_card *card, struct fw_request *request,
 	}
 
 	seqnum = be32_to_cpu(((struct snd_efw_transaction *)data)->seqnum);
-	if (seqnum > SND_EFW_TRANSACTION_SEQNUM_MAX) {
+	if (seqnum > SND_EFW_TRANSACTION_USER_SEQNUM_MAX + 1) {
 		handle_resp_for_kernel(card, generation, source,
 				       data, length, &rcode, seqnum);
 		if (snd_efw_resp_buf_debug)
