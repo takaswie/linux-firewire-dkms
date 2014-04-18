@@ -89,9 +89,6 @@ snd_bebob_stream_get_rate(struct snd_bebob *bebob, unsigned int *curr_rate)
 	err = avc_general_set_sig_fmt(bebob->unit, rx_rate,
 				      AVC_GENERAL_PLUG_DIR_IN, 0);
 end:
-	if (err < 0)
-		dev_err(&bebob->unit->device,
-			"failed to get sampling rate: %d\n", err);
 	return err;
 }
 
@@ -116,9 +113,6 @@ snd_bebob_stream_set_rate(struct snd_bebob *bebob, unsigned int rate)
 	 */
 	msleep(300);
 end:
-	if (err < 0)
-		dev_err(&bebob->unit->device,
-			"failed to set sampling rate: %d\n", err);
 	return err;
 }
 
@@ -539,8 +533,11 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, int rate)
 
 	/* stop streams if rate is different */
 	err = rate_spec->get(bebob, &curr_rate);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&bebob->unit->device,
+			"failed to set sampling rate: %d\n", err);
 		goto end;
+	}
 	if (rate == 0)
 		rate = curr_rate;
 	if (rate != curr_rate) {
@@ -563,8 +560,12 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, int rate)
 		 */
 		if (bebob->maudio_special_quirk == NULL) {
 			err = rate_spec->set(bebob, rate);
-			if (err < 0)
+			if (err < 0) {
+				dev_err(&bebob->unit->device,
+					"failed to set sampling rate: %d\n",
+					err);
 				goto end;
+			}
 		}
 
 		err = make_both_connections(bebob, rate);
@@ -587,6 +588,9 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, int rate)
 		if (bebob->maudio_special_quirk != NULL) {
 			err = rate_spec->set(bebob, rate);
 			if (err < 0) {
+				dev_err(&bebob->unit->device,
+					"failed to ensure sampling rate: %d\n",
+					err);
 				amdtp_stream_stop(master);
 				break_both_connections(bebob);
 				goto end;

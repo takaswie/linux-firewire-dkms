@@ -308,9 +308,6 @@ static int special_get_rate(struct snd_bebob *bebob, unsigned int *rate)
 		err = avc_general_get_sig_fmt(bebob->unit, rate,
 					      AVC_GENERAL_PLUG_DIR_IN, 0);
 	} while (err == -EAGAIN && ++trials < 3);
-	if (err < 0)
-		dev_err(&bebob->unit->device,
-			"failed to get sampling rate: %d\n", err);
 
 	return err;
 }
@@ -339,9 +336,6 @@ static int special_set_rate(struct snd_bebob *bebob, unsigned int rate)
 		snd_ctl_notify(bebob->card, SNDRV_CTL_EVENT_MASK_VALUE,
 			       params->ctl_id_sync);
 end:
-	if (err < 0)
-		dev_err(&bebob->unit->device,
-			"failed to set sampling rate: %d\n", err);
 	return err;
 }
 

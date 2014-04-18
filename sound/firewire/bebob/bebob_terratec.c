@@ -26,9 +26,6 @@ phase88_rack_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 
 	*id = (enable_ext & 0x01) || ((enable_word & 0x01) << 1);
 end:
-	if (err < 0)
-		dev_err(&bebob->unit->device,
-			"failed to get clock source: %d\n", err);
 	return err;
 }
 
@@ -38,11 +35,7 @@ static char *const phase24_series_clk_src_labels[] = {
 static int
 phase24_series_clk_src_get(struct snd_bebob *bebob, unsigned int *id)
 {
-	int err = avc_audio_get_selector(bebob->unit, 0, 4, id);
-	if (err < 0)
-		dev_err(&bebob->unit->device,
-			"failed to get clock source: %d\n", err);
-	return err;
+	return avc_audio_get_selector(bebob->unit, 0, 4, id);
 }
 
 struct snd_bebob_rate_spec phase_series_rate_spec = {

@@ -46,8 +46,11 @@ proc_read_hw_info(struct snd_info_entry *entry,
 
 	err = snd_bebob_read_block(bebob->unit, 0,
 				   info, sizeof(struct hw_info));
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&bebob->unit->device,
+			"fail to get firmware information:%d\n", err);
 		goto end;
+	}
 
 	snd_iprintf(buffer, "Manufacturer:\t%.8s\n",
 		    (char *)&info->manufacturer);
@@ -90,8 +93,11 @@ proc_read_meters(struct snd_info_entry *entry,
 		return;
 
 	err = spec->get(bebob, buf, size);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&bebob->unit->device,
+			"failed to get metering information: %d\n", err);
 		goto end;
+	}
 
 	for (i = 0, c = 1; i < channels; i++) {
 		snd_iprintf(buffer, "%s %d:\t%d\n",
@@ -118,8 +124,8 @@ proc_read_formation(struct snd_info_entry *entry,
 	formation = bebob->tx_stream_formations;
 	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		snd_iprintf(buffer,
-			"\t%d\t%d\t%d\n", snd_bebob_rate_table[i],
-			formation[i].pcm, formation[i].midi);
+			    "\t%d\t%d\t%d\n", snd_bebob_rate_table[i],
+			    formation[i].pcm, formation[i].midi);
 	}
 
 	snd_iprintf(buffer, "Input Stream to device:\n");
@@ -127,8 +133,8 @@ proc_read_formation(struct snd_info_entry *entry,
 	formation = bebob->rx_stream_formations;
 	for (i = 0; i < SND_BEBOB_STRM_FMT_ENTRIES; i++) {
 		snd_iprintf(buffer,
-			"\t%d\t%d\t%d\n", snd_bebob_rate_table[i],
-			formation[i].pcm, formation[i].midi);
+			    "\t%d\t%d\t%d\n", snd_bebob_rate_table[i],
+			    formation[i].pcm, formation[i].midi);
 	}
 }
 
@@ -139,23 +145,34 @@ proc_read_clock(struct snd_info_entry *entry,
 	struct snd_bebob *bebob = entry->private_data;
 	struct snd_bebob_rate_spec *rate_spec = bebob->spec->rate;
 	struct snd_bebob_clock_spec *clk_spec = bebob->spec->clock;
-	unsigned int rate;
+	unsigned int rate, id;
 	bool internal;
-	unsigned int id;
+	int err;
 
-	if (rate_spec->get(bebob, &rate) < 0)
-		return;
-	snd_iprintf(buffer, "Sampling rate: %d\n", rate);
+	err = rate_spec->get(bebob, &rate);
+	if (err < 0)
+		dev_err(&bebob->unit->device,
+			"failed to get sampling rate: %d\n", err);
+	else
+		snd_iprintf(buffer, "Sampling rate: %d\n", rate);
 
 	if (clk_spec) {
-		if (clk_spec->get(bebob, &id) >= 0)
+		err = clk_spec->get(bebob, &id);
+		if (err < 0)
+			dev_err(&bebob->unit->device,
+				"failed to get clock source: %d\n", err);
+		else
 			snd_iprintf(buffer, "Clock Source: %s\n",
 				    clk_spec->labels[id]);
-	} else if (snd_bebob_stream_check_internal_clock(bebob,
-							 &internal) >= 0) {
-		snd_iprintf(buffer, "Clock Source: %s (MSU-dest: %d)\n",
-			    (internal) ? "Internal" : "External",
-			    bebob->sync_input_plug);
+	} else {
+		err = snd_bebob_stream_check_internal_clock(bebob, &internal);
+		if (err < 0)
+			dev_err(&bebob->unit->device,
+				"failed to check clock source: %d\n", err);
+		else
+			snd_iprintf(buffer, "Clock Source: %s (MSU-dest: %d)\n",
+				    (internal) ? "Internal" : "External",
+				    bebob->sync_input_plug);
 	}
 }
 

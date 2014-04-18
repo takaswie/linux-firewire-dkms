@@ -256,8 +256,11 @@ pcm_open(struct snd_pcm_substream *substream)
 	    amdtp_stream_pcm_running(&bebob->tx_stream) ||
 	    amdtp_stream_pcm_running(&bebob->rx_stream)) {
 		err = spec->get(bebob, &sampling_rate);
-		if (err < 0)
+		if (err < 0) {
+			dev_err(&bebob->unit->device,
+				"failed to get sampling rate: %d\n", err);
 			goto err_locked;
+		}
 
 		substream->runtime->hw.rate_min = sampling_rate;
 		substream->runtime->hw.rate_max = sampling_rate;
