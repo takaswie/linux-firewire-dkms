@@ -64,7 +64,7 @@ static void print_event_efw(struct snd_firewire_event_efw_response *evt, int cou
 				printf("params[%d]:\t%08X\n", i, be32toh(t->params[i]));
 
 		resp += length;
-		count -= length * sizeof(__u32);
+		count -= length;
 	}
 }
 
