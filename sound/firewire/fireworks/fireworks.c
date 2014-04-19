@@ -228,6 +228,8 @@ efw_probe(struct fw_unit *unit,
 	init_waitqueue_head(&efw->hwdep_wait);
 	efw->resp_buf = efw->pull_ptr = efw->push_ptr = resp_buf;
 
+	snd_efw_transaction_add_instance(efw);
+
 	err = get_hardware_info(efw);
 	if (err < 0)
 		goto error;
@@ -246,7 +248,6 @@ efw_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
-	snd_efw_transaction_add_instance(efw);
 	err = snd_efw_create_hwdep_device(efw);
 	if (err < 0)
 		goto error;
@@ -266,6 +267,7 @@ end:
 	mutex_unlock(&devices_mutex);
 	return err;
 error:
+	snd_efw_transaction_remove_instance(efw);
 	snd_card_free(card);
 	mutex_unlock(&devices_mutex);
 	return err;
