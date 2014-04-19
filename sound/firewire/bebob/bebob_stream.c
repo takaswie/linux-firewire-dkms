@@ -773,6 +773,10 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		}
 	}
 
+	if (formation[i].pcm  > AMDTP_MAX_CHANNELS_FOR_PCM ||
+	    formation[i].midi > AMDTP_MAX_CHANNELS_FOR_MIDI)
+		return -ENOSYS;
+
 	return 0;
 }
 

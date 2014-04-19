@@ -342,7 +342,7 @@ void snd_oxfw_stream_update_duplex(struct snd_oxfw *oxfw)
  */
 static int
 parse_stream_formation(u8 *buf, unsigned int len,
-		       struct snd_oxfw_stream_formation *formation,
+		       struct snd_oxfw_stream_formation *formations,
 		       unsigned int *index)
 {
 	unsigned int e, channels, format;
@@ -375,11 +375,11 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		case 0x00:
 		/* Multi Bit Linear Audio (Raw) */
 		case 0x06:
-			formation[*index].pcm += channels;
+			formations[*index].pcm += channels;
 			break;
 		/* MIDI Conformant */
 		case 0x0d:
-			formation[*index].midi += channels;
+			formations[*index].midi += channels;
 			break;
 		/* IEC 61937-3 to 7 */
 		case 0x01:
@@ -409,6 +409,10 @@ parse_stream_formation(u8 *buf, unsigned int len,
 			return -ENOSYS;	/* not supported */
 		}
 	}
+
+	if (formations[*index].pcm  > AMDTP_MAX_CHANNELS_FOR_PCM ||
+	    formations[*index].midi > AMDTP_MAX_CHANNELS_FOR_MIDI)
+		return -ENOSYS;
 
 	return 0;
 }
