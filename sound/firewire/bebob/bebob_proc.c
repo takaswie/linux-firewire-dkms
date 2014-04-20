@@ -38,19 +38,14 @@ proc_read_hw_info(struct snd_info_entry *entry,
 {
 	struct snd_bebob *bebob = entry->private_data;
 	struct hw_info *info;
-	int err;
 
 	info = kzalloc(sizeof(struct hw_info), GFP_KERNEL);
 	if (info == NULL)
 		return;
 
-	err = snd_bebob_read_block(bebob->unit, 0,
-				   info, sizeof(struct hw_info));
-	if (err < 0) {
-		dev_err(&bebob->unit->device,
-			"fail to get firmware information:%d\n", err);
+	if (snd_bebob_read_block(bebob->unit, 0,
+				   info, sizeof(struct hw_info)) < 0)
 		goto end;
-	}
 
 	snd_iprintf(buffer, "Manufacturer:\t%.8s\n",
 		    (char *)&info->manufacturer);
@@ -81,7 +76,6 @@ proc_read_meters(struct snd_info_entry *entry,
 	struct snd_bebob_meter_spec *spec = bebob->spec->meter;
 	u32 *buf;
 	unsigned int i, c, channels, size;
-	int err;
 
 	if (spec == NULL)
 		return;
@@ -92,12 +86,8 @@ proc_read_meters(struct snd_info_entry *entry,
 	if (buf == NULL)
 		return;
 
-	err = spec->get(bebob, buf, size);
-	if (err < 0) {
-		dev_err(&bebob->unit->device,
-			"failed to get metering information: %d\n", err);
+	if (spec->get(bebob, buf, size) < 0)
 		goto end;
-	}
 
 	for (i = 0, c = 1; i < channels; i++) {
 		snd_iprintf(buffer, "%s %d:\t%d\n",
@@ -147,29 +137,17 @@ proc_read_clock(struct snd_info_entry *entry,
 	struct snd_bebob_clock_spec *clk_spec = bebob->spec->clock;
 	unsigned int rate, id;
 	bool internal;
-	int err;
 
-	err = rate_spec->get(bebob, &rate);
-	if (err < 0)
-		dev_err(&bebob->unit->device,
-			"failed to get sampling rate: %d\n", err);
-	else
+	if (rate_spec->get(bebob, &rate) >= 0)
 		snd_iprintf(buffer, "Sampling rate: %d\n", rate);
 
 	if (clk_spec) {
-		err = clk_spec->get(bebob, &id);
-		if (err < 0)
-			dev_err(&bebob->unit->device,
-				"failed to get clock source: %d\n", err);
-		else
+		if (clk_spec->get(bebob, &id) >= 0)
 			snd_iprintf(buffer, "Clock Source: %s\n",
 				    clk_spec->labels[id]);
 	} else {
-		err = snd_bebob_stream_check_internal_clock(bebob, &internal);
-		if (err < 0)
-			dev_err(&bebob->unit->device,
-				"failed to check clock source: %d\n", err);
-		else
+		if (snd_bebob_stream_check_internal_clock(bebob,
+							  &internal) >= 0)
 			snd_iprintf(buffer, "Clock Source: %s (MSU-dest: %d)\n",
 				    (internal) ? "Internal" : "External",
 				    bebob->sync_input_plug);

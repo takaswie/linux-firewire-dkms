@@ -258,7 +258,7 @@ pcm_open(struct snd_pcm_substream *substream)
 		err = spec->get(bebob, &sampling_rate);
 		if (err < 0) {
 			dev_err(&bebob->unit->device,
-				"failed to get sampling rate: %d\n", err);
+				"fail to get sampling rate: %d\n", err);
 			goto err_locked;
 		}
 

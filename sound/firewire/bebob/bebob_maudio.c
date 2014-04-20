@@ -272,7 +272,7 @@ snd_bebob_maudio_special_discover(struct snd_bebob *bebob, bool is1814)
 	err = avc_maudio_set_special_clk(bebob, 0x03, 0x00, 0x00, 0x00);
 	if (err < 0) {
 		dev_err(&bebob->unit->device,
-			"failed to initialize clock params: %d\n", err);
+			"fail to initialize clock params: %d\n", err);
 		goto end;
 	}
 
@@ -467,7 +467,7 @@ static int special_dig_in_iface_ctl_get(struct snd_kcontrol *kctl,
 				     &dig_in_iface);
 	if (err < 0) {
 		dev_err(&bebob->unit->device,
-			"failed to get digital input interface: %d\n", err);
+			"fail to get digital input interface: %d\n", err);
 		goto end;
 	}
 
@@ -510,7 +510,7 @@ static int special_dig_in_iface_ctl_set(struct snd_kcontrol *kctl,
 	err = avc_audio_set_selector(bebob->unit, 0x00, 0x04, dig_in_iface);
 	if (err < 0)
 		dev_err(&bebob->unit->device,
-			"failed to set digital input interface: %d\n", err);
+			"fail to set digital input interface: %d\n", err);
 end:
 	special_stream_formation_set(bebob);
 	mutex_unlock(&bebob->mutex);

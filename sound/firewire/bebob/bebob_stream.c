@@ -130,9 +130,10 @@ snd_bebob_stream_check_internal_clock(struct snd_bebob *bebob, bool *internal)
 	if (clk_spec) {
 		err = clk_spec->get(bebob, &id);
 		if (err < 0)
-			goto end;
-		if (strncmp(clk_spec->labels[id], SND_BEBOB_CLOCK_INTERNAL,
-			    strlen(SND_BEBOB_CLOCK_INTERNAL)) == 0)
+			dev_err(&bebob->unit->device,
+				"fail to get clock source: %d\n", err);
+		else if (strncmp(clk_spec->labels[id], SND_BEBOB_CLOCK_INTERNAL,
+				 strlen(SND_BEBOB_CLOCK_INTERNAL)) == 0)
 			*internal = true;
 		goto end;
 	}
@@ -153,8 +154,12 @@ snd_bebob_stream_check_internal_clock(struct snd_bebob *bebob, bool *internal)
 	avc_bridgeco_fill_msu_addr(addr, AVC_BRIDGECO_PLUG_DIR_IN,
 				   bebob->sync_input_plug);
 	err = avc_bridgeco_get_plug_input(bebob->unit, addr, input);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&bebob->unit->device,
+			"fail to get input for input MSU plug %d: %d\n",
+			bebob->sync_input_plug, err);
 		goto end;
+	}
 
 	/*
 	 * If there are no input plugs, all of fields are 0xff.
@@ -535,7 +540,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, int rate)
 	err = rate_spec->get(bebob, &curr_rate);
 	if (err < 0) {
 		dev_err(&bebob->unit->device,
-			"failed to set sampling rate: %d\n", err);
+			"fail to get sampling rate: %d\n", err);
 		goto end;
 	}
 	if (rate == 0)
@@ -562,7 +567,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, int rate)
 			err = rate_spec->set(bebob, rate);
 			if (err < 0) {
 				dev_err(&bebob->unit->device,
-					"failed to set sampling rate: %d\n",
+					"fail to set sampling rate: %d\n",
 					err);
 				goto end;
 			}
@@ -589,7 +594,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, int rate)
 			err = rate_spec->set(bebob, rate);
 			if (err < 0) {
 				dev_err(&bebob->unit->device,
-					"failed to ensure sampling rate: %d\n",
+					"fail to ensure sampling rate: %d\n",
 					err);
 				amdtp_stream_stop(master);
 				break_both_connections(bebob);
