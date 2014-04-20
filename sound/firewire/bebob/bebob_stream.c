@@ -378,6 +378,10 @@ break_both_connections(struct snd_bebob *bebob)
 	cmp_connection_break(&bebob->out_conn);
 
 	bebob->connected = false;
+
+	/* These models seems to be in transition state for a longer time. */
+	if (bebob->maudio_special_quirk != NULL)
+		msleep(200);
 }
 
 static void
