@@ -881,9 +881,9 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 	avc_bridgeco_fill_unit_addr(addr, AVC_BRIDGECO_PLUG_DIR_IN,
 				    AVC_BRIDGECO_PLUG_UNIT_ISOC, 0);
 	err = avc_bridgeco_get_plug_type(bebob->unit, addr, &type);
-	if (err < 0)
+	if (err < 0) {
 		goto end;
-	else if (type != AVC_BRIDGECO_PLUG_TYPE_ISOC) {
+	} else if (type != AVC_BRIDGECO_PLUG_TYPE_ISOC) {
 		err = -ENOSYS;
 		goto end;
 	}
@@ -894,9 +894,9 @@ int snd_bebob_stream_discover(struct snd_bebob *bebob)
 	avc_bridgeco_fill_unit_addr(addr, AVC_BRIDGECO_PLUG_DIR_OUT,
 				    AVC_BRIDGECO_PLUG_UNIT_ISOC, 0);
 	err = avc_bridgeco_get_plug_type(bebob->unit, addr, &type);
-	if (err < 0)
+	if (err < 0) {
 		goto end;
-	else if (type != AVC_BRIDGECO_PLUG_TYPE_ISOC) {
+	} else if (type != AVC_BRIDGECO_PLUG_TYPE_ISOC) {
 		err = -ENOSYS;
 		goto end;
 	}
