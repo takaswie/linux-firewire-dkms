@@ -256,8 +256,11 @@ int snd_oxfw_stream_start_duplex(struct snd_oxfw *oxfw, int rate)
 
 	/* stop streams if rate is different */
 	err = snd_oxfw_stream_get_rate(oxfw, &curr_rate);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&oxfw->unit->device,
+			"fail to get sampling rate: %d\n", err);
 		goto end;
+	}
 	if (rate == 0)
 		rate = curr_rate;
 	if (curr_rate != rate) {
@@ -267,21 +270,30 @@ int snd_oxfw_stream_start_duplex(struct snd_oxfw *oxfw, int rate)
 		stop_stream(oxfw, &oxfw->rx_stream);
 
 		err = snd_oxfw_stream_set_rate(oxfw, rate);
-		if (err < 0)
+		if (err < 0) {
+			dev_err(&oxfw->unit->device,
+				"fail to set sampling rate: %d\n", err);
 			goto end;
+		}
 	}
 
 	if (atomic_read(&oxfw->playback_substreams) &&
 	    !amdtp_stream_running(&oxfw->rx_stream)) {
 		err = start_stream(oxfw, &oxfw->rx_stream, rate);
-		if (err < 0)
+		if (err < 0) {
+			dev_err(&oxfw->unit->device,
+				"fail to start in-stream: %d\n", err);
 			goto end;
+		}
 	}
 
 	if (oxfw->has_output) {
 		if ((atomic_read(&oxfw->capture_substreams) > 0) &&
 		    !amdtp_stream_running(&oxfw->tx_stream))
 			err = start_stream(oxfw, &oxfw->tx_stream, rate);
+			if (err < 0)
+				dev_err(&oxfw->unit->device,
+					"fail to start out-stream: %d\n", err);
 	}
 end:
 	mutex_unlock(&oxfw->mutex);
@@ -427,8 +439,13 @@ assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 
 	/* get formation at current sampling rate */
 	err = avc_stream_get_format_single(oxfw->unit, dir, pid, buf, len);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&oxfw->unit->device,
+		"fail to get current stream format for isoc %s plug %d:%d\n",
+			(dir == AVC_GENERAL_PLUG_DIR_IN) ? "in" : "out",
+			pid, err);
 		goto end;
+	}
 
 	/* parse and set stream formation */
 	err = parse_stream_formation(buf, *len, formations, &i);
@@ -484,6 +501,10 @@ fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 					       formations);
 		goto end;
 	} else if (err < 0) {
+		dev_err(&oxfw->unit->device,
+			"fail to get stream format %d for isoc %s plug %d:%d\n",
+			eid, (dir == AVC_GENERAL_PLUG_DIR_IN) ? "in" : "out",
+			pid, err);
 		goto end;
 	}
 
@@ -498,10 +519,16 @@ fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 		len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
 		err = avc_stream_get_format_list(oxfw->unit, dir, 0,
 						 buf, &len, ++eid);
-		if (err < 0) {
-			/* No entries remained. */
-			if (err == -EINVAL)
-				err = 0;
+		/* No entries remained. */
+		if (err == -EINVAL) {
+			err = 0;
+			break;
+		} else if (err < 0) {
+			dev_err(&oxfw->unit->device,
+			"fail to get stream format %d for isoc %s plug %d:%d\n",
+				eid, (dir == AVC_GENERAL_PLUG_DIR_IN) ? "in" :
+								        "out",
+				pid, err);
 			break;
 		}
 	}
@@ -518,9 +545,12 @@ int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 
 	/* the number of plugs for isoc in/out, ext in/out  */
 	err = avc_general_get_plug_info(oxfw->unit, 0x1f, 0x07, 0x00, plugs);
-	if (err < 0)
+	if (err < 0) {
+		dev_err(&oxfw->unit->device,
+		"fail to get info for isoc/external in/out plugs: %d\n",
+			err);
 		goto end;
-	if ((plugs[0] == 0) && (plugs[1] == 0)) {
+	} else if ((plugs[0] == 0) && (plugs[1] == 0)) {
 		err = -ENOSYS;
 		goto end;
 	}

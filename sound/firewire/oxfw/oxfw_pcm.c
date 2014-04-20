@@ -230,8 +230,11 @@ static int oxfw_open(struct snd_pcm_substream *substream)
 	if (amdtp_stream_pcm_running(&oxfw->tx_stream) ||
 	    amdtp_stream_pcm_running(&oxfw->rx_stream)) {
 		err = snd_oxfw_stream_get_rate(oxfw, &rate);
-		if (err < 0)
+		if (err < 0) {
+			dev_err(&oxfw->unit->device,
+				"fail to get sampling rate: %d\n", err);
 			goto err_locked;
+		}
 		substream->runtime->hw.rate_min = rate;
 		substream->runtime->hw.rate_max = rate;
 	}
