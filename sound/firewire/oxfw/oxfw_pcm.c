@@ -7,11 +7,10 @@
 
 #include "oxfw.h"
 
-static int hw_rule_rate(struct snd_pcm_hw_params *params,
-			struct snd_pcm_hw_rule *rule,
-			struct snd_oxfw *oxfw,
-			struct snd_oxfw_stream_formation *formations)
+static int
+hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule)
 {
+	struct snd_oxfw_stream_formation *formations = rule->private;
 	struct snd_interval *r =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	const struct snd_interval *c =
@@ -36,11 +35,10 @@ static int hw_rule_rate(struct snd_pcm_hw_params *params,
 	return snd_interval_refine(r, &t);
 }
 
-static int hw_rule_channels(struct snd_pcm_hw_params *params,
-			    struct snd_pcm_hw_rule *rule,
-			    struct snd_oxfw *oxfw,
-			    struct snd_oxfw_stream_formation *formations)
+static int
+hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule)
 {
+	struct snd_oxfw_stream_formation *formations = rule->private;
 	struct snd_interval *c =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	const struct snd_interval *r =
@@ -66,42 +64,18 @@ static int hw_rule_channels(struct snd_pcm_hw_params *params,
 	return snd_interval_refine(c, &t);
 }
 
-static inline int hw_rule_capture_rate(struct snd_pcm_hw_params *params,
-				       struct snd_pcm_hw_rule *rule)
-{
-	struct snd_oxfw *oxfw = rule->private;
-	return hw_rule_rate(params, rule, oxfw,
-			    oxfw->tx_stream_formations);
-}
-
-static inline int hw_rule_playback_rate(struct snd_pcm_hw_params *params,
-					struct snd_pcm_hw_rule *rule)
-{
-	struct snd_oxfw *oxfw = rule->private;
-	return hw_rule_rate(params, rule, oxfw,
-			    oxfw->rx_stream_formations);
-}
-
-static inline int hw_rule_capture_channels(struct snd_pcm_hw_params *params,
-					   struct snd_pcm_hw_rule *rule)
-{
-	struct snd_oxfw *oxfw = rule->private;
-	return hw_rule_channels(params, rule, oxfw,
-				oxfw->tx_stream_formations);
-}
-
-static inline int hw_rule_playback_channels(struct snd_pcm_hw_params *params,
-					    struct snd_pcm_hw_rule *rule)
-{
-	struct snd_oxfw *oxfw = rule->private;
-	return hw_rule_channels(params, rule, oxfw,
-				oxfw->rx_stream_formations);
-}
-
-static void prepare_channels(struct snd_pcm_hardware *hw,
-			     struct snd_oxfw_stream_formation *formations)
+static void
+limit_channels_and_rates(struct snd_pcm_hardware *hw,
+			 struct snd_oxfw_stream_formation *formations)
 {
 	unsigned int i;
+
+	hw->channels_min = UINT_MAX;
+	hw->channels_max = 0;
+
+	hw->rate_min = UINT_MAX;
+	hw->rate_max = 0;
+	hw->rates = 0;
 
 	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
 		/* entry has no PCM channels */
@@ -110,18 +84,6 @@ static void prepare_channels(struct snd_pcm_hardware *hw,
 
 		hw->channels_min = min(hw->channels_min, formations[i].pcm);
 		hw->channels_max = max(hw->channels_max, formations[i].pcm);
-	}
-}
-
-static void prepare_rates(struct snd_pcm_hardware *hw,
-			  struct snd_oxfw_stream_formation *formations)
-{
-	unsigned int i;
-
-	for (i = 0; i < SND_OXFW_STREAM_TABLE_ENTRIES; i++) {
-		/* entry has no PCM channels */
-		if (formations[i].pcm == 0)
-			continue;
 
 		hw->rate_min = min(hw->rate_min, snd_oxfw_rate_table[i]);
 		hw->rate_max = max(hw->rate_max, snd_oxfw_rate_table[i]);
@@ -132,6 +94,10 @@ static void prepare_rates(struct snd_pcm_hardware *hw,
 static int init_hw_params(struct snd_oxfw *oxfw,
 			  struct snd_pcm_substream *substream)
 {
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	struct snd_oxfw_stream_formation *formations;
+	int err;
+
 	static const struct snd_pcm_hardware hw = {
 		.info = SNDRV_PCM_INFO_BATCH |
 			SNDRV_PCM_INFO_BLOCK_TRANSFER |
@@ -139,62 +105,39 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 			SNDRV_PCM_INFO_JOINT_DUPLEX |
 			SNDRV_PCM_INFO_MMAP |
 			SNDRV_PCM_INFO_MMAP_VALID,
-		/* set up later */
-		.rates = 0,
-		.rate_min = UINT_MAX,
-		.rate_max = 0,
-		/* set up later */
-		.channels_min = UINT_MAX,
-		.channels_max = 0,
 		.buffer_bytes_max = 4 * 16 * 2048 * 2,
 		.period_bytes_min = 1,
 		.period_bytes_max = 4 * 16 * 2048,
 		.periods_min = 2,
 		.periods_max = UINT_MAX,
 	};
-	struct snd_pcm_runtime *runtime = substream->runtime;
-	int err;
 
 	runtime->hw = hw;
 
-	/* add rule between channels and sampling rate */
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		prepare_rates(&runtime->hw, oxfw->tx_stream_formations);
-		prepare_channels(&runtime->hw, oxfw->tx_stream_formations);
-		runtime->hw.formats = SNDRV_PCM_FMTBIT_S32_LE;
-		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
-				    hw_rule_capture_channels, oxfw,
-				    SNDRV_PCM_HW_PARAM_RATE, -1);
-		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
-				    hw_rule_capture_rate, oxfw,
-				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+		runtime->hw.formats = AMDTP_IN_PCM_FORMAT_BITS;
+		formations = oxfw->tx_stream_formations;
 	} else {
-		prepare_rates(&runtime->hw, oxfw->rx_stream_formations);
-		prepare_channels(&runtime->hw, oxfw->rx_stream_formations);
 		runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
-		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
-				    hw_rule_playback_channels, oxfw,
-				    SNDRV_PCM_HW_PARAM_RATE, -1);
-		snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
-				    hw_rule_playback_rate, oxfw,
-				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+		formations = oxfw->rx_stream_formations;
 	}
+
+	limit_channels_and_rates(&runtime->hw, formations);
+
+	err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+				  hw_rule_channels, formations,
+				  SNDRV_PCM_HW_PARAM_RATE, -1);
+	if (err < 0)
+		goto end;
+
+	err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+				  hw_rule_rate, formations,
+				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	if (err < 0)
+		goto end;
 
 	/* AM824 in IEC 61883-6 can deliver 24bit data */
 	err = snd_pcm_hw_constraint_msbits(runtime, 0, 32, 24);
-	if (err < 0)
-		goto end;
-
-	/*
-	 * AMDTP functionality in firewire-lib require periods to be aligned to
-	 * 16 bit, or 24bit inner 32bit.
-	 */
-	err = snd_pcm_hw_constraint_step(runtime, 0,
-					 SNDRV_PCM_HW_PARAM_PERIOD_BYTES, 32);
-	if (err < 0)
-		goto end;
-	err = snd_pcm_hw_constraint_step(runtime, 0,
-					 SNDRV_PCM_HW_PARAM_BUFFER_BYTES, 32);
 	if (err < 0)
 		goto end;
 

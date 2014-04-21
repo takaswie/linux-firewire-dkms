@@ -62,10 +62,9 @@ int snd_efw_get_multiplier_mode(unsigned int sampling_rate, unsigned int *mode)
 }
 
 static int
-hw_rule_rate(struct snd_pcm_hw_params *params,
-	     struct snd_pcm_hw_rule *rule,
-	     struct snd_efw *efw, const unsigned int *channels)
+hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule)
 {
+	unsigned int *pcm_channels = rule->private;
 	struct snd_interval *r =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	const struct snd_interval *c =
@@ -73,31 +72,24 @@ hw_rule_rate(struct snd_pcm_hw_params *params,
 	struct snd_interval t = {
 		.min = UINT_MAX, .max = 0, .integer = 1
 	};
-	unsigned int i, mode, rate_bit;
+	unsigned int i, mode;
 
 	for (i = 0; i < ARRAY_SIZE(freq_table); i++) {
-		/* skip unsupported sampling rate */
-		rate_bit = snd_pcm_rate_to_rate_bit(freq_table[i]);
-		if (!(efw->supported_sampling_rate & rate_bit))
-			continue;
-
 		mode = get_multiplier_mode_with_index(i);
-		if (!snd_interval_test(c, channels[mode]))
+		if (!snd_interval_test(c, pcm_channels[mode]))
 			continue;
 
 		t.min = min(t.min, freq_table[i]);
 		t.max = max(t.max, freq_table[i]);
-
 	}
 
 	return snd_interval_refine(r, &t);
 }
 
 static int
-hw_rule_channels(struct snd_pcm_hw_params *params,
-		 struct snd_pcm_hw_rule *rule,
-		 struct snd_efw *efw, const unsigned int *channels)
+hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule)
 {
+	unsigned int *pcm_channels = rule->private;
 	struct snd_interval *c =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	const struct snd_interval *r =
@@ -105,67 +97,44 @@ hw_rule_channels(struct snd_pcm_hw_params *params,
 	struct snd_interval t = {
 		.min = UINT_MAX, .max = 0, .integer = 1
 	};
-	unsigned int i, mode, rate_bit;
+	unsigned int i, mode;
 
 	for (i = 0; i < ARRAY_SIZE(freq_table); i++) {
-		/* skip unsupported sampling rate */
-		rate_bit = snd_pcm_rate_to_rate_bit(freq_table[i]);
-		if (!(efw->supported_sampling_rate & rate_bit))
-			continue;
-
 		mode = get_multiplier_mode_with_index(i);
 		if (!snd_interval_test(r, freq_table[i]))
 			continue;
 
-		t.min = min(t.min, channels[mode]);
-		t.max = max(t.max, channels[mode]);
-
+		t.min = min(t.min, pcm_channels[mode]);
+		t.max = max(t.max, pcm_channels[mode]);
 	}
 
 	return snd_interval_refine(c, &t);
 }
 
-static inline int
-hw_rule_capture_rate(struct snd_pcm_hw_params *params,
-		     struct snd_pcm_hw_rule *rule)
+static void
+limit_channels(struct snd_pcm_hardware *hw, unsigned int *pcm_channels)
 {
-	struct snd_efw *efw = rule->private;
-	return hw_rule_rate(params, rule, efw,
-			    efw->pcm_capture_channels);
-}
+	unsigned int i, mode;
 
-static inline int
-hw_rule_playback_rate(struct snd_pcm_hw_params *params,
-		      struct snd_pcm_hw_rule *rule)
-{
-	struct snd_efw *efw = rule->private;
-	return hw_rule_rate(params, rule, efw,
-			    efw->pcm_playback_channels);
-}
+	hw->channels_min = UINT_MAX;
+	hw->channels_max = 0;
 
-static inline int
-hw_rule_capture_channels(struct snd_pcm_hw_params *params,
-			 struct snd_pcm_hw_rule *rule)
-{
-	struct snd_efw *efw = rule->private;
-	return hw_rule_channels(params, rule, efw,
-				efw->pcm_capture_channels);
-}
+	for (i = 0; i < ARRAY_SIZE(freq_table); i++) {
+		mode = get_multiplier_mode_with_index(i);
+		if (pcm_channels[mode] == 0)
+			continue;
 
-static inline int
-hw_rule_playback_channels(struct snd_pcm_hw_params *params,
-			  struct snd_pcm_hw_rule *rule)
-{
-	struct snd_efw *efw = rule->private;
-	return hw_rule_channels(params, rule, efw,
-				efw->pcm_playback_channels);
+		hw->channels_min = min(hw->channels_min, pcm_channels[mode]);
+		hw->channels_max = max(hw->channels_max, pcm_channels[mode]);
+	}
 }
 
 static int
 pcm_init_hw_params(struct snd_efw *efw,
 		   struct snd_pcm_substream *substream)
 {
-	unsigned int i, *pcm_channels, rate_bit, mode;
+	struct snd_pcm_runtime *runtime = substream->runtime;
+	unsigned int *pcm_channels;
 	int err;
 
 	struct snd_pcm_hardware hardware = {
@@ -175,13 +144,6 @@ pcm_init_hw_params(struct snd_efw *efw,
 			SNDRV_PCM_INFO_JOINT_DUPLEX |
 			SNDRV_PCM_INFO_MMAP |
 			SNDRV_PCM_INFO_MMAP_VALID,
-		.rates = efw->supported_sampling_rate,
-		/* set up later */
-		.rate_min = UINT_MAX,
-		.rate_max = 0,
-		/* set up later */
-		.channels_min = UINT_MAX,
-		.channels_max = 0,
 		.buffer_bytes_max = 4 * 34 * 2048 * 2,
 		.period_bytes_min = 1,
 		.period_bytes_max = 4 * 34 * 2048,
@@ -189,53 +151,33 @@ pcm_init_hw_params(struct snd_efw *efw,
 		.periods_max = UINT_MAX,
 	};
 
-	substream->runtime->hw = hardware;
+	runtime->hw = hardware;
 
-	/* add rule between channels and sampling rate */
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
-		substream->runtime->hw.formats = AMDTP_IN_PCM_FORMAT_BITS;
-		snd_pcm_hw_rule_add(substream->runtime, 0,
-				    SNDRV_PCM_HW_PARAM_CHANNELS,
-				    hw_rule_capture_channels, efw,
-				    SNDRV_PCM_HW_PARAM_RATE, -1);
-		snd_pcm_hw_rule_add(substream->runtime, 0,
-				    SNDRV_PCM_HW_PARAM_RATE,
-				    hw_rule_capture_rate, efw,
-				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+		runtime->hw.formats = AMDTP_IN_PCM_FORMAT_BITS;
 		pcm_channels = efw->pcm_capture_channels;
 	} else {
-		substream->runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
-		snd_pcm_hw_rule_add(substream->runtime, 0,
-				    SNDRV_PCM_HW_PARAM_CHANNELS,
-				    hw_rule_playback_channels, efw,
-				    SNDRV_PCM_HW_PARAM_RATE, -1);
-		snd_pcm_hw_rule_add(substream->runtime, 0,
-				    SNDRV_PCM_HW_PARAM_RATE,
-				    hw_rule_playback_rate, efw,
-				    SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+		runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
 		pcm_channels = efw->pcm_playback_channels;
 	}
 
-	/* limitation for min/max sampling rate */
-	snd_pcm_limit_hw_rates(substream->runtime);
+	/* limit rates */
+	runtime->hw.rates = efw->supported_sampling_rate,
+	snd_pcm_limit_hw_rates(runtime);
 
-	/* limitation for the number of channels */
-	for (i = 0; i < ARRAY_SIZE(freq_table); i++) {
-		/* skip unsupported sampling rate */
-		rate_bit = snd_pcm_rate_to_rate_bit(freq_table[i]);
-		if (!(efw->supported_sampling_rate & rate_bit))
-			continue;
+	limit_channels(&runtime->hw, pcm_channels);
 
-		mode = get_multiplier_mode_with_index(i);
-		if (pcm_channels[mode] == 0)
-			continue;
-		substream->runtime->hw.channels_min =
-				min(substream->runtime->hw.channels_min,
-				    pcm_channels[mode]);
-		substream->runtime->hw.channels_max =
-				max(substream->runtime->hw.channels_max,
-				    pcm_channels[mode]);
-	}
+	err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
+				  hw_rule_channels, pcm_channels,
+				  SNDRV_PCM_HW_PARAM_RATE, -1);
+	if (err < 0)
+		goto end;
+
+	err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
+				  hw_rule_rate, pcm_channels,
+				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
+	if (err < 0)
+		goto end;
 
 	/* AM824 in IEC 61883-6 can deliver 24bit data */
 	err = snd_pcm_hw_constraint_msbits(substream->runtime, 0, 32, 24);
