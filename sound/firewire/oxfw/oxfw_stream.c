@@ -527,7 +527,7 @@ fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 			dev_err(&oxfw->unit->device,
 			"fail to get stream format %d for isoc %s plug %d:%d\n",
 				eid, (dir == AVC_GENERAL_PLUG_DIR_IN) ? "in" :
-								        "out",
+									"out",
 				pid, err);
 			break;
 		}
