@@ -134,13 +134,19 @@ int amdtp_stream_add_pcm_hw_constraints(struct amdtp_stream *s,
 		goto end;
 
 	/*
-	 * Currently INTERRUPT_INTERVAL is 16 and equals 2msec. So
-	 * So snd_pcm_period_elapsed() can be called every 2m sec.
+	 * Currently firewire-lib processes 16 packets in one software
+	 * interrupt callback. This equals to 2msec but actually the
+	 * interval of the interrupts has a jitter. So the interval
+	 * between software interrupts doesn't equal just to 2msec.
+	 * Additionally, if adding a constraint to fit period size to 2msec,
+	 * actual calculated frames per period doesn't equal to 2msec,
+	 * depending on sampling rate.
+	 * Anyway, the interval to call snd_pcm_period_elapsed() is not 2msec.
+	 * Here let us use 5msec for safe period interrupt.
 	 */
 	err = snd_pcm_hw_constraint_minmax(runtime,
 					   SNDRV_PCM_HW_PARAM_PERIOD_TIME,
-					   INTERRUPT_INTERVAL * 1000000 / 8000,
-					   UINT_MAX);
+					   5000, UINT_MAX);
 	if (err < 0)
 		goto end;
 
@@ -151,10 +157,11 @@ int amdtp_stream_add_pcm_hw_constraints(struct amdtp_stream *s,
 	/*
 	 * One AMDTP packet can include some frames. In blocking mode, the
 	 * number equals to SYT_INTERVAL. So the number is 8, 16 or 32,
-	 * depending on its sampling rate. For accurate PCM interrupt, it's
-	 * preferrable to aligh period/buffer sizes to LCM of these numbers.
+	 * depending on its sampling rate. For accurate period interrupt, it's
+	 * preferrable to aligh period/buffer sizes to current SYT_INTERVAL.
 	 *
 	 * TODO: These constraints can be improved with propper rules.
+	 * Currently apply LCM of SYT_INTEVALs.
 	 */
 	err = snd_pcm_hw_constraint_step(runtime, 0,
 					 SNDRV_PCM_HW_PARAM_PERIOD_SIZE, 32);
