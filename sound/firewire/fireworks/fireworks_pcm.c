@@ -129,6 +129,19 @@ limit_channels(struct snd_pcm_hardware *hw, unsigned int *pcm_channels)
 	}
 }
 
+static void
+limit_period_and_buffer(struct snd_pcm_hardware *hw)
+{
+	hw->periods_min = 2;		/* SNDRV_PCM_INFO_BATCH */
+	hw->periods_max = UINT_MAX;
+
+	hw->period_bytes_min = 4 * hw->channels_max;	/* bytes for a frame */
+
+	/* Just to prevent from allocating much pages. */
+	hw->period_bytes_max = hw->period_bytes_min * 2048;
+	hw->buffer_bytes_max = hw->period_bytes_max * hw->periods_min;
+}
+
 static int
 pcm_init_hw_params(struct snd_efw *efw,
 		   struct snd_pcm_substream *substream)
@@ -138,21 +151,12 @@ pcm_init_hw_params(struct snd_efw *efw,
 	unsigned int *pcm_channels;
 	int err;
 
-	struct snd_pcm_hardware hardware = {
-		.info = SNDRV_PCM_INFO_BATCH |
-			SNDRV_PCM_INFO_BLOCK_TRANSFER |
-			SNDRV_PCM_INFO_INTERLEAVED |
-			SNDRV_PCM_INFO_JOINT_DUPLEX |
-			SNDRV_PCM_INFO_MMAP |
-			SNDRV_PCM_INFO_MMAP_VALID,
-		.buffer_bytes_max = 4 * 34 * 2048 * 2,
-		.period_bytes_min = 1,
-		.period_bytes_max = 4 * 34 * 2048,
-		.periods_min = 2,
-		.periods_max = UINT_MAX,
-	};
-
-	runtime->hw = hardware;
+	runtime->hw.info = SNDRV_PCM_INFO_BATCH |
+			   SNDRV_PCM_INFO_BLOCK_TRANSFER |
+			   SNDRV_PCM_INFO_INTERLEAVED |
+			   SNDRV_PCM_INFO_JOINT_DUPLEX |
+			   SNDRV_PCM_INFO_MMAP |
+			   SNDRV_PCM_INFO_MMAP_VALID;
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		runtime->hw.formats = AMDTP_IN_PCM_FORMAT_BITS;
@@ -169,6 +173,7 @@ pcm_init_hw_params(struct snd_efw *efw,
 	snd_pcm_limit_hw_rates(runtime);
 
 	limit_channels(&runtime->hw, pcm_channels);
+	limit_period_and_buffer(&runtime->hw);
 
 	err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
 				  hw_rule_channels, pcm_channels,
