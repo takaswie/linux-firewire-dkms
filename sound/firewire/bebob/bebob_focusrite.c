@@ -128,14 +128,12 @@ static int
 saffirepro_both_clk_freq_set(struct snd_bebob *bebob, unsigned int rate)
 {
 	u32 id;
-	bool flag;
 
-	flag = false;
 	for (id = 0; id < ARRAY_SIZE(rates); id++) {
 		if (rates[id] == rate)
-			flag = true;
+			break;
 	}
-	if (!flag)
+	if (id == ARRAY_SIZE(rates))
 		return -EINVAL;
 
 	return saffire_write_quad(bebob, SAFFIREPRO_RATE_NOREBOOT, id);
