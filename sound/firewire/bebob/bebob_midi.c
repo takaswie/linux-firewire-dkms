@@ -136,7 +136,7 @@ int snd_bebob_create_midi_devices(struct snd_bebob *bebob)
 		return err;
 
 	snprintf(rmidi->name, sizeof(rmidi->name),
-			"%s MIDI", bebob->card->shortname);
+		 "%s MIDI", bebob->card->shortname);
 	rmidi->private_data = bebob;
 
 	if (bebob->midi_input_ports > 0) {

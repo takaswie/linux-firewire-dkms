@@ -136,7 +136,7 @@ int snd_efw_create_midi_devices(struct snd_efw *efw)
 		return err;
 
 	snprintf(rmidi->name, sizeof(rmidi->name),
-			"%s MIDI", efw->card->shortname);
+		 "%s MIDI", efw->card->shortname);
 	rmidi->private_data = efw;
 
 	if (efw->midi_in_ports > 0) {
