@@ -128,11 +128,6 @@ int snd_efw_create_midi_devices(struct snd_efw *efw)
 	struct snd_rawmidi_str *str;
 	int err;
 
-	/* check the number of midi stream */
-	if ((efw->midi_in_ports > SND_EFW_MAX_MIDI_IN_PORTS) |
-	    (efw->midi_out_ports > SND_EFW_MAX_MIDI_OUT_PORTS))
-		return -EIO;
-
 	/* create midi ports */
 	err = snd_rawmidi_new(efw->card, efw->card->driver, 0,
 			      efw->midi_out_ports, efw->midi_in_ports,
