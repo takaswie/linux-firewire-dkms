@@ -101,8 +101,9 @@ hwdep_lock(struct snd_bebob *bebob)
 	if (bebob->dev_lock_count == 0) {
 		bebob->dev_lock_count = -1;
 		err = 0;
-	} else
+	} else {
 		err = -EBUSY;
+	}
 
 	spin_unlock_irq(&bebob->lock);
 
@@ -119,8 +120,9 @@ hwdep_unlock(struct snd_bebob *bebob)
 	if (bebob->dev_lock_count == -1) {
 		bebob->dev_lock_count = 0;
 		err = 0;
-	} else
+	} else {
 		err = -EBADFD;
+	}
 
 	spin_unlock_irq(&bebob->lock);
 
