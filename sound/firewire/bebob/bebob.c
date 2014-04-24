@@ -206,7 +206,6 @@ bebob_probe(struct fw_unit *unit,
 
 	bebob->card = card;
 	bebob->unit = unit;
-	bebob->card_index = -1;
 	bebob->spec = spec;
 	mutex_init(&bebob->mutex);
 	spin_lock_init(&bebob->lock);
@@ -275,8 +274,8 @@ end:
 	mutex_unlock(&devices_mutex);
 	return err;
 error:
-	snd_card_free(card);
 	mutex_unlock(&devices_mutex);
+	snd_card_free(card);
 	return err;
 }
 

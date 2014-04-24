@@ -231,7 +231,6 @@ efw_probe(struct fw_unit *unit,
 
 	efw->card = card;
 	efw->unit = unit;
-	efw->card_index = -1;
 	mutex_init(&efw->mutex);
 	spin_lock_init(&efw->lock);
 	init_waitqueue_head(&efw->hwdep_wait);
@@ -277,8 +276,8 @@ end:
 	return err;
 error:
 	snd_efw_transaction_remove_instance(efw);
-	snd_card_free(card);
 	mutex_unlock(&devices_mutex);
+	snd_card_free(card);
 	return err;
 }
 
