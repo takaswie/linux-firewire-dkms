@@ -86,9 +86,9 @@ get_hardware_info(struct snd_efw *efw)
 		goto end;
 
 	/* firmware version for communication chipset */
-	err = snprintf(version, sizeof(version), "%u.%u",
-		      (hwinfo->arm_version >> 24) & 0xff,
-		      (hwinfo->arm_version >> 16) & 0xff);
+	snprintf(version, sizeof(version), "%u.%u",
+		 (hwinfo->arm_version >> 24) & 0xff,
+		 (hwinfo->arm_version >> 16) & 0xff);
 	if (err < 0)
 		goto end;
 	efw->firmware_version = hwinfo->arm_version;
@@ -96,11 +96,11 @@ get_hardware_info(struct snd_efw *efw)
 	strcpy(efw->card->driver, "Fireworks");
 	strcpy(efw->card->shortname, hwinfo->model_name);
 	strcpy(efw->card->mixername, hwinfo->model_name);
-	err = snprintf(efw->card->longname, sizeof(efw->card->longname),
-		       "%s %s v%s, GUID %08x%08x at %s, S%d",
-		       hwinfo->vendor_name, hwinfo->model_name, version,
-		       hwinfo->guid_hi, hwinfo->guid_lo,
-		       dev_name(&efw->unit->device), 100 << fw_dev->max_speed);
+	snprintf(efw->card->longname, sizeof(efw->card->longname),
+		 "%s %s v%s, GUID %08x%08x at %s, S%d",
+		 hwinfo->vendor_name, hwinfo->model_name, version,
+		 hwinfo->guid_hi, hwinfo->guid_lo,
+		 dev_name(&efw->unit->device), 100 << fw_dev->max_speed);
 	if (err < 0)
 		goto end;
 
