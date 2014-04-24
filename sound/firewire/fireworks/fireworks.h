@@ -193,7 +193,6 @@ enum snd_efw_transport_mode {
 	SND_EFW_TRANSPORT_MODE_WINDOWS	= 0,
 	SND_EFW_TRANSPORT_MODE_IEC61883	= 1,
 };
-int snd_efw_command_identify(struct snd_efw *efw);
 int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 				  u16 addr_high, u32 addr_low);
 int snd_efw_command_set_tx_mode(struct snd_efw *efw, unsigned int mode);
@@ -204,8 +203,6 @@ int snd_efw_command_get_phys_meters(struct snd_efw *efw,
 				    unsigned int len);
 int snd_efw_command_get_clock_source(struct snd_efw *efw,
 				     enum snd_efw_clock_source *source);
-int snd_efw_command_set_clock_source(struct snd_efw *efw,
-				     enum snd_efw_clock_source source);
 int snd_efw_command_get_sampling_rate(struct snd_efw *efw, unsigned int *rate);
 int snd_efw_command_set_sampling_rate(struct snd_efw *efw, unsigned int rate);
 

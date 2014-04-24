@@ -174,14 +174,6 @@ end:
 	return err;
 }
 
-/* just blink LEDs on the device */
-int snd_efw_command_identify(struct snd_efw *efw)
-{
-	return efw_transaction(efw, EFC_CAT_HWCTL,
-			       EFC_CMD_HWCTL_IDENTIFY,
-			       NULL, 0, NULL, 0);
-}
-
 /*
  * The address in host system for transaction response is changable when the
  * device supports. struct hwinfo.flags includes its flag. The default is
@@ -359,12 +351,6 @@ int snd_efw_command_get_clock_source(struct snd_efw *efw,
 		*source = clock.source;
 
 	return err;
-}
-
-int snd_efw_command_set_clock_source(struct snd_efw *efw,
-				     enum snd_efw_clock_source source)
-{
-	return command_set_clock(efw, source, UINT_MAX);
 }
 
 int snd_efw_command_get_sampling_rate(struct snd_efw *efw, unsigned int *rate)
