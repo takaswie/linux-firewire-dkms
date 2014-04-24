@@ -56,7 +56,7 @@ get_formation_index(unsigned int rate)
 		if (snd_bebob_rate_table[i] == rate)
 			return i;
 	}
-	return -1;
+	return -EINVAL;
 }
 
 int
@@ -109,7 +109,7 @@ snd_bebob_stream_set_rate(struct snd_bebob *bebob, unsigned int rate)
 
 	/*
 	 * Some devices need a bit time for transition.
-	 * 300msec is got by some experimentals.
+	 * 300msec is got by some experiments.
 	 */
 	msleep(300);
 end:
@@ -139,8 +139,8 @@ snd_bebob_stream_check_internal_clock(struct snd_bebob *bebob, bool *internal)
 	}
 
 	/*
-	 * 2.The device don't support for switching source of clock
-	 *   then assumed to use internal clock always
+	 * 2.The device don't support to switch source of clock then assumed
+	 *   to use internal clock always
 	 */
 	if (bebob->sync_input_plug < 0) {
 		*internal = true;
@@ -855,7 +855,7 @@ seek_msu_sync_input_plug(struct snd_bebob *bebob)
 	unsigned int i, type;
 	int err;
 
-	/* get information about Music Sub Unit */
+	/* Get the number of Music Sub Unit for both direction. */
 	err = avc_general_get_plug_info(bebob->unit, 0x0c, 0x00, 0x00, plugs);
 	if (err < 0) {
 		dev_err(&bebob->unit->device,
