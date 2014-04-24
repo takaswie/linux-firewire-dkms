@@ -144,12 +144,6 @@ int avc_bridgeco_get_plug_ch_pos(struct fw_unit *unit,
 {
 	int err;
 
-	/* check given buffer */
-	if ((buf == NULL) || (len < 256)) {
-		err = -EINVAL;
-		goto end;
-	}
-
 	/* Info type is 'channel position'. */
 	avc_bridgeco_fill_plug_info_extension_command(buf, addr, 0x03);
 
