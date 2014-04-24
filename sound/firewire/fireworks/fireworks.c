@@ -142,12 +142,12 @@ get_hardware_info(struct snd_efw *efw)
 	efw->midi_out_ports = hwinfo->midi_out_ports;
 	efw->midi_in_ports = hwinfo->midi_in_ports;
 
-	if (efw->pcm_capture_channels[0]  > AMDTP_MAX_CHANNELS_FOR_PCM ||
-	    efw->pcm_capture_channels[1]  > AMDTP_MAX_CHANNELS_FOR_PCM ||
-	    efw->pcm_capture_channels[2]  > AMDTP_MAX_CHANNELS_FOR_PCM ||
-	    efw->pcm_playback_channels[0] > AMDTP_MAX_CHANNELS_FOR_PCM ||
-	    efw->pcm_playback_channels[1] > AMDTP_MAX_CHANNELS_FOR_PCM ||
-	    efw->pcm_playback_channels[2] > AMDTP_MAX_CHANNELS_FOR_PCM) {
+	if (hwinfo->amdtp_tx_pcm_channels    > AMDTP_MAX_CHANNELS_FOR_PCM ||
+	    hwinfo->amdtp_tx_pcm_channels_2x > AMDTP_MAX_CHANNELS_FOR_PCM ||
+	    hwinfo->amdtp_tx_pcm_channels_4x > AMDTP_MAX_CHANNELS_FOR_PCM ||
+	    hwinfo->amdtp_rx_pcm_channels    > AMDTP_MAX_CHANNELS_FOR_PCM ||
+	    hwinfo->amdtp_rx_pcm_channels_2x > AMDTP_MAX_CHANNELS_FOR_PCM ||
+	    hwinfo->amdtp_rx_pcm_channels_4x > AMDTP_MAX_CHANNELS_FOR_PCM) {
 		err = -ENOSYS;
 		goto end;
 	}
