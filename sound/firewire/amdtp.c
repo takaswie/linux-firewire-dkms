@@ -136,12 +136,11 @@ int amdtp_stream_add_pcm_hw_constraints(struct amdtp_stream *s,
 	/*
 	 * Currently firewire-lib processes 16 packets in one software
 	 * interrupt callback. This equals to 2msec but actually the
-	 * interval of the interrupts has a jitter. So the interval
-	 * between software interrupts doesn't equal just to 2msec.
-	 * Additionally, if adding a constraint to fit period size to 2msec,
-	 * actual calculated frames per period doesn't equal to 2msec,
+	 * interval of the interrupts has a jitter.
+	 * Additionally, even if adding a constraint to fit period size to
+	 * 2msec, actual calculated frames per period doesn't equal to 2msec,
 	 * depending on sampling rate.
-	 * Anyway, the interval to call snd_pcm_period_elapsed() is not 2msec.
+	 * Anyway, the interval to call snd_pcm_period_elapsed() cannot 2msec.
 	 * Here let us use 5msec for safe period interrupt.
 	 */
 	err = snd_pcm_hw_constraint_minmax(runtime,
