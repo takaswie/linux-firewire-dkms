@@ -51,7 +51,7 @@ int snd_efw_get_multiplier_mode(unsigned int sampling_rate, unsigned int *mode)
 {
 	unsigned int i;
 
-	for (i = 0; i < sizeof(freq_table); i++) {
+	for (i = 0; i < ARRAY_SIZE(freq_table); i++) {
 		if (freq_table[i] == sampling_rate) {
 			*mode = get_multiplier_mode_with_index(i);
 			return 0;

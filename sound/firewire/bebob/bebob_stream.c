@@ -52,7 +52,7 @@ get_formation_index(unsigned int rate)
 {
 	unsigned int i;
 
-	for (i = 0; i < sizeof(snd_bebob_rate_table); i++) {
+	for (i = 0; i < ARRAY_SIZE(snd_bebob_rate_table); i++) {
 		if (snd_bebob_rate_table[i] == rate)
 			return i;
 	}
@@ -745,7 +745,7 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		return -ENOSYS;
 
 	/* check sampling rate */
-	for (i = 0; i < sizeof(bridgeco_freq_table); i++) {
+	for (i = 0; i < ARRAY_SIZE(bridgeco_freq_table); i++) {
 		if (buf[2] == bridgeco_freq_table[i])
 			break;
 	}

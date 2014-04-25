@@ -10,20 +10,19 @@
 #include "./fireworks.h"
 
 static inline const char*
-get_phys_name(struct snd_efw_phys_grp *grp)
+get_phys_name(struct snd_efw_phys_grp *grp, bool input)
 {
 	const char *const ch_type[] = {
-		"Analog", "S/PDIF", "ADAT", "S/PDIF or ADAT",
-		"Mirroring", "Headphones", "I2S", "Guitar",
-		"Pirzo Guitar", "Guitar String", "Virtual", "Dummy"
+		"Analog", "S/PDIF", "ADAT", "S/PDIF or ADAT", "Mirroring",
+		"Headphones", "I2S", "Guitar", "Pirzo Guitar", "Guitar String",
 	};
 
-	if (grp->type < 10)
+	if (grp->type < ARRAY_SIZE(ch_type))
 		return ch_type[grp->type];
-	else if (grp->type == 0x10000)
-		return ch_type[10];
+	else if (input)
+		return "Input";
 	else
-		return ch_type[11];
+		return "Output";
 }
 
 static void
@@ -153,7 +152,7 @@ proc_read_phys_meters(struct snd_info_entry *entry,
 	linear = meters->values;
 	snd_iprintf(buffer, " %d Outputs:\n", max);
 	for (g = 0; g < efw->phys_out_grp_count; g++) {
-		name = get_phys_name(&efw->phys_out_grps[g]);
+		name = get_phys_name(&efw->phys_out_grps[g], false);
 		for (c = 0; c < efw->phys_out_grps[g].count; c++) {
 			if (m < max)
 				snd_iprintf(buffer, "\t%s [%d]: %d\n",
@@ -166,7 +165,7 @@ proc_read_phys_meters(struct snd_info_entry *entry,
 	linear = meters->values + meters->out_meters;
 	snd_iprintf(buffer, " %d Inputs:\n", max);
 	for (g = 0; g < efw->phys_in_grp_count; g++) {
-		name = get_phys_name(&efw->phys_in_grps[g]);
+		name = get_phys_name(&efw->phys_in_grps[g], true);
 		for (c = 0; c < efw->phys_in_grps[g].count; c++)
 			if (m < max)
 				snd_iprintf(buffer, "\t%s [%d]: %d\n",
