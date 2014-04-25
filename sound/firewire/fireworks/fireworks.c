@@ -203,9 +203,10 @@ efw_probe(struct fw_unit *unit,
 	mutex_lock(&devices_mutex);
 
 	/* check registered cards */
-	for (card_index = 0; card_index < SNDRV_CARDS; ++card_index)
+	for (card_index = 0; card_index < SNDRV_CARDS; ++card_index) {
 		if (!test_bit(card_index, devices_used) && enable[card_index])
 			break;
+	}
 	if (card_index >= SNDRV_CARDS) {
 		err = -ENOENT;
 		goto end;
