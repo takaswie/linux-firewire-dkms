@@ -189,6 +189,7 @@ efw_card_free(struct snd_card *card)
 	}
 
 	mutex_destroy(&efw->mutex);
+	kfree(efw->resp_buf);
 }
 
 static int
@@ -197,7 +198,6 @@ efw_probe(struct fw_unit *unit,
 {
 	struct snd_card *card;
 	struct snd_efw *efw;
-	void *resp_buf;
 	int card_index, err;
 
 	mutex_lock(&devices_mutex);
@@ -209,15 +209,6 @@ efw_probe(struct fw_unit *unit,
 	}
 	if (card_index >= SNDRV_CARDS) {
 		err = -ENOENT;
-		goto end;
-	}
-
-	/* prepare response buffer */
-	snd_efw_resp_buf_size = clamp(snd_efw_resp_buf_size,
-				      SND_EFW_RESPONSE_MAXIMUM_BYTES, 4096U);
-	resp_buf = kzalloc(snd_efw_resp_buf_size, GFP_KERNEL);
-	if (resp_buf == NULL) {
-		err = -ENOMEM;
 		goto end;
 	}
 
@@ -235,8 +226,15 @@ efw_probe(struct fw_unit *unit,
 	mutex_init(&efw->mutex);
 	spin_lock_init(&efw->lock);
 	init_waitqueue_head(&efw->hwdep_wait);
-	efw->resp_buf = efw->pull_ptr = efw->push_ptr = resp_buf;
 
+	snd_efw_resp_buf_size = clamp(snd_efw_resp_buf_size,
+				      SND_EFW_RESPONSE_MAXIMUM_BYTES, 4096U);
+	efw->resp_buf = kzalloc(snd_efw_resp_buf_size, GFP_KERNEL);
+	if (efw->resp_buf == NULL) {
+		err = -ENOMEM;
+		goto error;
+	}
+	efw->pull_ptr = efw->push_ptr = efw->resp_buf;
 	snd_efw_transaction_add_instance(efw);
 
 	err = get_hardware_info(efw);
