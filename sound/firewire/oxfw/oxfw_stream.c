@@ -221,6 +221,9 @@ int snd_oxfw_stream_init_duplex(struct snd_oxfw *oxfw)
 		err = init_stream(oxfw, &oxfw->tx_stream);
 		if (err < 0)
 			destroy_stream(oxfw, &oxfw->rx_stream);
+
+		/* OXFW starts to transmit packets with non-zero dbc. */
+		oxfw->tx_stream.flags |= CIP_SKIP_INIT_DBC_CHECK;
 	}
 end:
 	return err;
