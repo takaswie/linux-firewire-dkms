@@ -231,12 +231,18 @@ static const struct ieee1394_device_id oxfw_id_table[] = {
 		.vendor_id	= VEN_LOUD,
 		.model_id	= 0x00200f,
 	},
+	/*  Mackie(Loud), Tapco Link.Firewire */
+	{
+		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
+				  IEEE1394_MATCH_MODEL_ID,
+		.vendor_id	= VEN_LOUD,
+		.model_id	= 0x000460,
+	},
 	/* IDs are unknown but able to be supported */
 	/*  Mackie(Loud), d.2 pro */
 	/*  Mackie(Loud), d.4 pro */
 	/*  Mackie(Loud), U.420 */
 	/*  Mackie(Loud), U.420d */
-	/*  Mackie(Loud), Tapco Link.Firewire */
 	{ }
 };
 MODULE_DEVICE_TABLE(ieee1394, oxfw_id_table);
