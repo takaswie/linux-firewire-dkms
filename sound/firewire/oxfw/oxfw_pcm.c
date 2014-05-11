@@ -42,24 +42,23 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule)
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	const struct snd_interval *r =
 		hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_interval t = {
-		.min = UINT_MAX, .max = 0, .integer = 1
-	};
+	unsigned int i, count, list[SND_OXFW_STREAM_FORMAT_ENTRIES] = {0};
 
-	unsigned int i;
-
+	count = 0;
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
 		if (formations[i].rate == 0)
 			continue;
 
 		if (!snd_interval_test(r, formations[i].rate))
 			continue;
-
-		t.min = min(t.min, formations[i].pcm);
-		t.max = max(t.max, formations[i].pcm);
+		if (list[count] == formations[i].pcm)
+			continue;
+		if (list[count] != 0)
+			count++;
+		list[count] = formations[i].pcm;
 	}
 
-	return snd_interval_refine(c, &t);
+	return snd_interval_list(c, count + 1, list, 0);
 }
 
 static void
