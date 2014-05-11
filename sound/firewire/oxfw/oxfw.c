@@ -152,13 +152,20 @@ static int oxfw_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto err_card;
 
-	err = snd_oxfw_stream_init_duplex(oxfw);
+	err = snd_oxfw_stream_init_simplex(oxfw, &oxfw->rx_stream);
 	if (err < 0)
 		goto err_card;
+	if (oxfw->has_output) {
+		err = snd_oxfw_stream_init_simplex(oxfw, &oxfw->tx_stream);
+		if (err < 0)
+			goto err_card;
+	}
 
 	err = snd_card_register(card);
 	if (err < 0) {
-		snd_oxfw_stream_destroy_duplex(oxfw);
+		snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->rx_stream);
+		if (oxfw->has_output)
+			snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->tx_stream);
 		goto err_card;
 	}
 	dev_set_drvdata(&unit->device, oxfw);
@@ -174,14 +181,18 @@ static void oxfw_bus_reset(struct fw_unit *unit)
 	struct snd_oxfw *oxfw = dev_get_drvdata(&unit->device);
 
 	fcp_bus_reset(oxfw->unit);
-	snd_oxfw_stream_update_duplex(oxfw);
+	snd_oxfw_stream_update_simplex(oxfw, &oxfw->rx_stream);
+	if (oxfw->has_output)
+		snd_oxfw_stream_update_simplex(oxfw, &oxfw->tx_stream);
 }
 
 static void oxfw_remove(struct fw_unit *unit)
 {
 	struct snd_oxfw *oxfw = dev_get_drvdata(&unit->device);
 
-	snd_oxfw_stream_destroy_duplex(oxfw);
+	snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->rx_stream);
+	if (oxfw->has_output)
+		snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->tx_stream);
 
 	snd_card_disconnect(oxfw->card);
 	snd_card_free_when_closed(oxfw->card);

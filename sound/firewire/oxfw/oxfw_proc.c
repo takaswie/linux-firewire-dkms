@@ -46,9 +46,10 @@ proc_read_clock(struct snd_info_entry *entry,
 		snd_iprintf(buffer, "Sampling rate: %d\n", rate);
 }
 
-static void
-add_node(struct snd_oxfw *oxfw, struct snd_info_entry *root, const char *name,
-	 void (*op)(struct snd_info_entry *e, struct snd_info_buffer *b))
+static void add_node(struct snd_oxfw *oxfw, struct snd_info_entry *root,
+		     const char *name,
+		     void (*op)(struct snd_info_entry *e,
+				struct snd_info_buffer *b))
 {
 	struct snd_info_entry *entry;
 
