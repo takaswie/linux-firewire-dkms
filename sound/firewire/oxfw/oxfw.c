@@ -116,28 +116,28 @@ static int oxfw_probe(struct fw_unit *unit,
 	card->private_free = oxfw_card_free;
 	oxfw = card->private_data;
 	oxfw->card = card;
+	mutex_init(&oxfw->mutex);
 	oxfw->unit = unit;
 	oxfw->device_info = (const struct device_info *)id->driver_data;
-	mutex_init(&oxfw->mutex);
 	spin_lock_init(&oxfw->lock);
 	init_waitqueue_head(&oxfw->hwdep_wait);
 
 	err = snd_oxfw_stream_discover(oxfw);
 	if (err < 0)
-		goto err_card;
+		goto error;
 
 	err = name_card(oxfw);
 	if (err < 0)
-		goto err_card;
+		goto error;
 
 	err = snd_oxfw_create_pcm(oxfw);
 	if (err < 0)
-		goto err_card;
+		goto error;
 
 	if (oxfw->device_info) {
 		err = snd_oxfw_create_mixer(oxfw);
 		if (err < 0)
-			goto err_card;
+			goto error;
 	}
 
 	snd_oxfw_proc_init(oxfw);
@@ -145,20 +145,20 @@ static int oxfw_probe(struct fw_unit *unit,
 	if ((oxfw->midi_input_ports > 0) || (oxfw->midi_output_ports > 0)) {
 		err = snd_oxfw_create_midi(oxfw);
 		if (err < 0)
-			goto err_card;
+			goto error;
 	}
 
 	err = snd_oxfw_create_hwdep(oxfw);
 	if (err < 0)
-		goto err_card;
+		goto error;
 
 	err = snd_oxfw_stream_init_simplex(oxfw, &oxfw->rx_stream);
 	if (err < 0)
-		goto err_card;
+		goto error;
 	if (oxfw->has_output) {
 		err = snd_oxfw_stream_init_simplex(oxfw, &oxfw->tx_stream);
 		if (err < 0)
-			goto err_card;
+			goto error;
 	}
 
 	err = snd_card_register(card);
@@ -166,12 +166,12 @@ static int oxfw_probe(struct fw_unit *unit,
 		snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->rx_stream);
 		if (oxfw->has_output)
 			snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->tx_stream);
-		goto err_card;
+		goto error;
 	}
 	dev_set_drvdata(&unit->device, oxfw);
 
 	return 0;
-err_card:
+error:
 	snd_card_free(card);
 	return err;
 }
@@ -228,14 +228,14 @@ static const struct ieee1394_device_id oxfw_id_table[] = {
 		.vendor_id	= VEN_BEHRINGER,
 		.model_id	= 0x00fc22,
 	},
-	/* Mackie, Onyx-i series (former models) */
+	/* Mackie(Loud), Onyx-i series (former models) */
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
 		.vendor_id	= VEN_LOUD,
 		.model_id	= 0x081216,
 	},
-	/* Mackie, Onyx Satellite */
+	/* Mackie(Loud), Onyx Satellite */
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,

@@ -329,6 +329,7 @@ void snd_oxfw_stream_destroy_simplex(struct snd_oxfw *oxfw,
 
 	mutex_lock(&oxfw->mutex);
 	stop_stream(oxfw, stream);
+	amdtp_stream_destroy(stream);
 	cmp_connection_destroy(conn);
 	mutex_unlock(&oxfw->mutex);
 }
@@ -606,7 +607,7 @@ int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
 		if (oxfw->tx_stream_formations[i].midi > 0)
 			oxfw->midi_input_ports = 1;
-		else if (oxfw->rx_stream_formations[i].midi > 0)
+		if (oxfw->rx_stream_formations[i].midi > 0)
 			oxfw->midi_output_ports = 1;
 	}
 end:
