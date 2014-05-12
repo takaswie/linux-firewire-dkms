@@ -10,8 +10,7 @@
 
 int avc_stream_get_format(struct fw_unit *unit,
 			  enum avc_general_plug_dir dir, unsigned int pid,
-			  u8 *buf, unsigned int *len,
-			  unsigned int eid)
+			  u8 *buf, unsigned int *len, unsigned int eid)
 {
 	unsigned int subfunc;
 	int err;

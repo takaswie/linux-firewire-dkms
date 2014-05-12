@@ -7,8 +7,8 @@
 
 #include "oxfw.h"
 
-static int
-hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule)
+static int hw_rule_rate(struct snd_pcm_hw_params *params,
+			struct snd_pcm_hw_rule *rule)
 {
 	struct snd_oxfw_stream_formation *formations = rule->private;
 	struct snd_interval *r =
@@ -34,8 +34,8 @@ hw_rule_rate(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule)
 	return snd_interval_refine(r, &t);
 }
 
-static int
-hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule)
+static int hw_rule_channels(struct snd_pcm_hw_params *params,
+			    struct snd_pcm_hw_rule *rule)
 {
 	struct snd_oxfw_stream_formation *formations = rule->private;
 	struct snd_interval *c =
@@ -61,9 +61,8 @@ hw_rule_channels(struct snd_pcm_hw_params *params, struct snd_pcm_hw_rule *rule)
 	return snd_interval_list(c, count + 1, list, 0);
 }
 
-static void
-limit_channels_and_rates(struct snd_pcm_hardware *hw,
-			 struct snd_oxfw_stream_formation *formations)
+static void limit_channels_and_rates(struct snd_pcm_hardware *hw,
+				struct snd_oxfw_stream_formation *formations)
 {
 	unsigned int i;
 
@@ -87,8 +86,7 @@ limit_channels_and_rates(struct snd_pcm_hardware *hw,
 	}
 }
 
-static void
-limit_period_and_buffer(struct snd_pcm_hardware *hw)
+static void limit_period_and_buffer(struct snd_pcm_hardware *hw)
 {
 	hw->periods_min = 2;		/* SNDRV_PCM_INFO_BATCH */
 	hw->periods_max = UINT_MAX;
@@ -145,7 +143,7 @@ end:
 	return err;
 }
 
-static int oxfw_open(struct snd_pcm_substream *substream)
+static int pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 	unsigned int rate;
@@ -183,15 +181,15 @@ err_locked:
 	return err;
 }
 
-static int oxfw_close(struct snd_pcm_substream *substream)
+static int pcm_close(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 	snd_oxfw_stream_lock_release(oxfw);
 	return 0;
 }
 
-static int oxfw_hw_params_capture(struct snd_pcm_substream *substream,
-				  struct snd_pcm_hw_params *hw_params)
+static int pcm_capture_hw_params(struct snd_pcm_substream *substream,
+				 struct snd_pcm_hw_params *hw_params)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
@@ -202,8 +200,8 @@ static int oxfw_hw_params_capture(struct snd_pcm_substream *substream,
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
 						params_buffer_bytes(hw_params));
 }
-static int oxfw_hw_params_playback(struct snd_pcm_substream *substream,
-				   struct snd_pcm_hw_params *hw_params)
+static int pcm_playback_hw_params(struct snd_pcm_substream *substream,
+				  struct snd_pcm_hw_params *hw_params)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
@@ -215,7 +213,7 @@ static int oxfw_hw_params_playback(struct snd_pcm_substream *substream,
 						params_buffer_bytes(hw_params));
 }
 
-static int oxfw_hw_free_capture(struct snd_pcm_substream *substream)
+static int pcm_capture_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
@@ -226,7 +224,7 @@ static int oxfw_hw_free_capture(struct snd_pcm_substream *substream)
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
-static int oxfw_hw_free_playback(struct snd_pcm_substream *substream)
+static int pcm_playback_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
@@ -238,7 +236,7 @@ static int oxfw_hw_free_playback(struct snd_pcm_substream *substream)
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
 
-static int oxfw_prepare_capture(struct snd_pcm_substream *substream)
+static int pcm_capture_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -253,7 +251,7 @@ static int oxfw_prepare_capture(struct snd_pcm_substream *substream)
 end:
 	return err;
 }
-static int oxfw_prepare_playback(struct snd_pcm_substream *substream)
+static int pcm_playback_prepare(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 	struct snd_pcm_runtime *runtime = substream->runtime;
@@ -269,7 +267,7 @@ end:
 	return err;
 }
 
-static int oxfw_trigger_capture(struct snd_pcm_substream *substream, int cmd)
+static int pcm_capture_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 	struct snd_pcm_substream *pcm;
@@ -287,7 +285,7 @@ static int oxfw_trigger_capture(struct snd_pcm_substream *substream, int cmd)
 	amdtp_stream_pcm_trigger(&oxfw->tx_stream, pcm);
 	return 0;
 }
-static int oxfw_trigger_playback(struct snd_pcm_substream *substream, int cmd)
+static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 	struct snd_pcm_substream *pcm;
@@ -306,13 +304,13 @@ static int oxfw_trigger_playback(struct snd_pcm_substream *substream, int cmd)
 	return 0;
 }
 
-static snd_pcm_uframes_t oxfw_pointer_capture(struct snd_pcm_substream *sbstm)
+static snd_pcm_uframes_t pcm_capture_pointer(struct snd_pcm_substream *sbstm)
 {
 	struct snd_oxfw *oxfw = sbstm->private_data;
 
 	return amdtp_stream_pcm_pointer(&oxfw->tx_stream);
 }
-static snd_pcm_uframes_t oxfw_pointer_playback(struct snd_pcm_substream *sbstm)
+static snd_pcm_uframes_t pcm_playback_pointer(struct snd_pcm_substream *sbstm)
 {
 	struct snd_oxfw *oxfw = sbstm->private_data;
 
@@ -322,26 +320,26 @@ static snd_pcm_uframes_t oxfw_pointer_playback(struct snd_pcm_substream *sbstm)
 int snd_oxfw_create_pcm(struct snd_oxfw *oxfw)
 {
 	static struct snd_pcm_ops capture_ops = {
-		.open      = oxfw_open,
-		.close     = oxfw_close,
+		.open      = pcm_open,
+		.close     = pcm_close,
 		.ioctl     = snd_pcm_lib_ioctl,
-		.hw_params = oxfw_hw_params_capture,
-		.hw_free   = oxfw_hw_free_capture,
-		.prepare   = oxfw_prepare_capture,
-		.trigger   = oxfw_trigger_capture,
-		.pointer   = oxfw_pointer_capture,
+		.hw_params = pcm_capture_hw_params,
+		.hw_free   = pcm_capture_hw_free,
+		.prepare   = pcm_capture_prepare,
+		.trigger   = pcm_capture_trigger,
+		.pointer   = pcm_capture_pointer,
 		.page      = snd_pcm_lib_get_vmalloc_page,
 		.mmap      = snd_pcm_lib_mmap_vmalloc,
 	};
 	static struct snd_pcm_ops playback_ops = {
-		.open      = oxfw_open,
-		.close     = oxfw_close,
+		.open      = pcm_open,
+		.close     = pcm_close,
 		.ioctl     = snd_pcm_lib_ioctl,
-		.hw_params = oxfw_hw_params_playback,
-		.hw_free   = oxfw_hw_free_playback,
-		.prepare   = oxfw_prepare_playback,
-		.trigger   = oxfw_trigger_playback,
-		.pointer   = oxfw_pointer_playback,
+		.hw_params = pcm_playback_hw_params,
+		.hw_free   = pcm_playback_hw_free,
+		.prepare   = pcm_playback_prepare,
+		.trigger   = pcm_playback_trigger,
+		.pointer   = pcm_playback_pointer,
 		.page      = snd_pcm_lib_get_vmalloc_page,
 		.mmap      = snd_pcm_lib_mmap_vmalloc,
 	};

@@ -15,7 +15,7 @@ enum control_attribute {
 };
 
 static int oxfw_mute_command(struct snd_oxfw *oxfw, bool *value,
-			      enum control_action action)
+			     enum control_action action)
 {
 	u8 *buf;
 	u8 response_ok;
@@ -71,9 +71,9 @@ error:
 }
 
 static int oxfw_volume_command(struct snd_oxfw *oxfw, s16 *value,
-				unsigned int channel,
-				enum control_attribute attribute,
-				enum control_action action)
+			       unsigned int channel,
+			       enum control_attribute attribute,
+			       enum control_action action)
 {
 	u8 *buf;
 	u8 response_ok;
@@ -132,7 +132,7 @@ error:
 }
 
 static int oxfw_mute_get(struct snd_kcontrol *control,
-			  struct snd_ctl_elem_value *value)
+			 struct snd_ctl_elem_value *value)
 {
 	struct snd_oxfw *oxfw = control->private_data;
 
@@ -142,7 +142,7 @@ static int oxfw_mute_get(struct snd_kcontrol *control,
 }
 
 static int oxfw_mute_put(struct snd_kcontrol *control,
-			  struct snd_ctl_elem_value *value)
+			 struct snd_ctl_elem_value *value)
 {
 	struct snd_oxfw *oxfw = control->private_data;
 	bool mute;
@@ -162,7 +162,7 @@ static int oxfw_mute_put(struct snd_kcontrol *control,
 }
 
 static int oxfw_volume_info(struct snd_kcontrol *control,
-			     struct snd_ctl_elem_info *info)
+			    struct snd_ctl_elem_info *info)
 {
 	struct snd_oxfw *oxfw = control->private_data;
 
@@ -177,7 +177,7 @@ static int oxfw_volume_info(struct snd_kcontrol *control,
 static const u8 channel_map[6] = { 0, 1, 4, 5, 2, 3 };
 
 static int oxfw_volume_get(struct snd_kcontrol *control,
-			    struct snd_ctl_elem_value *value)
+			   struct snd_ctl_elem_value *value)
 {
 	struct snd_oxfw *oxfw = control->private_data;
 	unsigned int i;
@@ -189,7 +189,7 @@ static int oxfw_volume_get(struct snd_kcontrol *control,
 }
 
 static int oxfw_volume_put(struct snd_kcontrol *control,
-			  struct snd_ctl_elem_value *value)
+			   struct snd_ctl_elem_value *value)
 {
 	struct snd_oxfw *oxfw = control->private_data;
 	unsigned int i, changed_channels;

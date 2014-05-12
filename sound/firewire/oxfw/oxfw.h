@@ -89,8 +89,7 @@ struct snd_oxfw {
 #define AVC_GENERIC_FRAME_MAXIMUM_BYTES	512
 int avc_stream_get_format(struct fw_unit *unit,
 			  enum avc_general_plug_dir dir, unsigned int pid,
-			  u8 *buf, unsigned int *len,
-			  unsigned int eid);
+			  u8 *buf, unsigned int *len, unsigned int eid);
 static inline int
 avc_stream_get_format_single(struct fw_unit *unit,
 			     enum avc_general_plug_dir dir, unsigned int pid,

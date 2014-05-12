@@ -8,9 +8,8 @@
 
 #include "./oxfw.h"
 
-static void
-proc_read_formation(struct snd_info_entry *entry,
-		    struct snd_info_buffer *buffer)
+static void proc_read_formation(struct snd_info_entry *entry,
+				struct snd_info_buffer *buffer)
 {
 	struct snd_oxfw *oxfw = entry->private_data;
 	struct snd_oxfw_stream_formation *formation;
@@ -35,9 +34,8 @@ proc_read_formation(struct snd_info_entry *entry,
 	}
 }
 
-static void
-proc_read_clock(struct snd_info_entry *entry,
-		struct snd_info_buffer *buffer)
+static void proc_read_clock(struct snd_info_entry *entry,
+			    struct snd_info_buffer *buffer)
 {
 	struct snd_oxfw *oxfw = entry->private_data;
 	unsigned int rate;

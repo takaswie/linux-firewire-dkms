@@ -16,9 +16,8 @@
 
 #include "oxfw.h"
 
-static long
-hwdep_read(struct snd_hwdep *hwdep, char __user *buf,  long count,
-	   loff_t *offset)
+static long hwdep_read(struct snd_hwdep *hwdep, char __user *buf,  long count,
+		       loff_t *offset)
 {
 	struct snd_oxfw *oxfw = hwdep->private_data;
 	DEFINE_WAIT(wait);
@@ -53,8 +52,8 @@ hwdep_read(struct snd_hwdep *hwdep, char __user *buf,  long count,
 	return count;
 }
 
-static unsigned int
-hwdep_poll(struct snd_hwdep *hwdep, struct file *file, poll_table *wait)
+static unsigned int hwdep_poll(struct snd_hwdep *hwdep, struct file *file,
+			       poll_table *wait)
 {
 	struct snd_oxfw *oxfw = hwdep->private_data;
 	unsigned int events;
@@ -71,8 +70,7 @@ hwdep_poll(struct snd_hwdep *hwdep, struct file *file, poll_table *wait)
 	return events;
 }
 
-static int
-hwdep_get_info(struct snd_oxfw *oxfw, void __user *arg)
+static int hwdep_get_info(struct snd_oxfw *oxfw, void __user *arg)
 {
 	struct fw_device *dev = fw_parent_device(oxfw->unit);
 	struct snd_firewire_get_info info;
@@ -91,8 +89,7 @@ hwdep_get_info(struct snd_oxfw *oxfw, void __user *arg)
 	return 0;
 }
 
-static int
-hwdep_lock(struct snd_oxfw *oxfw)
+static int hwdep_lock(struct snd_oxfw *oxfw)
 {
 	int err;
 
@@ -109,8 +106,7 @@ hwdep_lock(struct snd_oxfw *oxfw)
 	return err;
 }
 
-static int
-hwdep_unlock(struct snd_oxfw *oxfw)
+static int hwdep_unlock(struct snd_oxfw *oxfw)
 {
 	int err;
 
@@ -127,8 +123,7 @@ hwdep_unlock(struct snd_oxfw *oxfw)
 	return err;
 }
 
-static int
-hwdep_release(struct snd_hwdep *hwdep, struct file *file)
+static int hwdep_release(struct snd_hwdep *hwdep, struct file *file)
 {
 	struct snd_oxfw *oxfw = hwdep->private_data;
 
@@ -140,9 +135,8 @@ hwdep_release(struct snd_hwdep *hwdep, struct file *file)
 	return 0;
 }
 
-static int
-hwdep_ioctl(struct snd_hwdep *hwdep, struct file *file,
-	    unsigned int cmd, unsigned long arg)
+static int hwdep_ioctl(struct snd_hwdep *hwdep, struct file *file,
+		       unsigned int cmd, unsigned long arg)
 {
 	struct snd_oxfw *oxfw = hwdep->private_data;
 
@@ -159,9 +153,8 @@ hwdep_ioctl(struct snd_hwdep *hwdep, struct file *file,
 }
 
 #ifdef CONFIG_COMPAT
-static int
-hwdep_compat_ioctl(struct snd_hwdep *hwdep, struct file *file,
-		   unsigned int cmd, unsigned long arg)
+static int hwdep_compat_ioctl(struct snd_hwdep *hwdep, struct file *file,
+			      unsigned int cmd, unsigned long arg)
 {
 	return hwdep_ioctl(hwdep, file, cmd,
 			   (unsigned long)compat_ptr(arg));

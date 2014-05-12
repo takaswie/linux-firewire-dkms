@@ -358,9 +358,8 @@ void snd_oxfw_stream_update_simplex(struct snd_oxfw *oxfw,
  * in AV/C Stream Format Information Specification 1.1 (Apr 2005, 1394TA)
  * Also 'Clause 12 AM824 sequence adaption layers' in IEC 61883-6:2005
  */
-static int
-parse_stream_formation(u8 *buf, unsigned int len,
-		       struct snd_oxfw_stream_formation *formation)
+static int parse_stream_formation(u8 *buf, unsigned int len,
+				  struct snd_oxfw_stream_formation *formation)
 {
 	unsigned int i, e, channels, format;
 
@@ -487,9 +486,9 @@ end:
 	return err;
 }
 
-static int
-fill_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
-		       unsigned short pid)
+static int fill_stream_formations(struct snd_oxfw *oxfw,
+				  enum avc_general_plug_dir dir,
+				  unsigned short pid)
 {
 	u8 *buf;
 	struct snd_oxfw_stream_formation *formations, tmp;
