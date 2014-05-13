@@ -38,8 +38,9 @@ config SND_OXFW
 	   * Griffin Firewave
 	   * LaCie Firewire Speakers
 	   * Behringer F-Control Audio 202
-	   * Mackie Onyx-i series (former models)
-	   * Mackie Onyx Satellite
+	   * Mackie(Loud) Onyx-i series (former models)
+	   * Mackie(Loud) Onyx Satellite
+	   * Mackie(Loud) Tapco Link.Firewire
 
 	  To compile this driver as a module, choose M here: the module
 	  will be called snd-oxfw.

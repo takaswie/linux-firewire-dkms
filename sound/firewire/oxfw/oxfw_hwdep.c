@@ -98,8 +98,9 @@ static int hwdep_lock(struct snd_oxfw *oxfw)
 	if (oxfw->dev_lock_count == 0) {
 		oxfw->dev_lock_count = -1;
 		err = 0;
-	} else
+	} else {
 		err = -EBUSY;
+	}
 
 	spin_unlock_irq(&oxfw->lock);
 
@@ -115,8 +116,9 @@ static int hwdep_unlock(struct snd_oxfw *oxfw)
 	if (oxfw->dev_lock_count == -1) {
 		oxfw->dev_lock_count = 0;
 		err = 0;
-	} else
+	} else {
 		err = -EBADFD;
+	}
 
 	spin_unlock_irq(&oxfw->lock);
 

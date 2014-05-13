@@ -8,6 +8,7 @@
 
 #include "oxfw.h"
 
+#define AVC_GENERIC_FRAME_MAXIMUM_BYTES	512
 #define CALLBACK_TIMEOUT	200
 
 /*
@@ -292,7 +293,7 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 		}
 	}
 
-	if (atomic_read(substreams) && !amdtp_stream_running(stream)) {
+	if ((atomic_read(substreams) > 0) && !amdtp_stream_running(stream)) {
 		err = start_stream(oxfw, stream, rate, pcm_channels);
 		if (err < 0)
 			dev_err(&oxfw->unit->device,
@@ -328,9 +329,12 @@ void snd_oxfw_stream_destroy_simplex(struct snd_oxfw *oxfw,
 		conn = &oxfw->in_conn;
 
 	mutex_lock(&oxfw->mutex);
+
 	stop_stream(oxfw, stream);
+
 	amdtp_stream_destroy(stream);
 	cmp_connection_destroy(conn);
+
 	mutex_unlock(&oxfw->mutex);
 }
 
@@ -391,7 +395,7 @@ static int parse_stream_formation(u8 *buf, unsigned int len,
 		format = buf[6 + e * 2];
 
 		switch (format) {
-		/* IEC 60958-3, currently handle as MBLA */
+		/* IEC 60958 Conformant, currently handled as MBLA */
 		case 0x00:
 		/* Multi Bit Linear Audio (Raw) */
 		case 0x06:

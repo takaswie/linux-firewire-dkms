@@ -93,7 +93,7 @@ int avc_general_inquiry_sig_fmt(struct fw_unit *unit, unsigned int rate,
 	buf[3] = 0xff & pid;	/* plug id */
 	buf[4] = 0x90;		/* EOH_1, Form_1, FMT. AM824 */
 	buf[5] = 0x07 & sfc;	/* FDF-hi. AM824, frequency */
-	buf[6] = 0xff;		/* FDF-mid. AM824, SYT hi (not used)*/
+	buf[6] = 0xff;		/* FDF-mid. AM824, SYT hi (not used) */
 	buf[7] = 0xff;		/* FDF-low. AM824, SYT lo (not used) */
 
 	/* do transaction and check buf[1-5] are the same against command */
