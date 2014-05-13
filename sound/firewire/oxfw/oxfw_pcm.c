@@ -42,7 +42,7 @@ static int hw_rule_channels(struct snd_pcm_hw_params *params,
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	const struct snd_interval *r =
 		hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_RATE);
-	unsigned int i, count, list[SND_OXFW_STREAM_FORMAT_ENTRIES] = {0};
+	unsigned int i, j, count, list[SND_OXFW_STREAM_FORMAT_ENTRIES] = {0};
 
 	count = 0;
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
@@ -53,12 +53,19 @@ static int hw_rule_channels(struct snd_pcm_hw_params *params,
 			continue;
 		if (list[count] == formations[i].pcm)
 			continue;
-		if (list[count] != 0)
-			count++;
-		list[count] = formations[i].pcm;
+
+		for (j = 0; j < ARRAY_SIZE(list); j++) {
+			if (list[j] == formations[i].pcm)
+				break;
+		}
+		if (j == ARRAY_SIZE(list)) {
+			list[count] = formations[i].pcm;
+			if (++count == ARRAY_SIZE(list))
+				break;
+		}
 	}
 
-	return snd_interval_list(c, count + 1, list, 0);
+	return snd_interval_list(c, count, list, 0);
 }
 
 static void limit_channels_and_rates(struct snd_pcm_hardware *hw,
@@ -102,8 +109,8 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 			  struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct amdtp_stream *s;
 	struct snd_oxfw_stream_formation *formations;
+	struct amdtp_stream *stream;
 	int err;
 
 	runtime->hw.info = SNDRV_PCM_INFO_BATCH |
@@ -115,11 +122,11 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		runtime->hw.formats = AMDTP_IN_PCM_FORMAT_BITS;
-		s = &oxfw->tx_stream;
+		stream = &oxfw->tx_stream;
 		formations = oxfw->tx_stream_formations;
 	} else {
 		runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
-		s = &oxfw->rx_stream;
+		stream = &oxfw->rx_stream;
 		formations = oxfw->rx_stream_formations;
 	}
 
@@ -138,7 +145,7 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 	if (err < 0)
 		goto end;
 
-	err = amdtp_stream_add_pcm_hw_constraints(s, runtime);
+	err = amdtp_stream_add_pcm_hw_constraints(stream, runtime);
 end:
 	return err;
 }
@@ -270,37 +277,33 @@ end:
 static int pcm_capture_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
-	struct snd_pcm_substream *pcm;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		pcm = substream;
+		amdtp_stream_pcm_trigger(&oxfw->tx_stream, substream);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		pcm = NULL;
+		amdtp_stream_pcm_trigger(&oxfw->tx_stream, NULL);
 		break;
 	default:
 		return -EINVAL;
 	}
-	amdtp_stream_pcm_trigger(&oxfw->tx_stream, pcm);
 	return 0;
 }
 static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
-	struct snd_pcm_substream *pcm;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		pcm = substream;
+		amdtp_stream_pcm_trigger(&oxfw->rx_stream, substream);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		pcm = NULL;
+		amdtp_stream_pcm_trigger(&oxfw->rx_stream, NULL);
 		break;
 	default:
 		return -EINVAL;
 	}
-	amdtp_stream_pcm_trigger(&oxfw->rx_stream, pcm);
 	return 0;
 }
 
