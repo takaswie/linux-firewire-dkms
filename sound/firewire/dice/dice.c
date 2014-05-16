@@ -141,6 +141,8 @@ static int dice_read_mode_params(struct snd_dice *dice, unsigned int mode)
 	int err;
 
 	if (highest_supported_mode_rate(dice, mode, &rate) < 0) {
+		dice->tx_channels[mode] = 0;
+		dice->tx_midi_ports[mode] = 0;
 		dice->rx_channels[mode] = 0;
 		dice->rx_midi_ports[mode] = 0;
 		return 0;
@@ -149,6 +151,14 @@ static int dice_read_mode_params(struct snd_dice *dice, unsigned int mode)
 	err = snd_dice_transaction_set_rate(dice, rate);
 	if (err < 0)
 		return err;
+
+	err = snd_dice_transaction_read_tx(dice, TX_NUMBER_AUDIO,
+					   values, 2 * 4);
+	if (err < 0)
+		return err;
+
+	dice->tx_channels[mode]   = be32_to_cpu(values[0]);
+	dice->tx_midi_ports[mode] = be32_to_cpu(values[1]);
 
 	err = snd_dice_transaction_read_rx(dice, RX_NUMBER_AUDIO,
 					   values, 2 * 4);
@@ -279,13 +289,13 @@ static int dice_probe(struct fw_unit *unit, const struct ieee1394_device_id *id)
 
 	snd_dice_create_proc(dice);
 
-	err = snd_dice_stream_init(dice);
+	err = snd_dice_stream_init_duplex(dice);
 	if (err < 0)
 		goto error;
 
 	err = snd_card_register(card);
 	if (err < 0) {
-		snd_dice_stream_destroy(dice);
+		snd_dice_stream_destroy_duplex(dice);
 		goto error;
 	}
 
@@ -303,7 +313,7 @@ static void dice_remove(struct fw_unit *unit)
 
 	snd_card_disconnect(dice->card);
 
-	snd_dice_stream_destroy(dice);
+	snd_dice_stream_destroy_duplex(dice);
 
 	snd_card_free_when_closed(dice->card);
 }
@@ -320,7 +330,7 @@ static void dice_bus_reset(struct fw_unit *unit)
 	}
 	dice->global_enabled = false;
 
-	snd_dice_stream_update(dice);
+	snd_dice_stream_update_duplex(dice);
 }
 
 #define DICE_INTERFACE	0x000001

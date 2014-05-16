@@ -181,7 +181,7 @@ static int playback_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_dice *dice = substream->private_data;
 
-	snd_dice_stream_stop(dice);
+	snd_dice_stream_stop_duplex(dice);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
@@ -191,7 +191,7 @@ static int playback_prepare(struct snd_pcm_substream *substream)
 	struct snd_dice *dice = substream->private_data;
 	int err;
 
-	err = snd_dice_stream_start(dice, substream->runtime->rate);
+	err = snd_dice_stream_start_duplex(dice, substream->runtime->rate);
 	if (err >= 0)
 		amdtp_stream_pcm_prepare(&dice->rx_stream);
 
