@@ -16,6 +16,7 @@ config SND_DICE
 	select SND_HWDEP
 	select SND_PCM
 	select SND_FIREWIRE_LIB
+	select SND_RAWMIDI
 	help
 	  Say Y here to include support for many DACs based on the DICE
 	  chip family (DICE-II/Jr/Mini) from TC Applied Technologies.
