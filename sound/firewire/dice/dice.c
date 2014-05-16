@@ -303,11 +303,7 @@ static void dice_remove(struct fw_unit *unit)
 
 	snd_card_disconnect(dice->card);
 
-	mutex_lock(&dice->mutex);
-
 	snd_dice_stream_destroy(dice);
-
-	mutex_unlock(&dice->mutex);
 
 	snd_card_free_when_closed(dice->card);
 }
@@ -324,11 +320,7 @@ static void dice_bus_reset(struct fw_unit *unit)
 	}
 	dice->global_enabled = false;
 
-	mutex_lock(&dice->mutex);
-
-	snd_dice_stream_stop_packets(dice);
-
-	mutex_unlock(&dice->mutex);
+	snd_dice_stream_update(dice);
 }
 
 #define DICE_INTERFACE	0x000001
