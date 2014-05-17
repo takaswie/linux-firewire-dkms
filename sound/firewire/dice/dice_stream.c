@@ -150,9 +150,27 @@ end:
 
 static int get_sync_mode(struct snd_dice *dice, enum cip_flags *sync_mode)
 {
-	/* Currently, clock source is fixed at SYT-Match mode. */
-	*sync_mode = 0;
-	return 0;
+	u32 source;
+	int err;
+
+	err = snd_dice_transaction_get_clock_source(dice, &source);
+	if (err < 0)
+		goto end;
+
+	switch (source) {
+	/* So-called 'SYT Match' modes, sync_to_syt value of packets received */
+	case CLOCK_SOURCE_ARX4:	/* in 4th stream */
+	case CLOCK_SOURCE_ARX3:	/* in 3rd stream */
+	case CLOCK_SOURCE_ARX2:	/* in 2nd stream */
+		err = -ENOSYS;
+	case CLOCK_SOURCE_ARX1:	/* in 1st stream */
+		*sync_mode = 0;
+		break;
+	default:
+		*sync_mode = CIP_SYNC_TO_DEVICE;
+	}
+end:
+	return err;
 }
 
 int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate)
@@ -306,15 +324,6 @@ int snd_dice_stream_init_duplex(struct snd_dice *dice)
 		goto end;
 
 	err = init_stream(dice, &dice->rx_stream);
-	if (err < 0)
-		goto end;
-
-	/* Currently, clock source is fixed at SYT-Match mode. */
-	err = snd_dice_transaction_set_clock_source(dice, CLOCK_SOURCE_ARX1);
-	if (err < 0) {
-		destroy_stream(dice, &dice->rx_stream);
-		destroy_stream(dice, &dice->tx_stream);
-	}
 end:
 	return err;
 }
