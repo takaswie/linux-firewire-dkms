@@ -27,7 +27,7 @@ static int dice_interface_check(struct fw_unit *unit)
 	};
 	struct fw_device *device = fw_parent_device(unit);
 	struct fw_csr_iterator it;
-	int key, vendor = -1, model = -1, err;
+	int key, val, vendor = -1, model = -1, err;
 	unsigned int category, i;
 	__be32 *pointers, value;
 	__be32 tx_data[4];
@@ -44,13 +44,13 @@ static int dice_interface_check(struct fw_unit *unit)
 	 * ID, and a 22-bit serial number.
 	 */
 	fw_csr_iterator_init(&it, unit->directory);
-	while (fw_csr_iterator_next(&it, &key, &value)) {
+	while (fw_csr_iterator_next(&it, &key, &val)) {
 		switch (key) {
 		case CSR_SPECIFIER_ID:
-			vendor = value;
+			vendor = val;
 			break;
 		case CSR_MODEL:
-			model = value;
+			model = val;
 			break;
 		}
 	}
