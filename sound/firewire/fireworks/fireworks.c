@@ -227,6 +227,7 @@ efw_probe(struct fw_unit *unit,
 	spin_lock_init(&efw->lock);
 	init_waitqueue_head(&efw->hwdep_wait);
 
+	/* prepare response buffer */
 	snd_efw_resp_buf_size = clamp(snd_efw_resp_buf_size,
 				      SND_EFW_RESPONSE_MAXIMUM_BYTES, 4096U);
 	efw->resp_buf = kzalloc(snd_efw_resp_buf_size, GFP_KERNEL);
