@@ -12,7 +12,7 @@
 #define NOTIFICATION_TIMEOUT_MS	100
 
 static u64 get_subaddr(struct snd_dice *dice, enum snd_dice_addr_type type,
-		       unsigned int offset)
+		       u64 offset)
 {
 	switch (type) {
 	case SND_DICE_ADDR_TYPE_TX:
