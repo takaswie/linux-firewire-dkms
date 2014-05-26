@@ -195,7 +195,8 @@ enum snd_efw_transport_mode {
 };
 int snd_efw_command_set_resp_addr(struct snd_efw *efw,
 				  u16 addr_high, u32 addr_low);
-int snd_efw_command_set_tx_mode(struct snd_efw *efw, unsigned int mode);
+int snd_efw_command_set_tx_mode(struct snd_efw *efw,
+				enum snd_efw_transport_mode mode);
 int snd_efw_command_get_hwinfo(struct snd_efw *efw,
 			       struct snd_efw_hwinfo *hwinfo);
 int snd_efw_command_get_phys_meters(struct snd_efw *efw,
@@ -207,7 +208,7 @@ int snd_efw_command_get_sampling_rate(struct snd_efw *efw, unsigned int *rate);
 int snd_efw_command_set_sampling_rate(struct snd_efw *efw, unsigned int rate);
 
 int snd_efw_stream_init_duplex(struct snd_efw *efw);
-int snd_efw_stream_start_duplex(struct snd_efw *efw, int sampling_rate);
+int snd_efw_stream_start_duplex(struct snd_efw *efw, unsigned int rate);
 void snd_efw_stream_stop_duplex(struct snd_efw *efw);
 void snd_efw_stream_update_duplex(struct snd_efw *efw);
 void snd_efw_stream_destroy_duplex(struct snd_efw *efw);
