@@ -154,6 +154,7 @@ EXPORT_SYMBOL(cmp_connection_init);
 /**
  * cmp_connection_check_used - check connection is already esablished or not
  * @c: the connection manager to be checked
+ * @bool: used or not
  */
 int cmp_connection_check_used(struct cmp_connection *c, bool *used)
 {
@@ -163,8 +164,12 @@ int cmp_connection_check_used(struct cmp_connection *c, bool *used)
 	err = snd_fw_transaction(
 			c->resources.unit, TCODE_READ_QUADLET_REQUEST,
 			pcr_address(c), &pcr, 4, 0);
-	if (err >= 0)
-		*used = (pcr & cpu_to_be32(PCR_BCAST_CONN | PCR_P2P_CONN_MASK));
+	if (err >= 0) {
+		if ((pcr & cpu_to_be32(PCR_BCAST_CONN | PCR_P2P_CONN_MASK)) > 0)
+			*used = true;
+		else
+			*used = false;
+	}
 	return err;
 }
 EXPORT_SYMBOL(cmp_connection_check_used);
