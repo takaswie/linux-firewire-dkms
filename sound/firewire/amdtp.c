@@ -198,7 +198,7 @@ void amdtp_stream_set_parameters(struct amdtp_stream *s,
 	    WARN_ON(midi_channels > AMDTP_MAX_CHANNELS_FOR_MIDI))
 		return;
 
-	for (sfc = 0; sfc < sizeof(amdtp_rate_table); ++sfc)
+	for (sfc = 0; sfc < ARRAY_SIZE(amdtp_rate_table); ++sfc)
 		if (amdtp_rate_table[sfc] == rate)
 			goto sfc_found;
 	WARN_ON(1);
