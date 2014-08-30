@@ -162,7 +162,7 @@ static int hwdep_compat_ioctl(struct snd_hwdep *hwdep, struct file *file,
 			   (unsigned long)compat_ptr(arg));
 }
 #else
-#define dice_hwdep_compat_ioctl NULL
+#define hwdep_compat_ioctl NULL
 #endif
 
 int snd_dice_create_hwdep(struct snd_dice *dice)
