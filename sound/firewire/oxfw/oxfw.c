@@ -14,10 +14,10 @@
 #define OXFORD_HARDWARE_ID_OXFW970	0x39443841
 #define OXFORD_HARDWARE_ID_OXFW971	0x39373100
 
+#define VENDOR_LOUD		0x000ff2
 #define VENDOR_GRIFFIN		0x001292
+#define VENDOR_BEHRINGER	0x001564
 #define VENDOR_LACIE		0x00d04b
-#define VEN_BEHRINGER		0x001564
-#define VEN_LOUD		0x000ff2
 
 #define SPECIFIER_1394TA	0x00a02d
 #define VERSION_AVC		0x010001
@@ -42,6 +42,33 @@ static const struct device_info lacie_speakers = {
 	.mute_fb_id   = 0x01,
 	.volume_fb_id = 0x01,
 };
+
+static bool detect_loud_models(struct fw_unit *unit)
+{
+	const char *models[] = {
+		"Onyxi",
+		"Onyx-i",
+		"d.Pro",
+		"Mackie Onyx Satellite",
+		"Tapco LINK.firewire 4x6",
+		"U.420"};
+	char model[32] = {0};
+	unsigned int i;
+	int err;
+
+	err = fw_csr_string(unit->directory, CSR_MODEL,
+			    model, sizeof(model));
+	if (err < 0)
+		return err;
+
+	model[31] = '\0';
+	for (i = 0; i < ARRAY_SIZE(models); i++) {
+		if (strncmp(models[i], model, strlen(model) == 0))
+			break;
+	}
+
+	return (i < ARRAY_SIZE(models));
+}
 
 static int name_card(struct snd_oxfw *oxfw)
 {
@@ -107,6 +134,9 @@ static int oxfw_probe(struct fw_unit *unit,
 	struct snd_card *card;
 	struct snd_oxfw *oxfw;
 	int err;
+
+	if ((id->vendor_id == VENDOR_LOUD) && !detect_loud_models(unit))
+		return -ENODEV;
 
 	err = snd_card_new(&unit->device, -1, NULL, THIS_MODULE,
 			   sizeof(*oxfw), &card);
@@ -225,35 +255,27 @@ static const struct ieee1394_device_id oxfw_id_table[] = {
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
 				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VEN_BEHRINGER,
+		.vendor_id	= VENDOR_BEHRINGER,
 		.model_id	= 0x00fc22,
 	},
-	/* Mackie(Loud), Onyx-i series (former models) */
+	/*
+	 * Any Mackie(Loud) models (name string/model id):
+	 *  Onyx-i series (former models):	0x081216
+	 *  Mackie Onyx Satellite:		0x00200f
+	 *  Tapco LINK.firewire 4x6:		0x000460
+	 *  d.2 pro:				Unknown
+	 *  d.4 pro:				Unknown
+	 *  U.420:				Unknown
+	 *  U.420d:				Unknown
+	 */
 	{
 		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VEN_LOUD,
-		.model_id	= 0x081216,
+				  IEEE1394_MATCH_SPECIFIER_ID |
+				  IEEE1394_MATCH_VERSION,
+		.vendor_id	= VENDOR_LOUD,
+		.specifier_id	= SPECIFIER_1394TA,
+		.version	= VERSION_AVC,
 	},
-	/* Mackie(Loud), Onyx Satellite */
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VEN_LOUD,
-		.model_id	= 0x00200f,
-	},
-	/*  Mackie(Loud), Tapco Link.Firewire */
-	{
-		.match_flags	= IEEE1394_MATCH_VENDOR_ID |
-				  IEEE1394_MATCH_MODEL_ID,
-		.vendor_id	= VEN_LOUD,
-		.model_id	= 0x000460,
-	},
-	/* IDs are unknown but able to be supported */
-	/*  Mackie(Loud), d.2 pro */
-	/*  Mackie(Loud), d.4 pro */
-	/*  Mackie(Loud), U.420 */
-	/*  Mackie(Loud), U.420d */
 	{ }
 };
 MODULE_DEVICE_TABLE(ieee1394, oxfw_id_table);
