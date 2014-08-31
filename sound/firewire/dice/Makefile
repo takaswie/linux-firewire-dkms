@@ -1,3 +1,3 @@
-snd-dice-objs := dice_transaction.o dice_stream.o dice_proc.o dice_midi.o \
-		 dice_pcm.o dice_hwdep.o dice.o
+snd-dice-objs := dice-transaction.o dice-stream.o dice-proc.o dice-midi.o \
+		 dice-pcm.o dice-hwdep.o dice.o
 obj-m += snd-dice.o
