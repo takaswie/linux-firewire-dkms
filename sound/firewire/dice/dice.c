@@ -30,7 +30,6 @@ static int dice_interface_check(struct fw_unit *unit)
 	int key, val, vendor = -1, model = -1, err;
 	unsigned int category, i;
 	__be32 *pointers, value;
-	__be32 tx_data[4];
 	__be32 version;
 
 	pointers = kmalloc(sizeof(__be32) * ARRAY_SIZE(min_values), GFP_KERNEL);
@@ -82,16 +81,6 @@ static int dice_interface_check(struct fw_unit *unit)
 			err = -ENODEV;
 			goto end;
 		}
-	}
-
-	/* We support playback only. Let capture devices be handled by FFADO. */
-	err = snd_fw_transaction(unit, TCODE_READ_BLOCK_REQUEST,
-				 DICE_PRIVATE_SPACE +
-				 be32_to_cpu(pointers[2]) * 4,
-				 tx_data, sizeof(tx_data), 0);
-	if (err < 0 || (tx_data[0] && tx_data[3])) {
-		err = -ENODEV;
-		goto end;
 	}
 
 	/*
