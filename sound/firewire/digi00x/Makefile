@@ -1,0 +1,2 @@
+snd-digi00x-objs := digi00x.o
+obj-m += snd-digi00x.o
