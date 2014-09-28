@@ -67,6 +67,7 @@ static int set_clock_info(struct snd_dice *dice,
 {
 	unsigned int i;
 	__be32 info;
+	u32 mask;
 	u32 clock;
 	int err;
 
@@ -76,7 +77,8 @@ static int set_clock_info(struct snd_dice *dice,
 
 	clock = be32_to_cpu(info);
 	if (source != UINT_MAX) {
-		clock &= ~CLOCK_SOURCE_MASK;
+		mask = CLOCK_SOURCE_MASK;
+		clock &= ~mask;
 		clock |= source;
 	}
 	if (rate != UINT_MAX) {
@@ -89,8 +91,9 @@ static int set_clock_info(struct snd_dice *dice,
 			goto end;
 		}
 
-		clock &= ~CLOCK_RATE_MASK;
-		clock |= BIT(i + CLOCK_RATE_SHIFT);
+		mask = CLOCK_RATE_MASK;
+		clock &= ~mask;
+		clock |= i << CLOCK_RATE_SHIFT;
 	}
 	info = cpu_to_be32(clock);
 
