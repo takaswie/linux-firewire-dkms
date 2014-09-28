@@ -319,14 +319,15 @@ int snd_dice_transaction_init(struct snd_dice *dice)
 	__be32 *pointers;
 	int err;
 
-	pointers = kmalloc(sizeof(pointers), GFP_KERNEL);
+	/* Use the same way which dice_interface_check() does. */
+	pointers = kmalloc(sizeof(__be32) * 10, GFP_KERNEL);
 	if (pointers == NULL)
 		return -ENOMEM;
 
 	/* Get offsets for sub-addresses */
 	err = snd_fw_transaction(dice->unit, TCODE_READ_BLOCK_REQUEST,
 				 DICE_PRIVATE_SPACE,
-				 pointers, sizeof(pointers), 0);
+				 pointers, sizeof(__be32) * 10, 0);
 	if (err < 0)
 		goto end;
 
