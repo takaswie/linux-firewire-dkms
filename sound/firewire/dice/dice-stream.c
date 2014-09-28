@@ -85,6 +85,9 @@ end:
 
 static void stop_stream(struct snd_dice *dice, struct amdtp_stream *stream)
 {
+	if (!amdtp_stream_running(stream))
+		return;
+
 	amdtp_stream_pcm_abort(stream);
 	amdtp_stream_stop(stream);
 
@@ -218,7 +221,7 @@ int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate)
 		goto end;
 	}
 	if (rate == 0)
-		curr_rate = rate;
+		rate = curr_rate;
 	if (rate != curr_rate)
 		stop_stream(dice, slave);
 

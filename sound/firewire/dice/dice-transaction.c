@@ -59,7 +59,7 @@ int snd_dice_transaction_read(struct snd_dice *dice,
 static unsigned int get_clock_info(struct snd_dice *dice, __be32 *info)
 {
 	return snd_dice_transaction_read_global(dice, GLOBAL_CLOCK_SELECT,
-						&info, 4);
+						info, 4);
 }
 
 static int set_clock_info(struct snd_dice *dice,
@@ -144,7 +144,7 @@ int snd_dice_transaction_get_rate(struct snd_dice *dice, unsigned int *rate)
 
 	index = (be32_to_cpu(info) & CLOCK_RATE_MASK) >> CLOCK_RATE_SHIFT;
 	if (index >= SND_DICE_RATES_COUNT)
-		err = -EIO;
+		err = -ENOSYS;
 	else
 		*rate = snd_dice_rates[index];
 end:
@@ -279,7 +279,7 @@ static void unregister_notification_address(struct snd_dice *dice)
 	__be64 *buffer;
 
 	buffer = kmalloc(2 * 8, GFP_KERNEL);
-	if (buffer != NULL)
+	if (buffer == NULL)
 		return;
 
 	buffer[0] = cpu_to_be64(
