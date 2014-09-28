@@ -1,3 +1,11 @@
+/*
+ * digi00x.h - a part of driver for Digidesign Digi 002/003 family
+ *
+ * Copyright (c) 2014 Takashi Sakamoto
+ *
+ * Licensed under the terms of the GNU General Public License, version 2.
+ */
+
 #ifndef SOUND_DIGI00X_H_INCLUDED
 #define SOUND_DIGI00X_H_INCLUDED
 
@@ -45,6 +53,20 @@
 
 /* DSP control: 0x0300 ~ 0x038c */
 
+struct snd_dg00x_stream {
+	struct fw_unit *unit;
+	int direction;
+	struct fw_iso_context *context;
+	struct mutex mutex;
+
+	unsigned int source_node_id_field;
+	struct iso_packets_buffer buffer;
+	unsigned int packet_index;
+
+	bool callbacked;
+	wait_queue_head_t callback_wait;
+};
+
 struct snd_dg00x {
 	struct snd_card *card;
 	struct fw_unit *unit;
@@ -57,24 +79,21 @@ struct snd_dg00x {
 	struct mutex mutexhw;
 	spinlock_t lockhw;
 
-	/* Handle heartbeat */
-	struct fw_address_handler heartbeat_handler;
+	struct snd_dg00x_stream tx_stream;
+	struct snd_dg00x_stream rx_stream;
+	struct snd_dg00x_stream *master;
+	atomic_t substreams;
 
-	/* for IEC 61883-1 and -6 streaming
-	struct amdtp_stream tx_stream;
-	struct amdtp_stream rx_stream;
-	atomic_t capture_substreams;
-	atomic_t playback_substreams;
-	*/
-
-	/* Digidesign 003 needs hardcoded iso stream numbers */
-	struct fw_iso_resources iso_rx;
-	struct fw_iso_resources iso_tx;
+	struct fw_iso_resources tx_resources;
+	struct fw_iso_resources rx_resources;
 
 	/* for uapi */
 	int dev_lock_count;
 	bool dev_lock_changed;
 	wait_queue_head_t hwdep_wait;
+
+	/* Handle heartbeat */
+	struct fw_address_handler heartbeat_handler;
 };
 
 /* values for SND_DG00X_ADDR_OFFSET_RATE */
@@ -97,15 +116,17 @@ enum snd_dg00x_clock {
 int snd_dg00x_get_rate(struct snd_dg00x *dg00x, unsigned int *rate);
 int snd_dg00x_set_rate(struct snd_dg00x *dg00x, unsigned int rate);
 int snd_dg00x_get_clock(struct snd_dg00x *dg00x, enum snd_dg00x_clock *clock);
+*/
 
 int snd_dg00x_stream_init_duplex(struct snd_dg00x *dg00x);
 int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x,
-				  struct amdtp_stream *request,
-				  int sampling_rate);
-int snd_dg00x_stream_stop_duplex(struct snd_dg00x *dg00x);
+				  struct snd_dg00x_stream *s,
+				  unsigned int rate);
+void snd_dg00x_stream_stop_duplex(struct snd_dg00x *dg00x);
 void snd_dg00x_stream_update_duplex(struct snd_dg00x *dg00x);
 void snd_dg00x_stream_destroy_duplex(struct snd_dg00x *dg00x);
 
+/*
 void snd_dg00x_stream_lock_changed(struct snd_dg00x *dg00x);
 int snd_dg00x_stream_lock_try(struct snd_dg00x *dg00x);
 void snd_dg00x_stream_lock_release(struct snd_dg00x *dg00x);
@@ -115,7 +136,13 @@ void snd_dg00x_proc_init(struct snd_dg00x *dg00x);
 int snd_dg00x_create_midi_devices(struct snd_dg00x *dg00x);
 
 int snd_dg00x_create_pcm_devices(struct snd_dg00x *dg00x);
+*/
 
 int snd_dg00x_create_hwdep_device(struct snd_dg00x *dg00x);
-*/
+
+static inline bool snd_dg00x_stream_running(struct snd_dg00x_stream *s)
+{
+	return !IS_ERR(s->context);
+}
+
 #endif

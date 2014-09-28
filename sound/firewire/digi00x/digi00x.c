@@ -1,3 +1,11 @@
+/*
+ * digi00x.c - a part of driver for Digidesign Digi 002/003 family
+ *
+ * Copyright (c) 2014 Takashi Sakamoto
+ *
+ * Licensed under the terms of the GNU General Public License, version 2.
+ */
+
 #include "digi00x.h"
 
 MODULE_DESCRIPTION("Digidesign 002/003 Driver");
@@ -178,6 +186,9 @@ static int snd_dg00x_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
+	err = snd_dg00x_create_hwdep_device(dg00x);
+	if (err < 0)
+		goto error;
 /*
 	snd_dg00x_proc_init(dg00x);
 
@@ -188,15 +199,12 @@ static int snd_dg00x_probe(struct fw_unit *unit,
 	err = snd_dg00x_create_pcm_devices(dg00x);
 	if (err < 0)
 		goto error;
-
-	err = snd_dg00x_create_hwdep_device(dg00x);
-	if (err < 0)
-		goto error;
+*/
 
 	err = snd_dg00x_stream_init_duplex(dg00x);
 	if (err < 0)
 		goto error;
-*/
+
 	err = snd_card_register(card);
 	if (err < 0)
 		goto error;
@@ -221,9 +229,9 @@ static void snd_dg00x_update(struct fw_unit *unit)
 static void snd_dg00x_remove(struct fw_unit *unit)
 {
 	struct snd_dg00x *dg00x = dev_get_drvdata(&unit->device);
-/*
+
 	snd_dg00x_stream_destroy_duplex(dg00x);
-*/
+
 	snd_card_disconnect(dg00x->card);
 	snd_card_free_when_closed(dg00x->card);
 }
