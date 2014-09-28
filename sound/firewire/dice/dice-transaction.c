@@ -103,15 +103,18 @@ static int set_clock_info(struct snd_dice *dice,
 		goto end;
 
 	if (wait_for_completion_timeout(&dice->clock_accepted,
-				msecs_to_jiffies(NOTIFICATION_TIMEOUT_MS)) > 0)
-		goto end;
+			msecs_to_jiffies(NOTIFICATION_TIMEOUT_MS)) == 0) {
+		/* Notification time out. Do confirmation. */
+		err = get_clock_info(dice, &info);
+		if (err == 0 && clock != be32_to_cpu(info))
+			err = -ETIMEDOUT;
 
-	/* Notification time out. Do confirmation. */
-	err = get_clock_info(dice, &info);
-	if (err < 0)
 		goto end;
-	if (clock != be32_to_cpu(info))
-		err = -ETIMEDOUT;
+	}
+
+	/* Check valid notification. */
+	if (!(dice->notification_bits & NOTIFY_CLOCK_ACCEPTED))
+		err = -EIO;
 end:
 	return err;
 }
