@@ -295,18 +295,19 @@ void snd_dice_transaction_destroy(struct snd_dice *dice)
 {
 	struct fw_address_handler *handler = &dice->notification_handler;
 
-	if (handler->address_callback == NULL)
+	if (handler->callback_data == NULL)
 		return;
 
 	unregister_notification_address(dice);
 	fw_core_remove_address_handler(handler);
+	handler->callback_data = NULL;
 }
 
 int snd_dice_transaction_reinit(struct snd_dice *dice)
 {
 	struct fw_address_handler *handler = &dice->notification_handler;
 
-	if (handler->address_callback == NULL)
+	if (handler->callback_data == NULL)
 		return -EINVAL;
 
 	return register_notification_address(dice, false);
@@ -334,13 +335,16 @@ int snd_dice_transaction_init(struct snd_dice *dice)
 	handler->address_callback = dice_notification;
 	handler->callback_data = dice;
 	err = fw_core_add_address_handler(handler, &fw_high_memory_region);
-	if (err < 0)
+	if (err < 0) {
+		handler->callback_data = NULL;
 		goto end;
+	}
 
 	/* Register the address space */
 	err = register_notification_address(dice, true);
 	if (err < 0) {
 		fw_core_remove_address_handler(handler);
+		handler->callback_data = NULL;
 		goto end;
 	}
 
