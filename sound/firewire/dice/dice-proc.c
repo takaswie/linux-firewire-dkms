@@ -32,8 +32,8 @@ static const char *str_from_array(const char *const strs[], unsigned int count,
 {
 	if (i < count)
 		return strs[i];
-	else
-		return "(unknown)";
+
+	return "(unknown)";
 }
 
 static void dice_proc_fixup_string(char *s, unsigned int size)

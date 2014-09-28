@@ -45,7 +45,7 @@ static const struct device_info lacie_speakers = {
 
 static bool detect_loud_models(struct fw_unit *unit)
 {
-	const char *models[] = {
+	const char *const models[] = {
 		"Onyxi",
 		"Onyx-i",
 		"d.Pro",

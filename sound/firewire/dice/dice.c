@@ -32,7 +32,8 @@ static int dice_interface_check(struct fw_unit *unit)
 	__be32 *pointers, value;
 	__be32 version;
 
-	pointers = kmalloc(sizeof(__be32) * ARRAY_SIZE(min_values), GFP_KERNEL);
+	pointers = kmalloc_array(ARRAY_SIZE(min_values), sizeof(__be32),
+				 GFP_KERNEL);
 	if (pointers == NULL)
 		return -ENOMEM;
 
