@@ -142,7 +142,7 @@ static int dice_read_mode_params(struct snd_dice *dice, unsigned int mode)
 		return err;
 
 	err = snd_dice_transaction_read_tx(dice, TX_NUMBER_AUDIO,
-					   values, 2 * 4);
+					   values, sizeof(values));
 	if (err < 0)
 		return err;
 
@@ -150,7 +150,7 @@ static int dice_read_mode_params(struct snd_dice *dice, unsigned int mode)
 	dice->tx_midi_ports[mode] = be32_to_cpu(values[1]);
 
 	err = snd_dice_transaction_read_rx(dice, RX_NUMBER_AUDIO,
-					   values, 2 * 4);
+					   values, sizeof(values));
 	if (err < 0)
 		return err;
 
