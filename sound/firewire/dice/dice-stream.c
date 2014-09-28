@@ -294,19 +294,22 @@ static int init_stream(struct snd_dice *dice, struct amdtp_stream *stream)
 {
 	int err;
 	struct fw_iso_resources *resources;
+	enum amdtp_stream_direction dir;
 
-	if (stream == &dice->tx_stream)
+	if (stream == &dice->tx_stream) {
 		resources = &dice->tx_resources;
-	else
+		dir = AMDTP_IN_STREAM;
+	} else {
 		resources = &dice->rx_resources;
+		dir = AMDTP_OUT_STREAM;
+	}
 
 	err = fw_iso_resources_init(resources, dice->unit);
 	if (err < 0)
 		goto end;
 	resources->channels_mask = 0x00000000ffffffffuLL;
 
-	err = amdtp_stream_init(stream, dice->unit, AMDTP_OUT_STREAM,
-				CIP_BLOCKING);
+	err = amdtp_stream_init(stream, dice->unit, dir, CIP_BLOCKING);
 	if (err < 0) {
 		amdtp_stream_destroy(stream);
 		fw_iso_resources_destroy(resources);
