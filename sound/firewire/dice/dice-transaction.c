@@ -65,12 +65,13 @@ static unsigned int get_clock_info(struct snd_dice *dice, __be32 *info)
 static int set_clock_info(struct snd_dice *dice,
 			  unsigned int rate, unsigned int source)
 {
+	unsigned int retries = 3;
 	unsigned int i;
 	__be32 info;
 	u32 mask;
 	u32 clock;
 	int err;
-
+retry:
 	err = get_clock_info(dice, &info);
 	if (err < 0)
 		goto end;
@@ -102,19 +103,21 @@ static int set_clock_info(struct snd_dice *dice,
 	if (err < 0)
 		goto end;
 
+	/* Timeout means it's invalid request, probably bus reset occured. */
 	if (wait_for_completion_timeout(&dice->clock_accepted,
 			msecs_to_jiffies(NOTIFICATION_TIMEOUT_MS)) == 0) {
-		/* Notification time out. Do confirmation. */
-		err = get_clock_info(dice, &info);
-		if (err == 0 && clock != be32_to_cpu(info))
+		if (retries-- == 0) {
 			err = -ETIMEDOUT;
+			goto end;
+		}
 
-		goto end;
+		err = snd_dice_transaction_reinit(dice);
+		if (err < 0)
+			goto end;
+
+		msleep(500);	/* arbitrary */
+		goto retry;
 	}
-
-	/* Check valid notification. */
-	if (!(dice->notification_bits & NOTIFY_CLOCK_ACCEPTED))
-		err = -EIO;
 end:
 	return err;
 }
@@ -254,6 +257,9 @@ static int register_notification_address(struct snd_dice *dice, bool retry)
 			/* success */
 			if (buffer[0] == cpu_to_be64(OWNER_NO_OWNER))
 				break;
+			/* The address seems to be already registered. */
+			if (buffer[0] == buffer[1])
+				break;
 
 			dev_err(&dice->unit->device,
 				"device is already in use\n");
@@ -305,6 +311,7 @@ void snd_dice_transaction_destroy(struct snd_dice *dice)
 		return;
 
 	unregister_notification_address(dice);
+
 	fw_core_remove_address_handler(handler);
 	handler->callback_data = NULL;
 }

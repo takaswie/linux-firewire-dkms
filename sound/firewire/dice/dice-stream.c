@@ -211,7 +211,7 @@ int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate)
 
 	/* Some packet queueing errors. */
 	if (amdtp_streaming_error(master) || amdtp_streaming_error(slave))
-		stop_stream(dice, slave);
+		stop_stream(dice, master);
 
 	/* Stop stream if rate is different. */
 	err = snd_dice_transaction_get_rate(dice, &curr_rate);
@@ -223,9 +223,6 @@ int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate)
 	if (rate == 0)
 		rate = curr_rate;
 	if (rate != curr_rate)
-		stop_stream(dice, slave);
-
-	if (!amdtp_stream_running(slave))
 		stop_stream(dice, master);
 
 	if (!amdtp_stream_running(master)) {
@@ -259,8 +256,8 @@ int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate)
 		if (err < 0) {
 			dev_err(&dice->unit->device,
 				"fail to enable interface\n");
-			stop_stream(dice, slave);
 			stop_stream(dice, master);
+			stop_stream(dice, slave);
 			goto end;
 		}
 
@@ -375,11 +372,13 @@ void snd_dice_stream_update_duplex(struct snd_dice *dice)
 	 */
 	mutex_lock(&dice->mutex);
 
-	stop_stream(dice, &dice->tx_stream);
-	stop_stream(dice, &dice->rx_stream);
-
 	fw_iso_resources_update(&dice->tx_resources);
 	fw_iso_resources_update(&dice->rx_resources);
+
+	stop_stream(dice, &dice->rx_stream);
+	stop_stream(dice, &dice->tx_stream);
+
+	dice->global_enabled = false;
 
 	mutex_unlock(&dice->mutex);
 }

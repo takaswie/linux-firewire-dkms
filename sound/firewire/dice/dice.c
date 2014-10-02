@@ -312,18 +312,12 @@ static void dice_remove(struct fw_unit *unit)
 	snd_card_free_when_closed(dice->card);
 }
 
-static void dice_bus_reset(struct fw_unit *unit)
+static void dice_update(struct fw_unit *unit)
 {
 	struct snd_dice *dice = dev_get_drvdata(&unit->device);
 
 	/* The handler address becomes clear. */
-	if (snd_dice_transaction_reinit(dice) < 0) {
-		dev_err(&dice->unit->device,
-			"failed to register notification handler\n");
-		return;
-	}
-	dice->global_enabled = false;
-
+	snd_dice_transaction_reinit(dice);
 	snd_dice_stream_update_duplex(dice);
 }
 
@@ -345,7 +339,7 @@ static struct fw_driver dice_driver = {
 		.bus	= &fw_bus_type,
 	},
 	.probe    = dice_probe,
-	.update   = dice_bus_reset,
+	.update   = dice_update,
 	.remove   = dice_remove,
 	.id_table = dice_id_table,
 };
