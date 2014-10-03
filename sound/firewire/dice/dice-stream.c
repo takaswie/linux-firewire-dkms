@@ -85,9 +85,6 @@ end:
 
 static void stop_stream(struct snd_dice *dice, struct amdtp_stream *stream)
 {
-	if (!amdtp_stream_running(stream))
-		return;
-
 	amdtp_stream_pcm_abort(stream);
 	amdtp_stream_stop(stream);
 
@@ -372,13 +369,14 @@ void snd_dice_stream_update_duplex(struct snd_dice *dice)
 	 */
 	mutex_lock(&dice->mutex);
 
-	fw_iso_resources_update(&dice->tx_resources);
-	fw_iso_resources_update(&dice->rx_resources);
+	/* The enable register becomes initialized, then streams are stopped. */
+	dice->global_enabled = false;
 
 	stop_stream(dice, &dice->rx_stream);
 	stop_stream(dice, &dice->tx_stream);
 
-	dice->global_enabled = false;
+	fw_iso_resources_update(&dice->rx_resources);
+	fw_iso_resources_update(&dice->tx_resources);
 
 	mutex_unlock(&dice->mutex);
 }

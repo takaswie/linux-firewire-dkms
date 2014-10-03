@@ -316,8 +316,9 @@ static void dice_update(struct fw_unit *unit)
 {
 	struct snd_dice *dice = dev_get_drvdata(&unit->device);
 
-	/* The handler address becomes clear. */
+	/* The handler address register becomes initialized. */
 	snd_dice_transaction_reinit(dice);
+
 	snd_dice_stream_update_duplex(dice);
 }
 
