@@ -322,7 +322,7 @@ static void destroy_stream(struct snd_dice *dice, struct amdtp_stream *stream)
 	amdtp_stream_destroy(stream);
 
 	if (stream == &dice->tx_stream)
-		fw_iso_resources_destroy(&dice->rx_resources);
+		fw_iso_resources_destroy(&dice->tx_resources);
 	else
 		fw_iso_resources_destroy(&dice->rx_resources);
 }
