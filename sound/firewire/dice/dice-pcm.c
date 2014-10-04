@@ -189,8 +189,10 @@ static int pcm_open(struct snd_pcm_substream *substream)
 	case CLOCK_SOURCE_TDIF:
 	case CLOCK_SOURCE_WC:
 		internal = false;
+		break;
 	default:
 		internal = true;
+		break;
 	}
 
 	/*

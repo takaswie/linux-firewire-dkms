@@ -173,11 +173,13 @@ static int get_sync_mode(struct snd_dice *dice, enum cip_flags *sync_mode)
 	case CLOCK_SOURCE_ARX3:	/* in 3rd stream */
 	case CLOCK_SOURCE_ARX2:	/* in 2nd stream */
 		err = -ENOSYS;
-	case CLOCK_SOURCE_ARX1:	/* in 1st stream */
+		break;
+	case CLOCK_SOURCE_ARX1:	/* in 1st stream, which this driver uses */
 		*sync_mode = 0;
 		break;
 	default:
 		*sync_mode = CIP_SYNC_TO_DEVICE;
+		break;
 	}
 end:
 	return err;
