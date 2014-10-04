@@ -403,7 +403,6 @@ int snd_dice_stream_lock_try(struct snd_dice *dice)
 	if (dice->dev_lock_count++ == 0)
 		dice_lock_changed(dice);
 	err = 0;
-
 out:
 	spin_unlock_irq(&dice->lock);
 
