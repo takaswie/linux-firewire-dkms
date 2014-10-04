@@ -377,15 +377,28 @@ int snd_dice_create_pcm(struct snd_dice *dice)
 		.mmap      = snd_pcm_lib_mmap_vmalloc,
 	};
 	struct snd_pcm *pcm;
+	unsigned int i, capture, playback;
 	int err;
 
-	err = snd_pcm_new(dice->card, "DICE", 0, 1, 1, &pcm);
+	capture = playback = 0;
+	for (i = 0; i < 3; i++) {
+		if (dice->tx_channels[i] > 0)
+			capture = 1;
+		if (dice->rx_channels[i] > 0)
+			playback = 1;
+	}
+
+	err = snd_pcm_new(dice->card, "DICE", 0, playback, capture, &pcm);
 	if (err < 0)
 		return err;
 	pcm->private_data = dice;
 	strcpy(pcm->name, dice->card->shortname);
-	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &capture_ops);
-	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &playback_ops);
+
+	if (capture > 0)
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &capture_ops);
+
+	if (playback > 0)
+		snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &playback_ops);
 
 	return 0;
 }
