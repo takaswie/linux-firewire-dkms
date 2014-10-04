@@ -133,6 +133,9 @@ int snd_dice_create_midi(struct snd_dice *dice)
 		midi_out_ports = max(dice->rx_midi_ports[i], midi_out_ports);
 	}
 
+	if (midi_in_ports + midi_out_ports == 0)
+		return 0;
+
 	/* create midi ports */
 	err = snd_rawmidi_new(dice->card, dice->card->driver, 0,
 			      midi_out_ports, midi_in_ports,
