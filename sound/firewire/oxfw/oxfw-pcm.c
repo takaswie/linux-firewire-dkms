@@ -163,10 +163,33 @@ end:
 	return err;
 }
 
+static int limit_to_current_params(struct snd_pcm_substream *substream)
+{
+	struct snd_oxfw *oxfw = substream->private_data;
+	struct snd_oxfw_stream_formation formation;
+	enum avc_general_plug_dir dir;
+	int err;
+
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+		dir = AVC_GENERAL_PLUG_DIR_OUT;
+	else
+		dir = AVC_GENERAL_PLUG_DIR_IN;
+
+	err = snd_oxfw_stream_get_current_formation(oxfw, dir, &formation);
+	if (err < 0)
+		goto end;
+
+	substream->runtime->hw.channels_min = formation.pcm;
+	substream->runtime->hw.channels_max = formation.pcm;
+	substream->runtime->hw.rate_min = formation.rate;
+	substream->runtime->hw.rate_max = formation.rate;
+end:
+	return err;
+}
+
 static int pcm_open(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
-	unsigned int rate;
 	int err;
 
 	err = snd_oxfw_stream_lock_try(oxfw);
@@ -183,14 +206,9 @@ static int pcm_open(struct snd_pcm_substream *substream)
 	 */
 	if (amdtp_stream_pcm_running(&oxfw->tx_stream) ||
 	    amdtp_stream_pcm_running(&oxfw->rx_stream)) {
-		err = snd_oxfw_stream_get_rate(oxfw, &rate);
-		if (err < 0) {
-			dev_err(&oxfw->unit->device,
-				"fail to get sampling rate: %d\n", err);
-			goto err_locked;
-		}
-		substream->runtime->hw.rate_min = rate;
-		substream->runtime->hw.rate_max = rate;
+		err = limit_to_current_params(substream);
+		if (err < 0)
+			goto end;
 	}
 
 	snd_pcm_set_sync(substream);

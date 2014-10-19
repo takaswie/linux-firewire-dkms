@@ -7,6 +7,7 @@
  */
 
 #include "oxfw.h"
+#include <linux/delay.h>
 
 #define AVC_GENERIC_FRAME_MAXIMUM_BYTES	512
 #define CALLBACK_TIMEOUT	200
@@ -77,6 +78,51 @@ int snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate)
 					      AVC_GENERAL_PLUG_DIR_OUT, 0);
 end:
 	return err;
+}
+
+static int set_stream_format(struct snd_oxfw *oxfw, struct amdtp_stream *s,
+			     unsigned int rate, unsigned int pcm_channels)
+{
+	u8 **formats;
+	struct snd_oxfw_stream_formation formation;
+	enum avc_general_plug_dir dir;
+	unsigned int i, err, len;
+
+	if (s == &oxfw->tx_stream) {
+		formats = oxfw->tx_stream_formats;
+		dir = AVC_GENERAL_PLUG_DIR_OUT;
+	} else {
+		formats = oxfw->rx_stream_formats;
+		dir = AVC_GENERAL_PLUG_DIR_IN;
+	}
+
+	/* Seek stream format for requirements. */
+	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
+		err = snd_oxfw_stream_parse_format(formats[i], &formation);
+		if (err < 0)
+			return err;
+
+		if ((formation.rate == rate) && (formation.pcm == pcm_channels))
+			break;
+	}
+	if (i == SND_OXFW_STREAM_FORMAT_ENTRIES)
+		return -EINVAL;
+
+	/* If assumed, just change rate. */
+	if (oxfw->assumed)
+		return snd_oxfw_stream_set_rate(oxfw, rate);
+
+	/* Calculate format length. */
+	len = 5 + formats[i][4] * 2;
+
+	err = avc_stream_set_format(oxfw->unit, dir, 0, formats[i], len);
+	if (err < 0)
+		return err;
+
+	/* Some immediate requests just after changing format causes freezing. */
+	msleep(100);
+
+	return 0;
 }
 
 static void stop_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
@@ -226,7 +272,8 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 				  unsigned int rate, unsigned int pcm_channels)
 {
 	struct amdtp_stream *opposite;
-	unsigned int curr_rate;
+	struct snd_oxfw_stream_formation formation;
+	enum avc_general_plug_dir dir;
 	atomic_t *substreams, *opposite_substreams;
 	int err = 0;
 
@@ -234,6 +281,7 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 		substreams = &oxfw->capture_substreams;
 		opposite = &oxfw->rx_stream;
 		opposite_substreams = &oxfw->playback_substreams;
+		dir = AVC_GENERAL_PLUG_DIR_OUT;
 	} else {
 		substreams = &oxfw->playback_substreams;
 		opposite_substreams = &oxfw->capture_substreams;
@@ -242,6 +290,8 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 			opposite = &oxfw->rx_stream;
 		else
 			opposite = NULL;
+
+		dir = AVC_GENERAL_PLUG_DIR_IN;
 	}
 
 	if (atomic_read(substreams) == 0)
@@ -261,17 +311,19 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 	if (amdtp_streaming_error(stream))
 		stop_stream(oxfw, stream);
 
-	/* stop streams if rate is different */
-	err = snd_oxfw_stream_get_rate(oxfw, &curr_rate);
+	err = snd_oxfw_stream_get_current_formation(oxfw, dir, &formation);
 	if (err < 0) {
 		dev_err(&oxfw->unit->device,
-			"fail to get sampling rate: %d\n", err);
+			"fail to get stream formation: %d\n", err);
 		goto end;
 	}
 	if (rate == 0)
-		rate = curr_rate;
-	if (curr_rate != rate) {
-		/* Stop streams safely. */
+		rate = formation.rate;
+	if (pcm_channels == 0)
+		pcm_channels = formation.pcm;
+
+	/* Stop streams safely. */
+	if ((rate != formation.rate) || (pcm_channels != formation.pcm)) {
 		if (opposite != NULL) {
 			err = check_connection_used_by_others(oxfw, opposite);
 			if (err < 0)
@@ -279,31 +331,33 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 			stop_stream(oxfw, opposite);
 		}
 		stop_stream(oxfw, stream);
+	}
 
-		err = snd_oxfw_stream_set_rate(oxfw, rate);
+	/* Start requested stream. */
+	if (!amdtp_stream_running(stream)) {
+		err = set_stream_format(oxfw, stream, rate, pcm_channels);
 		if (err < 0) {
 			dev_err(&oxfw->unit->device,
 				"fail to set sampling rate: %d\n", err);
 			goto end;
 		}
 
-		/* Start opposite stream if needed. */
-		if (opposite && !amdtp_stream_running(opposite) &&
-		    (atomic_read(opposite_substreams) > 0)) {
-			err = start_stream(oxfw, opposite, rate, 0);
-			if (err < 0) {
-				dev_err(&oxfw->unit->device,
-					"fail to restart stream: %d\n", err);
-				goto end;
-			}
-		}
-	}
-
-	if ((atomic_read(substreams) > 0) && !amdtp_stream_running(stream)) {
 		err = start_stream(oxfw, stream, rate, pcm_channels);
-		if (err < 0)
+		if (err < 0) {
 			dev_err(&oxfw->unit->device,
 				"fail to start stream: %d\n", err);
+			goto end;
+		}
+
+	}
+
+	/* Start opposite stream if needed. */
+	if (opposite && !amdtp_stream_running(opposite) &&
+	    (atomic_read(opposite_substreams) > 0)) {
+		err = start_stream(oxfw, opposite, rate, 0);
+		if (err < 0)
+			dev_err(&oxfw->unit->device,
+				"fail to restart stream: %d\n", err);
 	}
 end:
 	mutex_unlock(&oxfw->mutex);
@@ -361,6 +415,33 @@ void snd_oxfw_stream_update_simplex(struct snd_oxfw *oxfw,
 	} else {
 		amdtp_stream_update(stream);
 	}
+}
+
+int snd_oxfw_stream_get_current_formation(struct snd_oxfw *oxfw,
+				enum avc_general_plug_dir dir,
+				struct snd_oxfw_stream_formation *formation)
+{
+	u8 *format;
+	unsigned int len;
+	int err;
+
+	len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
+	format = kmalloc(len, GFP_KERNEL);
+	if (format == NULL)
+		return -ENOMEM;
+
+	err = avc_stream_get_format_single(oxfw->unit, dir, 0, format, &len);
+	if (err < 0)
+		goto end;
+	if (len < 3) {
+		err = -EIO;
+		goto end;
+	}
+
+	err = snd_oxfw_stream_parse_format(format, formation);
+end:
+	kfree(format);
+	return err;
 }
 
 /*

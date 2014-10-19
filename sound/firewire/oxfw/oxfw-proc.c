@@ -12,8 +12,8 @@ static void proc_read_formation(struct snd_info_entry *entry,
 				struct snd_info_buffer *buffer)
 {
 	struct snd_oxfw *oxfw = entry->private_data;
-	u8 *format;
 	struct snd_oxfw_stream_formation formation;
+	u8 *format;
 	unsigned int i, err;
 
 	snd_iprintf(buffer, "Output Stream from device:\n");

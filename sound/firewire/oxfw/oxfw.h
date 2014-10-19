@@ -79,6 +79,8 @@ struct snd_oxfw {
  * AV/C Stream Format Information Specification 1.1 Working Draft
  * (Apr 2005, 1394TA)
  */
+int avc_stream_set_format(struct fw_unit *unit, enum avc_general_plug_dir dir,
+			  unsigned int pid, u8 *format, unsigned int len);
 int avc_stream_get_format(struct fw_unit *unit,
 			  enum avc_general_plug_dir dir, unsigned int pid,
 			  u8 *buf, unsigned int *len, unsigned int eid);
@@ -128,6 +130,9 @@ struct snd_oxfw_stream_formation {
 };
 int snd_oxfw_stream_parse_format(u8 *format,
 				 struct snd_oxfw_stream_formation *formation);
+int snd_oxfw_stream_get_current_formation(struct snd_oxfw *oxfw,
+				enum avc_general_plug_dir dir,
+				struct snd_oxfw_stream_formation *formation);
 int snd_oxfw_stream_discover(struct snd_oxfw *oxfw);
 
 void snd_oxfw_stream_lock_changed(struct snd_oxfw *oxfw);

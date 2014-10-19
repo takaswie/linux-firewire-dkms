@@ -130,7 +130,7 @@ int snd_oxfw_create_midi(struct snd_oxfw *oxfw)
 	u8 *format;
 	int i, err;
 
-	/* if its stream has MIDI conformant data channel, add one MIDI port */
+	/* If its stream has MIDI conformant data channel, add one MIDI port */
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
 		format = oxfw->tx_stream_formats[i];
 		if (format != NULL) {
@@ -146,6 +146,8 @@ int snd_oxfw_create_midi(struct snd_oxfw *oxfw)
 				oxfw->midi_output_ports = 1;
 		}
 	}
+	if ((oxfw->midi_input_ports == 0) && (oxfw->midi_output_ports == 0))
+		return 0;
 
 	/* create midi ports */
 	err = snd_rawmidi_new(oxfw->card, oxfw->card->driver, 0,
