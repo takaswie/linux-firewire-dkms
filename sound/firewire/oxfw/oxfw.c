@@ -127,8 +127,8 @@ static void oxfw_card_free(struct snd_card *card)
 	unsigned int i;
 
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
-		kfree(oxfw->tx_stream_formations[i].info);
-		kfree(oxfw->rx_stream_formations[i].info);
+		kfree(oxfw->tx_stream_formats[i]);
+		kfree(oxfw->rx_stream_formats[i]);
 	}
 
 	mutex_destroy(&oxfw->mutex);
@@ -178,11 +178,9 @@ static int oxfw_probe(struct fw_unit *unit,
 
 	snd_oxfw_proc_init(oxfw);
 
-	if ((oxfw->midi_input_ports > 0) || (oxfw->midi_output_ports > 0)) {
-		err = snd_oxfw_create_midi(oxfw);
-		if (err < 0)
-			goto error;
-	}
+	err = snd_oxfw_create_midi(oxfw);
+	if (err < 0)
+		goto error;
 
 	err = snd_oxfw_create_hwdep(oxfw);
 	if (err < 0)

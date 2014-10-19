@@ -124,9 +124,28 @@ static void set_midi_substream_names(struct snd_oxfw *oxfw,
 
 int snd_oxfw_create_midi(struct snd_oxfw *oxfw)
 {
+	struct snd_oxfw_stream_formation formation;
 	struct snd_rawmidi *rmidi;
 	struct snd_rawmidi_str *str;
-	int err;
+	u8 *format;
+	int i, err;
+
+	/* if its stream has MIDI conformant data channel, add one MIDI port */
+	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
+		format = oxfw->tx_stream_formats[i];
+		if (format != NULL) {
+			err = snd_oxfw_stream_parse_format(format, &formation);
+			if (err >= 0 && formation.midi > 0)
+				oxfw->midi_input_ports = 1;
+		}
+
+		format = oxfw->rx_stream_formats[i];
+		if (format != NULL) {
+			err = snd_oxfw_stream_parse_format(format, &formation);
+			if (err >= 0 && formation.midi > 0)
+				oxfw->midi_output_ports = 1;
+		}
+	}
 
 	/* create midi ports */
 	err = snd_rawmidi_new(oxfw->card, oxfw->card->driver, 0,

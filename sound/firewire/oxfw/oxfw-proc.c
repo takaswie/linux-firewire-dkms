@@ -12,37 +12,38 @@ static void proc_read_formation(struct snd_info_entry *entry,
 				struct snd_info_buffer *buffer)
 {
 	struct snd_oxfw *oxfw = entry->private_data;
-	struct snd_oxfw_stream_formation *formation;
-	unsigned int i, j;
+	u8 *format;
+	struct snd_oxfw_stream_formation formation;
+	unsigned int i, err;
 
 	snd_iprintf(buffer, "Output Stream from device:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
-	formation = oxfw->tx_stream_formations;
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
-		snd_iprintf(buffer,
-			"\t%d\t%d\t%d\n", formation[i].rate,
-			formation[i].pcm, formation[i].midi);
-
-		if (formation[i].info == NULL)
+		format = oxfw->tx_stream_formats[i];
+		if (format == NULL)
 			continue;
 
-		for (j = 0; j < 17; j++)
-			snd_iprintf(buffer, ", %02x", formation[i].info[j]);
+		err = snd_oxfw_stream_parse_format(format, &formation);
+		if (err < 0)
+			continue;
+
+		snd_iprintf(buffer, "\t%d\t%d\t%d\n",
+			    formation.rate, formation.pcm, formation.midi);
 	}
 
 	snd_iprintf(buffer, "Input Stream to device:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
-	formation = oxfw->rx_stream_formations;
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
-		snd_iprintf(buffer,
-			"\t%d\t%d\t%d\n", formation[i].rate,
-			formation[i].pcm, formation[i].midi);
-
-		if (formation[i].info == NULL)
+		format = oxfw->rx_stream_formats[i];
+		if (format == NULL)
 			continue;
 
-		for (j = 0; j < 17; j++)
-			snd_iprintf(buffer, ", %02x", formation[i].info[j]);
+		err = snd_oxfw_stream_parse_format(format, &formation);
+		if (err < 0)
+			continue;
+
+		snd_iprintf(buffer, "\t%d\t%d\t%d\n",
+			    formation.rate, formation.pcm, formation.midi);
 	}
 }
 

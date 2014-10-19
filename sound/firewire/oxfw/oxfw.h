@@ -44,13 +44,6 @@ struct device_info {
 
 /* This is an arbitrary number for convinience. */
 #define	SND_OXFW_STREAM_FORMAT_ENTRIES	10
-struct snd_oxfw_stream_formation {
-	unsigned int rate;
-	unsigned int pcm;
-	unsigned int midi;
-	u8 *info;
-};
-
 struct snd_oxfw {
 	struct snd_card *card;
 	struct fw_unit *unit;
@@ -59,11 +52,9 @@ struct snd_oxfw {
 	spinlock_t lock;
 
 	bool has_output;
+	u8 *tx_stream_formats[SND_OXFW_STREAM_FORMAT_ENTRIES];
+	u8 *rx_stream_formats[SND_OXFW_STREAM_FORMAT_ENTRIES];
 	bool assumed;
-	struct snd_oxfw_stream_formation
-		tx_stream_formations[SND_OXFW_STREAM_FORMAT_ENTRIES];
-	struct snd_oxfw_stream_formation
-		rx_stream_formations[SND_OXFW_STREAM_FORMAT_ENTRIES];
 	struct cmp_connection out_conn;
 	struct cmp_connection in_conn;
 	struct amdtp_stream tx_stream;
@@ -130,6 +121,13 @@ void snd_oxfw_stream_destroy_simplex(struct snd_oxfw *oxfw,
 void snd_oxfw_stream_update_simplex(struct snd_oxfw *oxfw,
 				    struct amdtp_stream *stream);
 
+struct snd_oxfw_stream_formation {
+	unsigned int rate;
+	unsigned int pcm;
+	unsigned int midi;
+};
+int snd_oxfw_stream_parse_format(u8 *format,
+				 struct snd_oxfw_stream_formation *formation);
 int snd_oxfw_stream_discover(struct snd_oxfw *oxfw);
 
 void snd_oxfw_stream_lock_changed(struct snd_oxfw *oxfw);

@@ -10,7 +10,7 @@
 static int hw_rule_rate(struct snd_pcm_hw_params *params,
 			struct snd_pcm_hw_rule *rule)
 {
-	struct snd_oxfw_stream_formation *formations = rule->private;
+	u8 **formats = rule->private;
 	struct snd_interval *r =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_RATE);
 	const struct snd_interval *c =
@@ -18,17 +18,21 @@ static int hw_rule_rate(struct snd_pcm_hw_params *params,
 	struct snd_interval t = {
 		.min = UINT_MAX, .max = 0, .integer = 1
 	};
-	unsigned int i;
+	struct snd_oxfw_stream_formation formation;
+	unsigned int i, err;
 
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
-		if (formations[i].rate == 0)
+		if (formats[i] == NULL)
 			continue;
 
-		if (!snd_interval_test(c, formations[i].pcm))
+		err = snd_oxfw_stream_parse_format(formats[i], &formation);
+		if (err < 0)
+			continue;
+		if (!snd_interval_test(c, formation.pcm))
 			continue;
 
-		t.min = min(t.min, formations[i].rate);
-		t.max = max(t.max, formations[i].rate);
+		t.min = min(t.min, formation.rate);
+		t.max = max(t.max, formation.rate);
 
 	}
 	return snd_interval_refine(r, &t);
@@ -37,29 +41,34 @@ static int hw_rule_rate(struct snd_pcm_hw_params *params,
 static int hw_rule_channels(struct snd_pcm_hw_params *params,
 			    struct snd_pcm_hw_rule *rule)
 {
-	struct snd_oxfw_stream_formation *formations = rule->private;
+	u8 **formats = rule->private;
 	struct snd_interval *c =
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	const struct snd_interval *r =
 		hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_RATE);
-	unsigned int i, j, count, list[SND_OXFW_STREAM_FORMAT_ENTRIES] = {0};
+	struct snd_oxfw_stream_formation formation;
+	unsigned int i, j, err;
+	unsigned int count, list[SND_OXFW_STREAM_FORMAT_ENTRIES] = {0};
 
 	count = 0;
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
-		if (formations[i].rate == 0)
-			continue;
+		if (formats[i] == NULL)
+			break;
 
-		if (!snd_interval_test(r, formations[i].rate))
+		err = snd_oxfw_stream_parse_format(formats[i], &formation);
+		if (err < 0)
 			continue;
-		if (list[count] == formations[i].pcm)
+		if (!snd_interval_test(r, formation.rate))
+			continue;
+		if (list[count] == formation.pcm)
 			continue;
 
 		for (j = 0; j < ARRAY_SIZE(list); j++) {
-			if (list[j] == formations[i].pcm)
+			if (list[j] == formation.pcm)
 				break;
 		}
 		if (j == ARRAY_SIZE(list)) {
-			list[count] = formations[i].pcm;
+			list[count] = formation.pcm;
 			if (++count == ARRAY_SIZE(list))
 				break;
 		}
@@ -68,10 +77,10 @@ static int hw_rule_channels(struct snd_pcm_hw_params *params,
 	return snd_interval_list(c, count, list, 0);
 }
 
-static void limit_channels_and_rates(struct snd_pcm_hardware *hw,
-				struct snd_oxfw_stream_formation *formations)
+static void limit_channels_and_rates(struct snd_pcm_hardware *hw, u8 **formats)
 {
-	unsigned int i;
+	struct snd_oxfw_stream_formation formation;
+	unsigned int i, err;
 
 	hw->channels_min = UINT_MAX;
 	hw->channels_max = 0;
@@ -81,15 +90,19 @@ static void limit_channels_and_rates(struct snd_pcm_hardware *hw,
 	hw->rates = 0;
 
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
-		if (formations[i].rate == 0)
+		if (formats[i] == NULL)
+			break;
+
+		err = snd_oxfw_stream_parse_format(formats[i], &formation);
+		if (err < 0)
 			continue;
 
-		hw->channels_min = min(hw->channels_min, formations[i].pcm);
-		hw->channels_max = max(hw->channels_max, formations[i].pcm);
+		hw->channels_min = min(hw->channels_min, formation.pcm);
+		hw->channels_max = max(hw->channels_max, formation.pcm);
 
-		hw->rate_min = min(hw->rate_min, formations[i].rate);
-		hw->rate_max = max(hw->rate_max, formations[i].rate);
-		hw->rates |= snd_pcm_rate_to_rate_bit(formations[i].rate);
+		hw->rate_min = min(hw->rate_min, formation.rate);
+		hw->rate_max = max(hw->rate_max, formation.rate);
+		hw->rates |= snd_pcm_rate_to_rate_bit(formation.rate);
 	}
 }
 
@@ -109,7 +122,7 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 			  struct snd_pcm_substream *substream)
 {
 	struct snd_pcm_runtime *runtime = substream->runtime;
-	struct snd_oxfw_stream_formation *formations;
+	u8 **formats;
 	struct amdtp_stream *stream;
 	int err;
 
@@ -123,24 +136,24 @@ static int init_hw_params(struct snd_oxfw *oxfw,
 	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		runtime->hw.formats = AMDTP_IN_PCM_FORMAT_BITS;
 		stream = &oxfw->tx_stream;
-		formations = oxfw->tx_stream_formations;
+		formats = oxfw->tx_stream_formats;
 	} else {
 		runtime->hw.formats = AMDTP_OUT_PCM_FORMAT_BITS;
 		stream = &oxfw->rx_stream;
-		formations = oxfw->rx_stream_formations;
+		formats = oxfw->rx_stream_formats;
 	}
 
-	limit_channels_and_rates(&runtime->hw, formations);
+	limit_channels_and_rates(&runtime->hw, formats);
 	limit_period_and_buffer(&runtime->hw);
 
 	err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_CHANNELS,
-				  hw_rule_channels, formations,
+				  hw_rule_channels, formats,
 				  SNDRV_PCM_HW_PARAM_RATE, -1);
 	if (err < 0)
 		goto end;
 
 	err = snd_pcm_hw_rule_add(runtime, 0, SNDRV_PCM_HW_PARAM_RATE,
-				  hw_rule_rate, formations,
+				  hw_rule_rate, formats,
 				  SNDRV_PCM_HW_PARAM_CHANNELS, -1);
 	if (err < 0)
 		goto end;

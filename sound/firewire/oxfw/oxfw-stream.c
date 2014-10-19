@@ -93,25 +93,31 @@ static void stop_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream)
 static int start_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream,
 			unsigned int rate, unsigned int pcm_channels)
 {
-	struct snd_oxfw_stream_formation *formations;
-	unsigned int i, midi_ports;
+	u8 **formats;
 	struct cmp_connection *conn;
+	struct snd_oxfw_stream_formation formation;
+	unsigned int i, midi_ports;
 	int err;
 
 	if (stream == &oxfw->rx_stream) {
-		formations = oxfw->rx_stream_formations;
+		formats = oxfw->rx_stream_formats;
 		conn = &oxfw->in_conn;
 	} else {
-		formations = oxfw->tx_stream_formations;
+		formats = oxfw->tx_stream_formats;
 		conn = &oxfw->out_conn;
 	}
 
-	/* Get stream formation */
+	/* Get stream format */
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
-		if (formations[i].rate != rate)
+		if (formats[i] == NULL)
+			break;
+
+		err = snd_oxfw_stream_parse_format(formats[i], &formation);
+		if (err < 0)
+			goto end;
+		if (rate != formation.rate)
 			continue;
-		if ((pcm_channels == 0) ||
-		    (formations[i].pcm == pcm_channels))
+		if (pcm_channels == 0 ||  pcm_channels == formation.pcm)
 			break;
 	}
 	if (i == SND_OXFW_STREAM_FORMAT_ENTRIES) {
@@ -119,8 +125,8 @@ static int start_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream,
 		goto end;
 	}
 
-	pcm_channels = formations[i].pcm;
-	midi_ports = formations[i].midi;
+	pcm_channels = formation.pcm;
+	midi_ports = DIV_ROUND_UP(formation.midi, 8);
 
 	/* The stream should have one pcm channels at least */
 	if (pcm_channels == 0) {
@@ -363,38 +369,36 @@ void snd_oxfw_stream_update_simplex(struct snd_oxfw *oxfw,
  * in AV/C Stream Format Information Specification 1.1 (Apr 2005, 1394TA)
  * Also 'Clause 12 AM824 sequence adaption layers' in IEC 61883-6:2005
  */
-static int parse_stream_formation(u8 *buf, unsigned int len,
-				  struct snd_oxfw_stream_formation *formation)
+int snd_oxfw_stream_parse_format(u8 *format,
+				 struct snd_oxfw_stream_formation *formation)
 {
-	unsigned int i, e, channels, format;
+	unsigned int i, e, channels, type;
 
-	if (len < 3)
-		return -EINVAL;
+	memset(formation, 0, sizeof(struct snd_oxfw_stream_formation));
 
 	/*
 	 * this module can support a hierarchy combination that:
 	 *  Root:	Audio and Music (0x90)
 	 *  Level 1:	AM824 Compound  (0x40)
 	 */
-	if ((buf[0] != 0x90) || (buf[1] != 0x40))
+	if ((format[0] != 0x90) || (format[1] != 0x40))
 		return -ENOSYS;
 
 	/* check the sampling rate */
 	for (i = 0; i < ARRAY_SIZE(avc_stream_rate_table); i++) {
-		if (buf[2] == avc_stream_rate_table[i])
+		if (format[2] == avc_stream_rate_table[i])
 			break;
 	}
 	if (i == ARRAY_SIZE(avc_stream_rate_table))
 		return -ENOSYS;
 
-	memset(formation, 0, sizeof(struct snd_oxfw_stream_formation));
 	formation->rate = oxfw_rate_table[i];
 
-	for (e = 0; e < buf[4]; e++) {
-		channels = buf[5 + e * 2];
-		format = buf[6 + e * 2];
+	for (e = 0; e < format[4]; e++) {
+		channels = format[5 + e * 2];
+		type = format[6 + e * 2];
 
-		switch (format) {
+		switch (type) {
 		/* IEC 60958 Conformant, currently handled as MBLA */
 		case 0x00:
 		/* Multi Bit Linear Audio (Raw) */
@@ -403,7 +407,7 @@ static int parse_stream_formation(u8 *buf, unsigned int len,
 			break;
 		/* MIDI Conformant */
 		case 0x0d:
-			formation->midi += channels;
+			formation->midi = channels;
 			break;
 		/* IEC 61937-3 to 7 */
 		case 0x01:
@@ -442,14 +446,15 @@ static int parse_stream_formation(u8 *buf, unsigned int len,
 }
 
 static int
-assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
-			 unsigned int pid, u8 *buf, unsigned int *len,
-			 struct snd_oxfw_stream_formation *formations)
+assume_stream_formats(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
+		      unsigned int pid, u8 *buf, unsigned int *len,
+		      u8 **formats)
 {
-	unsigned int rate, pcm_channels, midi_channels, i, eid;
+	struct snd_oxfw_stream_formation formation;
+	unsigned int i, eid;
 	int err;
 
-	/* get formation at current sampling rate */
+	/* get format at current sampling rate */
 	err = avc_stream_get_format_single(oxfw->unit, dir, pid, buf, len);
 	if (err < 0) {
 		dev_err(&oxfw->unit->device,
@@ -459,26 +464,22 @@ assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 		goto end;
 	}
 
-	/* parse and set stream formation */
+	/* parse and set stream format */
 	eid = 0;
-	err = parse_stream_formation(buf, *len, &formations[eid]);
+	err = snd_oxfw_stream_parse_format(buf, &formation);
 	if (err < 0)
 		goto end;
 
-	rate = formations[eid].rate;
-	pcm_channels = formations[eid].pcm;
-	midi_channels = formations[eid].midi;
-
-	formations[eid].info = kmalloc(*len, GFP_KERNEL);
-	if (formations[eid].info == NULL) {
+	formats[eid] = kmalloc(*len, GFP_KERNEL);
+	if (formats[eid] == NULL) {
 		err = -ENOMEM;
 		goto end;
 	}
-	memcpy(formations[eid].info, buf, *len);
+	memcpy(formats[eid], buf, *len);
 
-	/* apply the formation for each available sampling rate */
+	/* apply the format for each available sampling rate */
 	for (i = 0; i < ARRAY_SIZE(oxfw_rate_table); i++) {
-		if (rate == oxfw_rate_table[i])
+		if (formation.rate == oxfw_rate_table[i])
 			continue;
 
 		err = avc_general_inquiry_sig_fmt(oxfw->unit,
@@ -488,17 +489,13 @@ assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 			continue;
 
 		eid++;
-		formations[eid].rate = oxfw_rate_table[i];
-		formations[eid].pcm = pcm_channels;
-		formations[eid].midi = midi_channels;
-
-		formations[eid].info = kmalloc(*len, GFP_KERNEL);
-		if (formations[eid].info == NULL) {
+		formats[eid] = kmalloc(*len, GFP_KERNEL);
+		if (formats[eid] == NULL) {
 			err = -ENOMEM;
 			goto end;
 		}
-		memcpy(formations[eid].info, buf, *len);
-		formations[eid].info[2] = avc_stream_rate_table[i];
+		memcpy(formats[eid], buf, *len);
+		formats[eid][2] = avc_stream_rate_table[i];
 	}
 
 	err = 0;
@@ -507,13 +504,13 @@ end:
 	return err;
 }
 
-static int fill_stream_formations(struct snd_oxfw *oxfw,
-				  enum avc_general_plug_dir dir,
-				  unsigned short pid)
+static int fill_stream_formats(struct snd_oxfw *oxfw,
+			       enum avc_general_plug_dir dir,
+			       unsigned short pid)
 {
-	u8 *buf;
-	struct snd_oxfw_stream_formation *formations;
+	u8 *buf, **formats;
 	unsigned int len, eid = 0;
+	struct snd_oxfw_stream_formation dummy;
 	int err;
 
 	buf = kmalloc(AVC_GENERIC_FRAME_MAXIMUM_BYTES, GFP_KERNEL);
@@ -521,9 +518,9 @@ static int fill_stream_formations(struct snd_oxfw *oxfw,
 		return -ENOMEM;
 
 	if (dir == AVC_GENERAL_PLUG_DIR_OUT)
-		formations = oxfw->tx_stream_formations;
+		formats = oxfw->tx_stream_formats;
 	else
-		formations = oxfw->rx_stream_formations;
+		formats = oxfw->rx_stream_formats;
 
 	/* get first entry */
 	len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
@@ -531,8 +528,8 @@ static int fill_stream_formations(struct snd_oxfw *oxfw,
 	if (err == -ENOSYS) {
 		/* LIST subfunction is not implemented */
 		len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
-		err = assume_stream_formations(oxfw, dir, pid, buf, &len,
-					       formations);
+		err = assume_stream_formats(oxfw, dir, pid, buf, &len,
+					    formats);
 		goto end;
 	} else if (err < 0) {
 		dev_err(&oxfw->unit->device,
@@ -544,17 +541,23 @@ static int fill_stream_formations(struct snd_oxfw *oxfw,
 
 	/* LIST subfunction is implemented */
 	while (eid < SND_OXFW_STREAM_FORMAT_ENTRIES) {
-		/* parse and set stream formation */
-		err = parse_stream_formation(buf, len, &formations[eid]);
+		/* The format is too short. */
+		if (len < 3) {
+			err = -EIO;
+			break;
+		}
+
+		/* parse and set stream format */
+		err = snd_oxfw_stream_parse_format(buf, &dummy);
 		if (err < 0)
 			break;
 
-		formations[eid].info = kmalloc(len, GFP_KERNEL);
-		if (formations[eid].info == NULL) {
+		formats[eid] = kmalloc(len, GFP_KERNEL);
+		if (formats[eid] == NULL) {
 			err = -ENOMEM;
 			break;
 		}
-		memcpy(formations[eid].info, buf, len);
+		memcpy(formats[eid], buf, len);
 
 		/* get next entry */
 		len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
@@ -581,7 +584,6 @@ end:
 int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 {
 	u8 plugs[AVC_PLUG_INFO_BUF_BYTES];
-	unsigned int i;
 	int err;
 
 	/* the number of plugs for isoc in/out, ext in/out  */
@@ -598,7 +600,7 @@ int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 
 	/* use oPCR[0] if exists */
 	if (plugs[1] > 0) {
-		err = fill_stream_formations(oxfw, AVC_GENERAL_PLUG_DIR_OUT, 0);
+		err = fill_stream_formats(oxfw, AVC_GENERAL_PLUG_DIR_OUT, 0);
 		if (err < 0)
 			goto end;
 		oxfw->has_output = true;
@@ -606,17 +608,9 @@ int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 
 	/* use iPCR[0] if exists */
 	if (plugs[0] > 0) {
-		err = fill_stream_formations(oxfw, AVC_GENERAL_PLUG_DIR_IN, 0);
+		err = fill_stream_formats(oxfw, AVC_GENERAL_PLUG_DIR_IN, 0);
 		if (err < 0)
 			goto end;
-	}
-
-	/* if its stream has MIDI conformant data channel, add one MIDI port */
-	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
-		if (oxfw->tx_stream_formations[i].midi > 0)
-			oxfw->midi_input_ports = 1;
-		if (oxfw->rx_stream_formations[i].midi > 0)
-			oxfw->midi_output_ports = 1;
 	}
 end:
 	return err;
