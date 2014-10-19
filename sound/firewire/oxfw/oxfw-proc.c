@@ -13,7 +13,7 @@ static void proc_read_formation(struct snd_info_entry *entry,
 {
 	struct snd_oxfw *oxfw = entry->private_data;
 	struct snd_oxfw_stream_formation *formation;
-	unsigned int i;
+	unsigned int i, j;
 
 	snd_iprintf(buffer, "Output Stream from device:\n");
 	snd_iprintf(buffer, "\tRate\tPCM\tMIDI\n");
@@ -22,6 +22,12 @@ static void proc_read_formation(struct snd_info_entry *entry,
 		snd_iprintf(buffer,
 			"\t%d\t%d\t%d\n", formation[i].rate,
 			formation[i].pcm, formation[i].midi);
+
+		if (formation[i].info == NULL)
+			continue;
+
+		for (j = 0; j < 17; j++)
+			snd_iprintf(buffer, ", %02x", formation[i].info[j]);
 	}
 
 	snd_iprintf(buffer, "Input Stream to device:\n");
@@ -31,6 +37,12 @@ static void proc_read_formation(struct snd_info_entry *entry,
 		snd_iprintf(buffer,
 			"\t%d\t%d\t%d\n", formation[i].rate,
 			formation[i].pcm, formation[i].midi);
+
+		if (formation[i].info == NULL)
+			continue;
+
+		for (j = 0; j < 17; j++)
+			snd_iprintf(buffer, ", %02x", formation[i].info[j]);
 	}
 }
 

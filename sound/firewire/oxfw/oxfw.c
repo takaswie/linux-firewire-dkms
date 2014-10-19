@@ -124,6 +124,12 @@ end:
 static void oxfw_card_free(struct snd_card *card)
 {
 	struct snd_oxfw *oxfw = card->private_data;
+	unsigned int i;
+
+	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
+		kfree(oxfw->tx_stream_formations[i].info);
+		kfree(oxfw->rx_stream_formations[i].info);
+	}
 
 	mutex_destroy(&oxfw->mutex);
 }

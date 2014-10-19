@@ -469,6 +469,13 @@ assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 	pcm_channels = formations[eid].pcm;
 	midi_channels = formations[eid].midi;
 
+	formations[eid].info = kmalloc(*len, GFP_KERNEL);
+	if (formations[eid].info == NULL) {
+		err = -ENOMEM;
+		goto end;
+	}
+	memcpy(formations[eid].info, buf, *len);
+
 	/* apply the formation for each available sampling rate */
 	for (i = 0; i < ARRAY_SIZE(oxfw_rate_table); i++) {
 		if (rate == oxfw_rate_table[i])
@@ -484,9 +491,18 @@ assume_stream_formations(struct snd_oxfw *oxfw, enum avc_general_plug_dir dir,
 		formations[eid].rate = oxfw_rate_table[i];
 		formations[eid].pcm = pcm_channels;
 		formations[eid].midi = midi_channels;
+
+		formations[eid].info = kmalloc(*len, GFP_KERNEL);
+		if (formations[eid].info == NULL) {
+			err = -ENOMEM;
+			goto end;
+		}
+		memcpy(formations[eid].info, buf, *len);
+		formations[eid].info[2] = avc_stream_rate_table[i];
 	}
 
 	err = 0;
+	oxfw->assumed = true;
 end:
 	return err;
 }
@@ -532,6 +548,13 @@ static int fill_stream_formations(struct snd_oxfw *oxfw,
 		err = parse_stream_formation(buf, len, &formations[eid]);
 		if (err < 0)
 			break;
+
+		formations[eid].info = kmalloc(len, GFP_KERNEL);
+		if (formations[eid].info == NULL) {
+			err = -ENOMEM;
+			break;
+		}
+		memcpy(formations[eid].info, buf, len);
 
 		/* get next entry */
 		len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;

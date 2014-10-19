@@ -48,6 +48,7 @@ struct snd_oxfw_stream_formation {
 	unsigned int rate;
 	unsigned int pcm;
 	unsigned int midi;
+	u8 *info;
 };
 
 struct snd_oxfw {
@@ -58,6 +59,7 @@ struct snd_oxfw {
 	spinlock_t lock;
 
 	bool has_output;
+	bool assumed;
 	struct snd_oxfw_stream_formation
 		tx_stream_formations[SND_OXFW_STREAM_FORMAT_ENTRIES];
 	struct snd_oxfw_stream_formation
