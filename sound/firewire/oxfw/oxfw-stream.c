@@ -496,8 +496,8 @@ static int fill_stream_formations(struct snd_oxfw *oxfw,
 				  unsigned short pid)
 {
 	u8 *buf;
-	struct snd_oxfw_stream_formation *formations, tmp;
-	unsigned int i, len, eid = 0;
+	struct snd_oxfw_stream_formation *formations;
+	unsigned int len, eid = 0;
 	int err;
 
 	buf = kmalloc(AVC_GENERIC_FRAME_MAXIMUM_BYTES, GFP_KERNEL);
@@ -550,25 +550,6 @@ static int fill_stream_formations(struct snd_oxfw *oxfw,
 			break;
 		}
 	}
-
-	if (eid >= SND_OXFW_STREAM_FORMAT_ENTRIES)
-		goto end;
-
-	/* Griffin FireWave have another entry in current formation. */
-	len = AVC_GENERIC_FRAME_MAXIMUM_BYTES;
-	err = avc_stream_get_format_single(oxfw->unit, dir, 0, buf, &len);
-	if (err < 0)
-		goto end;
-	err = parse_stream_formation(buf, len, &tmp);
-	if (err < 0)
-		goto end;
-	/* Store this if no duplicates. */
-	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
-		if (memcmp(&formations[i], &tmp, sizeof(tmp)) == 0)
-			break;
-	}
-	if (i == SND_OXFW_STREAM_FORMAT_ENTRIES)
-		formations[eid] = tmp;
 end:
 	kfree(buf);
 	return err;
