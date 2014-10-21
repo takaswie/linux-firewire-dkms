@@ -13,7 +13,7 @@
 #define CALLBACK_TIMEOUT	200
 
 /*
- * According to their datasheet:
+ * According to datasheet of Oxford Semiconductor:
  *  OXFW970: 32.0/44.1/48.0/96.0 Khz, 8 audio channels I/O
  *  OXFW971: 32.0/44.1/48.0/88.2/96.0/192.0 kHz, 16 audio channels I/O, MIDI I/O
  */
@@ -28,7 +28,7 @@ static const unsigned int oxfw_rate_table[] = {
 
 /*
  * See Table 5.7 – Sampling frequency for Multi-bit Audio
- * at AV/C Stream Format Information Specification 1.1 (Apr 2005, 1394TA)
+ * in AV/C Stream Format Information Specification 1.1 (Apr 2005, 1394TA)
  */
 static const unsigned int avc_stream_rate_table[] = {
 	[0] = 0x02,
@@ -39,32 +39,7 @@ static const unsigned int avc_stream_rate_table[] = {
 	[5] = 0x07,
 };
 
-int snd_oxfw_stream_get_rate(struct snd_oxfw *oxfw, unsigned int *rate)
-{
-	unsigned int tx_rate, rx_rate;
-	int err;
-
-	err = avc_general_get_sig_fmt(oxfw->unit, &rx_rate,
-				      AVC_GENERAL_PLUG_DIR_IN, 0);
-	if (err < 0)
-		goto end;
-	*rate = rx_rate;
-
-	if (oxfw->has_output) {
-		err = avc_general_get_sig_fmt(oxfw->unit, &tx_rate,
-						AVC_GENERAL_PLUG_DIR_OUT, 0);
-		if ((err < 0) || (rx_rate == tx_rate))
-			goto end;
-
-		/* synchronize transmit stream rate to receive stream rate */
-		err = avc_general_set_sig_fmt(oxfw->unit, rx_rate,
-					AVC_GENERAL_PLUG_DIR_OUT, 0);
-	}
-end:
-	return err;
-}
-
-int snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate)
+static int set_rate(struct snd_oxfw *oxfw, unsigned int rate)
 {
 	int err;
 
@@ -110,7 +85,7 @@ static int set_stream_format(struct snd_oxfw *oxfw, struct amdtp_stream *s,
 
 	/* If assumed, just change rate. */
 	if (oxfw->assumed)
-		return snd_oxfw_stream_set_rate(oxfw, rate);
+		return set_rate(oxfw, rate);
 
 	/* Calculate format length. */
 	len = 5 + formats[i][4] * 2;
@@ -119,7 +94,7 @@ static int set_stream_format(struct snd_oxfw *oxfw, struct amdtp_stream *s,
 	if (err < 0)
 		return err;
 
-	/* Some immediate requests just after changing format causes freezing. */
+	/* Some immediate requests just after changing format cause freezing. */
 	msleep(100);
 
 	return 0;
@@ -312,17 +287,13 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 		stop_stream(oxfw, stream);
 
 	err = snd_oxfw_stream_get_current_formation(oxfw, dir, &formation);
-	if (err < 0) {
-		dev_err(&oxfw->unit->device,
-			"fail to get stream formation: %d\n", err);
+	if (err < 0)
 		goto end;
-	}
 	if (rate == 0)
 		rate = formation.rate;
 	if (pcm_channels == 0)
 		pcm_channels = formation.pcm;
 
-	/* Stop streams safely. */
 	if ((rate != formation.rate) || (pcm_channels != formation.pcm)) {
 		if (opposite != NULL) {
 			err = check_connection_used_by_others(oxfw, opposite);
@@ -331,33 +302,30 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 			stop_stream(oxfw, opposite);
 		}
 		stop_stream(oxfw, stream);
+
+		err = set_stream_format(oxfw, stream, rate, pcm_channels);
+		if (err < 0) {
+			dev_err(&oxfw->unit->device,
+				"fail to set stream format: %d\n", err);
+			goto end;
+		}
+
+		/* Start opposite stream if needed. */
+		if (opposite && !amdtp_stream_running(opposite) &&
+		    (atomic_read(opposite_substreams) > 0)) {
+			err = start_stream(oxfw, opposite, rate, 0);
+			if (err < 0)
+				dev_err(&oxfw->unit->device,
+					"fail to restart stream: %d\n", err);
+		}
 	}
 
 	/* Start requested stream. */
 	if (!amdtp_stream_running(stream)) {
-		err = set_stream_format(oxfw, stream, rate, pcm_channels);
-		if (err < 0) {
-			dev_err(&oxfw->unit->device,
-				"fail to set sampling rate: %d\n", err);
-			goto end;
-		}
-
 		err = start_stream(oxfw, stream, rate, pcm_channels);
-		if (err < 0) {
-			dev_err(&oxfw->unit->device,
-				"fail to start stream: %d\n", err);
-			goto end;
-		}
-
-	}
-
-	/* Start opposite stream if needed. */
-	if (opposite && !amdtp_stream_running(opposite) &&
-	    (atomic_read(opposite_substreams) > 0)) {
-		err = start_stream(oxfw, opposite, rate, 0);
 		if (err < 0)
 			dev_err(&oxfw->unit->device,
-				"fail to restart stream: %d\n", err);
+				"fail to start stream: %d\n", err);
 	}
 end:
 	mutex_unlock(&oxfw->mutex);
@@ -688,11 +656,8 @@ int snd_oxfw_stream_discover(struct snd_oxfw *oxfw)
 	}
 
 	/* use iPCR[0] if exists */
-	if (plugs[0] > 0) {
+	if (plugs[0] > 0)
 		err = fill_stream_formats(oxfw, AVC_GENERAL_PLUG_DIR_IN, 0);
-		if (err < 0)
-			goto end;
-	}
 end:
 	return err;
 }

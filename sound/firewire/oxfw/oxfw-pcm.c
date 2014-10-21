@@ -222,6 +222,7 @@ err_locked:
 static int pcm_close(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
+
 	snd_oxfw_stream_lock_release(oxfw);
 	return 0;
 }

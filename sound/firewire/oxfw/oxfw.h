@@ -108,9 +108,6 @@ int avc_general_inquiry_sig_fmt(struct fw_unit *unit, unsigned int rate,
 				enum avc_general_plug_dir dir,
 				unsigned short pid);
 
-int snd_oxfw_stream_get_rate(struct snd_oxfw *oxfw, unsigned int *rate);
-int snd_oxfw_stream_set_rate(struct snd_oxfw *oxfw, unsigned int rate);
-
 int snd_oxfw_stream_init_simplex(struct snd_oxfw *oxfw,
 				 struct amdtp_stream *stream);
 int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
