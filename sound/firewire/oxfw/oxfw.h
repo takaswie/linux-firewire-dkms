@@ -130,6 +130,7 @@ int snd_oxfw_stream_parse_format(u8 *format,
 int snd_oxfw_stream_get_current_formation(struct snd_oxfw *oxfw,
 				enum avc_general_plug_dir dir,
 				struct snd_oxfw_stream_formation *formation);
+
 int snd_oxfw_stream_discover(struct snd_oxfw *oxfw);
 
 void snd_oxfw_stream_lock_changed(struct snd_oxfw *oxfw);
