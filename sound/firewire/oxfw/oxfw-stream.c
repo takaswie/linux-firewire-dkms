@@ -314,9 +314,11 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 		if (opposite && !amdtp_stream_running(opposite) &&
 		    (atomic_read(opposite_substreams) > 0)) {
 			err = start_stream(oxfw, opposite, rate, 0);
-			if (err < 0)
+			if (err < 0) {
 				dev_err(&oxfw->unit->device,
 					"fail to restart stream: %d\n", err);
+				goto end;
+			}
 		}
 	}
 
