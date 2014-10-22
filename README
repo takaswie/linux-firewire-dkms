@@ -1,6 +1,6 @@
-= Developing for snd-firewire-lib, snd-fireworks, snd-bebob and snd-oxfw =
+= Developing for snd-firewire-lib, snd-fireworks, snd-bebob, snd-dice and snd-oxfw =
 
-2014/01/14 坂本 貴史
+2014/10/22 坂本 貴史
 Takashi Sakamoto <o-takashi@sakamocchi.jp>
 
 == General ==
@@ -9,12 +9,13 @@ This repository is a test for my patch candidates for ALSA firewire stack.
 You can install my snd-firewire-lib, snd-fireworks, snd-bebob and snd-oxfw by DKMS.
 
 
-== snd-firewire-lib, snd-bebob, snd-fireworks and snd-oxfw ==
+== snd-firewire-lib, snd-bebob, snd-fireworks, snd-dice and snd-oxfw ==
 
-These are device drivers utilize Advanced Linux Sound Architecture (ALSA) and Linux
+They are device drivers utilize Advanced Linux Sound Architecture (ALSA) and Linux
 Firewire Subsystem (so called "juju").
  - snd-bebob: for devices based on BridgeCo's chipset and BeBoB firmware
  - snd-fireworks: for devices based on Echo Audio's Fireworks module
+ - snd-dice: for devices based on TC Applied Technologies DICE chipset family
  - snd-oxfw: for devices based on Oxford Semiconductor OXFW970/971 chipset
  - snd-firewire-lib: for helper functions of AMDTP/CMP/FCP and AV/C commands
 
@@ -27,14 +28,19 @@ I test these drivers with:
  - snd-bebob: Yamaha GO44, GO46
  - snd-bebob: M-Audio Ozonic, Firewire Solo, Firewire Audiophile, Firewire 410,
  - snd-bebob: Firewire 1814
- - snd-fireworks: Echo AudioFire12, AudioFirePre8, AudioFire4
+ - snd-fireworks: AudioFirePre8, AudioFire4
+ - snd-dice: TC Electronic Impact Twin
  - snd-oxfw: Behringer F-Control 202
+ - snd-oxfw: Griffin FireWave
 
-My testers test these drivers with:
+Some dedicated testers test these drivers with:
  - snd-bebob: Edirol FA-66 (great thanks to Fryderyk Dziarmagowski)
  - snd-bebob: Edirol FA_66 (great thanks to Daniel Wagner)
- - snd-bebob: BridgeCo AUdio A5 (great thanks to Daniel Wagner)
+ - snd-bebob: BridgeCo Audio A5 (great thanks to Daniel Wagner)
  - snd-bebob: PreSonus FP10 (great thanks to David Henningsson)
+ - snd-bebob: M-Audio ProjectMix I/O (great thanks to Darren Anderson)
+ - snd-bebob: Terratec PHASE X24 FW (great thanks to Maximilian Engelhardt)
+
 
 == Requirement ==
 
@@ -45,7 +51,6 @@ My testers test these drivers with:
 
  - Capture/playback of PCM/MIDI is supported at any sampling rate, any clock source
  - HWDEP interface is supported for mixer control application
-
 
 == Easy instraction with DKMS ==
 
@@ -63,17 +68,22 @@ Then you need to install 'linux-headers' package to make drivers for your kernel
 
 Install:
 1. $ git clone https://github.com/takaswie/snd-firewire-improve.git
-2. $ ln -s $(pwd)/snd-firewire-improve/ /usr/src/snd-firewire-3.11
+2. $ ln -s $(pwd)/snd-firewire-improve/ /usr/src/alsa-firewire-3.11
 (superuser)
-3. $ dkms install snd-firewire/3.11 (superuser)
+3. $ dkms install alsa-firewire/3.11 (superuser)
 
 Uninstall
-1. $ modprobe -r snd-bebob snd-fireworks snd-firewire-lib (superuser)
-2. $ dkms remove snd-firewire/3.11 --all (superuser)
-3. $ rm /usr/src/snd-firewire-3.11 (superuser)
+1. $ modprobe -r snd-bebob snd-fireworks snd-dice snd-oxfw snd-firewire-lib (superuser)
+2. $ dkms remove alsa-firewire/3.11 --all (superuser)
+3. $ rm /usr/src/alsa-firewire-3.11 (superuser)
 4. $ rm snd-firewire-improve
 
 == Bug repots  ==
+
+Linux 3.16 or later already includes snd-bebob and snd-fireworks, thus any bug reports
+should be sent to alsa-devel.
+
+http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
 
 I add proc interface to help debug. Please send the output to me with your
 experience.
@@ -89,6 +99,8 @@ snd-fireworks:
  - /proc/asound/cardX/#clock
  - /proc/asound/cardX/#meters
 
+snd-dice:
+ - /proc/asound/cardX/dice
+
 snd-oxfw:
  - /proc/asound/cardX/#formation
- - /proc/asound/cardX/#clock
