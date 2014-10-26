@@ -32,10 +32,11 @@ int snd_dice_stream_get_rate_mode(struct snd_dice *dice, unsigned int rate,
 	for (i = 0; i < ARRAY_SIZE(snd_dice_rates); i++) {
 		if (!(dice->clock_caps & BIT(i)))
 			continue;
-		if (snd_dice_rates[i] == rate) {
-			*mode = (i - 1) / 2;
-			return 0;
-		}
+		if (snd_dice_rates[i] != rate)
+			continue;
+
+		*mode = (i - 1) / 2;
+		return 0;
 	}
 	return -EINVAL;
 }
@@ -405,7 +406,6 @@ int snd_dice_stream_lock_try(struct snd_dice *dice)
 	err = 0;
 out:
 	spin_unlock_irq(&dice->lock);
-
 	return err;
 }
 
@@ -418,7 +418,6 @@ void snd_dice_stream_lock_release(struct snd_dice *dice)
 
 	if (--dice->dev_lock_count == 0)
 		dice_lock_changed(dice);
-
 out:
 	spin_unlock_irq(&dice->lock);
 }

@@ -106,7 +106,7 @@ retry:
 	if (err < 0)
 		goto end;
 
-	/* Timeout means it's invalid request, probably bus reset occured. */
+	/* Timeout means it's invalid request, probably bus reset occurred. */
 	if (wait_for_completion_timeout(&dice->clock_accepted,
 			msecs_to_jiffies(NOTIFICATION_TIMEOUT_MS)) == 0) {
 		if (retries-- == 0) {
@@ -149,10 +149,12 @@ int snd_dice_transaction_get_rate(struct snd_dice *dice, unsigned int *rate)
 		goto end;
 
 	index = (be32_to_cpu(info) & CLOCK_RATE_MASK) >> CLOCK_RATE_SHIFT;
-	if (index >= SND_DICE_RATES_COUNT)
+	if (index >= SND_DICE_RATES_COUNT) {
 		err = -ENOSYS;
-	else
-		*rate = snd_dice_rates[index];
+		goto end;
+	}
+
+	*rate = snd_dice_rates[index];
 end:
 	return err;
 }

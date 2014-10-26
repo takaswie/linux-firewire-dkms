@@ -22,7 +22,7 @@
 #define SPECIFIER_1394TA	0x00a02d
 #define VERSION_AVC		0x010001
 
-MODULE_DESCRIPTION("Oxford OXFW970/971 driver");
+MODULE_DESCRIPTION("Oxford Semiconductor FW970/971 driver");
 MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("snd-firewire-speakers");

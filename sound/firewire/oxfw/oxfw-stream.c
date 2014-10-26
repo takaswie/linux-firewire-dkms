@@ -156,13 +156,11 @@ static int start_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream,
 	}
 	amdtp_stream_set_parameters(stream, rate, pcm_channels, midi_ports);
 
-	/* Establish connection */
 	err = cmp_connection_establish(conn,
 				       amdtp_stream_get_max_payload(stream));
 	if (err < 0)
 		goto end;
 
-	/* Start stream */
 	err = amdtp_stream_start(stream,
 				 conn->resources.channel,
 				 conn->speed);
@@ -171,7 +169,7 @@ static int start_stream(struct snd_oxfw *oxfw, struct amdtp_stream *stream,
 		goto end;
 	}
 
-	/* Wait first callback */
+	/* Wait first packet */
 	err = amdtp_stream_wait_callback(stream, CALLBACK_TIMEOUT);
 	if (err < 0)
 		stop_stream(oxfw, stream);
@@ -294,7 +292,7 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 	if (pcm_channels == 0)
 		pcm_channels = formation.pcm;
 
-	if ((rate != formation.rate) || (pcm_channels != formation.pcm)) {
+	if ((formation.rate != rate) || (formation.pcm != pcm_channels)) {
 		if (opposite != NULL) {
 			err = check_connection_used_by_others(oxfw, opposite);
 			if (err < 0)
