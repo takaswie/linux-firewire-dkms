@@ -27,7 +27,7 @@
 #include <sound/rawmidi.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
-#include <sound/firewire.h>
+//#include <sound/firewire.h>
 #include <sound/hwdep.h>
 
 #include "digimagic.h"
@@ -51,9 +51,12 @@
 #define SND_DG00X_OFFSET_UNKNOWN4	0x0120	/* 0x03 */
 #define SND_DG00X_OFFSET_UNKNOWN5	0x0124	/* 0x00/0x01 */
 
-/* DSP control: 0x0300 ~ 0x038c */
-
-struct snd_dg00x_stream {
+/* DSP control: 0x0300 - 0x038c */
+enum snd_dg00x_engine_direction {
+	SND_DG00X_ENGINE_DIRECTION_TX = 0,
+	SND_DG00X_ENGINE_DIRECTION_RX,
+};
+struct snd_dg00x_engine {
 	struct fw_unit *unit;
 	int direction;
 	struct fw_iso_context *context;
@@ -79,9 +82,9 @@ struct snd_dg00x {
 	struct mutex mutexhw;
 	spinlock_t lockhw;
 
-	struct snd_dg00x_stream tx_stream;
-	struct snd_dg00x_stream rx_stream;
-	struct snd_dg00x_stream *master;
+	struct snd_dg00x_engine tx_engine;
+	struct snd_dg00x_engine rx_engine;
+	struct snd_dg00x_engine *master;
 	atomic_t substreams;
 
 	struct fw_iso_resources tx_resources;
@@ -94,6 +97,7 @@ struct snd_dg00x {
 
 	/* Handle heartbeat */
 	struct fw_address_handler heartbeat_handler;
+	struct fw_address_handler notification_handler;
 };
 
 /* values for SND_DG00X_ADDR_OFFSET_RATE */
@@ -102,6 +106,7 @@ enum snd_dg00x_rate {
 	SND_DG00X_RATE_48000,
 	SND_DG00X_RATE_88200,
 	SND_DG00X_RATE_96000,
+	SND_DG00x_RATE_COUNT,
 };
 
 /* values for SND_DG00X_ADDR_OFFSET_CLOCK */
@@ -118,14 +123,32 @@ int snd_dg00x_set_rate(struct snd_dg00x *dg00x, unsigned int rate);
 int snd_dg00x_get_clock(struct snd_dg00x *dg00x, enum snd_dg00x_clock *clock);
 */
 
+extern const unsigned int snd_dg00x_stream_rates[SND_DG00x_RATE_COUNT];
+int snd_dg00x_stream_get_rate(struct snd_dg00x *dg00x, unsigned int *rate);
+int snd_dg00x_stream_set_rate(struct snd_dg00x *dg00x, unsigned int rate);
+int snd_dg00x_stream_get_clock(struct snd_dg00x *dg00x,
+			       enum snd_dg00x_clock *clock);
+
+unsigned int snd_dg00x_engine_get_packet_size(struct snd_dg00x_engine *e);
+int snd_dg00x_engine_init(struct snd_dg00x *dg00x, struct snd_dg00x_engine *e);
+int snd_dg00x_engine_start(struct snd_dg00x *dg00x, struct snd_dg00x_engine *e);
+void snd_dg00x_engine_update(struct snd_dg00x_engine *e);
+void snd_dg00x_engine_stop(struct snd_dg00x_engine *e);
+void snd_dg00x_engine_destroy(struct snd_dg00x *dg00x,
+			      struct snd_dg00x_engine *e);
+bool snd_dg00x_engine_running(struct snd_dg00x_engine *e);
+
 int snd_dg00x_stream_init_duplex(struct snd_dg00x *dg00x);
 int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x,
-				  struct snd_dg00x_stream *s,
+				  struct snd_dg00x_engine *e,
 				  unsigned int rate);
 void snd_dg00x_stream_stop_duplex(struct snd_dg00x *dg00x);
 void snd_dg00x_stream_update_duplex(struct snd_dg00x *dg00x);
 void snd_dg00x_stream_destroy_duplex(struct snd_dg00x *dg00x);
 
+void snd_dg00x_stream_lock_changed(struct snd_dg00x *dg00x);
+int snd_dg00x_stream_lock_try(struct snd_dg00x *dg00x);
+void snd_dg00x_stream_lock_release(struct snd_dg00x *dg00x);
 /*
 void snd_dg00x_stream_lock_changed(struct snd_dg00x *dg00x);
 int snd_dg00x_stream_lock_try(struct snd_dg00x *dg00x);
@@ -140,9 +163,6 @@ int snd_dg00x_create_pcm_devices(struct snd_dg00x *dg00x);
 
 int snd_dg00x_create_hwdep_device(struct snd_dg00x *dg00x);
 
-static inline bool snd_dg00x_stream_running(struct snd_dg00x_stream *s)
-{
-	return !IS_ERR(s->context);
-}
+int snd_dg00x_create_pcm_devices(struct snd_dg00x *dg00x);
 
 #endif
