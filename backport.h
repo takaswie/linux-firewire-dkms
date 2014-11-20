@@ -2,11 +2,26 @@
 #include "./include/uapi/sound/asound.h"
 
 #include <sound/core.h>
+#include <sound/pcm.h>
 
 void fw_schedule_bus_reset(struct fw_card *card, bool delay, bool short_reset);
 
+/* commit 1fb8510cdb5b7befe8a59f533c7fc12ef0dac73e */
+/* This macro is just convenient to detect Linux 3.19 or later */
+#ifndef SNDRV_PCM_FORMAT_DSD_U32_LE
+static inline void snd_pcm_stop_xrun(struct snd_pcm_substream *substream)
+{
+	unsigned long flags;
+
+	snd_pcm_stream_lock_irqsave(substream, flags);
+	if (snd_pcm_running(substream))
+		snd_pcm_stop(substream, SNDRV_PCM_STATE_XRUN);
+	snd_pcm_stream_unlock_irqrestore(substream, flags);
+}
+#endif
+
 /* commit 393aa9c1cc514774332d7bc861307a76206e358d */
-/* This macro is just convinient to detect Linux 3.16 or later. */
+/* This macro is just convenient to detect Linux 3.16 or later. */
 #ifndef dev_to_snd_card
 static inline int snd_card_new(struct device *parent, int idx, const char *xid,
 			       struct module *module, int extra_size,
