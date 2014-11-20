@@ -13,7 +13,7 @@ export CONFIG_SND_FIREWORKS=m
 export CONFIG_SND_OXFW=m
 
 all:
-	$(MAKE) C=2 -C $(KDIR) M=$(PWD) modules
+	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
 install:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules_install
