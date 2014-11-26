@@ -25,6 +25,12 @@
 #define CYCLES_PER_SECOND	8000
 #define TICKS_PER_SECOND	(TICKS_PER_CYCLE * CYCLES_PER_SECOND)
 
+/*
+ * Several devices look only at the first eight data blocks.
+ * In any case, this is more than enough for the MIDI data rate.
+ */
+#define MAX_MIDI_RX_BLOCKS	8
+
 #define TRANSFER_DELAY_TICKS	0x2e00 /* 479.17 µs */
 
 /* isochronous header parameters */
@@ -81,8 +87,6 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	init_waitqueue_head(&s->callback_wait);
 	s->callbacked = false;
 	s->sync_slave = NULL;
-
-	s->rx_blocks_for_midi = UINT_MAX;
 
 	return 0;
 }
@@ -478,7 +482,7 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 		b = (u8 *)&buffer[s->midi_position];
 
 		port = (s->data_block_counter + f) % 8;
-		if ((f >= s->rx_blocks_for_midi) ||
+		if ((f >= MAX_MIDI_RX_BLOCKS) ||
 		    (s->midi[port] == NULL) ||
 		    (snd_rawmidi_transmit(s->midi[port], b + 1, 1) <= 0))
 			b[0] = 0x80;
