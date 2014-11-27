@@ -267,10 +267,10 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 		dir = AVC_GENERAL_PLUG_DIR_IN;
 	}
 
+	mutex_lock(&oxfw->mutex);
+
 	if (atomic_read(substreams) == 0)
 		goto end;
-
-	mutex_lock(&oxfw->mutex);
 
 	/*
 	 * Considering JACK/FFADO streaming:

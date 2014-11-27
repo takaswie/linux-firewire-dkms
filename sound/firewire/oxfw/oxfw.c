@@ -52,7 +52,7 @@ static bool detect_loud_models(struct fw_unit *unit)
 		"Mackie Onyx Satellite",
 		"Tapco LINK.firewire 4x6",
 		"U.420"};
-	char model[32] = {0};
+	char model[32];
 	unsigned int i;
 	int err;
 
@@ -61,9 +61,8 @@ static bool detect_loud_models(struct fw_unit *unit)
 	if (err < 0)
 		return err;
 
-	model[31] = '\0';
 	for (i = 0; i < ARRAY_SIZE(models); i++) {
-		if (strncmp(models[i], model, strlen(model) == 0))
+		if (strcmp(models[i], model) == 0)
 			break;
 	}
 
@@ -73,8 +72,8 @@ static bool detect_loud_models(struct fw_unit *unit)
 static int name_card(struct snd_oxfw *oxfw)
 {
 	struct fw_device *fw_dev = fw_parent_device(oxfw->unit);
-	char vendor[24] = {0};
-	char model[32] = {0};
+	char vendor[24];
+	char model[32];
 	const char *d, *v, *m;
 	u32 firmware;
 	int err;
