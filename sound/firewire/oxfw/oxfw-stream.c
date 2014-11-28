@@ -94,7 +94,7 @@ static int set_stream_format(struct snd_oxfw *oxfw, struct amdtp_stream *s,
 	if (err < 0)
 		return err;
 
-	/* Some immediate requests just after changing format cause freezing. */
+	/* Some requests just after changing format causes freezing. */
 	msleep(100);
 
 	return 0;
@@ -219,8 +219,6 @@ int snd_oxfw_stream_init_simplex(struct snd_oxfw *oxfw,
 		s_dir = AMDTP_OUT_STREAM;
 	}
 
-	mutex_lock(&oxfw->mutex);
-
 	err = cmp_connection_init(conn, oxfw->unit, c_dir, 0);
 	if (err < 0)
 		goto end;
@@ -236,7 +234,6 @@ int snd_oxfw_stream_init_simplex(struct snd_oxfw *oxfw,
 	if (stream == &oxfw->tx_stream)
 		oxfw->tx_stream.flags |= CIP_SKIP_INIT_DBC_CHECK;
 end:
-	mutex_unlock(&oxfw->mutex);
 	return err;
 }
 
@@ -247,17 +244,17 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 	struct amdtp_stream *opposite;
 	struct snd_oxfw_stream_formation formation;
 	enum avc_general_plug_dir dir;
-	atomic_t *substreams, *opposite_substreams;
+	unsigned int substreams, opposite_substreams;
 	int err = 0;
 
 	if (stream == &oxfw->tx_stream) {
-		substreams = &oxfw->capture_substreams;
+		substreams = oxfw->capture_substreams;
 		opposite = &oxfw->rx_stream;
-		opposite_substreams = &oxfw->playback_substreams;
+		opposite_substreams = oxfw->playback_substreams;
 		dir = AVC_GENERAL_PLUG_DIR_OUT;
 	} else {
-		substreams = &oxfw->playback_substreams;
-		opposite_substreams = &oxfw->capture_substreams;
+		substreams = oxfw->playback_substreams;
+		opposite_substreams = oxfw->capture_substreams;
 
 		if (oxfw->has_output)
 			opposite = &oxfw->rx_stream;
@@ -267,9 +264,7 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 		dir = AVC_GENERAL_PLUG_DIR_IN;
 	}
 
-	mutex_lock(&oxfw->mutex);
-
-	if (atomic_read(substreams) == 0)
+	if (substreams == 0)
 		goto end;
 
 	/*
@@ -310,7 +305,7 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 
 		/* Start opposite stream if needed. */
 		if (opposite && !amdtp_stream_running(opposite) &&
-		    (atomic_read(opposite_substreams) > 0)) {
+		    (opposite_substreams > 0)) {
 			err = start_stream(oxfw, opposite, rate, 0);
 			if (err < 0) {
 				dev_err(&oxfw->unit->device,
@@ -328,22 +323,17 @@ int snd_oxfw_stream_start_simplex(struct snd_oxfw *oxfw,
 				"fail to start stream: %d\n", err);
 	}
 end:
-	mutex_unlock(&oxfw->mutex);
 	return err;
 }
 
 void snd_oxfw_stream_stop_simplex(struct snd_oxfw *oxfw,
 				  struct amdtp_stream *stream)
 {
-	if (((stream == &oxfw->tx_stream) &&
-	     (atomic_read(&oxfw->capture_substreams) > 0)) ||
-	    ((stream == &oxfw->rx_stream) &&
-	     (atomic_read(&oxfw->playback_substreams) > 0)))
+	if (((stream == &oxfw->tx_stream) && (oxfw->capture_substreams > 0)) ||
+	    ((stream == &oxfw->rx_stream) && (oxfw->playback_substreams > 0)))
 		return;
 
-	mutex_lock(&oxfw->mutex);
 	stop_stream(oxfw, stream);
-	mutex_unlock(&oxfw->mutex);
 }
 
 void snd_oxfw_stream_destroy_simplex(struct snd_oxfw *oxfw,
@@ -356,14 +346,10 @@ void snd_oxfw_stream_destroy_simplex(struct snd_oxfw *oxfw,
 	else
 		conn = &oxfw->in_conn;
 
-	mutex_lock(&oxfw->mutex);
-
 	stop_stream(oxfw, stream);
 
 	amdtp_stream_destroy(stream);
 	cmp_connection_destroy(conn);
-
-	mutex_unlock(&oxfw->mutex);
 }
 
 void snd_oxfw_stream_update_simplex(struct snd_oxfw *oxfw,
@@ -376,13 +362,10 @@ void snd_oxfw_stream_update_simplex(struct snd_oxfw *oxfw,
 	else
 		conn = &oxfw->in_conn;
 
-	if (cmp_connection_update(conn) < 0) {
-		mutex_lock(&oxfw->mutex);
+	if (cmp_connection_update(conn) < 0)
 		stop_stream(oxfw, stream);
-		mutex_unlock(&oxfw->mutex);
-	} else {
+	else
 		amdtp_stream_update(stream);
-	}
 }
 
 int snd_oxfw_stream_get_current_formation(struct snd_oxfw *oxfw,

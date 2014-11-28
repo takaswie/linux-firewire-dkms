@@ -232,8 +232,13 @@ static int pcm_capture_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
+	mutex_lock(&oxfw->mutex);
+
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
-		atomic_inc(&oxfw->capture_substreams);
+		oxfw->capture_substreams++;
+
+	mutex_unlock(&oxfw->mutex);
+
 	amdtp_stream_set_pcm_format(&oxfw->tx_stream, params_format(hw_params));
 
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
@@ -244,8 +249,13 @@ static int pcm_playback_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
+	mutex_lock(&oxfw->mutex);
+
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
-		atomic_inc(&oxfw->playback_substreams);
+		oxfw->playback_substreams++;
+
+	mutex_unlock(&oxfw->mutex);
+
 	amdtp_stream_set_pcm_format(&oxfw->rx_stream, params_format(hw_params));
 
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
@@ -256,10 +266,14 @@ static int pcm_capture_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
+	mutex_lock(&oxfw->mutex);
+
 	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
-		atomic_dec(&oxfw->capture_substreams);
+		oxfw->capture_substreams--;
 
 	snd_oxfw_stream_stop_simplex(oxfw, &oxfw->tx_stream);
+
+	mutex_unlock(&oxfw->mutex);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
@@ -267,10 +281,14 @@ static int pcm_playback_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
 
+	mutex_lock(&oxfw->mutex);
+
 	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
-		atomic_dec(&oxfw->playback_substreams);
+		oxfw->playback_substreams--;
 
 	snd_oxfw_stream_stop_simplex(oxfw, &oxfw->rx_stream);
+
+	mutex_unlock(&oxfw->mutex);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
@@ -281,8 +299,10 @@ static int pcm_capture_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
 
+	mutex_lock(&oxfw->mutex);
 	err = snd_oxfw_stream_start_simplex(oxfw, &oxfw->tx_stream,
 					    runtime->rate, runtime->channels);
+	mutex_unlock(&oxfw->mutex);
 	if (err < 0)
 		goto end;
 
@@ -296,8 +316,10 @@ static int pcm_playback_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
 
+	mutex_lock(&oxfw->mutex);
 	err = snd_oxfw_stream_start_simplex(oxfw, &oxfw->rx_stream,
 					    runtime->rate, runtime->channels);
+	mutex_unlock(&oxfw->mutex);
 	if (err < 0)
 		goto end;
 
@@ -309,33 +331,37 @@ end:
 static int pcm_capture_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
+	struct snd_pcm_substream *pcm;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		amdtp_stream_pcm_trigger(&oxfw->tx_stream, substream);
+		pcm = substream;
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		amdtp_stream_pcm_trigger(&oxfw->tx_stream, NULL);
+		pcm = NULL;
 		break;
 	default:
 		return -EINVAL;
 	}
+	amdtp_stream_pcm_trigger(&oxfw->tx_stream, pcm);
 	return 0;
 }
 static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
+	struct snd_pcm_substream *pcm;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		amdtp_stream_pcm_trigger(&oxfw->rx_stream, substream);
+		pcm = substream;
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		amdtp_stream_pcm_trigger(&oxfw->rx_stream, NULL);
+		pcm = NULL;
 		break;
 	default:
 		return -EINVAL;
 	}
+	amdtp_stream_pcm_trigger(&oxfw->rx_stream, pcm);
 	return 0;
 }
 

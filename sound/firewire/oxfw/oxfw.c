@@ -214,20 +214,26 @@ static void oxfw_bus_reset(struct fw_unit *unit)
 	struct snd_oxfw *oxfw = dev_get_drvdata(&unit->device);
 
 	fcp_bus_reset(oxfw->unit);
+
+	mutex_lock(&oxfw->mutex);
+
 	snd_oxfw_stream_update_simplex(oxfw, &oxfw->rx_stream);
 	if (oxfw->has_output)
 		snd_oxfw_stream_update_simplex(oxfw, &oxfw->tx_stream);
+
+	mutex_unlock(&oxfw->mutex);
 }
 
 static void oxfw_remove(struct fw_unit *unit)
 {
 	struct snd_oxfw *oxfw = dev_get_drvdata(&unit->device);
 
+	snd_card_disconnect(oxfw->card);
+
 	snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->rx_stream);
 	if (oxfw->has_output)
 		snd_oxfw_stream_destroy_simplex(oxfw, &oxfw->tx_stream);
 
-	snd_card_disconnect(oxfw->card);
 	snd_card_free_when_closed(oxfw->card);
 }
 
