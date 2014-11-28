@@ -312,14 +312,16 @@ static void dice_remove(struct fw_unit *unit)
 	snd_card_free_when_closed(dice->card);
 }
 
-static void dice_update(struct fw_unit *unit)
+static void dice_bus_reset(struct fw_unit *unit)
 {
 	struct snd_dice *dice = dev_get_drvdata(&unit->device);
 
 	/* The handler address register becomes initialized. */
 	snd_dice_transaction_reinit(dice);
 
+	mutex_lock(&dice->mutex);
 	snd_dice_stream_update_duplex(dice);
+	mutex_unlock(&dice->mutex);
 }
 
 #define DICE_INTERFACE	0x000001
@@ -340,7 +342,7 @@ static struct fw_driver dice_driver = {
 		.bus	= &fw_bus_type,
 	},
 	.probe    = dice_probe,
-	.update   = dice_update,
+	.update   = dice_bus_reset,
 	.remove   = dice_remove,
 	.id_table = dice_id_table,
 };

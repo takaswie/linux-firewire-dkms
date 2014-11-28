@@ -77,7 +77,7 @@ struct snd_dice {
 	struct amdtp_stream rx_stream;
 	bool global_enabled;
 	struct completion clock_accepted;
-	atomic_t substreams_counter;
+	unsigned int substreams_counter;
 };
 
 enum snd_dice_addr_type {

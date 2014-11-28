@@ -14,13 +14,18 @@ static int capture_open(struct snd_rawmidi_substream *substream)
 
 	err = snd_dice_stream_lock_try(dice);
 	if (err < 0)
-		goto end;
+		return err;
 
-	atomic_inc(&dice->substreams_counter);
+	mutex_lock(&dice->mutex);
+
+	dice->substreams_counter++;
 	err = snd_dice_stream_start_duplex(dice, 0);
+
+	mutex_unlock(&dice->mutex);
+
 	if (err < 0)
 		snd_dice_stream_lock_release(dice);
-end:
+
 	return err;
 }
 
@@ -31,13 +36,18 @@ static int playback_open(struct snd_rawmidi_substream *substream)
 
 	err = snd_dice_stream_lock_try(dice);
 	if (err < 0)
-		goto end;
+		return err;
 
-	atomic_inc(&dice->substreams_counter);
+	mutex_lock(&dice->mutex);
+
+	dice->substreams_counter++;
 	err = snd_dice_stream_start_duplex(dice, 0);
+
+	mutex_unlock(&dice->mutex);
+
 	if (err < 0)
 		snd_dice_stream_lock_release(dice);
-end:
+
 	return err;
 }
 
@@ -45,8 +55,12 @@ static int capture_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_dice *dice = substream->rmidi->private_data;
 
-	atomic_dec(&dice->substreams_counter);
+	mutex_lock(&dice->mutex);
+
+	dice->substreams_counter--;
 	snd_dice_stream_stop_duplex(dice);
+
+	mutex_unlock(&dice->mutex);
 
 	snd_dice_stream_lock_release(dice);
 	return 0;
@@ -56,8 +70,12 @@ static int playback_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_dice *dice = substream->rmidi->private_data;
 
-	atomic_dec(&dice->substreams_counter);
+	mutex_lock(&dice->mutex);
+
+	dice->substreams_counter--;
 	snd_dice_stream_stop_duplex(dice);
+
+	mutex_unlock(&dice->mutex);
 
 	snd_dice_stream_lock_release(dice);
 	return 0;

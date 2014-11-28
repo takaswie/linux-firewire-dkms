@@ -231,8 +231,12 @@ static int capture_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_dice *dice = substream->private_data;
 
+	mutex_lock(&dice->mutex);
+
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
-		atomic_inc(&dice->substreams_counter);
+		dice->substreams_counter++;
+
+	mutex_unlock(&dice->mutex);
 
 	amdtp_stream_set_pcm_format(&dice->tx_stream,
 				    params_format(hw_params));
@@ -245,8 +249,12 @@ static int playback_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_dice *dice = substream->private_data;
 
+	mutex_lock(&dice->mutex);
+
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
-		atomic_inc(&dice->substreams_counter);
+		dice->substreams_counter++;
+
+	mutex_unlock(&dice->mutex);
 
 	amdtp_stream_set_pcm_format(&dice->rx_stream,
 				    params_format(hw_params));
@@ -259,10 +267,14 @@ static int capture_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_dice *dice = substream->private_data;
 
+	mutex_lock(&dice->mutex);
+
 	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
-		atomic_dec(&dice->substreams_counter);
+		dice->substreams_counter--;
 
 	snd_dice_stream_stop_duplex(dice);
+
+	mutex_unlock(&dice->mutex);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
@@ -271,10 +283,14 @@ static int playback_hw_free(struct snd_pcm_substream *substream)
 {
 	struct snd_dice *dice = substream->private_data;
 
+	mutex_lock(&dice->mutex);
+
 	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
-		atomic_dec(&dice->substreams_counter);
+		dice->substreams_counter--;
 
 	snd_dice_stream_stop_duplex(dice);
+
+	mutex_unlock(&dice->mutex);
 
 	return snd_pcm_lib_free_vmalloc_buffer(substream);
 }
@@ -284,7 +300,9 @@ static int capture_prepare(struct snd_pcm_substream *substream)
 	struct snd_dice *dice = substream->private_data;
 	int err;
 
+	mutex_lock(&dice->mutex);
 	err = snd_dice_stream_start_duplex(dice, substream->runtime->rate);
+	mutex_unlock(&dice->mutex);
 	if (err >= 0)
 		amdtp_stream_pcm_prepare(&dice->tx_stream);
 
@@ -295,7 +313,9 @@ static int playback_prepare(struct snd_pcm_substream *substream)
 	struct snd_dice *dice = substream->private_data;
 	int err;
 
+	mutex_lock(&dice->mutex);
 	err = snd_dice_stream_start_duplex(dice, substream->runtime->rate);
+	mutex_unlock(&dice->mutex);
 	if (err >= 0)
 		amdtp_stream_pcm_prepare(&dice->rx_stream);
 

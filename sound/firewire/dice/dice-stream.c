@@ -193,10 +193,8 @@ int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate)
 	enum cip_flags sync_mode;
 	int err = 0;
 
-	if (atomic_read(&dice->substreams_counter) == 0)
+	if (dice->substreams_counter == 0)
 		goto end;
-
-	mutex_lock(&dice->mutex);
 
 	err = get_sync_mode(dice, &sync_mode);
 	if (err < 0)
@@ -271,23 +269,18 @@ int snd_dice_stream_start_duplex(struct snd_dice *dice, unsigned int rate)
 		}
 	}
 end:
-	mutex_unlock(&dice->mutex);
 	return err;
 }
 
 void snd_dice_stream_stop_duplex(struct snd_dice *dice)
 {
-	if (atomic_read(&dice->substreams_counter) > 0)
+	if (dice->substreams_counter > 0)
 		return;
-
-	mutex_lock(&dice->mutex);
 
 	snd_dice_transaction_clear_enable(dice);
 
 	stop_stream(dice, &dice->tx_stream);
 	stop_stream(dice, &dice->rx_stream);
-
-	mutex_unlock(&dice->mutex);
 }
 
 static int init_stream(struct snd_dice *dice, struct amdtp_stream *stream)
@@ -332,7 +325,7 @@ int snd_dice_stream_init_duplex(struct snd_dice *dice)
 {
 	int err;
 
-	atomic_set(&dice->substreams_counter, 0);
+	dice->substreams_counter = 0;
 
 	err = init_stream(dice, &dice->tx_stream);
 	if (err < 0)
@@ -345,8 +338,6 @@ end:
 
 void snd_dice_stream_destroy_duplex(struct snd_dice *dice)
 {
-	mutex_lock(&dice->mutex);
-
 	snd_dice_transaction_clear_enable(dice);
 
 	stop_stream(dice, &dice->tx_stream);
@@ -355,9 +346,7 @@ void snd_dice_stream_destroy_duplex(struct snd_dice *dice)
 	stop_stream(dice, &dice->rx_stream);
 	destroy_stream(dice, &dice->rx_stream);
 
-	atomic_set(&dice->substreams_counter, 0);
-
-	mutex_unlock(&dice->mutex);
+	dice->substreams_counter = 0;
 }
 
 void snd_dice_stream_update_duplex(struct snd_dice *dice)
@@ -365,14 +354,11 @@ void snd_dice_stream_update_duplex(struct snd_dice *dice)
 	/*
 	 * On a bus reset, the DICE firmware disables streaming and then goes
 	 * off contemplating its own navel for hundreds of milliseconds before
-	 * it can react to any of our attempts to reenable streaming. This
+	 * it can react to any of our attempts to reenable streaming.  This
 	 * means that we lose synchronization anyway, so we force our streams
 	 * to stop so that the application can restart them in an orderly
 	 * manner.
 	 */
-	mutex_lock(&dice->mutex);
-
-	/* The enable register becomes initialized, then streams are stopped. */
 	dice->global_enabled = false;
 
 	stop_stream(dice, &dice->rx_stream);
@@ -380,8 +366,6 @@ void snd_dice_stream_update_duplex(struct snd_dice *dice)
 
 	fw_iso_resources_update(&dice->rx_resources);
 	fw_iso_resources_update(&dice->tx_resources);
-
-	mutex_unlock(&dice->mutex);
 }
 
 static void dice_lock_changed(struct snd_dice *dice)
