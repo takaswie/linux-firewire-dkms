@@ -35,8 +35,9 @@
 #include "../cmp.h"
 
 struct device_info {
-	const char *vendor_name;
 	const char *driver_name;
+	const char *vendor_name;
+	const char *model_name;
 	unsigned int mixer_channels;
 	u8 mute_fb_id;
 	u8 volume_fb_id;

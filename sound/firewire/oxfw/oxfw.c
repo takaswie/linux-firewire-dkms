@@ -27,22 +27,6 @@ MODULE_AUTHOR("Clemens Ladisch <clemens@ladisch.de>");
 MODULE_LICENSE("GPL v2");
 MODULE_ALIAS("snd-firewire-speakers");
 
-static const struct device_info griffin_firewave = {
-	.vendor_name = "Griffin",
-	.driver_name = "FireWave",
-	.mixer_channels = 6,
-	.mute_fb_id   = 0x01,
-	.volume_fb_id = 0x02,
-};
-
-static const struct device_info lacie_speakers = {
-	.vendor_name = "LaCie",
-	.driver_name = "FWSpeakers",
-	.mixer_channels = 1,
-	.mute_fb_id   = 0x01,
-	.volume_fb_id = 0x01,
-};
-
 static bool detect_loud_models(struct fw_unit *unit)
 {
 	const char *const models[] = {
@@ -100,7 +84,7 @@ static int name_card(struct snd_oxfw *oxfw)
 	if (oxfw->device_info) {
 		d = oxfw->device_info->driver_name;
 		v = oxfw->device_info->vendor_name;
-		m = oxfw->device_info->driver_name;
+		m = oxfw->device_info->model_name;
 	} else {
 		d = "OXFW";
 		v = vendor;
@@ -108,8 +92,10 @@ static int name_card(struct snd_oxfw *oxfw)
 	}
 
 	strcpy(oxfw->card->driver, d);
-	strcpy(oxfw->card->shortname, m);
 	strcpy(oxfw->card->mixername, m);
+
+	snprintf(oxfw->card->shortname, sizeof(oxfw->card->shortname),
+		 "%s %s", v, m);
 
 	snprintf(oxfw->card->longname, sizeof(oxfw->card->longname),
 		 "%s %s (OXFW%x %04x), GUID %08x%08x at %s, S%d",
@@ -236,6 +222,24 @@ static void oxfw_remove(struct fw_unit *unit)
 
 	snd_card_free_when_closed(oxfw->card);
 }
+
+static const struct device_info griffin_firewave = {
+	.driver_name = "FireWave",
+	.vendor_name = "Griffin",
+	.model_name = "FireWave",
+	.mixer_channels = 6,
+	.mute_fb_id   = 0x01,
+	.volume_fb_id = 0x02,
+};
+
+static const struct device_info lacie_speakers = {
+	.driver_name = "FWSpeakers",
+	.vendor_name = "LaCie",
+	.model_name = "FireWire Speakers",
+	.mixer_channels = 1,
+	.mute_fb_id   = 0x01,
+	.volume_fb_id = 0x01,
+};
 
 static const struct ieee1394_device_id oxfw_id_table[] = {
 	{
