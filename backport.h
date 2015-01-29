@@ -8,7 +8,8 @@ void fw_schedule_bus_reset(struct fw_card *card, bool delay, bool short_reset);
 
 /* commit 1fb8510cdb5b7befe8a59f533c7fc12ef0dac73e */
 /* This macro is just convenient to detect Linux 3.19 or later */
-#ifndef SNDRV_PCM_FORMAT_DSD_U32_LE
+#include <sound/soc.h>
+#ifndef SOC_DOUBLE_S_VALUE
 static inline void snd_pcm_stop_xrun(struct snd_pcm_substream *substream)
 {
 	unsigned long flags;
