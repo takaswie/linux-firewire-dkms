@@ -220,7 +220,7 @@ bebob_probe(struct fw_unit *unit,
 		err = snd_bebob_maudio_special_discover(bebob, true);
 	else if ((entry->vendor_id == VEN_MAUDIO1) &&
 		 (entry->model_id == MODEL_MAUDIO_PROJECTMIX))
-		err = snd_bebob_maudio_special_discover(bebob, false);
+		err = snd_bebob_maudio_special_discover(bebob, true);
 	else
 		err = snd_bebob_stream_discover(bebob);
 	if (err < 0)
