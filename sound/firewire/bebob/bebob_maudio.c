@@ -96,14 +96,17 @@ int snd_bebob_maudio_load_firmware(struct fw_unit *unit)
 	struct fw_device *device = fw_parent_device(unit);
 	int err, rcode;
 	u64 date;
-	__le32 *buf;
+	__be32 cues[3] = {
+		MAUDIO_BOOTLOADER_CUE1,
+		MAUDIO_BOOTLOADER_CUE2,
+		MAUDIO_BOOTLOADER_CUE3
+	};
 
 	/* check date of software used to build */
 	err = snd_bebob_read_block(unit, INFO_OFFSET_SW_DATE,
 				   &date, sizeof(u64));
 	if (err < 0)
-		return err;
-
+		goto end;
 	/*
 	 * firmware version 5058 or later has date later than "20070401", but
 	 * 'date' is not null-terminated.
@@ -111,30 +114,20 @@ int snd_bebob_maudio_load_firmware(struct fw_unit *unit)
 	if (date < 0x3230303730343031LL) {
 		dev_err(&unit->device,
 			"Use firmware version 5058 or later\n");
-		return -ENOSYS;
+		err = -ENOSYS;
+		goto end;
 	}
 
-	buf = kmalloc(12, GFP_KERNEL);
-	if (buf == NULL)
-		return -ENOMEM;
-
-	/* This command should be aligned to little-endian, not big-endian. */
-	buf[0] = cpu_to_le32(MAUDIO_BOOTLOADER_CUE1);
-	buf[1] = cpu_to_le32(MAUDIO_BOOTLOADER_CUE2);
-	buf[2] = cpu_to_le32(MAUDIO_BOOTLOADER_CUE3);
-
-	/* Just one time. */
 	rcode = fw_run_transaction(device->card, TCODE_WRITE_BLOCK_REQUEST,
 				   device->node_id, device->generation,
 				   device->max_speed, BEBOB_ADDR_REG_REQ,
-				   buf, 12);
+				   cues, sizeof(cues));
 	if (rcode != RCODE_COMPLETE) {
 		dev_err(&unit->device,
 			"Failed to send a cue to load firmware\n");
 		err = -EIO;
 	}
-
-	kfree(buf);
+end:
 	return err;
 }
 

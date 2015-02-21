@@ -231,12 +231,11 @@ static int capture_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_dice *dice = substream->private_data;
 
-	mutex_lock(&dice->mutex);
-
-	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
+	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN) {
+		mutex_lock(&dice->mutex);
 		dice->substreams_counter++;
-
-	mutex_unlock(&dice->mutex);
+		mutex_unlock(&dice->mutex);
+	}
 
 	amdtp_stream_set_pcm_format(&dice->tx_stream,
 				    params_format(hw_params));
@@ -249,12 +248,11 @@ static int playback_hw_params(struct snd_pcm_substream *substream,
 {
 	struct snd_dice *dice = substream->private_data;
 
-	mutex_lock(&dice->mutex);
-
-	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN)
+	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN) {
+		mutex_lock(&dice->mutex);
 		dice->substreams_counter++;
-
-	mutex_unlock(&dice->mutex);
+		mutex_unlock(&dice->mutex);
+	}
 
 	amdtp_stream_set_pcm_format(&dice->rx_stream,
 				    params_format(hw_params));

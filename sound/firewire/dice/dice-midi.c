@@ -7,7 +7,7 @@
  */
 #include "dice.h"
 
-static int capture_open(struct snd_rawmidi_substream *substream)
+static int midi_open(struct snd_rawmidi_substream *substream)
 {
 	struct snd_dice *dice = substream->rmidi->private_data;
 	int err;
@@ -29,29 +29,7 @@ static int capture_open(struct snd_rawmidi_substream *substream)
 	return err;
 }
 
-static int playback_open(struct snd_rawmidi_substream *substream)
-{
-	struct snd_dice *dice = substream->rmidi->private_data;
-	int err;
-
-	err = snd_dice_stream_lock_try(dice);
-	if (err < 0)
-		return err;
-
-	mutex_lock(&dice->mutex);
-
-	dice->substreams_counter++;
-	err = snd_dice_stream_start_duplex(dice, 0);
-
-	mutex_unlock(&dice->mutex);
-
-	if (err < 0)
-		snd_dice_stream_lock_release(dice);
-
-	return err;
-}
-
-static int capture_close(struct snd_rawmidi_substream *substream)
+static int midi_close(struct snd_rawmidi_substream *substream)
 {
 	struct snd_dice *dice = substream->rmidi->private_data;
 
@@ -66,22 +44,7 @@ static int capture_close(struct snd_rawmidi_substream *substream)
 	return 0;
 }
 
-static int playback_close(struct snd_rawmidi_substream *substream)
-{
-	struct snd_dice *dice = substream->rmidi->private_data;
-
-	mutex_lock(&dice->mutex);
-
-	dice->substreams_counter--;
-	snd_dice_stream_stop_duplex(dice);
-
-	mutex_unlock(&dice->mutex);
-
-	snd_dice_stream_lock_release(dice);
-	return 0;
-}
-
-static void capture_trigger(struct snd_rawmidi_substream *substrm, int up)
+static void midi_capture_trigger(struct snd_rawmidi_substream *substrm, int up)
 {
 	struct snd_dice *dice = substrm->rmidi->private_data;
 	unsigned long flags;
@@ -98,7 +61,7 @@ static void capture_trigger(struct snd_rawmidi_substream *substrm, int up)
 	spin_unlock_irqrestore(&dice->lock, flags);
 }
 
-static void playback_trigger(struct snd_rawmidi_substream *substrm, int up)
+static void midi_playback_trigger(struct snd_rawmidi_substream *substrm, int up)
 {
 	struct snd_dice *dice = substrm->rmidi->private_data;
 	unsigned long flags;
@@ -116,15 +79,15 @@ static void playback_trigger(struct snd_rawmidi_substream *substrm, int up)
 }
 
 static struct snd_rawmidi_ops capture_ops = {
-	.open		= capture_open,
-	.close		= capture_close,
-	.trigger	= capture_trigger,
+	.open		= midi_open,
+	.close		= midi_close,
+	.trigger	= midi_capture_trigger,
 };
 
 static struct snd_rawmidi_ops playback_ops = {
-	.open		= playback_open,
-	.close		= playback_close,
-	.trigger	= playback_trigger,
+	.open		= midi_open,
+	.close		= midi_close,
+	.trigger	= midi_playback_trigger,
 };
 
 static void set_midi_substream_names(struct snd_dice *dice,

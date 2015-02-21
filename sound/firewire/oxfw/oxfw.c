@@ -93,9 +93,7 @@ static int name_card(struct snd_oxfw *oxfw)
 
 	strcpy(oxfw->card->driver, d);
 	strcpy(oxfw->card->mixername, m);
-
-	snprintf(oxfw->card->shortname, sizeof(oxfw->card->shortname),
-		 "%s %s", v, m);
+	strcpy(oxfw->card->shortname, m);
 
 	snprintf(oxfw->card->longname, sizeof(oxfw->card->longname),
 		 "%s %s (OXFW%x %04x), GUID %08x%08x at %s, S%d",

@@ -30,7 +30,7 @@ int avc_stream_set_format(struct fw_unit *unit, enum avc_general_plug_dir dir,
 	buf[9] = 0xff;		/* Support status in response */
 	memcpy(buf + 10, format, len);
 
-	/* do transaction and check buf[1-7] are the same against command */
+	/* do transaction and check buf[1-8] are the same against command */
 	err = fcp_avc_transaction(unit, buf, len + 10, buf, len + 10,
 				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
 				  BIT(6) | BIT(7) | BIT(8));
