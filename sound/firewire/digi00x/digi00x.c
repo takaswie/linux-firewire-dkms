@@ -23,30 +23,30 @@ static DECLARE_BITMAP(devices_used, SNDRV_CARDS);
 #define MODEL_STRING_002	"Digi 002Rack"
 #define MODEL_STRING_003	" 003Rack"
 
-static void handle_notification(struct fw_card *card, struct fw_request *request,
-				int tcode, int destination, int source,
-				int generation, unsigned long long offset,
-				void *data, size_t length, void *callback_data)
+static void handle_message(struct fw_card *card, struct fw_request *request,
+			   int tcode, int destination, int source,
+			   int generation, unsigned long long offset,
+			   void *data, size_t length, void *callback_data)
 {
 	int rcode;
-	__be32 *buf = (__be32 *)data;
+	u32 *buf = (__be32 *)data;
 
 	rcode = RCODE_COMPLETE;
 
-//	snd_printk(KERN_INFO"%08x\n", be32_to_cpu(*buf));
+	snd_printk(KERN_INFO"%08x: %08x\n", offset, be32_to_cpu(*buf));
 
 	fw_send_response(card, request, rcode);
 }
 
-static void snd_dg00x_notification_unregister(struct snd_dg00x *dg00x)
+static void snd_dg00x_message_unregister(struct snd_dg00x *dg00x)
 {
-	if (dg00x->notification_handler.offset)
-		fw_core_remove_address_handler(&dg00x->notification_handler);
-	dg00x->notification_handler.offset = 0;
+	if (dg00x->message_handler.offset)
+		fw_core_remove_address_handler(&dg00x->message_handler);
+	dg00x->message_handler.offset = 0;
 }
 
 /* IR */
-static int snd_dg00x_notification_register(struct snd_dg00x *dg00x)
+static int snd_dg00x_message_register(struct snd_dg00x *dg00x)
 {
 	static const struct fw_address_region resp_register_region = {
 		.start	= 0xffff00000000ull,
@@ -55,22 +55,22 @@ static int snd_dg00x_notification_register(struct snd_dg00x *dg00x)
 	__be32 data[2];
 	int err;
 
-	dg00x->notification_handler.length = 8;
-	dg00x->notification_handler.address_callback = handle_notification;
-	dg00x->notification_handler.callback_data = (void *)dg00x;
+	dg00x->message_handler.length = 8;
+	dg00x->message_handler.address_callback = handle_message;
+	dg00x->message_handler.callback_data = (void *)dg00x;
 
-	err = fw_core_add_address_handler(&dg00x->notification_handler,
+	err = fw_core_add_address_handler(&dg00x->message_handler,
 					  &resp_register_region);
 	if (err < 0)
 		goto end;
 
-	data[0] = cpu_to_be32(dg00x->notification_handler.offset >> 32);
-	data[1] = cpu_to_be32(dg00x->notification_handler.offset);
+	data[0] = cpu_to_be32(dg00x->message_handler.offset >> 32);
+	data[1] = cpu_to_be32(dg00x->message_handler.offset);
 
 	err = snd_fw_transaction(dg00x->unit, TCODE_WRITE_BLOCK_REQUEST,
 				 0xffffe0000008ull, &data, sizeof(data), 0);
 	if (err < 0)
-		snd_dg00x_notification_unregister(dg00x);
+		snd_dg00x_message_unregister(dg00x);
 end:
 	return err;
 }
@@ -116,8 +116,8 @@ static int snd_dg00x_heartbeat_register(struct snd_dg00x *dg00x)
 	if (err < 0)
 		goto end;
 
-	data[0] = cpu_to_be32(dg00x->notification_handler.offset >> 32);
-	data[1] = cpu_to_be32(dg00x->notification_handler.offset);
+	data[0] = cpu_to_be32(dg00x->message_handler.offset >> 32);
+	data[1] = cpu_to_be32(dg00x->message_handler.offset);
 
 	err = snd_fw_transaction(dg00x->unit, TCODE_WRITE_BLOCK_REQUEST,
 				 0xffffe0000014ull, &data, sizeof(data), 0);
@@ -177,7 +177,7 @@ static void snd_dg00x_card_free(struct snd_card *card)
 	struct snd_dg00x *dg00x = card->private_data;
 
 	snd_dg00x_heartbeat_unregister(dg00x);
-	snd_dg00x_notification_unregister(dg00x);
+	snd_dg00x_message_unregister(dg00x);
 
 	if (dg00x->card_index >= 0) {
 		mutex_lock(&devices_mutex);
@@ -233,7 +233,7 @@ static int snd_dg00x_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
-	err = snd_dg00x_notification_register(dg00x);
+	err = snd_dg00x_message_register(dg00x);
 	if (err < 0)
 		goto error;
 

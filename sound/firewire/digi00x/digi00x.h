@@ -97,7 +97,7 @@ struct snd_dg00x {
 
 	/* Handle heartbeat */
 	struct fw_address_handler heartbeat_handler;
-	struct fw_address_handler notification_handler;
+	struct fw_address_handler message_handler;
 };
 
 /* values for SND_DG00X_ADDR_OFFSET_RATE */
