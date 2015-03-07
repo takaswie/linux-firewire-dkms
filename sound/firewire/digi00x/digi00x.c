@@ -12,16 +12,8 @@ MODULE_DESCRIPTION("Digidesign 002/003 Driver");
 MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp>");
 MODULE_LICENSE("GPL v2");
 
-static int index[SNDRV_CARDS]   = SNDRV_DEFAULT_IDX;
-static char *id[SNDRV_CARDS]    = SNDRV_DEFAULT_STR;
-static int enable[SNDRV_CARDS]  = SNDRV_DEFAULT_ENABLE_PNP;
-
-static DEFINE_MUTEX(devices_mutex);
-static DECLARE_BITMAP(devices_used, SNDRV_CARDS);
-
 #define VENDOR_DIGIDESIGN	0x00a07e
-#define MODEL_STRING_002	"Digi 002Rack"
-#define MODEL_STRING_003	" 003Rack"
+#define MODEL_DIGI00X		0x000002
 
 static void handle_message(struct fw_card *card, struct fw_request *request,
 			   int tcode, int destination, int source,
@@ -83,23 +75,6 @@ end:
 	return err;
 }
 
-/* Model ID for digi 003 is 0xab00 but the one for 002 is unknown. */
-static int match_model_name(struct fw_unit *unit)
-{
-	char model[32] = {0};
-	int err;
-
-	err = fw_csr_string(unit->directory, CSR_MODEL, model, sizeof(model));
-	if (err < 0)
-		goto end;
-
-	if((strncmp(model, MODEL_STRING_002, strlen(MODEL_STRING_002)) != 0) &&
-	   (strncmp(model, MODEL_STRING_003, strlen(MODEL_STRING_003)) != 0))
-		err = -ENODEV;
-end:
-	return err;
-}
-
 static int name_card(struct snd_dg00x *dg00x)
 {
 	struct fw_device *fw_dev = fw_parent_device(dg00x->unit);
@@ -128,17 +103,14 @@ end:
 	return err;
 }
 
-static void snd_dg00x_card_free(struct snd_card *card)
+static void dg00x_card_free(struct snd_card *card)
 {
 	struct snd_dg00x *dg00x = card->private_data;
 
+	snd_dg00x_stream_destroy_duplex(dg00x);
 	snd_dg00x_message_unregister(dg00x);
 
-	if (dg00x->card_index >= 0) {
-		mutex_lock(&devices_mutex);
-		clear_bit(dg00x->card_index, devices_used);
-		mutex_unlock(&devices_mutex);
-	}
+	fw_unit_put(dg00x->unit);
 
 	mutex_destroy(&dg00x->mutex);
 
@@ -150,42 +122,23 @@ static int snd_dg00x_probe(struct fw_unit *unit,
 {
 	struct snd_card *card;
 	struct snd_dg00x *dg00x;
-	int card_index, err;
-
-	mutex_lock(&devices_mutex);
-
-	err = match_model_name(unit);
-	if (err < 0)
-		goto error;
-
-	for (card_index = 0; card_index < SNDRV_CARDS; card_index++) {
-		if (!test_bit(card_index, devices_used) && enable[card_index])
-			break;
-	}
-	if (card_index >= SNDRV_CARDS) {
-		err = -ENOENT;
-		goto end;
-	}
+	int err;
 
 	/* create card */
-	err = snd_card_new(&unit->device, index[card_index], id[card_index],
-			   THIS_MODULE, sizeof(struct snd_dg00x), &card);
+	err = snd_card_new(&unit->device, -1, NULL, THIS_MODULE,
+			   sizeof(struct snd_dg00x), &card);
 	if (err < 0)
-		goto end;
-	dg00x = card->private_data;
-	dg00x->card_index = -1;
-	set_bit(card_index, devices_used);
-	card->private_free = snd_dg00x_card_free;
+		return err;
+	card->private_free = dg00x_card_free;
 
 	/* initialize myself */
+	dg00x = card->private_data;
 	dg00x->card = card;
-	dg00x->unit = unit;
+	dg00x->unit = fw_unit_get(unit);
+
 	mutex_init(&dg00x->mutex);
 	spin_lock_init(&dg00x->lock);
 	init_waitqueue_head(&dg00x->hwdep_wait);
-
-	if (err < 0)
-		goto error;
 
 	err = snd_dg00x_message_register(dg00x);
 	if (err < 0)
@@ -209,21 +162,19 @@ static int snd_dg00x_probe(struct fw_unit *unit,
 	err = snd_dg00x_create_pcm_devices(dg00x);
 	if (err < 0)
 		goto error;
-
+/*
 	err = snd_dg00x_stream_init_duplex(dg00x);
 	if (err < 0)
 		goto error;
-
+*/
 	err = snd_card_register(card);
 	if (err < 0)
 		goto error;
 
 	dev_set_drvdata(&unit->device, dg00x);
-end:
-	mutex_unlock(&devices_mutex);
+
 	return err;
 error:
-	mutex_unlock(&devices_mutex);
 	snd_card_free(card);
 	return err;
 }
@@ -239,17 +190,18 @@ static void snd_dg00x_remove(struct fw_unit *unit)
 {
 	struct snd_dg00x *dg00x = dev_get_drvdata(&unit->device);
 
-	snd_dg00x_stream_destroy_duplex(dg00x);
-
-	snd_card_disconnect(dg00x->card);
+	/* No need to wait for releasing card object in this context. */
 	snd_card_free_when_closed(dg00x->card);
 }
 
 
-static const struct ieee1394_device_id snd_dg00x_id_table[] = {
+static const struct ieee1394_device_id snd_dg00x_id_table[] =
+{
+	/* Both of 002/003 use the same ID. */
 	{
 		.match_flags = IEEE1394_MATCH_VENDOR_ID, 
 		.vendor_id = VENDOR_DIGIDESIGN,
+		.model_id = MODEL_DIGI00X,
 	},
 	{}
 };
