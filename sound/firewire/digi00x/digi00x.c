@@ -33,7 +33,8 @@ static void handle_message(struct fw_card *card, struct fw_request *request,
 
 	rcode = RCODE_COMPLETE;
 
-	snd_printk(KERN_INFO"%08x: %08x\n", offset, be32_to_cpu(*buf));
+	/* NOTE: offset may be one of 0x00 or 0x08. */
+	snd_printk(KERN_INFO"%08lld: %08x\n", offset, be32_to_cpu(*buf));
 
 	fw_send_response(card, request, rcode);
 }
@@ -45,7 +46,6 @@ static void snd_dg00x_message_unregister(struct snd_dg00x *dg00x)
 	dg00x->message_handler.offset = 0;
 }
 
-/* IR */
 static int snd_dg00x_message_register(struct snd_dg00x *dg00x)
 {
 	static const struct fw_address_region resp_register_region = {
@@ -64,66 +64,22 @@ static int snd_dg00x_message_register(struct snd_dg00x *dg00x)
 	if (err < 0)
 		goto end;
 
+	/* Unknown. */
 	data[0] = cpu_to_be32(dg00x->message_handler.offset >> 32);
 	data[1] = cpu_to_be32(dg00x->message_handler.offset);
-
 	err = snd_fw_transaction(dg00x->unit, TCODE_WRITE_BLOCK_REQUEST,
 				 0xffffe0000008ull, &data, sizeof(data), 0);
 	if (err < 0)
-		snd_dg00x_message_unregister(dg00x);
-end:
-	return err;
-}
-
-static void handle_heartbeat(struct fw_card *card, struct fw_request *request,
-			     int tcode, int destination, int source,
-			     int generation, unsigned long long offset,
-			     void *data, size_t length, void *callback_data)
-{
-	int rcode;
-	__be32 *buf = (__be32 *)data;
-
-	rcode = RCODE_COMPLETE;
-
-//	snd_printk(KERN_INFO"%08x\n", be32_to_cpu(*buf));
-
-	fw_send_response(card, request, rcode);
-}
-
-static void snd_dg00x_heartbeat_unregister(struct snd_dg00x *dg00x)
-{
-	if (dg00x->heartbeat_handler.offset)
-		fw_core_remove_address_handler(&dg00x->heartbeat_handler);
-	dg00x->heartbeat_handler.offset = 0;
-}
-
-/* IT */
-static int snd_dg00x_heartbeat_register(struct snd_dg00x *dg00x)
-{
-	static const struct fw_address_region resp_register_region = {
-		.start	= 0xffff00000000ull,
-		.end	= 0xffff0000ffffull,
-	};
-	__be32 data[2];
-	int err;
-
-	dg00x->heartbeat_handler.length = 8;
-	dg00x->heartbeat_handler.address_callback = handle_heartbeat;
-	dg00x->heartbeat_handler.callback_data = (void *)dg00x;
-
-	err = fw_core_add_address_handler(&dg00x->heartbeat_handler,
-					  &resp_register_region);
-	if (err < 0)
 		goto end;
 
+	/* For 0x7051/0x7058 message. Unknown. */
 	data[0] = cpu_to_be32(dg00x->message_handler.offset >> 32);
 	data[1] = cpu_to_be32(dg00x->message_handler.offset);
-
 	err = snd_fw_transaction(dg00x->unit, TCODE_WRITE_BLOCK_REQUEST,
 				 0xffffe0000014ull, &data, sizeof(data), 0);
-	if (err < 0) 
-		snd_dg00x_heartbeat_unregister(dg00x);
 end:
+	if (err < 0)
+		snd_dg00x_message_unregister(dg00x);
 	return err;
 }
 
@@ -176,7 +132,6 @@ static void snd_dg00x_card_free(struct snd_card *card)
 {
 	struct snd_dg00x *dg00x = card->private_data;
 
-	snd_dg00x_heartbeat_unregister(dg00x);
 	snd_dg00x_message_unregister(dg00x);
 
 	if (dg00x->card_index >= 0) {
@@ -229,7 +184,6 @@ static int snd_dg00x_probe(struct fw_unit *unit,
 	spin_lock_init(&dg00x->lock);
 	init_waitqueue_head(&dg00x->hwdep_wait);
 
-	err = snd_dg00x_heartbeat_register(dg00x);	
 	if (err < 0)
 		goto error;
 

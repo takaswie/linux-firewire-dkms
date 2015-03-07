@@ -95,8 +95,7 @@ struct snd_dg00x {
 	bool dev_lock_changed;
 	wait_queue_head_t hwdep_wait;
 
-	/* Handle heartbeat */
-	struct fw_address_handler heartbeat_handler;
+	/* Asynchronous message handler. */
 	struct fw_address_handler message_handler;
 };
 
