@@ -34,6 +34,7 @@
 #include "../packets-buffer.h"
 #include "../iso-resources.h"
 #include "../lib.h"
+#include "../amdtp.h"
 
 #define SND_DG00X_ADDR_BASE	0xffffe0000000
 #define UNKNOWN0	0x0000	/* Streaming status change? */
@@ -52,6 +53,7 @@
 #define SND_DG00X_OFFSET_UNKNOWN5	0x0124	/* 0x00/0x01 */
 
 /* DSP control: 0x0300 - 0x038c */
+
 enum snd_dg00x_engine_direction {
 	SND_DG00X_ENGINE_DIRECTION_TX = 0,
 	SND_DG00X_ENGINE_DIRECTION_RX,
@@ -65,6 +67,10 @@ struct snd_dg00x_engine {
 	unsigned int source_node_id_field;
 	struct iso_packets_buffer buffer;
 	unsigned int packet_index;
+
+	unsigned int sfc;
+	unsigned int pcm_data_channels;
+	unsigned int midi_data_channels;
 
 	bool callbacked;
 	wait_queue_head_t callback_wait;
@@ -82,13 +88,13 @@ struct snd_dg00x {
 	struct mutex mutexhw;
 	spinlock_t lockhw;
 
-	struct snd_dg00x_engine tx_engine;
-	struct snd_dg00x_engine rx_engine;
-	struct snd_dg00x_engine *master;
-	atomic_t substreams;
-
+	struct amdtp_stream tx_stream;
 	struct fw_iso_resources tx_resources;
+
+	struct snd_dg00x_engine rx_engine;
 	struct fw_iso_resources rx_resources;
+
+	unsigned int substreams;
 
 	/* for uapi */
 	int dev_lock_count;
@@ -116,31 +122,32 @@ enum snd_dg00x_clock {
 	SND_DG00X_CLOCK_WORD,
 };
 
-/*
-int snd_dg00x_get_rate(struct snd_dg00x *dg00x, unsigned int *rate);
-int snd_dg00x_set_rate(struct snd_dg00x *dg00x, unsigned int rate);
-int snd_dg00x_get_clock(struct snd_dg00x *dg00x, enum snd_dg00x_clock *clock);
-*/
-
 extern const unsigned int snd_dg00x_stream_rates[SND_DG00x_RATE_COUNT];
+int snd_dg00x_stream_get_pcm_channels(unsigned int rate,
+				      unsigned int *channels);
+int snd_dg00x_stream_get_quadlets_per_packet(unsigned int rate,
+					     unsigned int *quadlets);
 int snd_dg00x_stream_get_rate(struct snd_dg00x *dg00x, unsigned int *rate);
 int snd_dg00x_stream_set_rate(struct snd_dg00x *dg00x, unsigned int rate);
 int snd_dg00x_stream_get_clock(struct snd_dg00x *dg00x,
 			       enum snd_dg00x_clock *clock);
 
-unsigned int snd_dg00x_engine_get_packet_size(struct snd_dg00x_engine *e);
+void snd_dg00x_engine_set_params(struct snd_dg00x_engine *engine,
+				 unsigned int rate,
+				 unsigned int pcm_data_channels,
+				 unsigned int midi_data_channels);
+unsigned int snd_dg00x_engine_get_payload_size(struct snd_dg00x_engine *engine);
 int snd_dg00x_engine_init(struct snd_dg00x *dg00x, struct snd_dg00x_engine *e);
-int snd_dg00x_engine_start(struct snd_dg00x *dg00x, struct snd_dg00x_engine *e);
-void snd_dg00x_engine_update(struct snd_dg00x_engine *e);
-void snd_dg00x_engine_stop(struct snd_dg00x_engine *e);
+int snd_dg00x_engine_start(struct snd_dg00x *dg00x, int channel, int speed,
+			   struct snd_dg00x_engine *engine);
+void snd_dg00x_engine_update(struct snd_dg00x_engine *engine);
+void snd_dg00x_engine_stop(struct snd_dg00x_engine *engine);
 void snd_dg00x_engine_destroy(struct snd_dg00x *dg00x,
-			      struct snd_dg00x_engine *e);
-bool snd_dg00x_engine_running(struct snd_dg00x_engine *e);
+			      struct snd_dg00x_engine *engine);
+bool snd_dg00x_engine_running(struct snd_dg00x_engine *engine);
 
 int snd_dg00x_stream_init_duplex(struct snd_dg00x *dg00x);
-int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x,
-				  struct snd_dg00x_engine *e,
-				  unsigned int rate);
+int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate);
 void snd_dg00x_stream_stop_duplex(struct snd_dg00x *dg00x);
 void snd_dg00x_stream_update_duplex(struct snd_dg00x *dg00x);
 void snd_dg00x_stream_destroy_duplex(struct snd_dg00x *dg00x);
@@ -154,11 +161,11 @@ int snd_dg00x_stream_lock_try(struct snd_dg00x *dg00x);
 void snd_dg00x_stream_lock_release(struct snd_dg00x *dg00x);
 
 void snd_dg00x_proc_init(struct snd_dg00x *dg00x);
+*/
 
 int snd_dg00x_create_midi_devices(struct snd_dg00x *dg00x);
 
 int snd_dg00x_create_pcm_devices(struct snd_dg00x *dg00x);
-*/
 
 int snd_dg00x_create_hwdep_device(struct snd_dg00x *dg00x);
 
