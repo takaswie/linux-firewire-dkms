@@ -17,7 +17,7 @@ const unsigned int snd_dg00x_stream_rates[SND_DG00X_RATE_COUNT] =
 };
 
 /* Multi Bit Linear Audio data channels for each sampling transfer frequency. */
-const static unsigned int mbla_data_channels[SND_DG00X_RATE_COUNT] = 
+const unsigned int snd_dg00x_stream_mbla_data_channels[SND_DG00X_RATE_COUNT] =
 {
 	/* Analog/ADAT/SPDIF */
 	[0] = (8 + 8 + 2),
@@ -160,7 +160,7 @@ static int keep_resources(struct snd_dg00x *dg00x, unsigned int rate)
 
 	/* Keep resources for out-stream. */
 	amdtp_stream_set_parameters(&dg00x->rx_stream, rate,
-				    mbla_data_channels[i], 1);
+				    snd_dg00x_stream_mbla_data_channels[i], 1);
 	err = fw_iso_resources_allocate(&dg00x->rx_resources,
 				amdtp_stream_get_max_payload(&dg00x->rx_stream),
 				fw_parent_device(dg00x->unit)->max_speed);
@@ -169,7 +169,7 @@ static int keep_resources(struct snd_dg00x *dg00x, unsigned int rate)
 
 	/* Keep resources for in-stream. */
 	amdtp_stream_set_parameters(&dg00x->tx_stream, rate,
-				    mbla_data_channels[i], 1);
+				    snd_dg00x_stream_mbla_data_channels[i], 1);
 	err = fw_iso_resources_allocate(&dg00x->tx_resources,
 				amdtp_stream_get_max_payload(&dg00x->tx_stream),
 				fw_parent_device(dg00x->unit)->max_speed);
@@ -270,7 +270,7 @@ int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate)
 	}
 
 	if (!amdtp_stream_running(&dg00x->rx_stream)) {
-		err = snd_dg00x_dot_start(&dg00x->rx_stream,
+		err = amdtp_stream_start(&dg00x->rx_stream,
 				dg00x->rx_resources.channel,
 				fw_parent_device(dg00x->unit)->max_speed);
 		if (err < 0)
@@ -282,7 +282,7 @@ error:
 	finish_session(dg00x);
 
 	amdtp_stream_stop(&dg00x->tx_stream);
-	snd_dg00x_dot_stop(&dg00x->rx_stream);
+	amdtp_stream_stop(&dg00x->rx_stream);
 	release_resources(dg00x);
 
 	return err;
@@ -296,7 +296,7 @@ void snd_dg00x_stream_stop_duplex(struct snd_dg00x *dg00x)
 	finish_session(dg00x);
 
 	amdtp_stream_stop(&dg00x->tx_stream);
-	snd_dg00x_dot_stop(&dg00x->rx_stream);
+	amdtp_stream_stop(&dg00x->rx_stream);
 
 	release_resources(dg00x);
 }

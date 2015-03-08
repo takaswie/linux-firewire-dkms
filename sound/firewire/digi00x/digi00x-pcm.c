@@ -18,17 +18,15 @@ static int hw_rule_rate(struct snd_pcm_hw_params *params,
 	struct snd_interval t = {
 		.min = UINT_MAX, .max = 0, .integer = 1,
 	};
-	unsigned int i, rate, pcm_channels;
+	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(snd_dg00x_stream_rates); i++) {
-		rate = snd_dg00x_stream_rates[i];
-		if (!snd_dg00x_stream_get_pcm_channels(rate, &pcm_channels) < 0)
-			continue;
-		if (!snd_interval_test(c, pcm_channels))
+	for (i = 0; i < SND_DG00X_RATE_COUNT; i++) {
+		if (!snd_interval_test(c,
+				       snd_dg00x_stream_mbla_data_channels[i]))
 			continue;
 
-		t.min = min(t.min, rate);
-		t.max = max(t.max, rate);
+		t.min = min(t.min, snd_dg00x_stream_rates[i]);
+		t.max = max(t.max, snd_dg00x_stream_rates[i]);
 	}
 
 	return snd_interval_refine(r, &t);
@@ -44,17 +42,14 @@ static int hw_rule_channels(struct snd_pcm_hw_params * params,
 	struct snd_interval t = {
 		.min = UINT_MAX, .max = 0, .integer = 1,
 	};
-	unsigned int i, rate, pcm_channels;
+	unsigned int i;
 
-	for (i = 0; i < ARRAY_SIZE(snd_dg00x_stream_rates); i++) {
-		rate = snd_dg00x_stream_rates[i];
-		if (snd_dg00x_stream_get_pcm_channels(rate, &pcm_channels) < 0)
-			continue;
-		if (!snd_interval_test(r, rate))
+	for (i = 0; i < SND_DG00X_RATE_COUNT; i++) {
+		if (!snd_interval_test(r, snd_dg00x_stream_rates[i]))
 			continue;
 
-		t.min = min(t.min, pcm_channels);
-		t.max = max(t.max, pcm_channels);
+		t.min = min(t.min, snd_dg00x_stream_mbla_data_channels[i]);
+		t.max = max(t.max, snd_dg00x_stream_mbla_data_channels[i]);
 	}
 
 	return snd_interval_refine(c, &t);

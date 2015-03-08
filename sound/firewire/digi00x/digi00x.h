@@ -114,6 +114,8 @@ enum snd_dg00x_clock {
 };
 
 extern const unsigned int snd_dg00x_stream_rates[SND_DG00X_RATE_COUNT];
+extern const unsigned int
+snd_dg00x_stream_mbla_data_channels[SND_DG00X_RATE_COUNT];
 int snd_dg00x_stream_get_pcm_channels(unsigned int rate,
 				      unsigned int *channels);
 int snd_dg00x_stream_get_quadlets_per_packet(unsigned int rate,
