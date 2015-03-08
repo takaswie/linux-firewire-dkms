@@ -53,10 +53,6 @@
 
 /* DSP control: 0x0300 - 0x038c */
 
-enum snd_dg00x_engine_direction {
-	SND_DG00X_ENGINE_DIRECTION_TX = 0,
-	SND_DG00X_ENGINE_DIRECTION_RX,
-};
 struct snd_dg00x_engine {
 	struct fw_unit *unit;
 	int direction;
@@ -83,14 +79,10 @@ struct snd_dg00x {
 	struct mutex mutex;
 	spinlock_t lock;
 
-	/* TODO? */
-	struct mutex mutexhw;
-	spinlock_t lockhw;
-
 	struct amdtp_stream tx_stream;
 	struct fw_iso_resources tx_resources;
 
-	struct snd_dg00x_engine rx_engine;
+	struct amdtp_stream rx_stream;
 	struct fw_iso_resources rx_resources;
 
 	unsigned int substreams;
@@ -110,7 +102,7 @@ enum snd_dg00x_rate {
 	SND_DG00X_RATE_48000,
 	SND_DG00X_RATE_88200,
 	SND_DG00X_RATE_96000,
-	SND_DG00x_RATE_COUNT,
+	SND_DG00X_RATE_COUNT,
 };
 
 /* values for SND_DG00X_ADDR_OFFSET_CLOCK */
@@ -121,7 +113,7 @@ enum snd_dg00x_clock {
 	SND_DG00X_CLOCK_WORD,
 };
 
-extern const unsigned int snd_dg00x_stream_rates[SND_DG00x_RATE_COUNT];
+extern const unsigned int snd_dg00x_stream_rates[SND_DG00X_RATE_COUNT];
 int snd_dg00x_stream_get_pcm_channels(unsigned int rate,
 				      unsigned int *channels);
 int snd_dg00x_stream_get_quadlets_per_packet(unsigned int rate,
@@ -131,19 +123,10 @@ int snd_dg00x_stream_set_rate(struct snd_dg00x *dg00x, unsigned int rate);
 int snd_dg00x_stream_get_clock(struct snd_dg00x *dg00x,
 			       enum snd_dg00x_clock *clock);
 
-void snd_dg00x_engine_set_params(struct snd_dg00x_engine *engine,
-				 unsigned int rate,
-				 unsigned int pcm_data_channels,
-				 unsigned int midi_data_channels);
-unsigned int snd_dg00x_engine_get_payload_size(struct snd_dg00x_engine *engine);
-int snd_dg00x_engine_init(struct snd_dg00x *dg00x, struct snd_dg00x_engine *e);
-int snd_dg00x_engine_start(struct snd_dg00x *dg00x, int channel, int speed,
-			   struct snd_dg00x_engine *engine);
-void snd_dg00x_engine_update(struct snd_dg00x_engine *engine);
-void snd_dg00x_engine_stop(struct snd_dg00x_engine *engine);
-void snd_dg00x_engine_destroy(struct snd_dg00x *dg00x,
-			      struct snd_dg00x_engine *engine);
-bool snd_dg00x_engine_running(struct snd_dg00x_engine *engine);
+int snd_dg00x_dot_start(struct amdtp_stream *s, int channel, int speed);
+void snd_dg00x_dot_stop(struct amdtp_stream *s);
+int snd_dg00x_dot_init(struct amdtp_stream *s, struct fw_unit *unit);
+void snd_dg00x_dot_destroy(struct amdtp_stream *s);
 
 int snd_dg00x_stream_init_duplex(struct snd_dg00x *dg00x);
 int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate);

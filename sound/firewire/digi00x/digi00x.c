@@ -151,9 +151,7 @@ static int snd_dg00x_probe(struct fw_unit *unit,
 	err = snd_dg00x_create_hwdep_device(dg00x);
 	if (err < 0)
 		goto error;
-/*
-	snd_dg00x_proc_init(dg00x);
-*/
+
 	err = snd_dg00x_create_midi_devices(dg00x);
 	if (err < 0)
 		goto error;
@@ -161,11 +159,11 @@ static int snd_dg00x_probe(struct fw_unit *unit,
 	err = snd_dg00x_create_pcm_devices(dg00x);
 	if (err < 0)
 		goto error;
-/*
+
 	err = snd_dg00x_stream_init_duplex(dg00x);
 	if (err < 0)
 		goto error;
-*/
+
 	err = snd_card_register(card);
 	if (err < 0)
 		goto error;

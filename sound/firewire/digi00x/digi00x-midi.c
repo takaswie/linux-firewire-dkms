@@ -70,14 +70,14 @@ static void midi_capture_trigger(struct snd_rawmidi_substream *substrm, int up)
 	unsigned long flags;
 
 	spin_lock_irqsave(&dg00x->lock, flags);
-/*
+
 	if (up)
 		amdtp_stream_midi_trigger(&dg00x->tx_stream,
 					  substrm->number, substrm);
 	else
 		amdtp_stream_midi_trigger(&dg00x->tx_stream,
 					  substrm->number, NULL);
-*/
+
 	spin_unlock_irqrestore(&dg00x->lock, flags);
 }
 
@@ -87,14 +87,14 @@ static void midi_playback_trigger(struct snd_rawmidi_substream *substrm, int up)
 	unsigned long flags;
 
 	spin_lock_irqsave(&dg00x->lock, flags);
-/*
+
 	if (up)
 		amdtp_stream_midi_trigger(&dg00x->rx_stream,
 					  substrm->number, substrm);
 	else
 		amdtp_stream_midi_trigger(&dg00x->rx_stream,
 					  substrm->number, NULL);
-*/
+
 	spin_unlock_irqrestore(&dg00x->lock, flags);
 }
 

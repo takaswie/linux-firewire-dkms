@@ -1,3 +1,11 @@
+/*
+ * digi00x-pcm.c - a part of driver for Digidesign Digi 002/003 family
+ *
+ * Copyright (c) 2015 Takashi Sakamoto
+ *
+ * Licensed under the terms of the GNU General Public License, version 2.
+ */
+
 #include "digi00x.h"
 
 static int hw_rule_rate(struct snd_pcm_hw_params *params,
@@ -151,8 +159,8 @@ static int pcm_capture_hw_params(struct snd_pcm_substream *substream,
 		dg00x->substreams++;
 		mutex_unlock(&dg00x->mutex);
 	}
-//	amdtp_stream_set_pcm_format(&dg00x->tx_stream,
-//				    params_format(hw_params));
+	amdtp_stream_set_pcm_format(&dg00x->tx_stream,
+				    params_format(hw_params));
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
 						params_buffer_bytes(hw_params));
 }
@@ -166,8 +174,8 @@ static int pcm_playback_hw_params(struct snd_pcm_substream *substream,
 		dg00x->substreams++;
 		mutex_unlock(&dg00x->mutex);
 	}
-//	amdtp_stream_set_pcm_format(&dg00x->tx_stream,
-//				    params_format(hw_params));
+	amdtp_stream_set_pcm_format(&dg00x->tx_stream,
+				    params_format(hw_params));
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
 						params_buffer_bytes(hw_params));
 }
@@ -209,9 +217,13 @@ static int pcm_capture_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
 
+	mutex_lock(&dg00x->mutex);
+
 	err = snd_dg00x_stream_start_duplex(dg00x, runtime->rate);
-//	if (err >= 0)
-//		amdtp_stream_pcm_prepare(&dg00x->tx_stream);
+	if (err >= 0)
+		amdtp_stream_pcm_prepare(&dg00x->tx_stream);
+
+	mutex_unlock(&dg00x->mutex);
 
 	return err;
 }
@@ -221,9 +233,13 @@ static int pcm_playback_prepare(struct snd_pcm_substream *substream)
 	struct snd_pcm_runtime *runtime = substream->runtime;
 	int err;
 
+	mutex_lock(&dg00x->mutex);
+
 	err = snd_dg00x_stream_start_duplex(dg00x, runtime->rate);
-//	if (err >= 0)
-//		amdtp_stream_pcm_prepare(&dg00x->rx_stream);
+	if (err >= 0)
+		amdtp_stream_pcm_prepare(&dg00x->rx_stream);
+
+	mutex_unlock(&dg00x->mutex);
 
 	return err;
 }
@@ -234,10 +250,10 @@ static int pcm_capture_trigger(struct snd_pcm_substream *substream, int cmd)
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-//		amdtp_stream_pcm_trigger(&dg00x->tx_stream, substream);
+		amdtp_stream_pcm_trigger(&dg00x->tx_stream, substream);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-//		amdtp_stream_pcm_trigger(&dg00x->tx_stream, NULL);
+		amdtp_stream_pcm_trigger(&dg00x->tx_stream, NULL);
 		break;
 	default:
 		return -EINVAL;
@@ -251,10 +267,10 @@ static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-//		amdtp_stream_pcm_trigger(&dg00x->rx_stream, substream);
+		amdtp_stream_pcm_trigger(&dg00x->rx_stream, substream);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-//		amdtp_stream_pcm_trigger(&dg00x->rx_stream, NULL);
+		amdtp_stream_pcm_trigger(&dg00x->rx_stream, NULL);
 		break;
 	default:
 		return -EINVAL;
@@ -266,13 +282,13 @@ static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 static snd_pcm_uframes_t pcm_capture_pointer(struct snd_pcm_substream *sbstrm)
 {
 	struct snd_dg00x *dg00x = sbstrm->private_data;
-//	return amdtp_stream_pcm_pointer(&dg00x->tx_stream);
+	return amdtp_stream_pcm_pointer(&dg00x->tx_stream);
 	return 0;
 }
 static snd_pcm_uframes_t pcm_playback_pointer(struct snd_pcm_substream *sbstrm)
 {
 	struct snd_dg00x *dg00x = sbstrm->private_data;
-//	return amdtp_stream_pcm_pointer(&dg00x->rx_stream);
+	return amdtp_stream_pcm_pointer(&dg00x->rx_stream);
 	return 0;
 }
 
