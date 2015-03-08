@@ -30,7 +30,6 @@
 //#include <sound/firewire.h>
 #include <sound/hwdep.h>
 
-#include "digimagic.h"
 #include "../packets-buffer.h"
 #include "../iso-resources.h"
 #include "../lib.h"
