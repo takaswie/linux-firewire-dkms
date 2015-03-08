@@ -1,12 +1,14 @@
 /*
  * digi00x-stream.c - a part of driver for Digidesign Digi 002/003 family
  *
- * Copyright (c) 2014 Takashi Sakamoto
+ * Copyright (c) 2015 Takashi Sakamoto
  *
  * Licensed under the terms of the GNU General Public License, version 2.
  */
 
 #include "digi00x.h"
+
+#define CALLBACK_TIMEOUT 500
 
 const unsigned int snd_dg00x_stream_rates[SND_DG00X_RATE_COUNT] =
 {
@@ -283,6 +285,12 @@ int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate)
 		if (err < 0)
 			goto error;
 	}
+
+	if (!amdtp_stream_wait_callback(&dg00x->tx_stream, CALLBACK_TIMEOUT) ||
+	    !amdtp_stream_wait_callback(&dg00x->rx_stream, CALLBACK_TIMEOUT)) {
+			err = -ETIMEDOUT;
+			goto error;
+	}
 end:
 	return err;
 error:
@@ -308,6 +316,7 @@ void snd_dg00x_stream_stop_duplex(struct snd_dg00x *dg00x)
 	release_resources(dg00x);
 }
 
+/* TODO: investigation. */
 void snd_dg00x_stream_update_duplex(struct snd_dg00x *dg00x)
 {
 	fw_iso_resources_update(&dg00x->tx_resources);

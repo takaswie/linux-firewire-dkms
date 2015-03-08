@@ -281,13 +281,11 @@ static snd_pcm_uframes_t pcm_capture_pointer(struct snd_pcm_substream *sbstrm)
 {
 	struct snd_dg00x *dg00x = sbstrm->private_data;
 	return amdtp_stream_pcm_pointer(&dg00x->tx_stream);
-	return 0;
 }
 static snd_pcm_uframes_t pcm_playback_pointer(struct snd_pcm_substream *sbstrm)
 {
 	struct snd_dg00x *dg00x = sbstrm->private_data;
 	return amdtp_stream_pcm_pointer(&dg00x->rx_stream);
-	return 0;
 }
 
 static struct snd_pcm_ops pcm_capture_ops = {
@@ -321,14 +319,14 @@ int snd_dg00x_create_pcm_devices(struct snd_dg00x *dg00x)
 
 	err = snd_pcm_new(dg00x->card, dg00x->card->driver, 0, 1, 1, &pcm);
 	if (err < 0)
-		goto end;
+		return err;
 
 	pcm->private_data = dg00x;
 	snprintf(pcm->name, sizeof(pcm->name),
 		 "%s PCM", dg00x->card->shortname);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_PLAYBACK, &pcm_playback_ops);
 	snd_pcm_set_ops(pcm, SNDRV_PCM_STREAM_CAPTURE, &pcm_capture_ops);
-end:
-	return err;
+
+	return 0;
 }
 

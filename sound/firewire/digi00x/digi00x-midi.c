@@ -1,3 +1,11 @@
+/*
+ * digi00x-midi.h - a part of driver for Digidesign Digi 002/003 family
+ *
+ * Copyright (c) 2015 Takashi Sakamoto
+ *
+ * Licensed under the terms of the GNU General Public License, version 2.
+ */
+
 #include "digi00x.h"
 
 static int midi_capture_open(struct snd_rawmidi_substream *substream)
@@ -7,7 +15,7 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 
 	err = snd_dg00x_stream_lock_try(dg00x);
 	if (err < 0)
-		goto end;
+		return err;
 
 	mutex_lock(&dg00x->mutex);
 	dg00x->substreams++;
@@ -15,7 +23,7 @@ static int midi_capture_open(struct snd_rawmidi_substream *substream)
 	mutex_unlock(&dg00x->mutex);
 	if (err < 0)
 		snd_dg00x_stream_lock_release(dg00x);
-end:
+
 	return err;
 }
 
@@ -26,7 +34,7 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 
 	err = snd_dg00x_stream_lock_try(dg00x);
 	if (err < 0)
-		goto end;
+		return err;
 
 	mutex_lock(&dg00x->mutex);
 	dg00x->substreams++;
@@ -34,7 +42,7 @@ static int midi_playback_open(struct snd_rawmidi_substream *substream)
 	mutex_unlock(&dg00x->mutex);
 	if (err < 0)
 		snd_dg00x_stream_lock_release(dg00x);
-end:
+
 	return err;
 }
 

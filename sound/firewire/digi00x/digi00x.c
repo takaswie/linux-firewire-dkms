@@ -1,7 +1,7 @@
 /*
  * digi00x.c - a part of driver for Digidesign Digi 002/003 family
  *
- * Copyright (c) 2014 Takashi Sakamoto
+ * Copyright (c) 2015 Takashi Sakamoto
  *
  * Licensed under the terms of the GNU General Public License, version 2.
  */
@@ -25,7 +25,6 @@ static void handle_message(struct fw_card *card, struct fw_request *request,
 
 	rcode = RCODE_COMPLETE;
 
-	/* NOTE: offset may be one of 0x00 or 0x08. */
 	snd_printk(KERN_INFO"%08llx: %08x\n", offset, be32_to_cpu(*buf));
 
 	fw_send_response(card, request, rcode);
@@ -88,12 +87,12 @@ static int name_card(struct snd_dg00x *dg00x)
 	err = fw_csr_string(dg00x->unit->directory, CSR_MODEL, name,
 			    sizeof(name));
 	if (err < 0)
-		goto end;
+		return err;
 
 	model = name;
 	if (model[0] == ' ')
 		model = strchr(model, ' ') + 1;
-	
+
 	strcpy(dg00x->card->driver, "Digi00x");
 	strcpy(dg00x->card->shortname, model);
 	strcpy(dg00x->card->mixername, model);
@@ -102,8 +101,8 @@ static int name_card(struct snd_dg00x *dg00x)
 		 cpu_to_be32(fw_dev->config_rom[3]),
 		 cpu_to_be32(fw_dev->config_rom[4]),
 		 dev_name(&dg00x->unit->device), 100 << fw_dev->max_speed);
-end:
-	return err;
+
+	return 0;
 }
 
 static void dg00x_card_free(struct snd_card *card)
@@ -143,19 +142,15 @@ static int snd_dg00x_probe(struct fw_unit *unit,
 	spin_lock_init(&dg00x->lock);
 	init_waitqueue_head(&dg00x->hwdep_wait);
 
-	err = snd_dg00x_message_register(dg00x);
-	if (err < 0)
-		goto error;
-
 	err = name_card(dg00x);
 	if (err < 0)
 		goto error;
 
-	err = snd_dg00x_create_hwdep_device(dg00x);
+	err = snd_dg00x_message_register(dg00x);
 	if (err < 0)
 		goto error;
 
-	err = snd_dg00x_create_midi_devices(dg00x);
+	err = snd_dg00x_stream_init_duplex(dg00x);
 	if (err < 0)
 		goto error;
 
@@ -163,7 +158,11 @@ static int snd_dg00x_probe(struct fw_unit *unit,
 	if (err < 0)
 		goto error;
 
-	err = snd_dg00x_stream_init_duplex(dg00x);
+	err = snd_dg00x_create_midi_devices(dg00x);
+	if (err < 0)
+		goto error;
+
+	err = snd_dg00x_create_hwdep_device(dg00x);
 	if (err < 0)
 		goto error;
 

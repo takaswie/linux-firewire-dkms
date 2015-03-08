@@ -1,7 +1,7 @@
 /*
  * digi00x-hwdep.c - a part of driver for Digidesign Digi 002/003 family
  *
- * Copyright (c) 2014 Takashi Sakamoto
+ * Copyright (c) 2015 Takashi Sakamoto
  *
  * Licensed under the terms of the GNU General Public License, version 2.
  */
@@ -16,9 +16,8 @@
 
 #include "digi00x.h"
 
-static long
-hwdep_read(struct snd_hwdep *hwdep, char __user *buf,  long count,
-	   loff_t *offset)
+static long hwdep_read(struct snd_hwdep *hwdep, char __user *buf,  long count,
+		       loff_t *offset)
 {
 	struct snd_dg00x *dg00x = hwdep->private_data;
 	DEFINE_WAIT(wait);
@@ -53,8 +52,8 @@ hwdep_read(struct snd_hwdep *hwdep, char __user *buf,  long count,
 	return count;
 }
 
-static unsigned int
-hwdep_poll(struct snd_hwdep *hwdep, struct file *file, poll_table *wait)
+static unsigned int hwdep_poll(struct snd_hwdep *hwdep, struct file *file,
+			       poll_table *wait)
 {
 	struct snd_dg00x *dg00x = hwdep->private_data;
 	unsigned int events;
@@ -71,8 +70,7 @@ hwdep_poll(struct snd_hwdep *hwdep, struct file *file, poll_table *wait)
 	return events;
 }
 
-static int
-hwdep_get_info(struct snd_dg00x *dg00x, void __user *arg)
+static int hwdep_get_info(struct snd_dg00x *dg00x, void __user *arg)
 {
 	struct fw_device *dev = fw_parent_device(dg00x->unit);
 	struct snd_firewire_get_info info;
@@ -91,8 +89,7 @@ hwdep_get_info(struct snd_dg00x *dg00x, void __user *arg)
 	return 0;
 }
 
-static int
-hwdep_lock(struct snd_dg00x *dg00x)
+static int hwdep_lock(struct snd_dg00x *dg00x)
 {
 	int err;
 
@@ -110,8 +107,7 @@ hwdep_lock(struct snd_dg00x *dg00x)
 	return err;
 }
 
-static int
-hwdep_unlock(struct snd_dg00x *dg00x)
+static int hwdep_unlock(struct snd_dg00x *dg00x)
 {
 	int err;
 
@@ -129,8 +125,7 @@ hwdep_unlock(struct snd_dg00x *dg00x)
 	return err;
 }
 
-static int
-hwdep_release(struct snd_hwdep *hwdep, struct file *file)
+static int hwdep_release(struct snd_hwdep *hwdep, struct file *file)
 {
 	struct snd_dg00x *dg00x = hwdep->private_data;
 
@@ -142,8 +137,7 @@ hwdep_release(struct snd_hwdep *hwdep, struct file *file)
 	return 0;
 }
 
-static int
-hwdep_ioctl(struct snd_hwdep *hwdep, struct file *file,
+static int hwdep_ioctl(struct snd_hwdep *hwdep, struct file *file,
 	    unsigned int cmd, unsigned long arg)
 {
 	struct snd_dg00x *dg00x = hwdep->private_data;
@@ -161,9 +155,8 @@ hwdep_ioctl(struct snd_hwdep *hwdep, struct file *file,
 }
 
 #ifdef CONFIG_COMPAT
-static int
-hwdep_compat_ioctl(struct snd_hwdep *hwdep, struct file *file,
-		   unsigned int cmd, unsigned long arg)
+static int hwdep_compat_ioctl(struct snd_hwdep *hwdep, struct file *file,
+			      unsigned int cmd, unsigned long arg)
 {
 	return hwdep_ioctl(hwdep, file, cmd,
 			   (unsigned long)compat_ptr(arg));
@@ -187,12 +180,13 @@ int snd_dg00x_create_hwdep_device(struct snd_dg00x *dg00x)
 
 	err = snd_hwdep_new(dg00x->card, "Digi00x", 0, &hwdep);
 	if (err < 0)
-		goto end;
+		return err;
+
 	strcpy(hwdep->name, "Digi00x");
 	hwdep->iface = SNDRV_HWDEP_IFACE_FW_DIGI00X;
 	hwdep->ops = hwdep_ops;
 	hwdep->private_data = dg00x;
 	hwdep->exclusive = true;
-end:
+
 	return err;
 }
