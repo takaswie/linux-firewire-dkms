@@ -26,7 +26,7 @@ static void handle_message(struct fw_card *card, struct fw_request *request,
 	rcode = RCODE_COMPLETE;
 
 	/* NOTE: offset may be one of 0x00 or 0x08. */
-	snd_printk(KERN_INFO"%08lld: %08x\n", offset, be32_to_cpu(*buf));
+	snd_printk(KERN_INFO"%08llx: %08x\n", offset, be32_to_cpu(*buf));
 
 	fw_send_response(card, request, rcode);
 }
@@ -44,6 +44,7 @@ static int snd_dg00x_message_register(struct snd_dg00x *dg00x)
 		.start	= 0xffff00000000ull,
 		.end	= 0xffff0000ffffull,
 	};
+	struct fw_device *device = fw_parent_device(dg00x->unit);
 	__be32 data[2];
 	int err;
 
@@ -57,7 +58,8 @@ static int snd_dg00x_message_register(struct snd_dg00x *dg00x)
 		goto end;
 
 	/* Unknown. */
-	data[0] = cpu_to_be32(dg00x->message_handler.offset >> 32);
+	data[0] = cpu_to_be32((device->card->node_id << 16) |
+			      (dg00x->message_handler.offset >> 32));
 	data[1] = cpu_to_be32(dg00x->message_handler.offset);
 	err = snd_fw_transaction(dg00x->unit, TCODE_WRITE_BLOCK_REQUEST,
 				 0xffffe0000008ull, &data, sizeof(data), 0);
@@ -65,8 +67,9 @@ static int snd_dg00x_message_register(struct snd_dg00x *dg00x)
 		goto end;
 
 	/* For 0x7051/0x7058 message. Unknown. */
-	data[0] = cpu_to_be32(dg00x->message_handler.offset >> 32);
-	data[1] = cpu_to_be32(dg00x->message_handler.offset);
+	data[0] = cpu_to_be32((device->card->node_id << 16) |
+			      (dg00x->message_handler.offset >> 32));
+	data[1] = cpu_to_be32(dg00x->message_handler.offset + 4);
 	err = snd_fw_transaction(dg00x->unit, TCODE_WRITE_BLOCK_REQUEST,
 				 0xffffe0000014ull, &data, sizeof(data), 0);
 end:
@@ -180,7 +183,9 @@ static void snd_dg00x_update(struct fw_unit *unit)
 {
 	struct snd_dg00x *dg00x = dev_get_drvdata(&unit->device);
 
+	mutex_lock(&dg00x->mutex);
 	snd_dg00x_stream_update_duplex(dg00x);
+	mutex_unlock(&dg00x->mutex);
 }
 
 static void snd_dg00x_remove(struct fw_unit *unit)
@@ -196,7 +201,8 @@ static const struct ieee1394_device_id snd_dg00x_id_table[] =
 {
 	/* Both of 002/003 use the same ID. */
 	{
-		.match_flags = IEEE1394_MATCH_VENDOR_ID, 
+		.match_flags = IEEE1394_MATCH_VENDOR_ID |
+			       IEEE1394_MATCH_MODEL_ID,
 		.vendor_id = VENDOR_DIGIDESIGN,
 		.model_id = MODEL_DIGI00X,
 	},

@@ -99,8 +99,7 @@ static int begin_session(struct snd_dg00x *dg00x)
 	err = snd_fw_transaction(dg00x->unit,
 				 TCODE_READ_QUADLET_REQUEST,
 			 	 0xffffe0000000ull,
-				 &data, sizeof(data),
-				 FW_FIXED_GENERATION);
+				 &data, sizeof(data), 0);
 	if (err < 0)
 		goto error;
 	curr = be32_to_cpu(data);
@@ -114,8 +113,7 @@ static int begin_session(struct snd_dg00x *dg00x)
 		err = snd_fw_transaction(dg00x->unit,
 					 TCODE_WRITE_QUADLET_REQUEST,
 					 0xffffe0000004ull,
-					 &data, sizeof(data),
-					 FW_FIXED_GENERATION);
+					 &data, sizeof(data), 0);
 		if (err < 0)
 			goto error;
 
@@ -146,7 +144,7 @@ static void release_resources(struct snd_dg00x *dg00x)
 
 static int keep_resources(struct snd_dg00x *dg00x, unsigned int rate)
 {
-	unsigned int i;
+	unsigned int i, p;
 	__be32 data;
 	int err;
 
@@ -165,7 +163,7 @@ static int keep_resources(struct snd_dg00x *dg00x, unsigned int rate)
 				amdtp_stream_get_max_payload(&dg00x->rx_stream),
 				fw_parent_device(dg00x->unit)->max_speed);
 	if (err < 0)
-		goto error;
+		return err;
 
 	/* Keep resources for in-stream. */
 	amdtp_stream_set_parameters(&dg00x->tx_stream, rate,
@@ -177,13 +175,20 @@ static int keep_resources(struct snd_dg00x *dg00x, unsigned int rate)
 		goto error;
 
 	/* Register isochronous channels for both direction. */
-	data = cpu_to_be32((dg00x->rx_resources.channel << 16) |
-			   dg00x->tx_resources.channel);
+	data = cpu_to_be32((dg00x->tx_resources.channel << 16) |
+			   dg00x->rx_resources.channel);
 	err = snd_fw_transaction(dg00x->unit, TCODE_WRITE_QUADLET_REQUEST,
-				 0xffffe0000100ull, &data, sizeof(data),
-				 FW_FIXED_GENERATION);
+				 0xffffe0000100ull, &data, sizeof(data), 0);
 	if (err < 0)
 		goto error;
+
+	/* The first data channel in a packet is for MIDI conformant data. */
+	for (p = 0; p < snd_dg00x_stream_mbla_data_channels[i]; p++) {
+		dg00x->rx_stream.pcm_positions[p] = p + 1;
+		dg00x->tx_stream.pcm_positions[p] = p + 1;
+	}
+	dg00x->rx_stream.midi_position = 0;
+	dg00x->tx_stream.midi_position = 0;
 
 	return 0;
 error:
@@ -195,20 +200,19 @@ int snd_dg00x_stream_init_duplex(struct snd_dg00x *dg00x)
 {
 	int err;
 
-	/* For transmit stream. */
+	/* For out-stream. */
 	err = fw_iso_resources_init(&dg00x->rx_resources, dg00x->unit);
 	if (err < 0)
 		return err;
-	/* This stream is handled by doubleOhTree protocol, not by amdtp. */
 	err = amdtp_stream_init(&dg00x->rx_stream, dg00x->unit,
-				AMDTP_OUT_STREAM, 0);
+				AMDTP_OUT_STREAM, CIP_NONBLOCKING);
 
-	/* For receive stream. */
-	err = fw_iso_resources_init(&dg00x->rx_resources, dg00x->unit);
+	/* For in-stream. */
+	err = fw_iso_resources_init(&dg00x->tx_resources, dg00x->unit);
 	if (err < 0)
 		return err;
 	err = amdtp_stream_init(&dg00x->tx_stream, dg00x->unit,
-				AMDTP_OUT_STREAM,
+				AMDTP_IN_STREAM,
 				CIP_BLOCKING | CIP_SKIP_INIT_DBC_CHECK);
 	if (err < 0)
 		amdtp_stream_destroy(&dg00x->rx_stream);
@@ -241,6 +245,9 @@ int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate)
 	err = snd_dg00x_stream_get_rate(dg00x, &curr_rate);
 	if (err < 0)
 		goto error;
+	/* For MIDI substreams. */
+	if (rate == 0)
+		rate = curr_rate;
 	if (curr_rate != rate) {
 		finish_session(dg00x);
 
@@ -254,11 +261,11 @@ int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate)
 		if (err < 0)
 			goto end;
 
-		err = begin_session(dg00x);
+		err = keep_resources(dg00x, rate);
 		if (err < 0)
 			goto end;
 
-		err = keep_resources(dg00x, rate);
+		err = begin_session(dg00x);
 		if (err < 0)
 			goto end;
 
@@ -303,11 +310,11 @@ void snd_dg00x_stream_stop_duplex(struct snd_dg00x *dg00x)
 
 void snd_dg00x_stream_update_duplex(struct snd_dg00x *dg00x)
 {
-	amdtp_stream_update(&dg00x->tx_stream);
-	amdtp_stream_update(&dg00x->rx_stream);
-
 	fw_iso_resources_update(&dg00x->tx_resources);
 	fw_iso_resources_update(&dg00x->rx_resources);
+
+	amdtp_stream_update(&dg00x->tx_stream);
+	amdtp_stream_update(&dg00x->rx_stream);
 }
 
 void snd_dg00x_stream_lock_changed(struct snd_dg00x *dg00x)
