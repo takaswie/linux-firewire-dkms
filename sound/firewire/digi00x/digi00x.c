@@ -115,8 +115,6 @@ static void dg00x_card_free(struct snd_card *card)
 	fw_unit_put(dg00x->unit);
 
 	mutex_destroy(&dg00x->mutex);
-
-	return;
 }
 
 static int snd_dg00x_probe(struct fw_unit *unit,

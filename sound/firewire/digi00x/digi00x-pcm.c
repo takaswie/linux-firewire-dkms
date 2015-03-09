@@ -32,7 +32,7 @@ static int hw_rule_rate(struct snd_pcm_hw_params *params,
 	return snd_interval_refine(r, &t);
 }
 
-static int hw_rule_channels(struct snd_pcm_hw_params * params,
+static int hw_rule_channels(struct snd_pcm_hw_params *params,
 			    struct snd_pcm_hw_rule *rule)
 {
 	struct snd_interval *c =
@@ -143,7 +143,9 @@ err_locked:
 static int pcm_close(struct snd_pcm_substream *substream)
 {
 	struct snd_dg00x *dg00x = substream->private_data;
+
 	snd_dg00x_stream_lock_release(dg00x);
+
 	return 0;
 }
 
@@ -280,11 +282,13 @@ static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 static snd_pcm_uframes_t pcm_capture_pointer(struct snd_pcm_substream *sbstrm)
 {
 	struct snd_dg00x *dg00x = sbstrm->private_data;
+
 	return amdtp_stream_pcm_pointer(&dg00x->tx_stream);
 }
 static snd_pcm_uframes_t pcm_playback_pointer(struct snd_pcm_substream *sbstrm)
 {
 	struct snd_dg00x *dg00x = sbstrm->private_data;
+
 	return amdtp_stream_pcm_pointer(&dg00x->rx_stream);
 }
 

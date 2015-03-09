@@ -10,8 +10,7 @@
 
 #define CALLBACK_TIMEOUT 500
 
-const unsigned int snd_dg00x_stream_rates[SND_DG00X_RATE_COUNT] =
-{
+const unsigned int snd_dg00x_stream_rates[SND_DG00X_RATE_COUNT] = {
 	[0] = 44100,
 	[1] = 48000,
 	[2] = 88200,
@@ -19,8 +18,8 @@ const unsigned int snd_dg00x_stream_rates[SND_DG00X_RATE_COUNT] =
 };
 
 /* Multi Bit Linear Audio data channels for each sampling transfer frequency. */
-const unsigned int snd_dg00x_stream_mbla_data_channels[SND_DG00X_RATE_COUNT] =
-{
+const unsigned int
+snd_dg00x_stream_mbla_data_channels[SND_DG00X_RATE_COUNT] = {
 	/* Analog/ADAT/SPDIF */
 	[0] = (8 + 8 + 2),
 	[1] = (8 + 8 + 2),
@@ -85,19 +84,10 @@ int snd_dg00x_stream_get_clock(struct snd_dg00x *dg00x,
 	return err;
 }
 
-int snd_dg00x_stream_set_clock(struct snd_dg00x *dg00x,
-			       enum snd_dg00x_clock clock)
-{
-	__be32 data;
-
-	data = cpu_to_be32(clock);
-	return snd_fw_transaction(dg00x->unit, TCODE_WRITE_QUADLET_REQUEST,
-				  0xffffe0000118ull, &data, sizeof(data), 0);
-}
-
 static void finish_session(struct snd_dg00x *dg00x)
 {
 	__be32 data = cpu_to_be32(0x00000003);
+
 	snd_fw_transaction(dg00x->unit, TCODE_WRITE_QUADLET_REQUEST,
 			   0xffffe0000004ull, &data, sizeof(data), 0);
 }
@@ -110,7 +100,7 @@ static int begin_session(struct snd_dg00x *dg00x)
 
 	err = snd_fw_transaction(dg00x->unit,
 				 TCODE_READ_QUADLET_REQUEST,
-			 	 0xffffe0000000ull,
+				 0xffffe0000000ull,
 				 &data, sizeof(data), 0);
 	if (err < 0)
 		goto error;
@@ -129,7 +119,7 @@ static int begin_session(struct snd_dg00x *dg00x)
 		if (err < 0)
 			goto error;
 
-		msleep(10);
+		msleep(20);
 		curr--;
 	}
 
@@ -261,7 +251,7 @@ int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate)
 	/* For MIDI substreams. */
 	if (rate == 0)
 		rate = curr_rate;
-	if ((curr_rate != rate) |
+	if (curr_rate != rate |
 	    !amdtp_streaming_error(&dg00x->tx_stream) |
 	    !amdtp_streaming_error(&dg00x->rx_stream)) {
 		finish_session(dg00x);
@@ -336,7 +326,6 @@ void snd_dg00x_stream_stop_duplex(struct snd_dg00x *dg00x)
 
 	if (dg00x->playback_substreams > 0)
 		return;
-
 	finish_session(dg00x);
 	amdtp_stream_stop(&dg00x->rx_stream);
 	release_resources(dg00x);
