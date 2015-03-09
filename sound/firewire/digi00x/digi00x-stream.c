@@ -85,6 +85,16 @@ int snd_dg00x_stream_get_clock(struct snd_dg00x *dg00x,
 	return err;
 }
 
+int snd_dg00x_stream_set_clock(struct snd_dg00x *dg00x,
+			       enum snd_dg00x_clock clock)
+{
+	__be32 data;
+
+	data = cpu_to_be32(clock);
+	return snd_fw_transaction(dg00x->unit, TCODE_WRITE_QUADLET_REQUEST,
+				  0xffffe0000118ull, &data, sizeof(data), 0);
+}
+
 static void finish_session(struct snd_dg00x *dg00x)
 {
 	__be32 data = cpu_to_be32(0x00000003);
@@ -240,7 +250,8 @@ int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate)
 	unsigned int curr_rate;
 	int err = 0;
 
-	if (dg00x->substreams == 0)
+	if (dg00x->playback_substreams == 0 &&
+	    dg00x->capture_substreams == 0)
 		goto end;
 
 	/* Check current sampling rate. */
@@ -250,7 +261,9 @@ int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate)
 	/* For MIDI substreams. */
 	if (rate == 0)
 		rate = curr_rate;
-	if (curr_rate != rate) {
+	if ((curr_rate != rate) |
+	    !amdtp_streaming_error(&dg00x->tx_stream) |
+	    !amdtp_streaming_error(&dg00x->rx_stream)) {
 		finish_session(dg00x);
 
 		amdtp_stream_stop(&dg00x->tx_stream);
@@ -258,38 +271,50 @@ int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate)
 		release_resources(dg00x);
 	}
 
-	if (!amdtp_stream_running(&dg00x->tx_stream)) {
+	/* No streams are transmitted without receiving a stream. */
+	if (!amdtp_stream_running(&dg00x->rx_stream)) {
 		err = snd_dg00x_stream_set_rate(dg00x, rate);
 		if (err < 0)
-			goto end;
+			goto error;
 
 		err = keep_resources(dg00x, rate);
 		if (err < 0)
-			goto end;
+			goto error;
 
 		err = begin_session(dg00x);
 		if (err < 0)
-			goto end;
-
-		err = amdtp_stream_start(&dg00x->tx_stream,
-				dg00x->tx_resources.channel,
-				fw_parent_device(dg00x->unit)->max_speed);
-		if (err < 0)
 			goto error;
-	}
 
-	if (!amdtp_stream_running(&dg00x->rx_stream)) {
 		err = amdtp_stream_start(&dg00x->rx_stream,
 				dg00x->rx_resources.channel,
 				fw_parent_device(dg00x->unit)->max_speed);
 		if (err < 0)
 			goto error;
-	}
 
-	if (!amdtp_stream_wait_callback(&dg00x->tx_stream, CALLBACK_TIMEOUT) ||
-	    !amdtp_stream_wait_callback(&dg00x->rx_stream, CALLBACK_TIMEOUT)) {
+		if (!amdtp_stream_wait_callback(&dg00x->rx_stream,
+						CALLBACK_TIMEOUT)) {
 			err = -ETIMEDOUT;
 			goto error;
+		}
+	}
+
+	/*
+	 * The value of SYT field in transmitted packets is always 0x0000. Thus,
+	 * duplex streams with timestamp synchronization cannot be built.
+	 */
+	if (dg00x->capture_substreams > 0 &&
+	    !amdtp_stream_running(&dg00x->tx_stream)) {
+		err = amdtp_stream_start(&dg00x->tx_stream,
+				dg00x->tx_resources.channel,
+				fw_parent_device(dg00x->unit)->max_speed);
+		if (err < 0)
+			goto error;
+
+		if (!amdtp_stream_wait_callback(&dg00x->tx_stream,
+						CALLBACK_TIMEOUT)) {
+			err = -ETIMEDOUT;
+			goto error;
+		}
 	}
 end:
 	return err;
@@ -305,14 +330,15 @@ error:
 
 void snd_dg00x_stream_stop_duplex(struct snd_dg00x *dg00x)
 {
-	if (dg00x->substreams > 0)
+	if (dg00x->capture_substreams > 0)
+		return;
+	amdtp_stream_stop(&dg00x->tx_stream);
+
+	if (dg00x->playback_substreams > 0)
 		return;
 
 	finish_session(dg00x);
-
-	amdtp_stream_stop(&dg00x->tx_stream);
 	amdtp_stream_stop(&dg00x->rx_stream);
-
 	release_resources(dg00x);
 }
 

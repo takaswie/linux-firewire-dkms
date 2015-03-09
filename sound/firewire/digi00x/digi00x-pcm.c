@@ -154,7 +154,7 @@ static int pcm_capture_hw_params(struct snd_pcm_substream *substream,
 
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN) {
 		mutex_lock(&dg00x->mutex);
-		dg00x->substreams++;
+		dg00x->capture_substreams++;
 		mutex_unlock(&dg00x->mutex);
 	}
 	amdtp_stream_set_pcm_format(&dg00x->tx_stream,
@@ -169,7 +169,7 @@ static int pcm_playback_hw_params(struct snd_pcm_substream *substream,
 
 	if (substream->runtime->status->state == SNDRV_PCM_STATE_OPEN) {
 		mutex_lock(&dg00x->mutex);
-		dg00x->substreams++;
+		dg00x->playback_substreams++;
 		mutex_unlock(&dg00x->mutex);
 	}
 	amdtp_stream_set_pcm_format(&dg00x->rx_stream,
@@ -185,7 +185,7 @@ static int pcm_capture_hw_free(struct snd_pcm_substream *substream)
 	mutex_lock(&dg00x->mutex);
 
 	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
-		dg00x->substreams--;
+		dg00x->capture_substreams--;
 
 	snd_dg00x_stream_stop_duplex(dg00x);
 
@@ -200,7 +200,7 @@ static int pcm_playback_hw_free(struct snd_pcm_substream *substream)
 	mutex_lock(&dg00x->mutex);
 
 	if (substream->runtime->status->state != SNDRV_PCM_STATE_OPEN)
-		dg00x->substreams--;
+		dg00x->playback_substreams--;
 
 	snd_dg00x_stream_stop_duplex(dg00x);
 

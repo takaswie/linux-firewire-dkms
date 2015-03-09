@@ -196,8 +196,7 @@ static void snd_dg00x_remove(struct fw_unit *unit)
 }
 
 
-static const struct ieee1394_device_id snd_dg00x_id_table[] =
-{
+static const struct ieee1394_device_id snd_dg00x_id_table[] = {
 	/* Both of 002/003 use the same ID. */
 	{
 		.match_flags = IEEE1394_MATCH_VENDOR_ID |

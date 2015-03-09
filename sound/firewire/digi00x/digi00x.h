@@ -51,7 +51,8 @@ struct snd_dg00x {
 	struct amdtp_stream rx_stream;
 	struct fw_iso_resources rx_resources;
 
-	unsigned int substreams;
+	unsigned int playback_substreams;
+	unsigned int capture_substreams;
 
 	/* for uapi */
 	int dev_lock_count;
