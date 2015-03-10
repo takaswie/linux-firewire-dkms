@@ -251,7 +251,7 @@ int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate)
 	/* For MIDI substreams. */
 	if (rate == 0)
 		rate = curr_rate;
-	if (curr_rate != rate |
+	if ((curr_rate != rate) |
 	    !amdtp_streaming_error(&dg00x->tx_stream) |
 	    !amdtp_streaming_error(&dg00x->rx_stream)) {
 		finish_session(dg00x);
