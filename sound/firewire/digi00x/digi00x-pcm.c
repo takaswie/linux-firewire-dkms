@@ -98,12 +98,14 @@ static int pcm_init_hw_params(struct snd_dg00x *dg00x,
 	if (err < 0)
 		goto end;
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
 		err = amdtp_stream_add_pcm_hw_constraints(&dg00x->tx_stream,
 							  substream->runtime);
-	else
+	} else {
+		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S16,
 		err = amdtp_stream_add_pcm_hw_constraints(&dg00x->rx_stream,
 							  substream->runtime);
+	}
 end:
 	return err;
 }
@@ -174,8 +176,8 @@ static int pcm_playback_hw_params(struct snd_pcm_substream *substream,
 		dg00x->playback_substreams++;
 		mutex_unlock(&dg00x->mutex);
 	}
-	amdtp_stream_set_pcm_format(&dg00x->rx_stream,
-				    params_format(hw_params));
+	/* Apply doubleOhThree algorism to multiplex PCM samples. */
+	dg00x->rx_stream.transfer_samples = double_oh_three_write_s32;
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
 						params_buffer_bytes(hw_params));
 }
