@@ -174,8 +174,8 @@ static int pcm_playback_hw_params(struct snd_pcm_substream *substream,
 		dg00x->playback_substreams++;
 		mutex_unlock(&dg00x->mutex);
 	}
-	/* Apply doubleOhThree algorism to multiplex PCM samples. */
-	dg00x->rx_stream.transfer_samples = double_oh_three_write_s32;
+	amdtp_stream_set_pcm_format(&dg00x->rx_stream,
+				    params_format(hw_params));
 	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
 						params_buffer_bytes(hw_params));
 }

@@ -119,3 +119,51 @@ void double_oh_three_write_s32(struct amdtp_stream *s,
 			src = (void *)runtime->dma_area;
 	}
 }
+
+void double_oh_three_fill_midi(struct amdtp_stream *s,
+			       __be32 *buffer, unsigned int frames)
+{
+	unsigned int f, port;
+	u8 *b;
+
+	for (f = 0; f < frames; f++) {
+		port = (s->data_block_counter + f) % 4;
+		b = (u8 *)&buffer[s->midi_position];
+
+		/*
+		 * The device allows to transfer MIDI messages by maximum two
+		 * bytes per data channel. But this module transfers one byte
+		 * one time because MIDI data rate is quite lower than IEEE
+		 * 1394 bus data rate.
+		 */
+		if (amdtp_midi_ratelimit_per_packet(s, port) &&
+		    s->midi[port] != NULL &&
+		    snd_rawmidi_transmit(s->midi[port], &b[1], 1) == 1) {
+			amdtp_midi_rate_use_one_byte(s, port);
+			b[3] = 0x01 | (0x10 << port);
+		} else {
+			b[1] = 0;
+			b[3] = 0;
+		}
+		b[0] = 0x80;
+		b[2] = 0;
+
+		buffer += s->data_block_quadlets;
+	}
+}
+
+void double_oh_three_pull_midi(struct amdtp_stream *s,
+			       __be32 *buffer, unsigned int frames)
+{
+	unsigned int f;
+	u8 *b;
+
+	for (f = 0; f < frames; f++) {
+		b = (u8 *)&buffer[s->midi_position];
+
+		if (s->midi[0] && (b[3] > 0))
+			snd_rawmidi_receive(s->midi[0], b + 1, b[3]);
+
+		buffer += s->data_block_quadlets;
+	}
+}

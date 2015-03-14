@@ -97,6 +97,10 @@ void snd_dg00x_stream_lock_release(struct snd_dg00x *dg00x);
 void double_oh_three_write_s32(struct amdtp_stream *s,
 			       struct snd_pcm_substream *pcm,
 			       __be32 *buffer, unsigned int frames);
+void double_oh_three_fill_midi(struct amdtp_stream *s,
+			       __be32 *buffer, unsigned int frames);
+void double_oh_three_pull_midi(struct amdtp_stream *s,
+			       __be32 *buffer, unsigned int frames);
 
 int snd_dg00x_create_pcm_devices(struct snd_dg00x *dg00x);
 

@@ -137,7 +137,7 @@ int snd_dg00x_create_midi_devices(struct snd_dg00x *dg00x)
 	int err;
 
 	err = snd_rawmidi_new(dg00x->card, dg00x->card->driver, 0,
-			      1, 2, &rmidi);
+			      2, 1, &rmidi);
 	if (err < 0)
 		return err;
 

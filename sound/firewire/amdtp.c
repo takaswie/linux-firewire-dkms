@@ -72,6 +72,10 @@
 
 static void pcm_period_tasklet(unsigned long data);
 
+static void amdtp_fill_midi(struct amdtp_stream *s,
+			    __be32 *buffer, unsigned int frames);
+static void amdtp_pull_midi(struct amdtp_stream *s,
+			    __be32 *buffer, unsigned int frames);
 /**
  * amdtp_stream_init - initialize an AMDTP stream structure
  * @s: the AMDTP stream to initialize
@@ -494,7 +498,7 @@ static void amdtp_fill_pcm_silence(struct amdtp_stream *s,
  * fractional values, the values in midi_fifo_used[] are measured in bytes
  * multiplied by the sample rate.
  */
-static bool midi_ratelimit_per_packet(struct amdtp_stream *s, unsigned int port)
+bool amdtp_midi_ratelimit_per_packet(struct amdtp_stream *s, unsigned int port)
 {
 	int used;
 
@@ -508,11 +512,13 @@ static bool midi_ratelimit_per_packet(struct amdtp_stream *s, unsigned int port)
 
 	return used < s->midi_fifo_limit;
 }
+EXPORT_SYMBOL(amdtp_midi_ratelimit_per_packet);
 
-static void midi_rate_use_one_byte(struct amdtp_stream *s, unsigned int port)
+void amdtp_midi_rate_use_one_byte(struct amdtp_stream *s, unsigned int port)
 {
 	s->midi_fifo_used[port] += amdtp_rate_table[s->sfc];
 }
+EXPORT_SYMBOL(amdtp_midi_rate_use_one_byte);
 
 static void amdtp_fill_midi(struct amdtp_stream *s,
 			    __be32 *buffer, unsigned int frames)
@@ -525,10 +531,10 @@ static void amdtp_fill_midi(struct amdtp_stream *s,
 
 		port = (s->data_block_counter + f) % 8;
 		if (f < MAX_MIDI_RX_BLOCKS &&
-		    midi_ratelimit_per_packet(s, port) &&
+		    amdtp_midi_ratelimit_per_packet(s, port) &&
 		    s->midi[port] != NULL &&
 		    snd_rawmidi_transmit(s->midi[port], &b[1], 1) == 1) {
-			midi_rate_use_one_byte(s, port);
+			amdtp_midi_rate_use_one_byte(s, port);
 			b[0] = 0x81;
 		} else {
 			b[0] = 0x80;
@@ -666,7 +672,7 @@ static void handle_out_packet(struct amdtp_stream *s, unsigned int syt)
 	else
 		amdtp_fill_pcm_silence(s, buffer, data_blocks);
 	if (s->midi_ports)
-		amdtp_fill_midi(s, buffer, data_blocks);
+		s->transfer_midi(s, buffer, data_blocks);
 
 	s->data_block_counter = (s->data_block_counter + data_blocks) & 0xff;
 
@@ -764,7 +770,7 @@ static void handle_in_packet(struct amdtp_stream *s,
 			s->transfer_samples(s, pcm, buffer, data_blocks);
 
 		if (s->midi_ports)
-			amdtp_pull_midi(s, buffer, data_blocks);
+			s->transfer_midi(s, buffer, data_blocks);
 	}
 
 	if (s->flags & CIP_DBC_IS_END_EVENT)
@@ -928,6 +934,14 @@ int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed)
 	s->data_block_state = initial_state[s->sfc].data_block;
 	s->syt_offset_state = initial_state[s->sfc].syt_offset;
 	s->last_syt_offset = TICKS_PER_CYCLE;
+
+	/* Confirm MIDI callback function. */
+	if (s->transfer_midi == NULL) {
+		if (s->direction == AMDTP_OUT_STREAM)
+			s->transfer_midi = amdtp_fill_midi;
+		else
+			s->transfer_midi = amdtp_pull_midi;
+	}
 
 	/* initialize packet buffer */
 	if (s->direction == AMDTP_IN_STREAM) {

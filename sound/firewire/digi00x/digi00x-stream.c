@@ -160,7 +160,7 @@ static int keep_resources(struct snd_dg00x *dg00x, unsigned int rate)
 
 	/* Keep resources for out-stream. */
 	amdtp_stream_set_parameters(&dg00x->rx_stream, rate,
-				    snd_dg00x_stream_mbla_data_channels[i], 1);
+				    snd_dg00x_stream_mbla_data_channels[i], 2);
 	err = fw_iso_resources_allocate(&dg00x->rx_resources,
 				amdtp_stream_get_max_payload(&dg00x->rx_stream),
 				fw_parent_device(dg00x->unit)->max_speed);
@@ -191,6 +191,11 @@ static int keep_resources(struct snd_dg00x *dg00x, unsigned int rate)
 	}
 	dg00x->rx_stream.midi_position = 0;
 	dg00x->tx_stream.midi_position = 0;
+
+	/* Apply doubleOhThree algorism. */
+	dg00x->rx_stream.transfer_samples = double_oh_three_write_s32;
+	dg00x->rx_stream.transfer_midi = double_oh_three_fill_midi;
+	dg00x->tx_stream.transfer_midi = double_oh_three_pull_midi;
 
 	return 0;
 error:

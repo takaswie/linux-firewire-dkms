@@ -124,6 +124,8 @@ struct amdtp_stream {
 				 struct snd_pcm_substream *pcm,
 				 __be32 *buffer, unsigned int frames);
 	u8 pcm_positions[AMDTP_MAX_CHANNELS_FOR_PCM];
+	void (*transfer_midi)(struct amdtp_stream *s,
+			      __be32 *buffer, unsigned int frame);
 	u8 midi_position;
 
 	unsigned int syt_interval;
@@ -184,6 +186,9 @@ void amdtp_stream_pcm_abort(struct amdtp_stream *s);
 
 extern const unsigned int amdtp_syt_intervals[CIP_SFC_COUNT];
 extern const unsigned int amdtp_rate_table[CIP_SFC_COUNT];
+
+bool amdtp_midi_ratelimit_per_packet(struct amdtp_stream *s, unsigned int port);
+void amdtp_midi_rate_use_one_byte(struct amdtp_stream *s, unsigned int port);
 
 /**
  * amdtp_stream_running - check stream is running or not
