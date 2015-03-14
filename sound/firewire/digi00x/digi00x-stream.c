@@ -140,8 +140,6 @@ static void release_resources(struct snd_dg00x *dg00x)
 	/* Release isochronous resources. */
 	fw_iso_resources_free(&dg00x->tx_resources);
 	fw_iso_resources_free(&dg00x->rx_resources);
-
-	msleep(300);
 }
 
 static int keep_resources(struct snd_dg00x *dg00x, unsigned int rate)
