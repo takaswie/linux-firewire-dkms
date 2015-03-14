@@ -98,14 +98,12 @@ static int pcm_init_hw_params(struct snd_dg00x *dg00x,
 	if (err < 0)
 		goto end;
 
-	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE) {
+	if (substream->stream == SNDRV_PCM_STREAM_CAPTURE)
 		err = amdtp_stream_add_pcm_hw_constraints(&dg00x->tx_stream,
 							  substream->runtime);
-	} else {
-		substream->runtime->hw.formats = SNDRV_PCM_FMTBIT_S16,
+	else
 		err = amdtp_stream_add_pcm_hw_constraints(&dg00x->rx_stream,
 							  substream->runtime);
-	}
 end:
 	return err;
 }
