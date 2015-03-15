@@ -38,6 +38,7 @@ struct snd_dg00x {
 	struct snd_card *card;
 	struct fw_unit *unit;
 	int card_index;
+	unsigned int clock;
 
 	struct mutex mutex;
 	spinlock_t lock;
@@ -75,15 +76,17 @@ enum snd_dg00x_clock {
 	SND_DG00X_CLOCK_SPDIF,
 	SND_DG00X_CLOCK_ADAT,
 	SND_DG00X_CLOCK_WORD,
+	SND_DG00X_CLOCK_COUNT,
 };
 
 extern const unsigned int snd_dg00x_stream_rates[SND_DG00X_RATE_COUNT];
+extern const unsigned int snd_dg00x_stream_clocks[SND_DG00X_CLOCK_COUNT];
 extern const unsigned int
 snd_dg00x_stream_mbla_data_channels[SND_DG00X_RATE_COUNT];
 int snd_dg00x_stream_get_rate(struct snd_dg00x *dg00x, unsigned int *rate);
 int snd_dg00x_stream_set_rate(struct snd_dg00x *dg00x, unsigned int rate);
-int snd_dg00x_stream_get_clock(struct snd_dg00x *dg00x,
-			       enum snd_dg00x_clock *clock);
+int snd_dg00x_stream_get_clock(struct snd_dg00x *dg00x, unsigned int *clock);
+int snd_dg00x_stream_set_clock(struct snd_dg00x *dg00x, unsigned int clock);
 int snd_dg00x_stream_init_duplex(struct snd_dg00x *dg00x);
 int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate);
 void snd_dg00x_stream_stop_duplex(struct snd_dg00x *dg00x);
@@ -103,6 +106,8 @@ void double_oh_three_pull_midi(struct amdtp_stream *s,
 			       __be32 *buffer, unsigned int frames);
 
 int snd_dg00x_create_pcm_devices(struct snd_dg00x *dg00x);
+
+int snd_dg00x_create_mixer(struct snd_dg00x *dg00x);
 
 int snd_dg00x_create_midi_devices(struct snd_dg00x *dg00x);
 

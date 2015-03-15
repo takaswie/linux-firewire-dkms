@@ -17,6 +17,13 @@ const unsigned int snd_dg00x_stream_rates[SND_DG00X_RATE_COUNT] = {
 	[3] = 96000,
 };
 
+const unsigned int snd_dg00x_stream_clocks[SND_DG00X_CLOCK_COUNT] = {
+	[0] = SND_DG00X_CLOCK_INTERNAL,
+	[1] = SND_DG00X_CLOCK_SPDIF,
+	[2] = SND_DG00X_CLOCK_ADAT,
+	[3] = SND_DG00X_CLOCK_WORD,
+};
+
 /* Multi Bit Linear Audio data channels for each sampling transfer frequency. */
 const unsigned int
 snd_dg00x_stream_mbla_data_channels[SND_DG00X_RATE_COUNT] = {
@@ -66,8 +73,7 @@ int snd_dg00x_stream_set_rate(struct snd_dg00x *dg00x, unsigned int rate)
 				  0xffffe0000110ull, &data, sizeof(data), 0);
 }
 
-int snd_dg00x_stream_get_clock(struct snd_dg00x *dg00x,
-			       enum snd_dg00x_clock *clock)
+int snd_dg00x_stream_get_clock(struct snd_dg00x *dg00x, unsigned int *clock)
 {
 	__be32 data;
 	int err;
@@ -78,10 +84,27 @@ int snd_dg00x_stream_get_clock(struct snd_dg00x *dg00x,
 		return err;
 
 	*clock = be32_to_cpu(data) & 0x0f;
-	if (*clock >= ARRAY_SIZE(snd_dg00x_stream_rates))
+	if (*clock >= ARRAY_SIZE(snd_dg00x_stream_clocks))
 		err = -EIO;
 
 	return err;
+}
+
+int snd_dg00x_stream_set_clock(struct snd_dg00x *dg00x, unsigned int clock)
+{
+	__be32 data;
+	unsigned int i;
+
+	for (i = 0; i < ARRAY_SIZE(snd_dg00x_stream_clocks); i++) {
+		if (clock == snd_dg00x_stream_clocks[i])
+			break;
+	}
+	if (i == ARRAY_SIZE(snd_dg00x_stream_clocks))
+		return -EIO;
+
+	data = cpu_to_be32(i);
+	return snd_fw_transaction(dg00x->unit, TCODE_WRITE_QUADLET_REQUEST,
+				  0xffffe0000118ull, &data, sizeof(data), 0);
 }
 
 static void finish_session(struct snd_dg00x *dg00x)
@@ -190,7 +213,7 @@ static int keep_resources(struct snd_dg00x *dg00x, unsigned int rate)
 	dg00x->rx_stream.midi_position = 0;
 	dg00x->tx_stream.midi_position = 0;
 
-	/* Apply doubleOhThree algorism. */
+	/* Apply doubleOhThree algorithm. */
 	dg00x->rx_stream.transfer_samples = double_oh_three_write_s32;
 	dg00x->rx_stream.transfer_midi = double_oh_three_fill_midi;
 	dg00x->tx_stream.transfer_midi = double_oh_three_pull_midi;
@@ -241,6 +264,7 @@ void snd_dg00x_stream_destroy_duplex(struct snd_dg00x *dg00x)
 int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate)
 {
 	unsigned int curr_rate;
+	unsigned int curr_clock;
 	int err = 0;
 
 	if (dg00x->playback_substreams == 0 &&
@@ -267,6 +291,10 @@ int snd_dg00x_stream_start_duplex(struct snd_dg00x *dg00x, unsigned int rate)
 	/* No streams are transmitted without receiving a stream. */
 	if (!amdtp_stream_running(&dg00x->rx_stream)) {
 		err = snd_dg00x_stream_set_rate(dg00x, rate);
+		if (err < 0)
+			goto error;
+
+		err = snd_dg00x_stream_set_clock(dg00x, dg00x->clock);
 		if (err < 0)
 			goto error;
 
