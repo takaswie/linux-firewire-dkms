@@ -15,6 +15,9 @@ export CONFIG_SND_OXFW=m
 all:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
+check: clean
+	$(MAKE) C=2 -Wall -C $(KDIR) M=$(PWD) modules
+
 install:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules_install
 
