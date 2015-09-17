@@ -11,7 +11,6 @@
 #include <linux/firewire.h>
 #include <linux/module.h>
 #include <linux/slab.h>
-#include <linux/sched.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/rawmidi.h>
@@ -82,9 +81,11 @@ static void pcm_period_tasklet(unsigned long data);
  * @unit: the target of the stream
  * @dir: the direction of stream
  * @flags: the packet transmission method to use
+ * @fmt: the value of fmt field in CIP header
  */
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
-		      enum amdtp_stream_direction dir, enum cip_flags flags)
+		      enum amdtp_stream_direction dir, enum cip_flags flags,
+		      unsigned int fmt)
 {
 	s->unit = unit;
 	s->direction = dir;
@@ -98,7 +99,7 @@ int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
 	s->callbacked = false;
 	s->sync_slave = NULL;
 
-	s->fmt = CIP_FMT_AM;
+	s->fmt = fmt;
 
 	return 0;
 }
