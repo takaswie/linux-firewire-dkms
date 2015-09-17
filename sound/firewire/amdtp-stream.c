@@ -15,7 +15,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/rawmidi.h>
-#include "amdtp.h"
+#include "amdtp-stream.h"
 
 /* TODO: remove when merging to upstream. */
 #include "../../backport.h"
