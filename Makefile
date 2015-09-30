@@ -17,7 +17,7 @@ all:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules
 
 check: clean
-	$(MAKE) C=2 -Wall -C $(KDIR) M=$(PWD) modules
+	$(MAKE) C=1 CF=-D__CHECK_ENDIAN_ -C $(KDIR) M=$(PWD) modules
 
 install:
 	$(MAKE) -C $(KDIR) M=$(PWD) modules_install
