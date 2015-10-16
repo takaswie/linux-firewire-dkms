@@ -12,6 +12,9 @@
 #include <linux/slab.h>
 #include "lib.h"
 
+/* TODO: remove when merging to upstream. */
+#include "../../backport.h"
+
 #define ERROR_RETRY_DELAY_MS	20
 
 /**

@@ -25,7 +25,7 @@
 #include <sound/info.h>
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
-#include <sound/firewire.h>
+//#include <sound/firewire.h>
 #include <sound/hwdep.h>
 #include <sound/rawmidi.h>
 

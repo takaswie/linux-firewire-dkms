@@ -33,6 +33,12 @@ static inline int snd_card_new(struct device *parent, int idx, const char *xid,
 		(*card_ret)->dev = parent;
 	return err;
 }
+
+/* commit 67cb9366ff5f99868100198efba5ca88aaa6ad25 */
+static inline bool ktime_after(const ktime_t cmp1, const ktime_t cmp2)
+{
+	return ktime_compare(cmp1, cmp2) > 0;
+}
 #endif
 
 /* commit 16735d022f72b20ddbb2274b8e109f69575e9b2b */
