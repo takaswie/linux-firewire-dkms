@@ -1,45 +1,34 @@
-= Developing for snd-firewire-lib, snd-fireworks, snd-bebob, snd-dice and snd-oxfw =
+= Developing for ALSA firewire stack =
 
-2014/10/22 坂本 貴史
+2015/12/21 坂本 貴史
 Takashi Sakamoto <o-takashi@sakamocchi.jp>
 
 == General ==
 
-This repository is a test for my patch candidates for ALSA firewire stack.
-You can install my snd-firewire-lib, snd-fireworks, snd-bebob and snd-oxfw by DKMS.
+ALSA, Linux sound subsystem, includes packet streaming engine and device
+drivers for audio and music units on IEEE 1394 bus. This software stack
+is called as ALSA firewire stack.
 
+This repository is a test of my patch candidates for ALSA firewire stack.
+Currently, several modules are available by DKMS:
 
-== snd-firewire-lib, snd-bebob, snd-fireworks, snd-dice and snd-oxfw ==
-
-They are device drivers utilize Advanced Linux Sound Architecture (ALSA) and Linux
-Firewire Subsystem (so called "juju").
- - snd-bebob: for devices based on BridgeCo's chipset and BeBoB firmware
+Released and merged:
  - snd-fireworks: for devices based on Echo Audio's Fireworks module
- - snd-dice: for devices based on TC Applied Technologies DICE chipset family
+ - snd-bebob: for devices based on BridgeCo's chipset and BeBoB firmware
  - snd-oxfw: for devices based on Oxford Semiconductor OXFW970/971 chipset
+ - snd-dice: for devices based on TC Applied Technologies DICE chipset family
+ - snd-firewire-digi00x: for devices of Digidesign 002/003 family
+ - snd-firewire-tascam: for devices of TASCAM FireWire series
  - snd-firewire-lib: for helper functions of AMDTP/CMP/FCP and AV/C commands
 
-There is a project in user land, "FFADO".
-http://www.ffado.org/
+Under developing:
+ - snd-firewire-transceiver: enable packet streaming between Linux systems
+ - snd-fireface: for devices of RME Fireface series
+ - snd-firewire-motu: for devices of Mark of the Unicorn FireWire series
 
-My aim is implementing streaming functionality in ALSA, in kernel land.
-
-I test these drivers with:
- - snd-bebob: Yamaha GO44, GO46
- - snd-bebob: M-Audio Ozonic, Firewire Solo, Firewire Audiophile, Firewire 410,
- - snd-bebob: Firewire 1814
- - snd-fireworks: AudioFirePre8, AudioFire4
- - snd-dice: TC Electronic Impact Twin
- - snd-oxfw: Behringer F-Control 202
- - snd-oxfw: Griffin FireWave
-
-Some dedicated testers test these drivers with:
- - snd-bebob: Edirol FA-66 (great thanks to Fryderyk Dziarmagowski)
- - snd-bebob: Edirol FA_66 (great thanks to Daniel Wagner)
- - snd-bebob: BridgeCo Audio A5 (great thanks to Daniel Wagner)
- - snd-bebob: PreSonus FP10 (great thanks to David Henningsson)
- - snd-bebob: M-Audio ProjectMix I/O (great thanks to Darren Anderson)
- - snd-bebob: Terratec PHASE X24 FW (great thanks to Maximilian Engelhardt)
+My aim is implementing streaming functionality in ALSA, in kernel land. The
+other functionalities are out of the aim and should be implemented in
+userspace applications.
 
 
 == Requirement ==
@@ -51,8 +40,25 @@ Some dedicated testers test these drivers with:
 
  - Capture/playback of PCM/MIDI is supported at any sampling rate, any clock source
  - HWDEP interface is supported for mixer control application
+ - Model dependent functionalities which requires help of kernel space
 
-== Easy instraction with DKMS ==
+
+== Bug repots  ==
+
+Linux 3.16 or later already includes snd-bebob and snd-fireworks.
+Linux 3.19 or later includes snd-oxfw and updates of snd-dice.
+Linux 4.4 includes snd-firewire-digi00x and snd-firewire-tascam.
+
+Any bug reports should be sent to alsa-devel to share with users and developers.
+http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
+
+
+== Resources ==
+You can see my report about this developing:
+https://github.com/takaswie/alsa-firewire-report
+
+
+== Easy instruction with DKMS ==
 
 DKMS - Dynamic Kernel Module Support is easy for installing or updating external modules.
 http://linux.dell.com/dkms/
@@ -78,29 +84,5 @@ Uninstall
 3. $ rm /usr/src/alsa-firewire-3.11 (superuser)
 4. $ rm snd-firewire-improve
 
-== Bug repots  ==
 
-Linux 3.16 or later already includes snd-bebob and snd-fireworks, thus any bug reports
-should be sent to alsa-devel.
-
-http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
-
-I add proc interface to help debug. Please send the output to me with your
-experience.
-
-snd-bebob:
- - /proc/asound/cardX/#firmware
- - /proc/asound/cardX/#formation
- - /proc/asound/cardX/#clock
- - /proc/asound/cardX/#meter (if the device has)
-
-snd-fireworks:
- - /proc/asound/cardX/#firmware
- - /proc/asound/cardX/#clock
- - /proc/asound/cardX/#meters
-
-snd-dice:
- - /proc/asound/cardX/dice
-
-snd-oxfw:
- - /proc/asound/cardX/#formation
+End
