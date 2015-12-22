@@ -7,7 +7,6 @@ PWD := $(shell pwd)
 export CONFIG_SND_FIREWIRE_LIB=m
 export CONFIG_SND_DICE=m
 export CONFIG_SND_ISIGHT=m
-export CONFIG_SND_SCS1X=m
 export CONFIG_SND_BEBOB=m
 export CONFIG_SND_FIREWORKS=m
 export CONFIG_SND_OXFW=m
