@@ -18,6 +18,7 @@ struct snd_fwtx {
 	struct delayed_work dwork;
 
 	struct mutex mutex;
+	spinlock_t lock;
 
 	struct cmp_connection out_conn[OHCI1394_MIN_RX_CTX];
 	struct amdtp_stream tx_stream[OHCI1394_MIN_RX_CTX];
@@ -30,3 +31,5 @@ void snd_fwtx_stream_update_simplex(struct snd_fwtx *fwtx);
 int snd_fwtx_stream_start_simplex(struct snd_fwtx *fwtx, int index,
 				  unsigned int rate);
 void snd_fwtx_stream_stop_simplex(struct snd_fwtx *fwtx, int index);
+
+int snd_fwtx_create_midi_devices(struct snd_fwtx *fwtx);

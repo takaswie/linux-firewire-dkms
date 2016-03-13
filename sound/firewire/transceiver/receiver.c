@@ -42,6 +42,10 @@ static void do_registration(struct work_struct *work)
 		goto error;
 	strcpy(fwtx->card->driver, "FW-Receiver");
 
+	err = snd_fwtx_create_midi_devices(fwtx);
+	if (err < 0)
+		goto error;
+
 	err = snd_card_register(fwtx->card);
 	if (err < 0)
 		goto error;
@@ -87,6 +91,7 @@ int snd_fwtx_probe(struct fw_unit *unit)
 	dev_set_drvdata(&unit->device, fwtx);
 
 	mutex_init(&fwtx->mutex);
+	spin_lock_init(&fwtx->lock);
 
 	err = snd_fwtx_stream_init_simplex(fwtx);
 	if (err < 0)
