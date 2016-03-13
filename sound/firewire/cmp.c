@@ -14,29 +14,6 @@
 #include "iso-resources.h"
 #include "cmp.h"
 
-/* MPR common fields */
-#define MPR_SPEED_MASK		0xc0000000
-#define MPR_SPEED_SHIFT		30
-#define MPR_XSPEED_MASK		0x00000060
-#define MPR_XSPEED_SHIFT	5
-#define MPR_PLUGS_MASK		0x0000001f
-
-/* PCR common fields */
-#define PCR_ONLINE		0x80000000
-#define PCR_BCAST_CONN		0x40000000
-#define PCR_P2P_CONN_MASK	0x3f000000
-#define PCR_P2P_CONN_SHIFT	24
-#define PCR_CHANNEL_MASK	0x003f0000
-#define PCR_CHANNEL_SHIFT	16
-
-/* oPCR specific fields */
-#define OPCR_XSPEED_MASK	0x00C00000
-#define OPCR_XSPEED_SHIFT	22
-#define OPCR_SPEED_MASK		0x0000C000
-#define OPCR_SPEED_SHIFT	14
-#define OPCR_OVERHEAD_ID_MASK	0x00003C00
-#define OPCR_OVERHEAD_ID_SHIFT	10
-
 enum bus_reset_handling {
 	ABORT_ON_BUS_RESET,
 	SUCCEED_ON_BUS_RESET,
