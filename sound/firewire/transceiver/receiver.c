@@ -12,6 +12,8 @@
 
 static void fwtx_free(struct snd_fwtx *fwtx)
 {
+	snd_fwtx_stream_destroy_simplex(fwtx);
+
 	mutex_destroy(&fwtx->mutex);
 	fw_unit_put(fwtx->unit);
 	kfree(fwtx);
@@ -74,6 +76,7 @@ static void schedule_registration(struct snd_fwtx *fwtx)
 int snd_fwtx_probe(struct fw_unit *unit)
 {
 	struct snd_fwtx *fwtx;
+	int err;
 
 	/* Allocate this independent of sound card instance. */
 	fwtx = kzalloc(sizeof(struct snd_fwtx), GFP_KERNEL);
@@ -84,6 +87,10 @@ int snd_fwtx_probe(struct fw_unit *unit)
 	dev_set_drvdata(&unit->device, fwtx);
 
 	mutex_init(&fwtx->mutex);
+
+	err = snd_fwtx_stream_init_simplex(fwtx);
+	if (err < 0)
+		return err;
 
 	/* Allocate and register this sound card later. */
 	INIT_DEFERRABLE_WORK(&fwtx->dwork, do_registration);
@@ -98,6 +105,9 @@ void snd_fwtx_update(struct fw_unit *unit)
 
 	if (!fwtx->registered)
 		schedule_registration(fwtx);
+
+	if (fwtx->registered)
+		snd_fwtx_stream_update_simplex(fwtx);
 }
 
 void snd_fwtx_remove(struct fw_unit *unit)
