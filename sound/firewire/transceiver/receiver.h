@@ -33,3 +33,4 @@ int snd_fwtx_stream_start_simplex(struct snd_fwtx *fwtx, int index,
 void snd_fwtx_stream_stop_simplex(struct snd_fwtx *fwtx, int index);
 
 int snd_fwtx_create_midi_devices(struct snd_fwtx *fwtx);
+int snd_fwtx_create_pcm_devices(struct snd_fwtx *fwtx);
