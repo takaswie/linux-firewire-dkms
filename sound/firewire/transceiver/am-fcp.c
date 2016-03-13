@@ -60,6 +60,51 @@ rejected:
 	frame[0] = 0x0a;
 }
 
+/*
+ * AV/C unit info command on
+ *  AV/C Digital Interface Command Set General Specification Version 4.2
+ */
+static void handle_avc_unit_info(struct fw_am_unit *am,
+				 u8* frame, unsigned int len)
+{
+	struct fw_device *fw_dev = fw_parent_device(am->unit);
+	struct fw_csr_iterator it;
+	int key, val;
+	u32 vendor_id;
+
+	if (frame[0] != 0x01)
+		goto rejected;
+	if (frame[1] != 0xff)
+		goto rejected;
+
+	vendor_id = 0;
+	fw_csr_iterator_init(&it, fw_dev->config_rom + 5);
+	while (fw_csr_iterator_next(&it, &key, &val)) {
+		if (key == CSR_VENDOR) {
+			vendor_id = val;
+			break;
+		}
+	}
+	if (vendor_id == 0)
+		goto not_implemented;
+
+	frame[0] = 0x0c;	/* Implemented/Status */
+	frame[1] = 0xff;	/* Unit */
+	frame[2] = 0x30;	/* Unit Info */
+	frame[3] = 0x07;	/* Fixed value */
+	frame[4] = (0x01 << 3);	/* Audio subunit */
+	frame[5] = (vendor_id >> 4) & 0xff;
+	frame[6] = (vendor_id >> 2) & 0xff;
+	frame[7] = vendor_id & 0xff;
+
+	return;
+rejected:
+	frame[0] = 0x0a;
+	return;
+not_implemented:
+	frame[0] = 0x08;
+}
+
 /* TODO: remove callback. */
 static void response_callback(struct fw_card *card, int rcode,
 			      void *payload, size_t length, void *data)
@@ -100,6 +145,9 @@ static void handle_request(struct work_struct *work)
 		switch (t->frame[2]) {
 		case 0x02:
 			handle_avc_plug_info(am, t->frame, t->size);
+			break;
+		case 0x30:	/* Unit info */
+			handle_avc_unit_info(am, t->frame, t->size);
 			break;
 		case 0x31:	/* Subunit info */
 		case 0x19:	/* Input signal format */
