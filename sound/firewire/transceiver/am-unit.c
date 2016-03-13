@@ -45,6 +45,10 @@ static void do_registration(struct work_struct *work)
 		goto error;
 	strcpy(am->card->driver, "FW-Transmitter");
 
+	err = fw_am_unit_create_midi_devices(am);
+	if (err < 0)
+		goto error;
+
 	err = snd_card_register(am->card);
 	if (err < 0)
 		goto error;
@@ -90,6 +94,7 @@ int fw_am_unit_probe(struct fw_unit *unit)
 	dev_set_drvdata(&unit->device, am);
 
 	mutex_init(&am->mutex);
+	spin_lock_init(&am->lock);
 
 	err = fw_am_unit_stream_init(am);
 	if (err < 0)

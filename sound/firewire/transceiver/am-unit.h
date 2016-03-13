@@ -14,6 +14,7 @@ struct fw_am_unit {
 	struct fw_unit *unit;
 
 	struct mutex mutex;
+	spinlock_t lock;
 
 	bool registered;
 	struct snd_card *card;
@@ -45,3 +46,5 @@ void fw_am_unit_cmp_unregister(struct fw_am_unit *am);
 int fw_am_unit_fcp_register(struct fw_am_unit *am);
 void fw_am_unit_fcp_update(struct fw_am_unit *am);
 void fw_am_unit_fcp_unregister(struct fw_am_unit *am);
+
+int fw_am_unit_create_midi_devices(struct fw_am_unit *unit);
