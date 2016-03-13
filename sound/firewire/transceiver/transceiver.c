@@ -27,6 +27,34 @@ MODULE_LICENSE("GPL v2");
 #define AM_UNIT_NAME_1		0x7820414c	/* x AL */
 #define AM_UNIT_NAME_2		0x53410000	/* SA.. */
 
+int snd_fwtxrx_name_card(struct fw_unit *unit, struct snd_card *card)
+{
+	struct fw_device *fw_dev = fw_parent_device(unit);
+	char vendor[24];
+	char model[32];
+	int err;
+
+	err = fw_csr_string(fw_dev->config_rom + 5, CSR_VENDOR,
+			    vendor, sizeof(vendor));
+	if (err < 0)
+		return err;
+
+	err = fw_csr_string(unit->directory, CSR_MODEL,
+			    model, sizeof(model));
+	if (err < 0)
+		return err;
+
+	strcpy(card->shortname, model);
+	strcpy(card->mixername, model);
+
+	snprintf(card->longname, sizeof(card->longname),
+		 "%s %s, GUID %08x%08x at %s, S%d",
+		 vendor, model, fw_dev->config_rom[3], fw_dev->config_rom[4],
+		 dev_name(&unit->device), 100 << fw_dev->max_speed);
+
+	return 0;
+}
+
 static int check_unit_directory(struct fw_unit *unit)
 {
 	struct fw_csr_iterator it;
@@ -77,17 +105,36 @@ static int check_unit_directory(struct fw_unit *unit)
 static int fwtxrx_probe(struct fw_unit *unit,
 			const struct ieee1394_device_id *entry)
 {
-	return check_unit_directory(unit);
+	struct fw_device *fw_dev = fw_parent_device(unit);
+	struct fw_card *fw_card = fw_dev->card;
+	int err;
+
+	err = check_unit_directory(unit);
+	if (err < 0)
+		return err;
+
+	if (fw_card->node_id == fw_dev->node_id)
+		err = fw_am_unit_probe(unit);
+
+	return err;
 }
 
 static void fwtxrx_update(struct fw_unit *unit)
 {
-	return;
+	struct fw_device *fw_dev = fw_parent_device(unit);
+	struct fw_card *fw_card = fw_dev->card;
+
+	if (fw_card->node_id == fw_dev->node_id)
+		fw_am_unit_update(unit);
 }
 
 static void fwtxrx_remove(struct fw_unit *unit)
 {
-	return;
+	struct fw_device *fw_dev = fw_parent_device(unit);
+	struct fw_card *fw_card = fw_dev->card;
+
+	if (fw_card->node_id == fw_dev->node_id)
+		fw_am_unit_remove(unit);
 }
 
 static u32 am_unit_leafs[] = {

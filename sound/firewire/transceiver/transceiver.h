@@ -21,4 +21,10 @@
 #include "../cmp.h"
 #include "../amdtp-am824.h"
 
+int fw_am_unit_probe(struct fw_unit *unit);
+void fw_am_unit_update(struct fw_unit *unit);
+void fw_am_unit_remove(struct fw_unit *unit);
+
+int snd_fwtxrx_name_card(struct fw_unit *unit, struct snd_card *card);
+
 #endif
