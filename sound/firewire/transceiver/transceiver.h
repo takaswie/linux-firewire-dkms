@@ -31,6 +31,10 @@ void fw_am_cmp_destroy(void);
 int fw_am_fcp_init(void);
 void fw_am_fcp_destroy(void);
 
+int snd_fwtx_probe(struct fw_unit *unit);
+void snd_fwtx_update(struct fw_unit *unit);
+void snd_fwtx_remove(struct fw_unit *unit);
+
 int snd_fwtxrx_stream_add_pcm_constraints(struct amdtp_stream *stream,
 					  struct snd_pcm_runtime *runtime);
 int snd_fwtxrx_name_card(struct fw_unit *unit, struct snd_card *card);

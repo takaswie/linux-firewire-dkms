@@ -152,6 +152,8 @@ static int fwtxrx_probe(struct fw_unit *unit,
 
 	if (fw_card->node_id == fw_dev->node_id)
 		err = fw_am_unit_probe(unit);
+	else
+		err = snd_fwtx_probe(unit);
 
 	return err;
 }
@@ -163,6 +165,8 @@ static void fwtxrx_update(struct fw_unit *unit)
 
 	if (fw_card->node_id == fw_dev->node_id)
 		fw_am_unit_update(unit);
+	else
+		snd_fwtx_update(unit);
 }
 
 static void fwtxrx_remove(struct fw_unit *unit)
@@ -172,6 +176,8 @@ static void fwtxrx_remove(struct fw_unit *unit)
 
 	if (fw_card->node_id == fw_dev->node_id)
 		fw_am_unit_remove(unit);
+	else
+		snd_fwtx_remove(unit);
 }
 
 static u32 am_unit_leafs[] = {
