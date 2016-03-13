@@ -8,6 +8,8 @@
 
 #include "transceiver.h"
 
+#define OHCI1394_MIN_TX_CTX	4
+
 struct fw_am_unit {
 	struct fw_unit *unit;
 
@@ -16,4 +18,13 @@ struct fw_am_unit {
 	bool registered;
 	struct snd_card *card;
 	struct delayed_work dwork;
+
+	struct amdtp_stream tx_streams[OHCI1394_MIN_TX_CTX];
 };
+
+int fw_am_unit_stream_init(struct fw_am_unit *am);
+void fw_am_unit_stream_destroy(struct fw_am_unit *am);
+int fw_am_unit_stream_start(struct fw_am_unit *am, unsigned int index,
+			    unsigned int isoc_ch, unsigned int speed);
+void fw_am_unit_stream_update(struct fw_am_unit *am);
+void fw_am_unit_stream_stop(struct fw_am_unit *am, unsigned int index);

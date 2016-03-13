@@ -12,6 +12,8 @@
 
 static void am_unit_free(struct fw_am_unit *am)
 {
+	fw_am_unit_stream_destroy(am);
+
 	mutex_destroy(&am->mutex);
 	fw_unit_put(am->unit);
 	kfree(am);
@@ -75,6 +77,7 @@ static void schedule_registration(struct fw_am_unit *am)
 int fw_am_unit_probe(struct fw_unit *unit)
 {
 	struct fw_am_unit *am;
+	int err;
 
 	/* Allocate this independent of sound card instance. */
 	am = kzalloc(sizeof(struct fw_am_unit), GFP_KERNEL);
@@ -85,6 +88,10 @@ int fw_am_unit_probe(struct fw_unit *unit)
 	dev_set_drvdata(&unit->device, am);
 
 	mutex_init(&am->mutex);
+
+	err = fw_am_unit_stream_init(am);
+	if (err < 0)
+		return err;
 
 	/* Allocate and register this sound card later. */
 	INIT_DEFERRABLE_WORK(&am->dwork, do_registration);
@@ -97,8 +104,11 @@ void fw_am_unit_update(struct fw_unit *unit)
 {
 	struct fw_am_unit *am = dev_get_drvdata(&unit->device);
 
-	if (!am->registered)
+	if (!am->registered) {
 		schedule_registration(am);
+	} else {
+		fw_am_unit_stream_update(am);
+	}
 }
 
 void fw_am_unit_remove(struct fw_unit *unit)
