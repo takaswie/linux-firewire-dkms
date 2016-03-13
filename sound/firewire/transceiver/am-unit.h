@@ -22,6 +22,8 @@ struct fw_am_unit {
 	struct amdtp_stream tx_streams[OHCI1394_MIN_TX_CTX];
 
 	struct list_head list_for_cmp;
+	u32 ompr;
+	u32 opcr[OHCI1394_MIN_TX_CTX];
 
 	struct list_head list_for_fcp;
 };
