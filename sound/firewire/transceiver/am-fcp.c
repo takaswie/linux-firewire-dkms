@@ -105,6 +105,47 @@ not_implemented:
 	frame[0] = 0x08;
 }
 
+/*
+ * Output plug signal format command on
+ *  AV/C Digital Interface Command Set General Specification Version 4.2
+ */
+static void handle_avc_out_signal_format(struct fw_am_unit *am,
+					 u8 *frame, unsigned int len)
+{
+	unsigned int index, sfc;
+
+	mutex_lock(&am->mutex);
+
+	index = frame[3];
+	if (frame[1] != 0xff || index >= OHCI1394_MIN_TX_CTX)
+		goto rejected;
+
+	/* Control */
+	if (frame[0] == 0x00) {
+		if (amdtp_stream_running(&am->tx_streams[index]))
+			goto rejected;
+
+		sfc = frame[5];
+		if (sfc >= CIP_SFC_COUNT)
+			goto rejected;
+
+		am->tx_streams[index].sfc = sfc;
+		frame[0] = 0x09;
+	}
+
+	/* Status */
+	if (frame[0] == 0x01) {
+		frame[0] = 0x0c;	/* Implemented/stable */
+		frame[5] = am->tx_streams[index].sfc;
+	}
+
+	mutex_unlock(&am->mutex);
+	return;
+rejected:
+	frame[0] = 0x0a;
+	mutex_unlock(&am->mutex);
+}
+
 /* TODO: remove callback. */
 static void response_callback(struct fw_card *card, int rcode,
 			      void *payload, size_t length, void *data)
@@ -148,6 +189,8 @@ static void handle_request(struct work_struct *work)
 			break;
 		case 0x30:	/* Unit info */
 			handle_avc_unit_info(am, t->frame, t->size);
+		case 0x18:	/* Output signal format */
+			handle_avc_out_signal_format(am, t->frame, t->size);
 			break;
 		case 0x31:	/* Subunit info */
 		case 0x19:	/* Input signal format */
