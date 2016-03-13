@@ -26,6 +26,9 @@ struct fw_am_unit {
 	u32 opcr[OHCI1394_MIN_TX_CTX];
 
 	struct list_head list_for_fcp;
+	void *transactions;
+	struct mutex transactions_mutex;
+	struct work_struct fcp_work;
 };
 
 int fw_am_unit_stream_init(struct fw_am_unit *am);
