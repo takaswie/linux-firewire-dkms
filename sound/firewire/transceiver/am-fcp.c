@@ -33,6 +33,32 @@ struct fcp_transaction {
 	struct fw_transaction request;
 };
 
+/*
+ * AV/C plug info command on
+ *  AV/C Digital Interface Command Set General Specification Version 4.2
+ */
+static void handle_avc_plug_info(struct fw_am_unit *am,
+				 u8* frame, unsigned int len)
+{
+
+	if (frame[0] != 0x01)
+		goto rejected;
+	if (frame[1] != 0xff)
+		goto rejected;
+	if (frame[3] != 0x00)
+		goto rejected;
+
+	frame[0] = 0x0c;	/* Implemented/Status */
+	frame[4] = 0x00;	/* PCR Input plugs */
+	frame[5] = OHCI1394_MIN_TX_CTX;	/* PCR Output plugs */
+	frame[6] = 0x00;	/* External input plugs */
+	frame[7] = 0x00;	/* External output plugs */
+
+	return;
+
+rejected:
+	frame[0] = 0x0a;
+}
 
 /* TODO: remove callback. */
 static void response_callback(struct fw_card *card, int rcode,
@@ -70,7 +96,17 @@ static void handle_request(struct work_struct *work)
 			continue;
 
 		t->state = STATE_WAITING;
-		t->frame[0] = 0x08;	/* Not implemented */
+
+		switch (t->frame[2]) {
+		case 0x02:
+			handle_avc_plug_info(am, t->frame, t->size);
+			break;
+		case 0x31:	/* Subunit info */
+		case 0x19:	/* Input signal format */
+		default:
+			t->frame[0] = 0x08;	/* Not implemented */
+			break;
+		}
 
 		/* The generation is updated after destination. */
 		generation = fw_dev->generation;
