@@ -25,6 +25,9 @@ int fw_am_unit_probe(struct fw_unit *unit);
 void fw_am_unit_update(struct fw_unit *unit);
 void fw_am_unit_remove(struct fw_unit *unit);
 
+int fw_am_cmp_init(void);
+void fw_am_cmp_destroy(void);
+
 int snd_fwtxrx_name_card(struct fw_unit *unit, struct snd_card *card);
 
 #endif

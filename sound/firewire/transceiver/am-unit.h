@@ -20,6 +20,8 @@ struct fw_am_unit {
 	struct delayed_work dwork;
 
 	struct amdtp_stream tx_streams[OHCI1394_MIN_TX_CTX];
+
+	struct list_head list_for_cmp;
 };
 
 int fw_am_unit_stream_init(struct fw_am_unit *am);
@@ -28,3 +30,7 @@ int fw_am_unit_stream_start(struct fw_am_unit *am, unsigned int index,
 			    unsigned int isoc_ch, unsigned int speed);
 void fw_am_unit_stream_update(struct fw_am_unit *am);
 void fw_am_unit_stream_stop(struct fw_am_unit *am, unsigned int index);
+
+int fw_am_unit_cmp_register(struct fw_am_unit *am);
+void fw_am_unit_cmp_update(struct fw_am_unit *am);
+void fw_am_unit_cmp_unregister(struct fw_am_unit *am);

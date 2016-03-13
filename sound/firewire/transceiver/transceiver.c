@@ -201,13 +201,21 @@ static int __init snd_fwtxrx_init(void)
 {
 	int err;
 
-	err = driver_register(&fwtxrx_driver.driver);
+	err = fw_am_cmp_init();
 	if (err < 0)
 		return err;
 
+	err = driver_register(&fwtxrx_driver.driver);
+	if (err < 0) {
+		fw_am_cmp_destroy();
+		return err;
+	}
+
 	err = fw_core_add_descriptor(&am_unit_directory);
-	if (err < 0)
+	if (err < 0) {
+		fw_am_cmp_destroy();
 		driver_unregister(&fwtxrx_driver.driver);
+	}
 
 	return err;
 }
@@ -216,6 +224,7 @@ static void __exit snd_fwtxrx_exit(void)
 {
 	fw_core_remove_descriptor(&am_unit_directory);
 	driver_unregister(&fwtxrx_driver.driver);
+	fw_am_cmp_destroy();
 }
 
 module_init(snd_fwtxrx_init)

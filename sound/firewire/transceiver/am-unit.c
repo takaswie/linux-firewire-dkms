@@ -13,6 +13,7 @@
 static void am_unit_free(struct fw_am_unit *am)
 {
 	fw_am_unit_stream_destroy(am);
+	fw_am_unit_cmp_unregister(am);
 
 	mutex_destroy(&am->mutex);
 	fw_unit_put(am->unit);
@@ -93,6 +94,12 @@ int fw_am_unit_probe(struct fw_unit *unit)
 	if (err < 0)
 		return err;
 
+	err = fw_am_unit_cmp_register(am);
+	if (err < 0) {
+		fw_am_unit_stream_destroy(am);
+		return err;
+	}
+
 	/* Allocate and register this sound card later. */
 	INIT_DEFERRABLE_WORK(&am->dwork, do_registration);
 	schedule_registration(am);
@@ -108,6 +115,7 @@ void fw_am_unit_update(struct fw_unit *unit)
 		schedule_registration(am);
 	} else {
 		fw_am_unit_stream_update(am);
+		fw_am_unit_cmp_update(am);
 	}
 }
 
