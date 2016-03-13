@@ -27,6 +27,43 @@ MODULE_LICENSE("GPL v2");
 #define AM_UNIT_NAME_1		0x7820414c	/* x AL */
 #define AM_UNIT_NAME_2		0x53410000	/* SA.. */
 
+int snd_fwtxrx_stream_add_pcm_constraints(struct amdtp_stream *stream,
+					  struct snd_pcm_runtime *runtime)
+{
+	struct snd_pcm_hardware *hw = &runtime->hw;
+	unsigned int i;
+
+	hw->info = SNDRV_PCM_INFO_MMAP |
+		   SNDRV_PCM_INFO_MMAP_VALID |
+		   SNDRV_PCM_INFO_BATCH |
+		   SNDRV_PCM_INFO_INTERLEAVED |
+		   SNDRV_PCM_INFO_BLOCK_TRANSFER;
+
+	if (stream->direction == AMDTP_IN_STREAM)
+		hw->formats = AM824_IN_PCM_FORMAT_BITS;
+	else
+		hw->formats = AM824_OUT_PCM_FORMAT_BITS;
+
+	/* TODO: PCM channels */
+	hw->channels_min = 2;
+	hw->channels_max = 2;
+
+	for (i = 0; i < CIP_SFC_COUNT; i++)
+		hw->rates |= snd_pcm_rate_to_rate_bit(amdtp_rate_table[i]);
+	snd_pcm_limit_hw_rates(runtime);
+
+	hw->periods_min = 2;		/* SNDRV_PCM_INFO_BATCH */
+	hw->periods_max = UINT_MAX;
+
+	hw->period_bytes_min = 4 * hw->channels_max;	/* bytes for a frame */
+
+	/* Just to prevent from allocating much pages. */
+	hw->period_bytes_max = hw->period_bytes_min * 2048;
+	hw->buffer_bytes_max = hw->period_bytes_max * hw->periods_min;
+
+	return amdtp_am824_add_pcm_hw_constraints(stream, runtime);
+}
+
 int snd_fwtxrx_name_card(struct fw_unit *unit, struct snd_card *card)
 {
 	struct fw_device *fw_dev = fw_parent_device(unit);

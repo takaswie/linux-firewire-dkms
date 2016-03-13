@@ -49,6 +49,10 @@ static void do_registration(struct work_struct *work)
 	if (err < 0)
 		goto error;
 
+	err = fw_am_unit_create_pcm_devices(am);
+	if (err < 0)
+		goto error;
+
 	err = snd_card_register(am->card);
 	if (err < 0)
 		goto error;

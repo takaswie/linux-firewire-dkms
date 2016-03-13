@@ -48,3 +48,4 @@ void fw_am_unit_fcp_update(struct fw_am_unit *am);
 void fw_am_unit_fcp_unregister(struct fw_am_unit *am);
 
 int fw_am_unit_create_midi_devices(struct fw_am_unit *unit);
+int fw_am_unit_create_pcm_devices(struct fw_am_unit *unit);
