@@ -1,14 +1,12 @@
 /*
- * receiver.c - something
+ * rx.c - something
  *
  * Copyright (c) 2015-2016 Takashi Sakamoto
  *
  * Licensed under the terms of the GNU General Public License, version 2.
  */
 
-#include "receiver.h"
-
-#define PROBE_DELAY_MS		(2 * MSEC_PER_SEC)
+#include "rx.h"
 
 static void fwtx_free(struct snd_fwtx *fwtx)
 {
@@ -37,7 +35,7 @@ static void do_registration(struct work_struct *work)
 	if (err < 0)
 		return;
 
-	err = snd_fwtxrx_name_card(fwtx->unit, fwtx->card);
+	err = snd_fw_trx_name_card(fwtx->unit, fwtx->card);
 	if (err < 0)
 		goto error;
 	strcpy(fwtx->card->driver, "FW-Receiver");
@@ -65,22 +63,6 @@ error:
 		 "Sound card registration failed: %d\n", err);
 }
 
-static void schedule_registration(struct snd_fwtx *fwtx)
-{
-	struct fw_card *fw_card = fw_parent_device(fwtx->unit)->card;
-	u64 now, delay;
-
-	now = get_jiffies_64();
-	delay = fw_card->reset_jiffies + msecs_to_jiffies(PROBE_DELAY_MS);
-
-	if (time_after64(delay, now))
-		delay -= now;
-	else
-		delay = 0;
-
-	mod_delayed_work(system_wq, &fwtx->dwork, delay);
-}
-
 int snd_fwtx_probe(struct fw_unit *unit)
 {
 	struct snd_fwtx *fwtx;
@@ -103,7 +85,7 @@ int snd_fwtx_probe(struct fw_unit *unit)
 
 	/* Allocate and register this sound card later. */
 	INIT_DEFERRABLE_WORK(&fwtx->dwork, do_registration);
-	schedule_registration(fwtx);
+	snd_fw_schedule_registration(unit, &fwtx->dwork);
 
 	return 0;
 }
@@ -113,9 +95,8 @@ void snd_fwtx_update(struct fw_unit *unit)
 	struct snd_fwtx *fwtx = dev_get_drvdata(&unit->device);
 
 	if (!fwtx->registered)
-		schedule_registration(fwtx);
-
-	if (fwtx->registered)
+		snd_fw_schedule_registration(unit, &fwtx->dwork);
+	else
 		snd_fwtx_stream_update_simplex(fwtx);
 }
 

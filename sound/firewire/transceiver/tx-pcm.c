@@ -1,34 +1,62 @@
 /*
- * am-unit-pcm.c - something
+ * tx-pcm.c - something
  *
  * Copyright (c) 2015-2016 Takashi Sakamoto
  *
  * Licensed under the terms of the GNU General Public License, version 2.
  */
 
-#include "am-unit.h"
-#include <sound/pcm_params.h>
+#include "tx.h"
 
 static int pcm_playback_open(struct snd_pcm_substream *substream)
 {
 	struct fw_am_unit *am = substream->private_data;
+	struct snd_pcm_runtime *runtime = substream->runtime;
 	unsigned int index = substream->pcm->device;
-	unsigned int rate;
 	int err;
 
-	err = snd_fwtxrx_stream_add_pcm_constraints(&am->tx_streams[index],
+	/* When peers start packet streaming. */
+	if (amdtp_stream_running(&am->opcr[index].stream))
+		return -EIO;
+
+	runtime->hw.info = SNDRV_PCM_INFO_BATCH |
+			   SNDRV_PCM_INFO_BLOCK_TRANSFER |
+			   SNDRV_PCM_INFO_INTERLEAVED |
+			   SNDRV_PCM_INFO_MMAP |
+			   SNDRV_PCM_INFO_MMAP_VALID;
+	runtime->hw.formats = AM824_OUT_PCM_FORMAT_BITS;
+
+	runtime->hw.rates = SNDRV_PCM_RATE_32000 |
+			    SNDRV_PCM_RATE_44100 |
+			    SNDRV_PCM_RATE_48000 |
+			    SNDRV_PCM_RATE_88200 |
+			    SNDRV_PCM_RATE_96000 |
+			    SNDRV_PCM_RATE_176400 |
+			    SNDRV_PCM_RATE_192000;
+	snd_pcm_limit_hw_rates(runtime);
+
+	runtime->hw.channels_min = 2;
+	runtime->hw.channels_max = 64;
+
+	runtime->hw.periods_min = 2;
+	runtime->hw.periods_max = UINT_MAX;
+	runtime->hw.period_bytes_min = 4 * 64;
+	runtime->hw.period_bytes_max = runtime->hw.period_bytes_min * 2048;
+	runtime->hw.buffer_bytes_max = runtime->hw.period_bytes_max *
+				       runtime->hw.periods_min;
+
+	err = snd_fw_trx_stream_add_pcm_constraints(&am->opcr[index].stream,
 						    substream->runtime);
-	if (err >= 0)
-		snd_pcm_set_sync(substream);
+	if (err < 0)
+		return err;
 
-	if (amdtp_stream_running(&am->tx_streams[index])) {
-		/* TODO: PCM channels */
-		rate = amdtp_rate_table[am->tx_streams[index].sfc];
-		substream->runtime->hw.rate_min = rate;
-		substream->runtime->hw.rate_max = rate;
-	}
+	snd_pcm_set_sync(substream);
 
-	return err;
+	/* TODO: PCM channels */
+	substream->runtime->hw.rate_min = am->opcr[index].rate;
+	substream->runtime->hw.rate_max = am->opcr[index].rate;
+
+	return 0;
 }
 
 static int pcm_playback_close(struct snd_pcm_substream *substream)
@@ -48,7 +76,7 @@ static int pcm_playback_hw_params(struct snd_pcm_substream *substream,
 	if (err < 0)
 		return err;
 
-	amdtp_am824_set_pcm_format(&am->tx_streams[index],
+	amdtp_am824_set_pcm_format(&am->opcr[index].stream,
 				   params_format(hw_params));
 
 	return 0;
@@ -64,7 +92,7 @@ static int pcm_playback_prepare(struct snd_pcm_substream *substream)
 	struct fw_am_unit *am = substream->private_data;
 	unsigned int index = substream->pcm->device;
 
-	amdtp_stream_pcm_prepare(&am->tx_streams[index]);
+	amdtp_stream_pcm_prepare(&am->opcr[index].stream);
 
 	return 0;
 }
@@ -76,10 +104,10 @@ static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:
-		amdtp_stream_pcm_trigger(&am->tx_streams[index], substream);
+		amdtp_stream_pcm_trigger(&am->opcr[index].stream, substream);
 		break;
 	case SNDRV_PCM_TRIGGER_STOP:
-		amdtp_stream_pcm_trigger(&am->tx_streams[index], NULL);
+		amdtp_stream_pcm_trigger(&am->opcr[index].stream, NULL);
 		break;
 	default:
 		return -EINVAL;
@@ -93,7 +121,7 @@ static snd_pcm_uframes_t pcm_playback_pointer(struct snd_pcm_substream *substrea
 	struct fw_am_unit *am = substream->private_data;
 	unsigned int index = substream->pcm->device;
 
-	return amdtp_stream_pcm_pointer(&am->tx_streams[index]);
+	return amdtp_stream_pcm_pointer(&am->opcr[index].stream);
 }
 
 static struct snd_pcm_ops pcm_playback_ops = {

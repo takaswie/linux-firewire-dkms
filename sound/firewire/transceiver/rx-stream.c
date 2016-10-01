@@ -1,27 +1,33 @@
 /*
- * receiver-stream.c - something
+ * rx-stream.c - something
  *
  * Copyright (c) 2015-2016 Takashi Sakamoto
  *
  * Licensed under the terms of the GNU General Public License, version 2.
  */
 
-#include "receiver.h"
+#include "rx.h"
 
 #define CALLBACK_TIMEOUT	100
 
 int snd_fwtx_stream_start_simplex(struct snd_fwtx *fwtx, int index,
-				  unsigned int rate)
+				  unsigned int channels, unsigned int rate)
 {
 	int err;
 
-	if (fwtx->capture_substreams == 0)
+	if (fwtx->capture_substreams[index] == 0)
 		return 0;
 
-	/* TODO: PCM channels? */
-	/* TODO: how to decive rate? */
+	/* TODO: retrieve from peer. */
+	if (channels == 0)
+		channels = 2;
+	if (rate == 0)
+		rate = 44100;
+
+	/* TODO: set stream format to peers. */
+
 	err = amdtp_am824_set_parameters(&fwtx->tx_stream[index],
-					 rate, 2, 8, false);
+					 rate, channels, rate, false);
 	if (err < 0)
 		return err;
 

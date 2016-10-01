@@ -1,12 +1,12 @@
 /*
- * am-unit-midi.c - something
+ * tx-midi.c - something
  *
  * Copyright (c) 2015-2016 Takashi Sakamoto
  *
  * Licensed under the terms of the GNU General Public License, version 2.
  */
 
-#include "am-unit.h"
+#include "tx.h"
 
 static int midi_playback_open(struct snd_rawmidi_substream *substream)
 {
@@ -30,10 +30,10 @@ static void midi_playback_trigger(struct snd_rawmidi_substream *substream,
 	spin_lock_irqsave(&am->lock, flags);
 
 	if (up)
-		amdtp_am824_midi_trigger(&am->tx_streams[index],
+		amdtp_am824_midi_trigger(&am->opcr[index].stream,
 					 substream->number, substream);
 	else
-		amdtp_am824_midi_trigger(&am->tx_streams[index],
+		amdtp_am824_midi_trigger(&am->opcr[index].stream,
 					 substream->number, NULL);
 
 	spin_unlock_irqrestore(&am->lock, flags);

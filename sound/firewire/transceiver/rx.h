@@ -6,7 +6,8 @@
  * Licensed under the terms of the GNU General Public License, version 2.
  */
 
-#include "transceiver.h"
+#include "trx.h"
+#include "../cmp.h"
 
 #define OHCI1394_MIN_RX_CTX	4
 
@@ -29,7 +30,7 @@ int snd_fwtx_stream_init_simplex(struct snd_fwtx *fwtx);
 void snd_fwtx_stream_destroy_simplex(struct snd_fwtx *fwtx);
 void snd_fwtx_stream_update_simplex(struct snd_fwtx *fwtx);
 int snd_fwtx_stream_start_simplex(struct snd_fwtx *fwtx, int index,
-				  unsigned int rate);
+				  unsigned int channels, unsigned int rate);
 void snd_fwtx_stream_stop_simplex(struct snd_fwtx *fwtx, int index);
 
 int snd_fwtx_create_midi_devices(struct snd_fwtx *fwtx);

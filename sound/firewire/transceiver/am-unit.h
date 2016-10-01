@@ -6,46 +6,23 @@
  * Licensed under the terms of the GNU General Public License, version 2.
  */
 
-#include "transceiver.h"
+#ifndef SOUND_FIREWIRE_AM_UNIT_H_INCLUDED
+#define SOUND_FIREWIRE_AM_UNIT_H_INCLUDED
 
-#define OHCI1394_MIN_TX_CTX	4
+#include <linux/firewire.h>
+#include <linux/firewire-constants.h>
 
-struct fw_am_unit {
-	struct fw_unit *unit;
+/* See d71e6a11737f4b3d857425a1d6f893231cbd1296 */
+#define ROOT_VENDOR_ID_OLD	0xd00d1e
+#define ROOT_VENDOR_ID		0x001f11
+#define ROOT_MODEL_ID		0x023901
 
-	struct mutex mutex;
-	spinlock_t lock;
+/* Unit directory for AV/C protocol. */
+#define AM_UNIT_SPEC_1394TA	0x0000a02d
+#define AM_UNIT_VERSION_AVC	0x00010001
+#define AM_UNIT_MODEL_ID	0x00736e64	/* "snd" */
+#define AM_UNIT_NAME_0		0x4c696e75	/* Linu */
+#define AM_UNIT_NAME_1		0x7820414c	/* x AL */
+#define AM_UNIT_NAME_2		0x53410000	/* SA.. */
 
-	bool registered;
-	struct snd_card *card;
-	struct delayed_work dwork;
-
-	struct amdtp_stream tx_streams[OHCI1394_MIN_TX_CTX];
-
-	struct list_head list_for_cmp;
-	u32 ompr;
-	u32 opcr[OHCI1394_MIN_TX_CTX];
-
-	struct list_head list_for_fcp;
-	void *transactions;
-	struct mutex transactions_mutex;
-	struct work_struct fcp_work;
-};
-
-int fw_am_unit_stream_init(struct fw_am_unit *am);
-void fw_am_unit_stream_destroy(struct fw_am_unit *am);
-int fw_am_unit_stream_start(struct fw_am_unit *am, unsigned int index,
-			    unsigned int isoc_ch, unsigned int speed);
-void fw_am_unit_stream_update(struct fw_am_unit *am);
-void fw_am_unit_stream_stop(struct fw_am_unit *am, unsigned int index);
-
-int fw_am_unit_cmp_register(struct fw_am_unit *am);
-void fw_am_unit_cmp_update(struct fw_am_unit *am);
-void fw_am_unit_cmp_unregister(struct fw_am_unit *am);
-
-int fw_am_unit_fcp_register(struct fw_am_unit *am);
-void fw_am_unit_fcp_update(struct fw_am_unit *am);
-void fw_am_unit_fcp_unregister(struct fw_am_unit *am);
-
-int fw_am_unit_create_midi_devices(struct fw_am_unit *unit);
-int fw_am_unit_create_pcm_devices(struct fw_am_unit *unit);
+#endif

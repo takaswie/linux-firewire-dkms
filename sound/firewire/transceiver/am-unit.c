@@ -6,153 +6,54 @@
  * Licensed under the terms of the GNU General Public License, version 2.
  */
 
+#include <linux/module.h>
+#include <linux/platform_device.h>
+
 #include "am-unit.h"
 
-#define PROBE_DELAY_MS		(2 * MSEC_PER_SEC)
+MODULE_DESCRIPTION("An Audio and Music unit_directory entry to IEEE 1394 bus");
+MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp");
+MODULE_LICENSE("GPL v2");
 
-static void am_unit_free(struct fw_am_unit *am)
+static u32 am_unit_leafs[] = {
+	0x00040000,		/* Unit directory consists of below 4 quads. */
+	(CSR_SPECIFIER_ID << 24) | AM_UNIT_SPEC_1394TA,
+	(CSR_VERSION	  << 24) | AM_UNIT_VERSION_AVC,
+	(CSR_MODEL	  << 24) | AM_UNIT_MODEL_ID,
+	((CSR_LEAF | CSR_DESCRIPTOR) << 24) | 0x00000001, /* Begin at next. */
+	0x00050000,		/* Text leaf consists of below 5 quads. */
+	0x00000000,
+	0x00000000,
+	AM_UNIT_NAME_0,
+	AM_UNIT_NAME_1,
+	AM_UNIT_NAME_2,
+};
+
+static struct fw_descriptor am_unit_directory = {
+	.length = ARRAY_SIZE(am_unit_leafs),
+	.immediate = 0x0c0083c0,	/* Node capabilities */
+	.key = (CSR_DIRECTORY | CSR_UNIT) << 24,
+	.data = am_unit_leafs,
+};
+
+static int fw_am_unit_probe(struct platform_device *pdev)
 {
-	fw_am_unit_stream_destroy(am);
-	fw_am_unit_cmp_unregister(am);
-	fw_am_unit_fcp_unregister(am);
-
-	mutex_destroy(&am->mutex);
-	fw_unit_put(am->unit);
-	kfree(am);
+	return fw_core_add_descriptor(&am_unit_directory);
 }
 
-static void am_unit_card_free(struct snd_card *card)
+static int fw_am_unit_remove(struct platform_device *pdev)
 {
-	am_unit_free(card->private_data);
-}
-
-static void do_registration(struct work_struct *work)
-{
-	struct fw_am_unit *am =
-			container_of(work, struct fw_am_unit, dwork.work);
-	int err;
-
-	if (am->registered)
-		return;
-
-	err = snd_card_new(&am->unit->device, -1, NULL, THIS_MODULE, 0,
-			   &am->card);
-	if (err < 0)
-		return;
-
-	err = snd_fwtxrx_name_card(am->unit, am->card);
-	if (err < 0)
-		goto error;
-	strcpy(am->card->driver, "FW-Transmitter");
-
-	err = fw_am_unit_create_midi_devices(am);
-	if (err < 0)
-		goto error;
-
-	err = fw_am_unit_create_pcm_devices(am);
-	if (err < 0)
-		goto error;
-
-	err = snd_card_register(am->card);
-	if (err < 0)
-		goto error;
-
-	am->card->private_free = am_unit_card_free;
-	am->card->private_data = am;
-	am->registered = true;
-
-	return;
-error:
-	snd_card_free(am->card);
-        dev_info(&am->unit->device,
-		 "Sound card registration failed: %d\n", err);
-}
-
-static void schedule_registration(struct fw_am_unit *am)
-{
-	struct fw_card *fw_card = fw_parent_device(am->unit)->card;
-	u64 now, delay;
-
-	now = get_jiffies_64();
-	delay = fw_card->reset_jiffies + msecs_to_jiffies(PROBE_DELAY_MS);
-
-	if (time_after64(delay, now))
-		delay -= now;
-	else
-		delay = 0;
-
-	mod_delayed_work(system_wq, &am->dwork, delay);
-}
-
-int fw_am_unit_probe(struct fw_unit *unit)
-{
-	struct fw_am_unit *am;
-	int err;
-
-	/* Allocate this independent of sound card instance. */
-	am = kzalloc(sizeof(struct fw_am_unit), GFP_KERNEL);
-	if (am == NULL)
-		return -ENOMEM;
-
-	am->unit = fw_unit_get(unit);
-	dev_set_drvdata(&unit->device, am);
-
-	mutex_init(&am->mutex);
-	spin_lock_init(&am->lock);
-
-	err = fw_am_unit_stream_init(am);
-	if (err < 0)
-		return err;
-
-	err = fw_am_unit_cmp_register(am);
-	if (err < 0) {
-		fw_am_unit_stream_destroy(am);
-		return err;
-	}
-
-	err = fw_am_unit_fcp_register(am);
-	if (err < 0) {
-		fw_am_unit_stream_destroy(am);
-		fw_am_unit_cmp_unregister(am);
-		return err;
-	}
-
-	/* Allocate and register this sound card later. */
-	INIT_DEFERRABLE_WORK(&am->dwork, do_registration);
-	schedule_registration(am);
-
+	fw_core_remove_descriptor(&am_unit_directory);
 	return 0;
 }
 
-void fw_am_unit_update(struct fw_unit *unit)
-{
-	struct fw_am_unit *am = dev_get_drvdata(&unit->device);
+static struct platform_driver fw_am_unit_driver = {
+	.driver = {
+		.owner	= THIS_MODULE,
+		.name	= "snd-firewire-am-unit",
+	},
+	.probe	= fw_am_unit_probe,
+	.remove	= fw_am_unit_remove,
+};
 
-	if (!am->registered) {
-		schedule_registration(am);
-	} else {
-		fw_am_unit_stream_update(am);
-		fw_am_unit_cmp_update(am);
-		fw_am_unit_fcp_update(am);
-	}
-}
-
-void fw_am_unit_remove(struct fw_unit *unit)
-{
-	struct fw_am_unit *am = dev_get_drvdata(&unit->device);
-
-	/*
-	 * Confirm to stop the work for registration before the sound card is
-	 * going to be released. The work is not scheduled again because bus
-	 * reset handler is not called anymore.
-	 */
-	cancel_delayed_work_sync(&am->dwork);
-
-	if (am->registered) {
-		/* No need to wait for releasing card object in this context. */
-		snd_card_free_when_closed(am->card);
-	} else {
-		/* Don't forget this case. */
-		am_unit_free(am);
-	}
-}
+module_platform_driver(fw_am_unit_driver);
