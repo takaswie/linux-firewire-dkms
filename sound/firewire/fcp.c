@@ -17,7 +17,7 @@
 #include <linux/delay.h>
 #include "fcp.h"
 #include "lib.h"
-#include "amdtp-stream.h"
+#include "amdtp-am824.h"
 
 #define CTS_AVC 0x00
 
@@ -176,6 +176,216 @@ end:
 	return err;
 }
 EXPORT_SYMBOL(avc_general_get_plug_info);
+
+/*
+ * See Table 5.7 – Sampling frequency for Multi-bit Audio
+ * in AV/C Stream Format Information Specification 1.1 (Apr 2005, 1394TA)
+ */
+const unsigned int avc_stream_rate_table[AVC_STREAM_RATE_COUNT] = {
+	[AVC_STREAM_RATE_22050]  = 22050,
+	[AVC_STREAM_RATE_24000]  = 24000,
+	[AVC_STREAM_RATE_32000]  = 32000,
+	[AVC_STREAM_RATE_44100]  = 44100,
+	[AVC_STREAM_RATE_48000]  = 48000,
+	[AVC_STREAM_RATE_88200]  = 88200,
+	[AVC_STREAM_RATE_96000]  = 96000,
+	[AVC_STREAM_RATE_176400] = 176400,
+	[AVC_STREAM_RATE_192000] = 192000,
+};
+EXPORT_SYMBOL(avc_stream_rate_table);
+const unsigned int avc_stream_rate_codes[AVC_STREAM_RATE_COUNT] = {
+	[AVC_STREAM_RATE_22050]  = 0x00,
+	[AVC_STREAM_RATE_24000]  = 0x01,
+	[AVC_STREAM_RATE_32000]  = 0x02,
+	[AVC_STREAM_RATE_44100]  = 0x03,
+	[AVC_STREAM_RATE_48000]  = 0x04,
+	[AVC_STREAM_RATE_88200]  = 0x0a,
+	[AVC_STREAM_RATE_96000]  = 0x05,
+	[AVC_STREAM_RATE_176400] = 0x06,
+	[AVC_STREAM_RATE_192000] = 0x07,
+};
+EXPORT_SYMBOL(avc_stream_rate_codes);
+
+int avc_stream_set_format(struct fw_unit *unit, enum avc_general_plug_dir dir,
+			  unsigned int pid, u8 *format, unsigned int len)
+{
+	u8 *buf;
+	int err;
+
+	buf = kmalloc(len + 10, GFP_KERNEL);
+	if (buf == NULL)
+		return -ENOMEM;
+
+	buf[0] = 0x00;		/* CONTROL */
+	buf[1] = 0xff;		/* UNIT */
+	buf[2] = 0xbf;		/* EXTENDED STREAM FORMAT INFORMATION */
+	buf[3] = 0xc0;		/* SINGLE subfunction */
+	buf[4] = dir;		/* Plug Direction */
+	buf[5] = 0x00;		/* UNIT */
+	buf[6] = 0x00;		/* PCR (Isochronous Plug) */
+	buf[7] = 0xff & pid;	/* Plug ID */
+	buf[8] = 0xff;		/* Padding */
+	buf[9] = 0xff;		/* Support status in response */
+	memcpy(buf + 10, format, len);
+
+	/* do transaction and check buf[1-8] are the same against command */
+	err = fcp_avc_transaction(unit, buf, len + 10, buf, len + 10,
+				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
+				  BIT(6) | BIT(7) | BIT(8));
+	if ((err > 0) && (err < len + 10))
+		err = -EIO;
+	else if (buf[0] == 0x08) /* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a) /* REJECTED */
+		err = -EINVAL;
+	else
+		err = 0;
+
+	kfree(buf);
+
+	return err;
+}
+EXPORT_SYMBOL(avc_stream_set_format);
+
+int avc_stream_get_format(struct fw_unit *unit,
+			  enum avc_general_plug_dir dir, unsigned int pid,
+			  u8 *buf, unsigned int *len, unsigned int eid)
+{
+	unsigned int subfunc;
+	int err;
+
+	if (eid == 0xff)
+		subfunc = 0xc0;	/* SINGLE */
+	else
+		subfunc = 0xc1;	/* LIST */
+
+	buf[0] = 0x01;		/* STATUS */
+	buf[1] = 0xff;		/* UNIT */
+	buf[2] = 0xbf;		/* EXTENDED STREAM FORMAT INFORMATION */
+	buf[3] = subfunc;	/* SINGLE or LIST */
+	buf[4] = dir;		/* Plug Direction */
+	buf[5] = 0x00;		/* Unit */
+	buf[6] = 0x00;		/* PCR (Isochronous Plug) */
+	buf[7] = 0xff & pid;	/* Plug ID */
+	buf[8] = 0xff;		/* Padding */
+	buf[9] = 0xff;		/* support status in response */
+	buf[10] = 0xff & eid;	/* entry ID for LIST subfunction */
+	buf[11] = 0xff;		/* padding */
+
+	/* do transaction and check buf[1-7] are the same against command */
+	err = fcp_avc_transaction(unit, buf, 12, buf, *len,
+				  BIT(1) | BIT(2) | BIT(3) | BIT(4) | BIT(5) |
+				  BIT(6) | BIT(7));
+	if ((err > 0) && (err < 10))
+		err = -EIO;
+	else if (buf[0] == 0x08)	/* NOT IMPLEMENTED */
+		err = -ENOSYS;
+	else if (buf[0] == 0x0a)	/* REJECTED */
+		err = -EINVAL;
+	else if (buf[0] == 0x0b)	/* IN TRANSITION */
+		err = -EAGAIN;
+	/* LIST subfunction has entry ID */
+	else if ((subfunc == 0xc1) && (buf[10] != eid))
+		err = -EIO;
+	if (err < 0)
+		goto end;
+
+	/* keep just stream format information */
+	if (subfunc == 0xc0) {
+		memmove(buf, buf + 10, err - 10);
+		*len = err - 10;
+	} else {
+		memmove(buf, buf + 11, err - 11);
+		*len = err - 11;
+	}
+
+	err = 0;
+end:
+	return err;
+}
+EXPORT_SYMBOL(avc_stream_get_format);
+
+/*
+ * See Table 6.16 - AM824 Stream Format
+ *     Figure 6.19 - format_information field for AM824 Compound
+ * in AV/C Stream Format Information Specification 1.1 (Apr 2005, 1394TA)
+ * Also 'Clause 12 AM824 sequence adaption layers' in IEC 61883-6:2005
+ */
+int avc_stream_parse_format(u8 *format, struct avc_stream_formation *formation)
+{
+	unsigned int i, e, channels, type;
+
+	memset(formation, 0, sizeof(struct avc_stream_formation));
+
+	/*
+	 * this module can support a hierarchy combination that:
+	 *  Root:	Audio and Music (0x90)
+	 *  Level 1:	AM824 Compound  (0x40)
+	 */
+	if ((format[0] != 0x90) || (format[1] != 0x40))
+		return -ENOSYS;
+
+	/* check the sampling rate */
+	for (i = 0; i < ARRAY_SIZE(avc_stream_rate_codes); i++) {
+		if (format[2] == avc_stream_rate_codes[i])
+			break;
+	}
+	if (i == ARRAY_SIZE(avc_stream_rate_codes))
+		return -ENOSYS;
+
+	formation->rate = avc_stream_rate_table[i];
+
+	for (e = 0; e < format[4]; e++) {
+		channels = format[5 + e * 2];
+		type = format[6 + e * 2];
+
+		switch (type) {
+		/* IEC 60958 Conformant, currently handled as MBLA */
+		case 0x00:
+		/* Multi Bit Linear Audio (Raw) */
+		case 0x06:
+			formation->pcm += channels;
+			break;
+		/* MIDI Conformant */
+		case 0x0d:
+			formation->midi = channels;
+			break;
+		/* IEC 61937-3 to 7 */
+		case 0x01:
+		case 0x02:
+		case 0x03:
+		case 0x04:
+		case 0x05:
+		/* Multi Bit Linear Audio */
+		case 0x07:	/* DVD-Audio */
+		case 0x0c:	/* High Precision */
+		/* One Bit Audio */
+		case 0x08:	/* (Plain) Raw */
+		case 0x09:	/* (Plain) SACD */
+		case 0x0a:	/* (Encoded) Raw */
+		case 0x0b:	/* (Encoded) SACD */
+		/* SMPTE Time-Code conformant */
+		case 0x0e:
+		/* Sample Count */
+		case 0x0f:
+		/* Anciliary Data */
+		case 0x10:
+		/* Synchronization Stream (Stereo Raw audio) */
+		case 0x40:
+		/* Don't care */
+		case 0xff:
+		default:
+			return -ENOSYS;	/* not supported */
+		}
+	}
+
+	if (formation->pcm  > AM824_MAX_CHANNELS_FOR_PCM ||
+	    formation->midi > AM824_MAX_CHANNELS_FOR_MIDI)
+		return -ENOSYS;
+
+	return 0;
+}
+EXPORT_SYMBOL(avc_stream_parse_format);
 
 static DEFINE_SPINLOCK(transactions_lock);
 static LIST_HEAD(transactions);

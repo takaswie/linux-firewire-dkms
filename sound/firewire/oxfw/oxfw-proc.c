@@ -12,7 +12,7 @@ static void proc_read_formation(struct snd_info_entry *entry,
 				struct snd_info_buffer *buffer)
 {
 	struct snd_oxfw *oxfw = entry->private_data;
-	struct snd_oxfw_stream_formation formation, curr;
+	struct avc_stream_formation formation, curr;
 	u8 *format;
 	char flag;
 	int i, err;
@@ -31,7 +31,7 @@ static void proc_read_formation(struct snd_info_entry *entry,
 		if (format == NULL)
 			continue;
 
-		err = snd_oxfw_stream_parse_format(format, &formation);
+		err = avc_stream_parse_format(format, &formation);
 		if (err < 0)
 			continue;
 
@@ -61,7 +61,7 @@ static void proc_read_formation(struct snd_info_entry *entry,
 		if (format == NULL)
 			continue;
 
-		err = snd_oxfw_stream_parse_format(format, &formation);
+		err = avc_stream_parse_format(format, &formation);
 		if (err < 0)
 			continue;
 

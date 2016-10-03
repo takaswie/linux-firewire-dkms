@@ -18,14 +18,14 @@ static int hw_rule_rate(struct snd_pcm_hw_params *params,
 	struct snd_interval t = {
 		.min = UINT_MAX, .max = 0, .integer = 1
 	};
-	struct snd_oxfw_stream_formation formation;
+	struct avc_stream_formation formation;
 	int i, err;
 
 	for (i = 0; i < SND_OXFW_STREAM_FORMAT_ENTRIES; i++) {
 		if (formats[i] == NULL)
 			continue;
 
-		err = snd_oxfw_stream_parse_format(formats[i], &formation);
+		err = avc_stream_parse_format(formats[i], &formation);
 		if (err < 0)
 			continue;
 		if (!snd_interval_test(c, formation.pcm))
@@ -46,7 +46,7 @@ static int hw_rule_channels(struct snd_pcm_hw_params *params,
 		hw_param_interval(params, SNDRV_PCM_HW_PARAM_CHANNELS);
 	const struct snd_interval *r =
 		hw_param_interval_c(params, SNDRV_PCM_HW_PARAM_RATE);
-	struct snd_oxfw_stream_formation formation;
+	struct avc_stream_formation formation;
 	int i, j, err;
 	unsigned int count, list[SND_OXFW_STREAM_FORMAT_ENTRIES] = {0};
 
@@ -55,7 +55,7 @@ static int hw_rule_channels(struct snd_pcm_hw_params *params,
 		if (formats[i] == NULL)
 			break;
 
-		err = snd_oxfw_stream_parse_format(formats[i], &formation);
+		err = avc_stream_parse_format(formats[i], &formation);
 		if (err < 0)
 			continue;
 		if (!snd_interval_test(r, formation.rate))
@@ -79,7 +79,7 @@ static int hw_rule_channels(struct snd_pcm_hw_params *params,
 
 static void limit_channels_and_rates(struct snd_pcm_hardware *hw, u8 **formats)
 {
-	struct snd_oxfw_stream_formation formation;
+	struct avc_stream_formation formation;
 	int i, err;
 
 	hw->channels_min = UINT_MAX;
@@ -93,7 +93,7 @@ static void limit_channels_and_rates(struct snd_pcm_hardware *hw, u8 **formats)
 		if (formats[i] == NULL)
 			break;
 
-		err = snd_oxfw_stream_parse_format(formats[i], &formation);
+		err = avc_stream_parse_format(formats[i], &formation);
 		if (err < 0)
 			continue;
 
@@ -166,7 +166,7 @@ end:
 static int limit_to_current_params(struct snd_pcm_substream *substream)
 {
 	struct snd_oxfw *oxfw = substream->private_data;
-	struct snd_oxfw_stream_formation formation;
+	struct avc_stream_formation formation;
 	enum avc_general_plug_dir dir;
 	int err;
 
