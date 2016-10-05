@@ -147,6 +147,65 @@ rejected:
 	mutex_unlock(&am->mutex);
 }
 
+static void handle_avc_stream_format(struct fw_am_unit *am,
+				     u8 *frame, unsigned int len)
+{
+	unsigned int i, index;
+	struct avc_stream_formation formation;
+
+	/* SINGLE subfunction is supported only. */
+	if (frame[3] != 0xc0)
+		goto not_implemented;
+
+	/* Check address. */
+	if (frame[1] != 0xff || frame[4] != AVC_GENERAL_PLUG_DIR_OUT ||
+	    frame[5] !=0x00 || frame[6] != 0x00 ||
+	    frame[7] >= OHCI1394_MIN_TX_CTX)
+		goto not_implemented;
+
+	/* The index of PCR unit. */
+	index = frame[7];
+
+	/* Control. */
+	if (frame[0] == 0x00) {
+		err = avc_stream_parse_format(&frame[10], &formation);
+		if (err < 0)
+			goto rejected;
+
+		am->opcr[index].rate = formation->rate;;
+		am->opcr[index].pcm_channels = formation->pcm;
+
+		frame[0] = 0x09;	/* Accepted. */
+	/* Status. */
+	} else if (frame[0] == 0x01) {
+		for (i = 0; i < ARRAY_SIZE(avc_stream_rate_table); ++i) {
+			if (am->opcr[index].rate == avc_stream_rate_table[i])
+				break;
+		}
+		if (i == ARRAY_SIZE(avc_stream_rate_table))
+			goto rejected;
+
+		frame[9] = 0x00;	/* Support_status is active. */
+		frame[10] = 0x90;	/* Root is Audio and Music. */
+		frame[11] = 0x40;	/* Level 1 is AM824 compound. */
+		frame[12] = avc_stream_rate_codes[i];
+		frame[13] = 0x02;	/* Command rate ctl is not supported. */
+		frame[14] = 0x01;	/* One entry. */
+		frame[15] = am->opcr[index].pcm_channels;
+		frame[16] = 0x06;	/* Multi bit linear audio (raw). */
+
+		frame[0] = 0x0c;	/* Implemented/stable */
+	} else {
+		goto not_implemented;
+	}
+
+rejected:
+	frame[0] = 0x0a;
+	return;
+not_implemented:
+	frame[0] = 0x08;
+}
+
 /* TODO: remove callback. */
 static void response_callback(struct fw_card *card, int rcode,
 			      void *payload, size_t length, void *data)
