@@ -9,15 +9,49 @@
 #include "tx.h"
 #include "../cmp.h"
 
+#define CALLBACK_TIMEOUT 200
+
+static void establish_work(struct work_struct *work)
+{
+	struct pcr_resource *pcr =
+			container_of(work, struct pcr_resource, establish_work);
+	int err;
+
+	err = amdtp_am824_set_parameters(&pcr->stream, pcr->rate,
+					 pcr->pcm_channels, 8, false);
+	if (err < 0)
+		return;
+
+	/* I believe that all of parameters are already set. */
+	err = amdtp_stream_start(&pcr->stream, pcr->isoc_ch, pcr->speed);
+	if (err < 0)
+		return;
+
+	/* This returns immediately. */
+	if (!amdtp_stream_wait_callback(&pcr->stream, CALLBACK_TIMEOUT) < 0) {
+		amdtp_stream_stop(&pcr->stream);
+		err = -ETIMEDOUT;
+	}
+}
+
+static void break_work(struct work_struct *work)
+{
+	struct pcr_resource *pcr =
+			container_of(work, struct pcr_resource, break_work);
+
+	amdtp_stream_pcm_abort(&pcr->stream);
+	amdtp_stream_stop(&pcr->stream);
+}
+
 static int handle_conn_req(struct fw_am_unit *am, unsigned int index,
 			   __be32 *quad)
 {
+	struct pcr_resource *pcr = &am->opcr[index];
 	u32 curr = be32_to_cpu(quad[0]);
 	u32 new = be32_to_cpu(quad[1]);
-	unsigned int spd, xspd, isoc_ch;
-	int err;
+	unsigned int spd, xspd;
 
-	if (curr != am->opcr[index].reg)
+	if (curr != pcr->reg)
 		return RCODE_DATA_ERROR;
 
 	/* Check speed. */
@@ -33,23 +67,17 @@ static int handle_conn_req(struct fw_am_unit *am, unsigned int index,
 	/* Check peer-to-peer connection. */
 	if ((curr & PCR_P2P_CONN_MASK) == 0 && (new & PCR_P2P_CONN_MASK) == 1) {
 		/* Peer should reserve the isochronous resources. */
-		isoc_ch = (new & PCR_CHANNEL_MASK) >> PCR_CHANNEL_SHIFT;
-
-		mutex_lock(&am->mutex);
-		err = fw_am_unit_stream_start(am, index, isoc_ch, spd);
-		mutex_unlock(&am->mutex);
-		if (err < 0)
-			return RCODE_CONFLICT_ERROR;
+		pcr->isoc_ch = (new & PCR_CHANNEL_MASK) >> PCR_CHANNEL_SHIFT;
+		pcr->speed = spd;
+		schedule_work(&pcr->establish_work);
 	} else if ((curr & PCR_P2P_CONN_MASK) == 1 &&
 		   (new & PCR_P2P_CONN_MASK) == 0) {
-		mutex_lock(&am->mutex);
-		fw_am_unit_stream_stop(am, index);
-		mutex_unlock(&am->mutex);
+		schedule_work(&pcr->break_work);
 	} else {
 		return RCODE_DATA_ERROR;
 	}
 
-	am->opcr[index].reg = new;
+	pcr->reg = new;
 	quad[0] = cpu_to_be32(new);
 
 	return RCODE_COMPLETE;
@@ -75,18 +103,29 @@ static void handle_cmp(struct fw_card *card, struct fw_request *request,
 		goto end;
 	}
 
+	/* Check address offset. */
 	index = offset - (CSR_REGISTER_BASE + CSR_OMPR);
+	if (index >= OHCI1394_MIN_TX_CTX) {
+		rcode = RCODE_ADDRESS_ERROR;
+		goto end;
+	}
+
+	/* For oMPR, read-only. */
 	if (index == 0) {
 		if (tcode == TCODE_READ_QUADLET_REQUEST)
 			*quad = cpu_to_be32(am->ompr);
 		else
 			rcode = RCODE_DATA_ERROR;
-	} else {
-		if (tcode == TCODE_READ_QUADLET_REQUEST)
-			*quad = cpu_to_be32(am->opcr[index - 1].reg);
-		else
-			rcode = handle_conn_req(am, index - 1, quad);
+
+		goto end;
 	}
+
+	/* For oPCR. */
+	--index;
+	if (tcode == TCODE_READ_QUADLET_REQUEST)
+		*quad = cpu_to_be32(am->opcr[index].reg);
+	else
+		rcode = handle_conn_req(am, index, quad);
 end:
 	fw_send_response(card, request, rcode);
 }
@@ -99,7 +138,7 @@ static void initialize_ompr(struct fw_am_unit *am)
 	am->ompr = (fw_dev->max_speed << MPR_SPEED_SHIFT) & MPR_SPEED_MASK;
 	if (fw_dev->max_speed > SCODE_BETA)
 		am->ompr |= (fw_dev->max_speed << MPR_XSPEED_SHIFT) &
-								MPR_PLUGS_MASK;
+								MPR_XSPEED_MASK;
 	am->ompr |= OHCI1394_MIN_TX_CTX & MPR_PLUGS_MASK;
 }
 
@@ -111,12 +150,40 @@ static void initialize_opcrs(struct fw_am_unit *am)
 
 	for (i = 0; i < OHCI1394_MIN_TX_CTX; i++) {
 		opcr = &am->opcr[i];
-		opcr->rate = 44100;
-		opcr->pcm_channels = 2;
 		amdtp_am824_set_parameters(&opcr->stream, 44100, 2, 8, false);
 		payload = amdtp_stream_get_max_payload(&opcr->stream);
 		opcr->reg |= ((1 << PCR_ONLINE_SHIFT) & PCR_ONLINE) | payload;
 	}
+}
+
+static int initialize_streams(struct fw_am_unit *am)
+{
+	unsigned int i;
+	int err;
+
+	for (i = 0; i < OHCI1394_MIN_TX_CTX; i++) {
+		err = amdtp_am824_init(&am->opcr[i].stream, am->unit,
+				       AMDTP_OUT_STREAM, CIP_NONBLOCKING);
+		if (err < 0)
+			break;
+
+		INIT_WORK(&am->opcr[i].establish_work, establish_work);
+		INIT_WORK(&am->opcr[i].break_work, break_work);
+	}
+	if (err < 0) {
+		for (--i; i >= 0; i--)
+			amdtp_stream_destroy(&am->opcr[i].stream);
+	}
+
+	return err;
+}
+
+static void destroy_streams(struct fw_am_unit *am)
+{
+	unsigned int i;
+
+	for (i = 0; i < OHCI1394_MIN_TX_CTX; i++)
+		amdtp_stream_destroy(&am->opcr[i].stream);
 }
 
 int fw_am_unit_cmp_init(struct fw_am_unit *am)
@@ -130,26 +197,35 @@ int fw_am_unit_cmp_init(struct fw_am_unit *am)
 	initialize_ompr(am);
 	initialize_opcrs(am);
 
+	err = initialize_streams(am);
+	if (err < 0)
+		return err;
+
 	am->cmp_handler.length = CSR_OPCR(OHCI1394_MIN_TX_CTX) - CSR_OMPR;
 	am->cmp_handler.address_callback = handle_cmp;
 	am->cmp_handler.callback_data = am;
 	err = fw_core_add_address_handler(&am->cmp_handler,
 					  &cmp_register_region);
 	if (err < 0)
-		return err;
+		destroy_streams(am);
 
-	return 0;
+	return err;
 }
 
 void fw_am_unit_cmp_update(struct fw_am_unit *am)
 {
 	unsigned int i;
 
-	for (i = 0; i < OHCI1394_MIN_TX_CTX; i++)
-		am->opcr[i].reg &= 0x80ffc3ff;
+	for (i = 0; i < OHCI1394_MIN_TX_CTX; i++) {
+		amdtp_stream_update(&am->opcr[i].stream);
+		am->opcr[i].reg &= PCR_ONLINE | PCR_CHANNEL_MASK |
+				   OPCR_XSPEED_MASK | OPCR_SPEED_MASK |
+				   0x000003ff;
+	}
 }
 
 void fw_am_unit_cmp_destroy(struct fw_am_unit *am)
 {
 	fw_core_remove_address_handler(&am->cmp_handler);
+	destroy_streams(am);
 }

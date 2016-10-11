@@ -7,6 +7,7 @@
  */
 
 #include "tx.h"
+#include "../fcp.h"
 
 enum fcp_state {
 	STATE_IDLE,
@@ -109,6 +110,7 @@ not_implemented:
 static void handle_avc_out_signal_format(struct fw_am_unit *am,
 					 u8 *frame, unsigned int len)
 {
+	struct pcr_resource *pcr;
 	unsigned int index, sfc, i;
 
 	mutex_lock(&am->mutex);
@@ -116,24 +118,25 @@ static void handle_avc_out_signal_format(struct fw_am_unit *am,
 	index = frame[3];
 	if (frame[1] != 0xff || index >= OHCI1394_MIN_TX_CTX)
 		goto rejected;
+	pcr = &am->opcr[index];
 
 	/* Control */
 	if (frame[0] == 0x00) {
-		if (amdtp_stream_running(&am->opcr[index].stream))
+		if (amdtp_stream_running(&pcr->stream))
 			goto rejected;
 
 		sfc = frame[5];
 		if (sfc >= CIP_SFC_COUNT)
 			goto rejected;
 
-		am->opcr[index].rate = amdtp_rate_table[sfc];
+		pcr->rate = amdtp_rate_table[sfc];
 		frame[0] = 0x09;
 	}
 
 	/* Status */
 	if (frame[0] == 0x01) {
 		for (i = 0; i < CIP_SFC_COUNT; ++i) {
-			if (amdtp_rate_table[i] == am->opcr[index].rate)
+			if (amdtp_rate_table[i] == pcr->rate)
 				break;
 		}
 		frame[0] = 0x0c;	/* Implemented/stable */
@@ -152,6 +155,8 @@ static void handle_avc_stream_format(struct fw_am_unit *am,
 {
 	unsigned int i, index;
 	struct avc_stream_formation formation;
+	struct pcr_resource *pcr;
+	int err;
 
 	/* SINGLE subfunction is supported only. */
 	if (frame[3] != 0xc0)
@@ -165,6 +170,9 @@ static void handle_avc_stream_format(struct fw_am_unit *am,
 
 	/* The index of PCR unit. */
 	index = frame[7];
+	if (index >= OHCI1394_MIN_TX_CTX)
+		goto rejected;
+	pcr = &am->opcr[index];
 
 	/* Control. */
 	if (frame[0] == 0x00) {
@@ -172,14 +180,14 @@ static void handle_avc_stream_format(struct fw_am_unit *am,
 		if (err < 0)
 			goto rejected;
 
-		am->opcr[index].rate = formation->rate;;
-		am->opcr[index].pcm_channels = formation->pcm;
+		pcr->rate = formation.rate;;
+		pcr->pcm_channels = formation.pcm;
 
 		frame[0] = 0x09;	/* Accepted. */
 	/* Status. */
 	} else if (frame[0] == 0x01) {
 		for (i = 0; i < ARRAY_SIZE(avc_stream_rate_table); ++i) {
-			if (am->opcr[index].rate == avc_stream_rate_table[i])
+			if (pcr->rate == avc_stream_rate_table[i])
 				break;
 		}
 		if (i == ARRAY_SIZE(avc_stream_rate_table))
@@ -191,7 +199,7 @@ static void handle_avc_stream_format(struct fw_am_unit *am,
 		frame[12] = avc_stream_rate_codes[i];
 		frame[13] = 0x02;	/* Command rate ctl is not supported. */
 		frame[14] = 0x01;	/* One entry. */
-		frame[15] = am->opcr[index].pcm_channels;
+		frame[15] = pcr->pcm_channels;
 		frame[16] = 0x06;	/* Multi bit linear audio (raw). */
 
 		frame[0] = 0x0c;	/* Implemented/stable */
@@ -251,6 +259,9 @@ static void handle_request(struct work_struct *work)
 			handle_avc_unit_info(am, t->frame, t->size);
 		case 0x18:	/* Output signal format */
 			handle_avc_out_signal_format(am, t->frame, t->size);
+			break;
+		case 0xbf:
+			handle_avc_stream_format(am, t->frame, t->size);
 			break;
 		case 0x31:	/* Subunit info */
 		case 0x19:	/* Input signal format */

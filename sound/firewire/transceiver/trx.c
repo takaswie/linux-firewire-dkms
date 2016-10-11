@@ -32,9 +32,9 @@ int snd_fw_trx_stream_add_pcm_constraints(struct amdtp_stream *stream,
 	else
 		hw->formats = AM824_OUT_PCM_FORMAT_BITS;
 
-	/* TODO: PCM channels */
+	/* TODO: list subfunction. */
 	hw->channels_min = 2;
-	hw->channels_max = 2;
+	hw->channels_max = 64;
 
 	for (i = 0; i < CIP_SFC_COUNT; i++)
 		hw->rates |= snd_pcm_rate_to_rate_bit(amdtp_rate_table[i]);
@@ -131,14 +131,13 @@ static int fw_trx_probe(struct fw_unit *unit,
 			const struct ieee1394_device_id *entry)
 {
 	struct fw_device *fw_dev = fw_parent_device(unit);
-	struct fw_card *fw_card = fw_dev->card;
 	int err;
 
 	err = check_unit_directory(unit);
 	if (err < 0)
 		return err;
 
-	if (fw_card->node_id == fw_dev->node_id)
+	if (fw_dev->is_local)
 		err = fw_am_unit_probe(unit);
 	else
 		err = snd_fwtx_probe(unit);
@@ -149,9 +148,8 @@ static int fw_trx_probe(struct fw_unit *unit,
 static void fw_trx_update(struct fw_unit *unit)
 {
 	struct fw_device *fw_dev = fw_parent_device(unit);
-	struct fw_card *fw_card = fw_dev->card;
 
-	if (fw_card->node_id == fw_dev->node_id)
+	if (fw_dev->is_local)
 		fw_am_unit_update(unit);
 	else
 		snd_fwtx_update(unit);
@@ -160,9 +158,8 @@ static void fw_trx_update(struct fw_unit *unit)
 static void fw_trx_remove(struct fw_unit *unit)
 {
 	struct fw_device *fw_dev = fw_parent_device(unit);
-	struct fw_card *fw_card = fw_dev->card;
 
-	if (fw_card->node_id == fw_dev->node_id)
+	if (fw_dev->is_local)
 		fw_am_unit_remove(unit);
 	else
 		snd_fwtx_remove(unit);

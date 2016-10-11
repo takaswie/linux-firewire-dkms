@@ -12,7 +12,8 @@ static void am_unit_card_free(struct snd_card *card)
 {
 	struct fw_am_unit *am = card->private_data;
 
-	fw_am_unit_stream_destroy(am);
+	fw_am_unit_cmp_destroy(am);
+	fw_am_unit_fcp_destroy(am);
 
 	mutex_destroy(&am->mutex);
 	fw_unit_put(am->unit);
@@ -39,11 +40,6 @@ int fw_am_unit_probe(struct fw_unit *unit)
 
 	mutex_init(&am->mutex);
 	spin_lock_init(&am->lock);
-
-	/* Prepare for packet streaming. */
-	err = fw_am_unit_stream_init(am);
-	if (err < 0)
-		goto error;
 
 	/* Prepare for ALSA character devices. */
 	err = snd_fw_trx_name_card(unit, card);
@@ -74,7 +70,6 @@ int fw_am_unit_probe(struct fw_unit *unit)
 	/* Register and add ALSA character devices. */
 	err = snd_card_register(card);
 	if (err < 0) {
-		fw_am_unit_stream_destroy(am);
 		fw_am_unit_fcp_destroy(am);
 		fw_am_unit_cmp_destroy(am);
 		goto error;
@@ -90,7 +85,6 @@ void fw_am_unit_update(struct fw_unit *unit)
 {
 	struct fw_am_unit *am = dev_get_drvdata(&unit->device);
 
-	fw_am_unit_stream_update(am);
 	fw_am_unit_cmp_update(am);
 	fw_am_unit_fcp_update(am);
 }
@@ -98,10 +92,6 @@ void fw_am_unit_update(struct fw_unit *unit)
 void fw_am_unit_remove(struct fw_unit *unit)
 {
 	struct fw_am_unit *am = dev_get_drvdata(&unit->device);
-
-	/* Release handlers in advance. */
-	fw_am_unit_cmp_destroy(am);
-	fw_am_unit_fcp_destroy(am);
 
 	snd_card_free_when_closed(am->card);
 }

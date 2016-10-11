@@ -35,8 +35,11 @@ static int pcm_playback_open(struct snd_pcm_substream *substream)
 			    SNDRV_PCM_RATE_192000;
 	snd_pcm_limit_hw_rates(runtime);
 
-	runtime->hw.channels_min = 2;
-	runtime->hw.channels_max = 64;
+	runtime->hw.rate_min = am->opcr[index].rate;
+	runtime->hw.rate_max = am->opcr[index].rate;
+
+	runtime->hw.channels_min = am->opcr[index].pcm_channels;
+	runtime->hw.channels_max = am->opcr[index].pcm_channels;
 
 	runtime->hw.periods_min = 2;
 	runtime->hw.periods_max = UINT_MAX;
@@ -52,10 +55,6 @@ static int pcm_playback_open(struct snd_pcm_substream *substream)
 
 	snd_pcm_set_sync(substream);
 
-	/* TODO: PCM channels */
-	substream->runtime->hw.rate_min = am->opcr[index].rate;
-	substream->runtime->hw.rate_max = am->opcr[index].rate;
-
 	return 0;
 }
 
@@ -69,17 +68,12 @@ static int pcm_playback_hw_params(struct snd_pcm_substream *substream,
 {
 	struct fw_am_unit *am = substream->private_data;
 	unsigned int index = substream->pcm->device;
-	int err;
 
-	err = snd_pcm_lib_alloc_vmalloc_buffer(substream,
-					       params_buffer_bytes(hw_params));
-	if (err < 0)
-		return err;
+	if (amdtp_stream_running(&am->opcr[index].stream))
+		return -EIO;
 
-	amdtp_am824_set_pcm_format(&am->opcr[index].stream,
-				   params_format(hw_params));
-
-	return 0;
+	return snd_pcm_lib_alloc_vmalloc_buffer(substream,
+						params_buffer_bytes(hw_params));
 }
 
 static int pcm_playback_hw_free(struct snd_pcm_substream *substream)
@@ -92,6 +86,9 @@ static int pcm_playback_prepare(struct snd_pcm_substream *substream)
 	struct fw_am_unit *am = substream->private_data;
 	unsigned int index = substream->pcm->device;
 
+	if (amdtp_stream_running(&am->opcr[index].stream))
+		return -EIO;
+
 	amdtp_stream_pcm_prepare(&am->opcr[index].stream);
 
 	return 0;
@@ -101,6 +98,9 @@ static int pcm_playback_trigger(struct snd_pcm_substream *substream, int cmd)
 {
 	struct fw_am_unit *am = substream->private_data;
 	unsigned int index = substream->pcm->device;
+
+	if (amdtp_stream_running(&am->opcr[index].stream))
+		return -EIO;
 
 	switch (cmd) {
 	case SNDRV_PCM_TRIGGER_START:

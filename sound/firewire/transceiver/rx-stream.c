@@ -7,27 +7,61 @@
  */
 
 #include "rx.h"
+#include "../fcp.h"
 
 #define CALLBACK_TIMEOUT	100
 
 int snd_fwtx_stream_start_simplex(struct snd_fwtx *fwtx, int index,
-				  unsigned int channels, unsigned int rate)
+				  unsigned int pcm_channels, unsigned int rate)
 {
+	u8 format[9];
+	struct avc_stream_formation formation;
+	unsigned int i, len;
 	int err;
 
 	if (fwtx->capture_substreams[index] == 0)
 		return 0;
 
-	/* TODO: retrieve from peer. */
-	if (channels == 0)
-		channels = 2;
-	if (rate == 0)
-		rate = 44100;
+	/* Get current stream format information. */
+	len = sizeof(format);
+	err = avc_stream_get_format_single(fwtx->unit, AVC_GENERAL_PLUG_DIR_OUT,
+					   index, format, &len);
+	if (err < 0)
+		return err;
+	err = avc_stream_parse_format(format, &formation);
+	if (err < 0)
+		return err;
 
-	/* TODO: set stream format to peers. */
+	/* Supplement to stream format information. */
+	if (pcm_channels == 0)
+		pcm_channels = formation.pcm;
+	if (rate == 0)
+		rate = formation.rate;
+
+	/* Construct stream format information. */
+	for (i = 0; i < ARRAY_SIZE(avc_stream_rate_table); ++i) {
+		if (avc_stream_rate_table[i] == rate)
+			break;
+	}
+	if (i == ARRAY_SIZE(avc_stream_rate_table))
+		return -EINVAL;
+
+	format[0] = 0x90;	/* Audio and Music root. */
+	format[1] = 0x40;	/* Compound AM824 level. */
+	format[2] = avc_stream_rate_codes[i];	/* Sampling frequency. */
+	format[3] = 0x02;	/* Unsupport Command-based rate control. */
+	format[4] = 0x02;	/* Two stream formats. */
+	format[5] = pcm_channels;
+	format[6] = 0x06;	/* Multi bit linear audio data channel. */
+	format[7] = 0x01;
+	format[8] = 0x0d;	/* MIDI conformant data channel. */
+	err = avc_stream_set_format(fwtx->unit, AVC_GENERAL_PLUG_DIR_OUT, index,
+				    format, sizeof(format));
+	if (err < 0)
+		return err;
 
 	err = amdtp_am824_set_parameters(&fwtx->tx_stream[index],
-					 rate, channels, rate, false);
+					 rate, pcm_channels, rate, false);
 	if (err < 0)
 		return err;
 
@@ -69,7 +103,7 @@ int snd_fwtx_stream_init_simplex(struct snd_fwtx *fwtx)
 {
 	int i, err;
 
-
+	/* TODO: error handling. */
 	for (i = 0; i < OHCI1394_MIN_RX_CTX; i++) {
 		err = cmp_connection_init(&fwtx->out_conn[i], fwtx->unit,
 					  CMP_OUTPUT, i);
@@ -79,7 +113,6 @@ int snd_fwtx_stream_init_simplex(struct snd_fwtx *fwtx)
 		err = amdtp_am824_init(&fwtx->tx_stream[i], fwtx->unit,
 				       AMDTP_IN_STREAM, CIP_BLOCKING);
 		if (err < 0) {
-			/* TODO: error handling. */
 			cmp_connection_destroy(&fwtx->out_conn[i]);
 			break;
 		}

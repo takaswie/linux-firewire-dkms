@@ -18,9 +18,9 @@
 #define ROOT_MODEL_ID		0x023901
 
 /* Unit directory for AV/C protocol. */
-#define AM_UNIT_SPEC_1394TA	0x0000a02d
-#define AM_UNIT_VERSION_AVC	0x00010001
-#define AM_UNIT_MODEL_ID	0x00736e64	/* "snd" */
+#define AM_UNIT_SPEC_1394TA	0x00a02d
+#define AM_UNIT_VERSION_AVC	0x010001
+#define AM_UNIT_MODEL_ID	0x023903
 #define AM_UNIT_NAME_0		0x4c696e75	/* Linu */
 #define AM_UNIT_NAME_1		0x7820414c	/* x AL */
 #define AM_UNIT_NAME_2		0x53410000	/* SA.. */

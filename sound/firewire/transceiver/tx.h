@@ -15,9 +15,16 @@
 
 struct pcr_resource {
 	u32 reg;
-	unsigned int pcm_channels;
+
 	unsigned int rate;
+	unsigned int pcm_channels;
+
+	unsigned int isoc_ch;
+	unsigned int speed;
 	struct amdtp_stream stream;
+
+	struct work_struct establish_work;
+	struct work_struct break_work;
 };
 
 struct fw_am_unit {
