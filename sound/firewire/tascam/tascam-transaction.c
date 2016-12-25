@@ -158,7 +158,7 @@ static void async_midi_port_callback(struct fw_card *card, int rcode,
 		snd_rawmidi_transmit_ack(substream, port->consume_bytes);
 	else if (!rcode_is_permanent_error(rcode))
 		/* To start next transaction immediately for recovery. */
-		port->next_ktime = ktime_set(0, 0);
+		port->next_ktime = 0;
 	else
 		/* Don't continue processing. */
 		port->error = true;
@@ -199,7 +199,7 @@ static void midi_port_work(struct work_struct *work)
 	if (port->consume_bytes <= 0) {
 		/* Do it in next chance, immediately. */
 		if (port->consume_bytes == 0) {
-			port->next_ktime = ktime_set(0, 0);
+			port->next_ktime = 0;
 			schedule_work(&port->work);
 		} else {
 			/* Fatal error. */
@@ -319,7 +319,7 @@ int snd_tscm_transaction_register(struct snd_tscm *tscm)
 
 	for (i = 0; i < TSCM_MIDI_OUT_PORT_MAX; i++) {
 		tscm->out_ports[i].parent = fw_parent_device(tscm->unit);
-		tscm->out_ports[i].next_ktime = ktime_set(0, 0);
+		tscm->out_ports[i].next_ktime = 0;
 		INIT_WORK(&tscm->out_ports[i].work, midi_port_work);
 	}
 
