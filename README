@@ -33,7 +33,7 @@ userspace applications.
 
 == Requirement ==
 
-- Linux kernel 3.11 or later
+- Linux kernel 4.4 or later
 
 
 == Current status ==
@@ -74,14 +74,14 @@ Then you need to install 'linux-headers' package to make drivers for your kernel
 
 Install:
 1. $ git clone https://github.com/takaswie/snd-firewire-improve.git
-2. $ ln -s $(pwd)/snd-firewire-improve/ /usr/src/alsa-firewire-3.11
+2. $ ln -s $(pwd)/snd-firewire-improve/ /usr/src/alsa-firewire-4.4
 (superuser)
-3. $ dkms install alsa-firewire/3.11 (superuser)
+3. $ dkms install alsa-firewire/4.4 (superuser)
 
 Uninstall
 1. $ modprobe -r snd-bebob snd-fireworks snd-dice snd-oxfw snd-firewire-lib (superuser)
-2. $ dkms remove alsa-firewire/3.11 --all (superuser)
-3. $ rm /usr/src/alsa-firewire-3.11 (superuser)
+2. $ dkms remove alsa-firewire/4.4 --all (superuser)
+3. $ rm /usr/src/alsa-firewire-4.4 (superuser)
 4. $ rm snd-firewire-improve
 
 
