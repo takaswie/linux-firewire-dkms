@@ -9,7 +9,6 @@
 #include <linux/firewire.h>
 #include <linux/firewire-constants.h>
 #include <linux/module.h>
-#include <linux/sched.h>
 #include "lib.h"
 #include "iso-resources.h"
 #include "cmp.h"

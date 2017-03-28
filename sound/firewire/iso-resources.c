@@ -11,7 +11,6 @@
 #include <linux/export.h>
 #include <linux/jiffies.h>
 #include <linux/mutex.h>
-#include <linux/sched.h>
 #include <linux/spinlock.h>
 #include "iso-resources.h"
 

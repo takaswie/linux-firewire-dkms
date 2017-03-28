@@ -17,7 +17,6 @@
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/compat.h>
-#include <linux/sched.h>
 
 /* TODO: remove when merging to upstream. */
 #include "../../../backport.h"

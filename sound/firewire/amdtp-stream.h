@@ -4,7 +4,6 @@
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/mutex.h>
-#include <linux/sched.h>
 #include <sound/asound.h>
 #include "packets-buffer.h"
 
