@@ -50,6 +50,7 @@ struct snd_ff {
 	struct snd_card *card;
 	struct fw_unit *unit;
 	struct mutex mutex;
+	spinlock_t lock;
 
 	bool registered;
 	struct delayed_work dwork;
@@ -100,5 +101,7 @@ struct snd_ff_protocol {
 int snd_ff_transaction_register(struct snd_ff *ff);
 int snd_ff_transaction_reregister(struct snd_ff *ff);
 void snd_ff_transaction_unregister(struct snd_ff *ff);
+
+int snd_ff_create_midi_devices(struct snd_ff *ff);
 
 #endif
