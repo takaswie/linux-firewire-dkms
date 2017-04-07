@@ -1,6 +1,6 @@
 = Developing for ALSA firewire stack =
 
-2017/03/28 坂本 貴史
+2017/04/07 坂本 貴史
 Takashi Sakamoto <o-takashi@sakamocchi.jp>
 
 == General ==
@@ -20,11 +20,11 @@ Released and merged:
  - snd-firewire-digi00x: for devices of Digidesign 002/003 family
  - snd-firewire-tascam: for devices of TASCAM FireWire series
  - snd-firewire-motu: for devices of Mark of the Unicorn FireWire series
+ - snd-fireface: for devices of RME Fireface series
  - snd-firewire-lib: for helper functions of AMDTP/CMP/FCP and AV/C commands
 
 Under developing:
  - snd-firewire-transceiver: enable packet streaming between Linux systems
- - snd-fireface: for devices of RME Fireface series
 
 My aim is implementing streaming functionality in ALSA, in kernel land. The
 other functionalities are out of the aim and should be implemented in
@@ -48,7 +48,7 @@ userspace applications.
 Linux 3.16 or later already includes snd-bebob and snd-fireworks.
 Linux 3.19 or later includes snd-oxfw and updates of snd-dice.
 Linux 4.4 includes snd-firewire-digi00x and snd-firewire-tascam.
-Linux 4.12 includes snd-firewire-motu.
+Linux 4.12 includes snd-firewire-motu and snd-fireface.
 
 Any bug reports should be sent to alsa-devel to share with users and developers.
 http://mailman.alsa-project.org/mailman/listinfo/alsa-devel
