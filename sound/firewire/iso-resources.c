@@ -14,6 +14,9 @@
 #include <linux/spinlock.h>
 #include "iso-resources.h"
 
+/* TODO: remove when merging to upstream. */
+#include "../../backport.h"
+
 /**
  * fw_iso_resources_init - initializes a &struct fw_iso_resources
  * @r: the resource manager to initialize

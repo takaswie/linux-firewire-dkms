@@ -4,6 +4,10 @@
 #include <linux/err.h>
 #include <linux/interrupt.h>
 #include <linux/mutex.h>
+
+/* TODO: remove when merging to upstream. */
+#include "../../backport.h"
+
 #include <sound/asound.h>
 #include "packets-buffer.h"
 
