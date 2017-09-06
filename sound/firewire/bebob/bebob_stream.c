@@ -629,8 +629,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, unsigned int rate)
 		if (err < 0) {
 			dev_err(&bebob->unit->device,
 				"fail to run AMDTP master stream:%d\n", err);
-			break_both_connections(bebob);
-			goto end;
+			goto break_connections;
 		}
 
 		/*
@@ -644,19 +643,15 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, unsigned int rate)
 				dev_err(&bebob->unit->device,
 					"fail to ensure sampling rate: %d\n",
 					err);
-				amdtp_stream_stop(&bebob->rx_stream);
-				break_both_connections(bebob);
-				goto end;
+				goto stop_rx_stream;
 			}
 		}
 
 		/* wait first callback */
 		if (!amdtp_stream_wait_callback(&bebob->rx_stream,
 						CALLBACK_TIMEOUT)) {
-			amdtp_stream_stop(&bebob->rx_stream);
-			break_both_connections(bebob);
 			err = -ETIMEDOUT;
-			goto end;
+			goto stop_rx_stream;
 		}
 	}
 
@@ -666,9 +661,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, unsigned int rate)
 		if (err < 0) {
 			dev_err(&bebob->unit->device,
 				"fail to run AMDTP slave stream:%d\n", err);
-			amdtp_stream_stop(&bebob->rx_stream);
-			break_both_connections(bebob);
-			goto end;
+			goto stop_rx_stream;
 		}
 
 		/* wait first callback */
@@ -681,6 +674,12 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, unsigned int rate)
 		}
 	}
 end:
+	return err;
+
+stop_rx_stream:
+	amdtp_stream_stop(&bebob->rx_stream);
+break_connections:
+	break_both_connections(bebob);
 	return err;
 }
 
