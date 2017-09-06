@@ -268,7 +268,7 @@ map_data_channels(struct snd_bebob *bebob, struct amdtp_stream *s)
 	 * use the maximum length of FCP.
 	 */
 	buf = kzalloc(256, GFP_KERNEL);
-	if (buf == NULL)
+	if (!buf)
 		return -ENOMEM;
 
 	if (s == &bebob->tx_stream)
@@ -472,7 +472,7 @@ break_both_connections(struct snd_bebob *bebob)
 	bebob->connected = false;
 
 	/* These models seems to be in transition state for a longer time. */
-	if (bebob->maudio_special_quirk != NULL)
+	if (bebob->maudio_special_quirk)
 		msleep(200);
 }
 
@@ -496,7 +496,7 @@ start_stream(struct snd_bebob *bebob, struct amdtp_stream *stream,
 		conn = &bebob->out_conn;
 
 	/* channel mapping */
-	if (bebob->maudio_special_quirk == NULL) {
+	if (!bebob->maudio_special_quirk) {
 		err = map_data_channels(bebob, stream);
 		if (err < 0)
 			goto end;
@@ -611,7 +611,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, unsigned int rate)
 		 *
 		 * For firmware customized by M-Audio, refer to next NOTE.
 		 */
-		if (bebob->maudio_special_quirk == NULL) {
+		if (!bebob->maudio_special_quirk) {
 			err = rate_spec->set(bebob, rate);
 			if (err < 0) {
 				dev_err(&bebob->unit->device,
@@ -637,7 +637,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob, unsigned int rate)
 		 * The firmware customized by M-Audio uses these commands to
 		 * start transmitting stream. This is not usual way.
 		 */
-		if (bebob->maudio_special_quirk != NULL) {
+		if (bebob->maudio_special_quirk) {
 			err = rate_spec->set(bebob, rate);
 			if (err < 0) {
 				dev_err(&bebob->unit->device,
@@ -794,7 +794,7 @@ fill_stream_formations(struct snd_bebob *bebob, enum avc_bridgeco_plug_dir dir,
 	int err;
 
 	buf = kmalloc(FORMAT_MAXIMUM_LENGTH, GFP_KERNEL);
-	if (buf == NULL)
+	if (!buf)
 		return -ENOMEM;
 
 	if (dir == AVC_BRIDGECO_PLUG_DIR_IN)
