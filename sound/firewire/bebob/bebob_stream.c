@@ -736,7 +736,7 @@ parse_stream_formation(u8 *buf, unsigned int len,
 		return -ENOSYS;
 
 	/* Avoid double count by different entries for the same rate. */
-	memset(&formation[i], 0, sizeof(struct snd_bebob_stream_formation));
+	memset(&formation[i], 0, sizeof(*formation));
 
 	for (e = 0; e < buf[4]; e++) {
 		channels = buf[5 + e * 2];
