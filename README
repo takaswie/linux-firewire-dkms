@@ -24,6 +24,7 @@ Released and merged:
  - snd-firewire-lib: for helper functions of AMDTP/CMP/FCP and AV/C commands
 
 Under developing:
+ - snd-mln2: for devices based on Yamaha's MLN2 board module.
  - snd-firewire-transceiver: enable packet streaming between Linux systems
 
 My aim is implementing streaming functionality in ALSA, in kernel land. The
