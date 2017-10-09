@@ -44,61 +44,101 @@ static int name_card(struct snd_mln *mln)
 	return 0;
 }
 
+static void mln_free(struct snd_mln *mln)
+{
+	fw_unit_put(mln->unit);
+
+	mutex_destroy(&mln->mutex);
+	kfree(mln);
+}
+
 static void mln_card_free(struct snd_card *card)
 {
 	struct snd_mln *mln = card->private_data;
 
-	fw_unit_put(mln->unit);
+	mln_free(mln);
+}
 
-	mutex_destroy(&mln->mutex);
+static void do_registration(struct work_struct *work)
+{
+	struct snd_mln *mln = container_of(work, struct snd_mln, dwork.work);
+	int err;
+
+	if (mln->registered)
+		return;
+
+	err = snd_card_new(&mln->unit->device, -1, NULL, THIS_MODULE, 0,
+			   &mln->card);
+	if (err < 0)
+		return;
+
+	err = name_card(mln);
+	if (err < 0)
+		goto  error;
+
+	err = snd_card_register(mln->card);
+	if (err < 0)
+		goto error;
+
+	mln->card->private_free = mln_card_free;
+	mln->card->private_data = mln;
+	mln->registered = true;
+
+	return;
+error:
+	snd_card_free(mln->card);
+	dev_info(&mln->unit->device,
+		 "Sound card registration failed: %d\n", err);
 }
 
 static int snd_mln_probe(struct fw_unit *unit,
 			 const struct ieee1394_device_id *entry)
 {
-	struct snd_card *card;
 	struct snd_mln *mln;
-	int err;
 
-	err = snd_card_new(&unit->device, -1, NULL, THIS_MODULE,
-			   sizeof(*mln), &card);
-	if (err < 0)
-		return err;
-	card->private_free = mln_card_free;
+	mln = kzalloc(sizeof(*mln), GFP_KERNEL);
+	if (mln == NULL)
+		return -ENOMEM;
 
-	mln = card->private_data;
-	mln->card = card;
 	mln->unit = fw_unit_get(unit);
 	dev_set_drvdata(&unit->device, mln);
 
 	mutex_init(&mln->mutex);
 
-	err = name_card(mln);
-	if (err < 0) {
-		snd_card_free(card);
-		return err;
-	}
-
-	err = snd_card_register(card);
-	if (err < 0) {
-		snd_card_free(card);
-		return err;
-	}
+	/* Register this sound card later. */
+	INIT_DEFERRABLE_WORK(&mln->dwork, do_registration);
+	snd_fw_schedule_registration(unit, &mln->dwork);
 
 	return 0;
 }
 
 static void snd_mln_update(struct fw_unit *unit)
 {
-	return;
+	struct snd_mln *mln = dev_get_drvdata(&unit->device);
+
+	/* Postpone a workqueue for deferred registration. */
+	if (!mln->registered)
+		snd_fw_schedule_registration(unit, &mln->dwork);
 }
 
 static void snd_mln_remove(struct fw_unit *unit)
 {
 	struct snd_mln *mln = dev_get_drvdata(&unit->device);
 
-	/* No need to wait for releasing card object in this context. */
-	snd_card_free_when_closed(mln->card);
+	/*
+	 * Confirm to stop the work for registration before the sound card is
+	 * going to be released. The work is not scheduled again because bus
+	 * reset handler is not called anymore.
+	 */
+	cancel_work_sync(&mln->dwork.work);
+
+	if (mln->registered) {
+		/* No need to wait for releasing card object in this context. */
+		snd_card_free_when_closed(mln->card);
+	} else {
+		/* Don't forget this case. */
+		mln_free(mln);
+	}
 }
 
 static const struct ieee1394_device_id snd_mln_id_table[] = {
