@@ -160,13 +160,14 @@ config SND_FIREFACE
 	 Say Y here to include support for RME fireface series.
 	  * Fireface 400
 
-config SND_MLN2
-	tristate "Yamaha MLN2 board module support"
+config SND_MLN
+	tristate "Yamaha MLN3 board module support"
 	select SND_FIREWIRE_LIB
 	select SND_HWDEP
 	help
-	 Say Y here to include support for Yamaha mLAN 2nd generation.
-	  * 01X
-	  * i88X
+	 Say Y here to include support for Yamaha mLAN 3rd generation.
+	  * 3rd generation
+	   * Yamaha n8/n12
+	   * Steinberg MR816x/MR816cx
 
 endif # SND_FIREWIRE
