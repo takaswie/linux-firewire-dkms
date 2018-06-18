@@ -1,6 +1,10 @@
 obj-m += sound/firewire/
 
-KDIR := /lib/modules/$(shell uname -r)/build
+ifndef KERNELRELEASE
+KERNELRELEASE := $(shell uname -r)
+endif
+
+KDIR := /lib/modules/$(KERNELRELEASE)/build
 PWD := $(shell pwd)
 
 #force to build all modules
