@@ -18,6 +18,8 @@
 #define END_OFFSET	0x6180
 
 struct snd_lm_loader {
+	enum snd_lm_type type;
+
 	struct fw_unit *unit;
 
 	bool loaded;
@@ -97,6 +99,7 @@ int snd_lm_loader_probe(struct fw_unit *unit)
 	lm = kzalloc(sizeof(struct snd_lm_loader), GFP_KERNEL);
 	if (!lm)
 		return -ENOMEM;
+	lm->type = SND_LM_TYPE_LOADER;
 
 	lm->unit = fw_unit_get(unit);
 	dev_set_drvdata(&unit->device, lm);
