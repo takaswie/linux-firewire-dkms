@@ -37,6 +37,14 @@ int snd_lm_loader_probe(struct fw_unit *unit);
 void snd_lm_loader_remove(struct fw_unit *unit);
 void snd_lm_loader_bus_update(struct fw_unit *unit);
 
+enum snd_lm_runtime_msg_types {
+	SND_LM_RUNTIME_MSG_TYPE_ASCII = 1,
+	SND_LM_RUNTIME_MSG_TYPE_UNKNOWN_0,
+	SND_LM_RUNTIME_MSG_TYPE_UNKNOWN_1,
+	SND_LM_RUNTIME_MSG_TYPE_UNKNOWN_2,
+	SND_LM_RUNTIME_MSG_TYPE_UNKNOWN_3,
+};
+
 struct snd_lm_runtime {
 	enum snd_lm_type type;
 
@@ -47,10 +55,19 @@ struct snd_lm_runtime {
 	struct snd_card *card;
 
 	struct mutex mutex;
+	struct fw_address_handler msg_handler;
+	enum snd_lm_runtime_msg_types last_msg_type;
+	wait_queue_head_t wait;
+
+	u32 caps[3];
 };
 
 int snd_lm_runtime_probe(struct fw_unit *unit);
 void snd_lm_runtime_bus_update(struct fw_unit *unit);
 void snd_lm_runtime_remove(struct fw_unit *unit);
+
+int snd_lm_transaction_register(struct snd_lm_runtime *lm);
+int snd_lm_transaction_reregister(struct snd_lm_runtime *lm);
+void snd_lm_transaction_unregister(struct snd_lm_runtime *lm);
 
 #endif

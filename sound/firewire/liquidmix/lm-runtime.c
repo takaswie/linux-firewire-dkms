@@ -47,6 +47,8 @@ static int name_card(struct snd_lm_runtime *lm)
 
 static void lm_runtime_free(struct snd_lm_runtime *lm)
 {
+	snd_lm_transaction_unregister(lm);
+
 	fw_unit_put(lm->unit);
 
 	mutex_destroy(&lm->mutex);
@@ -72,6 +74,10 @@ static void do_registration(struct work_struct *work)
 	if (err < 0)
 		goto error;
 
+	err = snd_lm_transaction_register(lm);
+	if (err < 0)
+		goto error;
+
 	err = snd_card_register(lm->card);
 	if (err < 0)
 		goto error;
@@ -86,6 +92,7 @@ static void do_registration(struct work_struct *work)
 
 	return;
 error:
+	snd_lm_transaction_unregister(lm);
 	snd_card_free(lm->card);
 	dev_info(&lm->unit->device,
 		 "Sound card registration failed: %d\n", err);
@@ -116,6 +123,8 @@ void snd_lm_runtime_bus_update(struct fw_unit *unit)
 
 	if (!lm->registered)
 		snd_fw_schedule_registration(unit, &lm->dwork);
+	else
+		snd_lm_transaction_reregister(lm);
 }
 
 void snd_lm_runtime_remove(struct fw_unit *unit)
