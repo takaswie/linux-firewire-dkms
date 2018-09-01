@@ -20,4 +20,12 @@
 /* TODO: remove when merging to upstream. */
 #include "../../../backport.h"
 
+#include "../lib.h"
+
+#define SND_LM_FIRMWARE_NAME	"focusrite-liquid_mix-v2.3.4.bin"
+
+int snd_lm_loader_probe(struct fw_unit *unit);
+void snd_lm_loader_remove(struct fw_unit *unit);
+void snd_lm_loader_bus_update(struct fw_unit *unit);
+
 #endif

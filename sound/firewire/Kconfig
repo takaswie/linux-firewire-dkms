@@ -164,6 +164,7 @@ config SND_FIREWIRE_LIQUIDMIX
 	tristate "Focusrite Liqud Mix series support"
 	select SND_FIREWIRE_LIB
 	select SND_HWDEP
+	select FW_LOADER
 	help
 	 Say Y here to include support for Focusrite Liquid Mix series.
 	  * Liquid Mix 16

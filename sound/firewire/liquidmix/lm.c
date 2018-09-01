@@ -13,6 +13,7 @@
 MODULE_DESCRIPTION("Focusrite Liquid Mix driver");
 MODULE_AUTHOR("Takashi Sakamoto <o-takashi@sakamocchi.jp>");
 MODULE_LICENSE("GPL v2");
+MODULE_FIRMWARE(SND_LM_FIRMWARE_NAME);
 
 #define LM_DEVICE_ENTRY(model)					\
 	{							\
@@ -23,6 +24,10 @@ MODULE_LICENSE("GPL v2");
 	}
 
 static const struct ieee1394_device_id lm_id_table[] = {
+	// Liquid Mix 32 firmware loader.
+	LM_DEVICE_ENTRY(0x010200),
+	// Liquid Mix 16 firmware loader.
+	LM_DEVICE_ENTRY(0x010204),
 	{},
 };
 MODULE_DEVICE_TABLE(ieee1394, lm_id_table);
@@ -30,16 +35,17 @@ MODULE_DEVICE_TABLE(ieee1394, lm_id_table);
 static int lm_probe(struct fw_unit *unit,
 		    const struct ieee1394_device_id *entry)
 {
-	return 0;
+	return snd_lm_loader_probe(unit);
 }
 
 static void lm_remove(struct fw_unit *unit)
 {
+	snd_lm_loader_remove(unit);
 }
 
 static void lm_bus_update(struct fw_unit *unit)
 {
-	return;
+	snd_lm_loader_bus_update(unit);
 }
 
 static struct fw_driver lm_driver = {
