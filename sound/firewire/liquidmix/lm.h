@@ -37,4 +37,20 @@ int snd_lm_loader_probe(struct fw_unit *unit);
 void snd_lm_loader_remove(struct fw_unit *unit);
 void snd_lm_loader_bus_update(struct fw_unit *unit);
 
+struct snd_lm_runtime {
+	enum snd_lm_type type;
+
+	struct fw_unit *unit;
+
+	bool registered;
+	struct delayed_work dwork;
+	struct snd_card *card;
+
+	struct mutex mutex;
+};
+
+int snd_lm_runtime_probe(struct fw_unit *unit);
+void snd_lm_runtime_bus_update(struct fw_unit *unit);
+void snd_lm_runtime_remove(struct fw_unit *unit);
+
 #endif

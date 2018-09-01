@@ -24,6 +24,8 @@ MODULE_FIRMWARE(SND_LM_FIRMWARE_NAME);
 	}
 
 static const struct ieee1394_device_id lm_id_table[] = {
+	// Liquid Mix 16/32 runtime v2.3.4.
+	LM_DEVICE_ENTRY(0x420304),
 	// Liquid Mix 32 firmware loader.
 	LM_DEVICE_ENTRY(0x010200),
 	// Liquid Mix 16 firmware loader.
@@ -35,17 +37,36 @@ MODULE_DEVICE_TABLE(ieee1394, lm_id_table);
 static int lm_probe(struct fw_unit *unit,
 		    const struct ieee1394_device_id *entry)
 {
-	return snd_lm_loader_probe(unit);
+	if (entry == lm_id_table)
+		return snd_lm_runtime_probe(unit);
+	else
+		return snd_lm_loader_probe(unit);
 }
 
 static void lm_remove(struct fw_unit *unit)
 {
-	snd_lm_loader_remove(unit);
+	struct snd_lm_common *lm = dev_get_drvdata(&unit->device);
+
+	if (lm->type == SND_LM_TYPE_LOADER)
+		snd_lm_loader_remove(unit);
+	else if (lm->type == SND_LM_TYPE_RUNTIME)
+		snd_lm_runtime_remove(unit);
+	else
+		dev_info(&unit->device,
+			 "Something goes bad. Please report to developer.\n");
 }
 
 static void lm_bus_update(struct fw_unit *unit)
 {
-	snd_lm_loader_bus_update(unit);
+	struct snd_lm_common *lm = dev_get_drvdata(&unit->device);
+
+	if (lm->type == SND_LM_TYPE_LOADER)
+		snd_lm_loader_bus_update(unit);
+	else if (lm->type == SND_LM_TYPE_RUNTIME)
+		snd_lm_runtime_bus_update(unit);
+	else
+		dev_info(&unit->device,
+			 "Something goes bad. Please report to developer.\n");
 }
 
 static struct fw_driver lm_driver = {
