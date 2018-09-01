@@ -160,4 +160,13 @@ config SND_FIREFACE
 	 Say Y here to include support for RME fireface series.
 	  * Fireface 400
 
+config SND_FIREWIRE_LIQUIDMIX
+	tristate "Focusrite Liqud Mix series support"
+	select SND_FIREWIRE_LIB
+	select SND_HWDEP
+	help
+	 Say Y here to include support for Focusrite Liquid Mix series.
+	  * Liquid Mix 16
+	  * Liquid Mix 32
+
 endif # SND_FIREWIRE
