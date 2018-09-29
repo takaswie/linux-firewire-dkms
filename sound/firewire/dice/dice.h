@@ -30,7 +30,7 @@
 
 #include <sound/control.h>
 #include <sound/core.h>
-//#include <sound/firewire.h>
+#include <sound/firewire.h>
 #include <sound/hwdep.h>
 #include <sound/info.h>
 #include <sound/initval.h>

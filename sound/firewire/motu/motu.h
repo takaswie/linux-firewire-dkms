@@ -27,7 +27,7 @@
 #include <sound/pcm.h>
 #include <sound/info.h>
 #include <sound/rawmidi.h>
-//#include <sound/firewire.h>
+#include <sound/firewire.h>
 #include <sound/hwdep.h>
 
 #include "../lib.h"

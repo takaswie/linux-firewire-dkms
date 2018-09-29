@@ -29,7 +29,7 @@
 #include <sound/rawmidi.h>
 #include <sound/pcm_params.h>
 #include <sound/hwdep.h>
-//#include <sound/firewire.h>
+#include <sound/firewire.h>
 
 #include "../packets-buffer.h"
 #include "../iso-resources.h"

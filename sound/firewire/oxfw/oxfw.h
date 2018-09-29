@@ -26,7 +26,7 @@
 #include <sound/info.h>
 #include <sound/rawmidi.h>
 #include <sound/hwdep.h>
-//#include <sound/firewire.h>
+#include <sound/firewire.h>
 
 #include "../lib.h"
 #include "../fcp.h"
