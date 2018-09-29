@@ -28,7 +28,7 @@
 #include <sound/pcm.h>
 #include <sound/pcm_params.h>
 #include <sound/hwdep.h>
-//#include <sound/firewire.h>
+#include <sound/firewire.h>
 
 #include "../lib.h"
 #include "../amdtp-stream.h"
