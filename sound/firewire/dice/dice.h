@@ -23,6 +23,7 @@
 #include <linux/slab.h>
 #include <linux/spinlock.h>
 #include <linux/wait.h>
+#include <linux/sched/signal.h>
 
 /* TODO: remove when merging to upstream. */
 #include "../../../backport.h"

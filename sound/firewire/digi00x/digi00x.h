@@ -16,6 +16,7 @@
 #include <linux/mod_devicetable.h>
 #include <linux/delay.h>
 #include <linux/slab.h>
+#include <linux/sched/signal.h>
 
 /* TODO: remove when merging to upstream. */
 #include "../../../backport.h"
