@@ -66,6 +66,7 @@ union snd_firewire_event {
 #define SNDRV_FIREWIRE_IOCTL_GET_INFO _IOR('H', 0xf8, struct snd_firewire_get_info)
 #define SNDRV_FIREWIRE_IOCTL_LOCK      _IO('H', 0xf9)
 #define SNDRV_FIREWIRE_IOCTL_UNLOCK    _IO('H', 0xfa)
+#define SNDRV_FIREWIRE_IOCTL_TASCAM_STATUS _IOWR('H', 0xfb, struct snd_firewire_tascam_status)
 
 #define SNDRV_FIREWIRE_TYPE_DICE	1
 #define SNDRV_FIREWIRE_TYPE_FIREWORKS	2
@@ -89,5 +90,9 @@ struct snd_firewire_get_info {
  */
 
 #define SNDRV_FIREWIRE_TASCAM_STATUS_COUNT	64
+
+struct snd_firewire_tascam_status {
+	__u32 info[SNDRV_FIREWIRE_TASCAM_STATUS_COUNT];
+};
 
 #endif /* _UAPI_SOUND_FIREWIRE_H_INCLUDED */
