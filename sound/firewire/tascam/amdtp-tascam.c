@@ -122,11 +122,36 @@ static void read_status_messages(struct amdtp_stream *s,
 {
 	struct snd_tscm *tscm = container_of(s, struct snd_tscm, tx_stream);
 	unsigned int index = 0;
+	u32 quad;
+	u32 mask;
 	int i;
 
 	for (i = 0; i < data_blocks; i++) {
 		index = be32_to_cpu(buffer[0]) % SNDRV_FIREWIRE_TASCAM_STATUS_COUNT;
-		tscm->status[index] = buffer[s->data_block_quadlets - 1];
+		quad = buffer[s->data_block_quadlets - 1];
+
+		if (index >= 5 && index <= 15) {
+			if (index == 5)
+				mask = 0x0000ffff;
+			else
+				mask = 0xffffffff;
+
+			if ((quad ^ tscm->status[index]) & mask) {
+				spin_lock_irq(&tscm->lock);
+
+				tscm->queue[tscm->push_pos].index = index;
+				tscm->queue[tscm->push_pos].flags =
+							be32_to_cpu(quad);
+
+				if (++tscm->push_pos >= SND_TSCM_QUEUE_COUNT)
+					tscm->push_pos = 0;
+
+				spin_unlock_irq(&tscm->lock);
+
+				wake_up(&tscm->hwdep_wait);
+			}
+		}
+		tscm->status[index] = quad;
 		buffer += s->data_block_quadlets;
 	}
 }

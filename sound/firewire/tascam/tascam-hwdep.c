@@ -16,6 +16,54 @@
 
 #include "tascam.h"
 
+static long tscm_hwdep_read_queue(struct snd_tscm *tscm, char __user *buf,
+				  long remained, loff_t *offset)
+{
+	unsigned int type;
+	struct snd_firewire_tascam_control *ctl;
+	int length;
+	long count;
+
+	if (remained < sizeof(type))
+		return 0;
+
+	type = SNDRV_FIREWIRE_EVENT_TASCAM_CONTROL;
+	if (copy_to_user(buf, &type, sizeof(type)))
+		return -EFAULT;
+	count = sizeof(unsigned int);
+	remained -= count;
+	buf += count;
+
+	length = sizeof(*ctl);
+
+	spin_lock_irq(&tscm->lock);
+
+	while (tscm->push_pos != tscm->pull_pos) {
+		ctl = &tscm->queue[tscm->pull_pos];
+
+		if (remained < length)
+			break;
+
+		spin_unlock_irq(&tscm->lock);
+
+		if (copy_to_user(buf, ctl, length))
+			return -EFAULT;
+
+		spin_lock_irq(&tscm->lock);
+
+		count += length;
+		remained -= length;
+		buf += length;
+
+		if (++tscm->pull_pos >= SND_TSCM_QUEUE_COUNT)
+			tscm->pull_pos = 0;
+	}
+
+	spin_unlock_irq(&tscm->lock);
+
+	return count;
+}
+
 static long tscm_hwdep_read_locked(struct snd_tscm *tscm, char __user *buf,
 				   long count, loff_t *offset)
 {
@@ -46,7 +94,7 @@ static long hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
 
 	spin_lock_irq(&tscm->lock);
 
-	while (!tscm->dev_lock_changed) {
+	while (!tscm->dev_lock_changed && tscm->push_pos == tscm->pull_pos) {
 		prepare_to_wait(&tscm->hwdep_wait, &wait, TASK_INTERRUPTIBLE);
 		spin_unlock_irq(&tscm->lock);
 		schedule();
@@ -56,7 +104,14 @@ static long hwdep_read(struct snd_hwdep *hwdep, char __user *buf, long count,
 		spin_lock_irq(&tscm->lock);
 	}
 
-	return tscm_hwdep_read_locked(tscm, buf, count, offset);
+	spin_unlock_irq(&tscm->lock);
+
+	if (tscm->dev_lock_changed)
+		count = tscm_hwdep_read_locked(tscm, buf, count, offset);
+	else if (tscm->push_pos != tscm->pull_pos)
+		count = tscm_hwdep_read_queue(tscm, buf, count, offset);
+
+	return count;
 }
 
 static __poll_t hwdep_poll(struct snd_hwdep *hwdep, struct file *file,
@@ -68,7 +123,7 @@ static __poll_t hwdep_poll(struct snd_hwdep *hwdep, struct file *file,
 	poll_wait(file, &tscm->hwdep_wait, wait);
 
 	spin_lock_irq(&tscm->lock);
-	if (tscm->dev_lock_changed)
+	if (tscm->dev_lock_changed || tscm->pull_pos != tscm->push_pos)
 		events = EPOLLIN | EPOLLRDNORM;
 	else
 		events = 0;

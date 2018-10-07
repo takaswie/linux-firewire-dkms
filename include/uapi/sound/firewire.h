@@ -12,6 +12,7 @@
 #define SNDRV_FIREWIRE_EVENT_EFW_RESPONSE	0x4e617475
 #define SNDRV_FIREWIRE_EVENT_DIGI00X_MESSAGE	0x746e736c
 #define SNDRV_FIREWIRE_EVENT_MOTU_NOTIFICATION	0x64776479
+#define SNDRV_FIREWIRE_EVENT_TASCAM_CONTROL	0x7473636d
 
 struct snd_firewire_event_common {
 	unsigned int type; /* SNDRV_FIREWIRE_EVENT_xxx */
@@ -51,6 +52,16 @@ struct snd_firewire_event_digi00x_message {
 struct snd_firewire_event_motu_notification {
 	unsigned int type;
 	__u32 message;	/* MOTU-specific bits. */
+};
+
+struct snd_firewire_tascam_control {
+	unsigned int index;
+	__u32 flags;
+};
+
+struct snd_firewire_event_tascam_ctl {
+	unsigned int type;
+	struct snd_firewire_tascam_control controls[0];
 };
 
 union snd_firewire_event {
