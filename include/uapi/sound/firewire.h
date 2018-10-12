@@ -56,7 +56,8 @@ struct snd_firewire_event_motu_notification {
 
 struct snd_firewire_tascam_control {
 	unsigned int index;
-	__u32 flags;
+	__u32 before;
+	__u32 after;
 };
 
 struct snd_firewire_event_tascam_ctl {

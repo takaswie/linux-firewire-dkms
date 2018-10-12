@@ -144,7 +144,9 @@ static void read_status_messages(struct amdtp_stream *s,
 				spin_lock_irq(&tscm->lock);
 
 				tscm->queue[tscm->push_pos].index = index;
-				tscm->queue[tscm->push_pos].flags =
+				tscm->queue[tscm->push_pos].before =
+					be32_to_cpu(tscm->status[index]);
+				tscm->queue[tscm->push_pos].after =
 							be32_to_cpu(quad);
 
 				if (++tscm->push_pos >= SND_TSCM_QUEUE_COUNT)
