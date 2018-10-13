@@ -49,20 +49,20 @@ struct snd_firewire_event_digi00x_message {
 	__u32 message;	/* Digi00x-specific message */
 };
 
-struct snd_firewire_event_motu_notification {
-	unsigned int type;
-	__u32 message;	/* MOTU-specific bits. */
-};
-
 struct snd_firewire_tascam_control {
 	unsigned int index;
 	__u32 before;
 	__u32 after;
 };
 
-struct snd_firewire_event_tascam_ctl {
+struct snd_firewire_event_tascam_control {
 	unsigned int type;
 	struct snd_firewire_tascam_control controls[0];
+};
+
+struct snd_firewire_event_motu_notification {
+	unsigned int type;
+	__u32 message;	/* MOTU-specific bits. */
 };
 
 union snd_firewire_event {
@@ -71,6 +71,7 @@ union snd_firewire_event {
 	struct snd_firewire_event_dice_notification dice_notification;
 	struct snd_firewire_event_efw_response      efw_response;
 	struct snd_firewire_event_digi00x_message   digi00x_message;
+	struct snd_firewire_event_tascam_control    tascam_control;
 	struct snd_firewire_event_motu_notification motu_notification;
 };
 
@@ -78,7 +79,7 @@ union snd_firewire_event {
 #define SNDRV_FIREWIRE_IOCTL_GET_INFO _IOR('H', 0xf8, struct snd_firewire_get_info)
 #define SNDRV_FIREWIRE_IOCTL_LOCK      _IO('H', 0xf9)
 #define SNDRV_FIREWIRE_IOCTL_UNLOCK    _IO('H', 0xfa)
-#define SNDRV_FIREWIRE_IOCTL_TASCAM_STATUS _IOWR('H', 0xfb, struct snd_firewire_tascam_status)
+#define SNDRV_FIREWIRE_IOCTL_TASCAM_STATUS _IOR('H', 0xfb, struct snd_firewire_tascam_status)
 
 #define SNDRV_FIREWIRE_TYPE_DICE	1
 #define SNDRV_FIREWIRE_TYPE_FIREWORKS	2
@@ -104,7 +105,7 @@ struct snd_firewire_get_info {
 #define SNDRV_FIREWIRE_TASCAM_STATUS_COUNT	64
 
 struct snd_firewire_tascam_status {
-	__u32 info[SNDRV_FIREWIRE_TASCAM_STATUS_COUNT];
+	__u32 data[SNDRV_FIREWIRE_TASCAM_STATUS_COUNT];
 };
 
 #endif /* _UAPI_SOUND_FIREWIRE_H_INCLUDED */

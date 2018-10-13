@@ -121,43 +121,45 @@ static void read_status_messages(struct amdtp_stream *s,
 				 __be32 *buffer, unsigned int data_blocks)
 {
 	struct snd_tscm *tscm = container_of(s, struct snd_tscm, tx_stream);
-	unsigned int index = 0;
-	u32 quad;
-	u32 mask;
 	int i;
 
 	for (i = 0; i < data_blocks; i++) {
+		unsigned int index;
+		__be32 before, after;
+
 		index = be32_to_cpu(buffer[0]) % SNDRV_FIREWIRE_TASCAM_STATUS_COUNT;
-		quad = buffer[s->data_block_quadlets - 1];
+		before = tscm->status[index];
+		after = buffer[s->data_block_quadlets - 1];
 
-		if (index >= 5 && index <= 15) {
+		if (index > 4 && index < 16) {
+			__be32 mask;
+
 			if (index == 5)
-				mask = 0x0000ffff;
+				mask = cpu_to_be32(~0x0000ffff);
 			else if (index == 6)
-				mask = 0x0000ffff;
+				mask = cpu_to_be32(~0x0000ffff);
 			else if (index == 8)
-				mask = 0xfff0f0ff;
+				mask = cpu_to_be32(~0x000f0f00);
 			else
-				mask = 0xffffffff;
+				mask = cpu_to_be32(~0x00000000);
 
-			if ((quad ^ tscm->status[index]) & mask) {
+			if ((before ^ after) & mask) {
+				struct snd_firewire_tascam_control *entry =
+						&tscm->queue[tscm->push_pos];
+
 				spin_lock_irq(&tscm->lock);
-
-				tscm->queue[tscm->push_pos].index = index;
-				tscm->queue[tscm->push_pos].before =
-					be32_to_cpu(tscm->status[index]);
-				tscm->queue[tscm->push_pos].after =
-							be32_to_cpu(quad);
-
+				entry->index = index;
+				entry->before = be32_to_cpu(before);
+				entry->after = be32_to_cpu(after);
 				if (++tscm->push_pos >= SND_TSCM_QUEUE_COUNT)
 					tscm->push_pos = 0;
-
 				spin_unlock_irq(&tscm->lock);
 
 				wake_up(&tscm->hwdep_wait);
 			}
 		}
-		tscm->status[index] = quad;
+
+		tscm->status[index] = after;
 		buffer += s->data_block_quadlets;
 	}
 }
