@@ -133,6 +133,10 @@ static void read_status_messages(struct amdtp_stream *s,
 		if (index >= 5 && index <= 15) {
 			if (index == 5)
 				mask = 0x0000ffff;
+			else if (index == 6)
+				mask = 0x0000ffff;
+			else if (index == 8)
+				mask = 0xfff0f0ff;
 			else
 				mask = 0xffffffff;
 
