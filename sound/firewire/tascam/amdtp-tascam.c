@@ -129,19 +129,19 @@ static void read_status_messages(struct amdtp_stream *s,
 
 		index = be32_to_cpu(buffer[0]) % SNDRV_FIREWIRE_TASCAM_STATUS_COUNT;
 		before = tscm->status[index];
-		after = buffer[s->data_block_quadlets - 1];
+		after = be32_to_cpu(buffer[s->data_block_quadlets - 1]);
 
 		if (index > 4 && index < 16) {
 			__be32 mask;
 
 			if (index == 5)
-				mask = cpu_to_be32(~0x0000ffff);
+				mask = ~0x0000ffff;
 			else if (index == 6)
-				mask = cpu_to_be32(~0x0000ffff);
+				mask = ~0x0000ffff;
 			else if (index == 8)
-				mask = cpu_to_be32(~0x000f0f00);
+				mask = ~0x000f0f00;
 			else
-				mask = cpu_to_be32(~0x00000000);
+				mask = ~0x00000000;
 
 			if ((before ^ after) & mask) {
 				struct snd_firewire_tascam_control *entry =
@@ -149,8 +149,8 @@ static void read_status_messages(struct amdtp_stream *s,
 
 				spin_lock_irq(&tscm->lock);
 				entry->index = index;
-				entry->before = be32_to_cpu(before);
-				entry->after = be32_to_cpu(after);
+				entry->before = before;
+				entry->after = after;
 				if (++tscm->push_pos >= SND_TSCM_QUEUE_COUNT)
 					tscm->push_pos = 0;
 				spin_unlock_irq(&tscm->lock);
