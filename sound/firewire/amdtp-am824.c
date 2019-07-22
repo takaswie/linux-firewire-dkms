@@ -285,7 +285,7 @@ static void midi_rate_use_one_byte(struct amdtp_stream *s, unsigned int port)
 }
 
 static void write_midi_messages(struct amdtp_stream *s, __be32 *buffer,
-				unsigned int frames)
+			unsigned int frames, unsigned int data_block_counter)
 {
 	struct amdtp_am824 *p = s->protocol;
 	unsigned int f, port;
@@ -294,7 +294,7 @@ static void write_midi_messages(struct amdtp_stream *s, __be32 *buffer,
 	for (f = 0; f < frames; f++) {
 		b = (u8 *)&buffer[p->midi_position];
 
-		port = (s->data_block_counter + f) % 8;
+		port = (data_block_counter + f) % 8;
 		if (f < MAX_MIDI_RX_BLOCKS &&
 		    midi_ratelimit_per_packet(s, port) &&
 		    p->midi[port] != NULL &&
@@ -312,8 +312,8 @@ static void write_midi_messages(struct amdtp_stream *s, __be32 *buffer,
 	}
 }
 
-static void read_midi_messages(struct amdtp_stream *s,
-			       __be32 *buffer, unsigned int frames)
+static void read_midi_messages(struct amdtp_stream *s, __be32 *buffer,
+			unsigned int frames, unsigned int data_block_counter)
 {
 	struct amdtp_am824 *p = s->protocol;
 	int len;
@@ -324,7 +324,7 @@ static void read_midi_messages(struct amdtp_stream *s,
 		unsigned int port = f;
 
 		if (!(s->flags & CIP_UNALIGHED_DBC))
-			port += s->data_block_counter;
+			port += data_block_counter;
 		port %= 8;
 		b = (u8 *)&buffer[p->midi_position];
 
@@ -336,8 +336,9 @@ static void read_midi_messages(struct amdtp_stream *s,
 	}
 }
 
-static unsigned int process_rx_data_blocks(struct amdtp_stream *s, __be32 *buffer,
-					   unsigned int data_blocks, unsigned int *syt)
+static unsigned int process_rx_data_blocks(struct amdtp_stream *s,
+			__be32 *buffer, unsigned int data_blocks,
+			unsigned int data_block_counter, unsigned int *syt)
 {
 	struct amdtp_am824 *p = s->protocol;
 	struct snd_pcm_substream *pcm = READ_ONCE(s->pcm);
@@ -352,13 +353,14 @@ static unsigned int process_rx_data_blocks(struct amdtp_stream *s, __be32 *buffe
 	}
 
 	if (p->midi_ports)
-		write_midi_messages(s, buffer, data_blocks);
+		write_midi_messages(s, buffer, data_blocks, data_block_counter);
 
 	return pcm_frames;
 }
 
-static unsigned int process_tx_data_blocks(struct amdtp_stream *s, __be32 *buffer,
-					   unsigned int data_blocks, unsigned int *syt)
+static unsigned int process_tx_data_blocks(struct amdtp_stream *s,
+			__be32 *buffer, unsigned int data_blocks,
+			unsigned int data_block_counter, unsigned int *syt)
 {
 	struct amdtp_am824 *p = s->protocol;
 	struct snd_pcm_substream *pcm = READ_ONCE(s->pcm);
@@ -372,7 +374,7 @@ static unsigned int process_tx_data_blocks(struct amdtp_stream *s, __be32 *buffe
 	}
 
 	if (p->midi_ports)
-		read_midi_messages(s, buffer, data_blocks);
+		read_midi_messages(s, buffer, data_blocks, data_block_counter);
 
 	return pcm_frames;
 }
