@@ -136,6 +136,7 @@ struct amdtp_stream {
 
 			// To generate CIP header.
 			unsigned int fdf;
+			int syt_override;
 		} rx;
 	} ctx_data;
 
