@@ -515,7 +515,7 @@ static void build_it_pkt_header(struct amdtp_stream *s, unsigned int cycle,
 	}
 
 	trace_amdtp_packet(s, cycle, cip_header, payload_length, data_blocks,
-			   index);
+			   s->data_block_counter, index);
 
 	if (!(s->flags & CIP_DBC_IS_END_EVENT)) {
 		s->data_block_counter =
@@ -657,7 +657,7 @@ static int parse_ir_ctx_header(struct amdtp_stream *s, unsigned int cycle,
 	s->data_block_counter = dbc;
 
 	trace_amdtp_packet(s, cycle, cip_header, *payload_length, *data_blocks,
-			   index);
+			   s->data_block_counter, index);
 
 	return err;
 }
