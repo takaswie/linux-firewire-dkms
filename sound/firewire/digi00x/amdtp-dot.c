@@ -331,8 +331,8 @@ void amdtp_dot_midi_trigger(struct amdtp_stream *s, unsigned int port,
 }
 
 static unsigned int process_tx_data_blocks(struct amdtp_stream *s,
-			__be32 *buffer, unsigned int data_blocks,
-			unsigned int data_block_counter, unsigned int *syt)
+				__be32 *buffer, unsigned int data_blocks,
+				unsigned int data_block_counter)
 {
 	struct snd_pcm_substream *pcm;
 	unsigned int pcm_frames;
@@ -351,8 +351,8 @@ static unsigned int process_tx_data_blocks(struct amdtp_stream *s,
 }
 
 static unsigned int process_rx_data_blocks(struct amdtp_stream *s,
-			__be32 *buffer, unsigned int data_blocks,
-			unsigned int data_block_counter, unsigned int *syt)
+				__be32 *buffer, unsigned int data_blocks,
+				unsigned int data_block_counter)
 {
 	struct snd_pcm_substream *pcm;
 	unsigned int pcm_frames;
