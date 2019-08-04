@@ -446,10 +446,9 @@ start_stream(struct snd_bebob *bebob, struct amdtp_stream *stream)
 			goto end;
 	}
 
-	/* start amdtp stream */
-	err = amdtp_stream_start(stream,
-				 conn->resources.channel,
-				 conn->speed);
+	// start amdtp stream.
+	err = amdtp_domain_add_stream(&bebob->domain, stream,
+				      conn->resources.channel, conn->speed);
 end:
 	return err;
 }
@@ -524,7 +523,13 @@ int snd_bebob_stream_init_duplex(struct snd_bebob *bebob)
 		return err;
 	}
 
-	return 0;
+	err = amdtp_domain_init(&bebob->domain);
+	if (err < 0) {
+		destroy_stream(bebob, &bebob->tx_stream);
+		destroy_stream(bebob, &bebob->rx_stream);
+	}
+
+	return err;
 }
 
 static int keep_resources(struct snd_bebob *bebob, struct amdtp_stream *stream,
@@ -567,9 +572,7 @@ int snd_bebob_stream_reserve_duplex(struct snd_bebob *bebob, unsigned int rate)
 	if (rate == 0)
 		rate = curr_rate;
 	if (curr_rate != rate) {
-		amdtp_stream_stop(&bebob->tx_stream);
-		amdtp_stream_stop(&bebob->rx_stream);
-
+		amdtp_domain_stop(&bebob->domain);
 		break_both_connections(bebob);
 
 		cmp_connection_release(&bebob->out_conn);
@@ -621,9 +624,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob)
 	// packet queueing error or detecting discontinuity
 	if (amdtp_streaming_error(&bebob->rx_stream) ||
 	    amdtp_streaming_error(&bebob->tx_stream)) {
-		amdtp_stream_stop(&bebob->rx_stream);
-		amdtp_stream_stop(&bebob->tx_stream);
-
+		amdtp_domain_stop(&bebob->domain);
 		break_both_connections(bebob);
 	}
 
@@ -641,11 +642,16 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob)
 			return err;
 
 		err = start_stream(bebob, &bebob->rx_stream);
-		if (err < 0) {
-			dev_err(&bebob->unit->device,
-				"fail to run AMDTP master stream:%d\n", err);
+		if (err < 0)
 			goto error;
-		}
+
+		err = start_stream(bebob, &bebob->tx_stream);
+		if (err < 0)
+			goto error;
+
+		err = amdtp_domain_start(&bebob->domain);
+		if (err < 0)
+			goto error;
 
 		// NOTE:
 		// The firmware customized by M-Audio uses these commands to
@@ -661,21 +667,8 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob)
 		}
 
 		if (!amdtp_stream_wait_callback(&bebob->rx_stream,
-						CALLBACK_TIMEOUT)) {
-			err = -ETIMEDOUT;
-			goto error;
-		}
-	}
-
-	if (!amdtp_stream_running(&bebob->tx_stream)) {
-		err = start_stream(bebob, &bebob->tx_stream);
-		if (err < 0) {
-			dev_err(&bebob->unit->device,
-				"fail to run AMDTP slave stream:%d\n", err);
-			goto error;
-		}
-
-		if (!amdtp_stream_wait_callback(&bebob->tx_stream,
+						CALLBACK_TIMEOUT) ||
+		    !amdtp_stream_wait_callback(&bebob->tx_stream,
 						CALLBACK_TIMEOUT)) {
 			err = -ETIMEDOUT;
 			goto error;
@@ -684,8 +677,7 @@ int snd_bebob_stream_start_duplex(struct snd_bebob *bebob)
 
 	return 0;
 error:
-	amdtp_stream_stop(&bebob->tx_stream);
-	amdtp_stream_stop(&bebob->rx_stream);
+	amdtp_domain_stop(&bebob->domain);
 	break_both_connections(bebob);
 	return err;
 }
@@ -693,9 +685,7 @@ error:
 void snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
 {
 	if (bebob->substreams_counter == 0) {
-		amdtp_stream_stop(&bebob->rx_stream);
-		amdtp_stream_stop(&bebob->tx_stream);
-
+		amdtp_domain_stop(&bebob->domain);
 		break_both_connections(bebob);
 
 		cmp_connection_release(&bebob->out_conn);
@@ -709,6 +699,8 @@ void snd_bebob_stream_stop_duplex(struct snd_bebob *bebob)
  */
 void snd_bebob_stream_destroy_duplex(struct snd_bebob *bebob)
 {
+	amdtp_domain_destroy(&bebob->domain);
+
 	destroy_stream(bebob, &bebob->tx_stream);
 	destroy_stream(bebob, &bebob->rx_stream);
 }
