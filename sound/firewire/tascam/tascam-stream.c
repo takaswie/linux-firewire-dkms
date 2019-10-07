@@ -384,7 +384,8 @@ void snd_tscm_stream_destroy_duplex(struct snd_tscm *tscm)
 	destroy_stream(tscm, &tscm->tx_stream);
 }
 
-int snd_tscm_stream_reserve_duplex(struct snd_tscm *tscm, unsigned int rate)
+int snd_tscm_stream_reserve_duplex(struct snd_tscm *tscm, unsigned int rate,
+				   unsigned int frames_per_period)
 {
 	unsigned int curr_rate;
 	int err;
@@ -412,6 +413,14 @@ int snd_tscm_stream_reserve_duplex(struct snd_tscm *tscm, unsigned int rate)
 		err = keep_resources(tscm, rate, &tscm->rx_stream);
 		if (err < 0) {
 			fw_iso_resources_free(&tscm->tx_resources);
+			return err;
+		}
+
+		err = amdtp_domain_set_events_per_period(&tscm->domain,
+							frames_per_period);
+		if (err < 0) {
+			fw_iso_resources_free(&tscm->tx_resources);
+			fw_iso_resources_free(&tscm->rx_resources);
 			return err;
 		}
 	}
