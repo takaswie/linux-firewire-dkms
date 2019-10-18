@@ -395,7 +395,7 @@ static int capture_ack(struct snd_pcm_substream *substream)
 	struct snd_dice *dice = substream->private_data;
 	struct amdtp_stream *stream = &dice->tx_stream[substream->pcm->device];
 
-	return amdtp_stream_pcm_ack(stream);
+	return amdtp_domain_stream_pcm_ack(&dice->domain, stream);
 }
 
 static int playback_ack(struct snd_pcm_substream *substream)
@@ -403,7 +403,7 @@ static int playback_ack(struct snd_pcm_substream *substream)
 	struct snd_dice *dice = substream->private_data;
 	struct amdtp_stream *stream = &dice->rx_stream[substream->pcm->device];
 
-	return amdtp_stream_pcm_ack(stream);
+	return amdtp_domain_stream_pcm_ack(&dice->domain, stream);
 }
 
 int snd_dice_create_pcm(struct snd_dice *dice)
