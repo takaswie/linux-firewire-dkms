@@ -111,6 +111,8 @@ typedef unsigned int (*amdtp_stream_process_ctx_payloads_t)(
 						const struct pkt_desc *desc,
 						unsigned int packets,
 						struct snd_pcm_substream *pcm);
+
+struct amdtp_domain;
 struct amdtp_stream {
 	struct fw_unit *unit;
 	enum cip_flags flags;
@@ -183,6 +185,7 @@ struct amdtp_stream {
 	int channel;
 	int speed;
 	struct list_head list;
+	struct amdtp_domain *domain;
 };
 
 int amdtp_stream_init(struct amdtp_stream *s, struct fw_unit *unit,
