@@ -292,6 +292,10 @@ struct amdtp_domain {
 	struct amdtp_stream *irq_target;
 
 	struct {
+		unsigned int tx_start;
+	} processing_cycle;
+
+	struct {
 		struct seq_desc *descs;
 		unsigned int size;
 		unsigned int tail;
