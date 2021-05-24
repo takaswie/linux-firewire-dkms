@@ -20,13 +20,13 @@ export CONFIG_SND_FIREWIRE_MOTU=m
 export CONFIG_SND_FIREFACE=m
 
 all:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules
+	$(MAKE) W=1 -C $(KDIR) M=$(PWD) modules
 
 check: clean
-	$(MAKE) C=1 CF=-D__CHECK_ENDIAN__ -C $(KDIR) M=$(PWD) modules
+	$(MAKE) W=1 C=1 CF=-D__CHECK_ENDIAN__ -C $(KDIR) M=$(PWD) modules
 
 install:
-	$(MAKE) -C $(KDIR) M=$(PWD) modules_install
+	$(MAKE) W=1 -C $(KDIR) M=$(PWD) modules_install
 
 clean:
-	$(MAKE) -C $(KDIR) M=$(PWD) clean
+	$(MAKE) W=1 -C $(KDIR) M=$(PWD) clean
