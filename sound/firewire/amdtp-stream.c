@@ -614,7 +614,7 @@ static void update_pcm_pointers(struct amdtp_stream *s,
 		// buffer associated to PCM substream to process PCM frames in the buffer, instead
 		// of receiving notification of period elapsed by poll wait.
 		if (!pcm->runtime->no_period_wakeup) {
-			if (in_interrupt()) {
+			if (in_softirq()) {
 				// In software IRQ context for 1394 OHCI.
 				snd_pcm_period_elapsed(pcm);
 			} else {
@@ -1742,7 +1742,7 @@ unsigned long amdtp_domain_stream_pcm_pointer(struct amdtp_domain *d,
 	if (irq_target && amdtp_stream_running(irq_target)) {
 		// In software IRQ context, the call causes dead-lock to disable the tasklet
 		// synchronously.
-		if (!in_interrupt())
+		if (!in_softirq())
 			fw_iso_context_flush_completions(irq_target->context);
 	}
 
