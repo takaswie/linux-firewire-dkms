@@ -1051,7 +1051,7 @@ static void process_rx_packets(struct fw_iso_context *context, u32 tstamp, size_
 	const __be32 *ctx_header = header;
 	const unsigned int events_per_period = d->events_per_period;
 	unsigned int event_count = s->ctx_data.rx.event_count;
-	struct pkt_desc *desc = s->pkt_descs;
+	struct pkt_desc *desc = s->packet_descs_cursor;
 	unsigned int pkt_header_length;
 	unsigned int packets;
 	bool need_hw_irq;
@@ -1110,6 +1110,7 @@ static void process_rx_packets(struct fw_iso_context *context, u32 tstamp, size_
 	}
 
 	s->ctx_data.rx.event_count = event_count;
+	s->packet_descs_cursor = desc;
 }
 
 static void skip_rx_packets(struct fw_iso_context *context, u32 tstamp, size_t header_length,
@@ -1206,7 +1207,7 @@ static void process_tx_packets(struct fw_iso_context *context, u32 tstamp, size_
 {
 	struct amdtp_stream *s = private_data;
 	__be32 *ctx_header = header;
-	struct pkt_desc *desc = s->pkt_descs;
+	struct pkt_desc *desc = s->packet_descs_cursor;
 	unsigned int packet_count;
 	unsigned int desc_count;
 	int i;
@@ -1232,6 +1233,10 @@ static void process_tx_packets(struct fw_iso_context *context, u32 tstamp, size_
 
 		if (d->replay.enable)
 			cache_seq(s, desc, desc_count);
+
+		for (i = 0; i < desc_count; ++i)
+			desc = amdtp_stream_next_packet_desc(s, desc);
+		s->packet_descs_cursor = desc;
 	}
 
 	for (i = 0; i < packet_count; ++i) {
@@ -1668,7 +1673,7 @@ static int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed,
 		err = -ENOMEM;
 		goto err_context;
 	}
-	s->pkt_descs = descs;
+	s->packet_descs = descs;
 
 	INIT_LIST_HEAD(&s->packet_descs_list);
 	for (i = 0; i < s->queue_size; ++i) {
@@ -1676,6 +1681,7 @@ static int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed,
 		list_add_tail(&descs->link, &s->packet_descs_list);
 		++descs;
 	}
+	s->packet_descs_cursor = list_first_entry(&s->packet_descs_list, struct pkt_desc, link);
 
 	s->packet_index = 0;
 	do {
@@ -1714,8 +1720,8 @@ static int amdtp_stream_start(struct amdtp_stream *s, int channel, int speed,
 
 	return 0;
 err_pkt_descs:
-	kfree(s->pkt_descs);
-	s->pkt_descs = NULL;
+	kfree(s->packet_descs);
+	s->packet_descs = NULL;
 err_context:
 	if (s->direction == AMDTP_OUT_STREAM) {
 		kfree(s->ctx_data.rx.seq.descs);
@@ -1809,8 +1815,8 @@ static void amdtp_stream_stop(struct amdtp_stream *s)
 	fw_iso_context_destroy(s->context);
 	s->context = ERR_PTR(-1);
 	iso_packets_buffer_destroy(&s->buffer, s->unit);
-	kfree(s->pkt_descs);
-	s->pkt_descs = NULL;
+	kfree(s->packet_descs);
+	s->packet_descs = NULL;
 
 	if (s->direction == AMDTP_OUT_STREAM) {
 		kfree(s->ctx_data.rx.seq.descs);
