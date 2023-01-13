@@ -9,7 +9,7 @@
 #include <linux/completion.h>
 #include <linux/device.h>
 #include <linux/errno.h>
-#include <linux/firewire.h>
+#include "../../include/linux/firewire.h"
 #include <linux/firewire-constants.h>
 #include <linux/fs.h>
 #include <linux/init.h>

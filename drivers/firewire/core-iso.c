@@ -9,7 +9,7 @@
 
 #include <linux/dma-mapping.h>
 #include <linux/errno.h>
-#include <linux/firewire.h>
+#include "../../include/linux/firewire.h"
 #include <linux/firewire-constants.h>
 #include <linux/kernel.h>
 #include <linux/mm.h>

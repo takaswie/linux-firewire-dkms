@@ -11,7 +11,7 @@
 #include <linux/delay.h>
 #include <linux/device.h>
 #include <linux/dma-mapping.h>
-#include <linux/firewire.h>
+#include "../../include/linux/firewire.h"
 #include <linux/firewire-constants.h>
 #include <linux/init.h>
 #include <linux/interrupt.h>

@@ -12,8 +12,8 @@
 #include <linux/dma-mapping.h>
 #include <linux/err.h>
 #include <linux/errno.h>
-#include <linux/firewire.h>
-#include <linux/firewire-cdev.h>
+#include "../../include/linux/firewire.h"
+#include "../../include/uapi/linux/firewire-cdev.h"
 #include <linux/idr.h>
 #include <linux/irqflags.h>
 #include <linux/jiffies.h>

@@ -8,7 +8,7 @@
 #include <linux/crc-itu-t.h>
 #include <linux/device.h>
 #include <linux/errno.h>
-#include <linux/firewire.h>
+#include "../../include/linux/firewire.h"
 #include <linux/firewire-constants.h>
 #include <linux/jiffies.h>
 #include <linux/kernel.h>
