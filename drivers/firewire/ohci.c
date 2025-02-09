@@ -3724,11 +3724,12 @@ static int pci_probe(struct pci_dev *dev,
 		return -ENXIO;
 	}
 
-	ohci->registers = pcim_iomap_region(dev, 0, ohci_driver_name);
-	if (IS_ERR(ohci->registers)) {
+	err = pcim_iomap_regions(dev, 1 << 0, ohci_driver_name);
+	if (err) {
 		ohci_err(ohci, "request and map MMIO resource unavailable\n");
 		return -ENXIO;
 	}
+	ohci->registers = pcim_iomap_table(dev)[0];
 
 	for (i = 0; i < ARRAY_SIZE(ohci_quirks); i++)
 		if ((ohci_quirks[i].vendor == dev->vendor) &&
