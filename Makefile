@@ -6,7 +6,7 @@ obj-m += drivers/target/sbp/
 obj-m += sound/firewire/
 
 # The 'TOPLEVEL_HEADER_DIRECTORY' was provided into the sub-make process by the following part.
-NOSTDINC_FLAGS += -I$(TOPLEVEL_HEADER_DIRECTORY) -I$(TOPLEVEL_UAPI_HEADER_DIRECTORY)
+NOSTDINC_FLAGS += -I$(TOPLEVEL_HEADER_DIRECTORY) -I$(TOPLEVEL_UAPI_HEADER_DIRECTORY) -include include/backport.h
 
 #
 # The following part is not used by the top-level Makefile of kernel tree referred by the -C option.
