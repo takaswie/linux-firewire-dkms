@@ -69,3 +69,54 @@ License
 =======
 
 GNU General Public License version 2.0, derived from the license of Linux kernel.
+
+Easy instruction to work with DKMS
+==================================
+
+DKMS - Dynamic Kernel Module Support is easy for installing or updating external modules.
+`<https://github.com/dell/dkms>`_
+
+This instruction is for Debian/Ubuntu. You need to make your arrangement for the other Linux
+distribution you use, especially for module signing.
+
+These distributions provide the ``dkms`` package in their official repository. Install it at first.
+
+::
+
+    $ sudo apt-get install dkms
+
+
+Then one of ``linux-headers`` packages is required to make the kernel modules for the running
+kernel. For example, if the running kernel is ``linux-generic``, it should be
+``linux-headers-generic``.
+
+::
+
+ $ sudo apt-get install linux-headers-generic
+
+When building and installing the kernel modules, execute the following commands.
+
+::
+
+    $ git clone `<https://github.com/takaswie/linux-firewire-dkms.git>`_
+    $ cd linux-firewire-dkms
+    $ sudo ln -s $(pwd) /usr/src/linux-firewire-6.17
+    $ sudo dkms install linux-firewire/6.17 --force
+
+The ``force`` option is required to replace the kernel modules existing in the system. After the
+installation, for the affinity to package manager, it is preferable to add the following file
+including the content equivalent to the ``force`` option.
+
+::
+
+    $ sudo mkdir -p /usr/share/dkms/modules_to_force_install
+    $ echo linux-firewire_version-override | sudo tee /usr/share/dkms/modules_to_force_install/linux-firewire.conf
+
+When uninstalling and remove the kernel modules, execute the following commands.
+
+::
+
+    $ sudo dkms remove linux-firewire/6.17 --all
+    $ sudo rm /usr/share/dkms/modules_to_force_install/linux-firewire.conf
+    $ sudo rm /usr/src/linux-firewire-6.17
+    $ rm -r snd-firewire-improve
