@@ -9,6 +9,7 @@
 #include <linux/firewire.h>
 #include <linux/firewire-constants.h>
 #include <linux/module.h>
+#include <linux/mod_devicetable.h>
 #include <linux/mutex.h>
 #include <linux/slab.h>
 #include <linux/compat.h>
