@@ -777,8 +777,8 @@ static void handle_request(struct fw_card *card, struct fw_request *request,
 	if (is_fcp)
 		fw_request_get(request);
 
-	r = kmalloc_obj(*r, GFP_ATOMIC);
-	e = kmalloc_obj(*e, GFP_ATOMIC);
+	r = kmalloc_obj(*r);
+	e = kmalloc_obj(*e);
 	if (r == NULL || e == NULL)
 		goto failed;
 
@@ -789,7 +789,7 @@ static void handle_request(struct fw_card *card, struct fw_request *request,
 	r->length  = length;
 
 	r->resource.release = release_request;
-	ret = add_client_resource(handler->client, &r->resource, GFP_ATOMIC);
+	ret = add_client_resource(handler->client, &r->resource, GFP_KERNEL);
 	if (ret < 0)
 		goto failed;
 
