@@ -539,7 +539,8 @@ static int ioctl_get_info(struct client *client, union ioctl_arg *arg)
 	return 0;
 }
 
-static int add_client_resource(struct client *client, struct client_resource *resource)
+static int add_client_resource(struct client *client, struct client_resource *resource,
+			       client_resource_release_fn_t release)
 {
 	scoped_guard(spinlock_irqsave, &client->lock) {
 		u32 index;
@@ -553,6 +554,7 @@ static int add_client_resource(struct client *client, struct client_resource *re
 			return ret;
 
 		resource->handle = index;
+		resource->release = release;
 		client_get(client);
 	}
 
@@ -697,8 +699,7 @@ static int init_request(struct client *client,
 		goto failed;
 	}
 
-	e->r.resource.release = release_transaction;
-	ret = add_client_resource(client, &e->r.resource);
+	ret = add_client_resource(client, &e->r.resource, release_transaction);
 	if (ret < 0)
 		goto failed;
 
@@ -781,8 +782,7 @@ static void handle_request(struct fw_card *card, struct fw_request *request,
 	r->data    = payload;
 	r->length  = length;
 
-	r->resource.release = release_request;
-	ret = add_client_resource(handler->client, &r->resource);
+	ret = add_client_resource(handler->client, &r->resource, release_request);
 	if (ret < 0)
 		goto failed;
 
@@ -885,8 +885,7 @@ static int ioctl_allocate(struct client *client, union ioctl_arg *arg)
 	}
 	a->offset = r->handler.offset;
 
-	r->resource.release = release_address_handler;
-	ret = add_client_resource(client, &r->resource);
+	ret = add_client_resource(client, &r->resource, release_address_handler);
 	if (ret < 0) {
 		release_address_handler(client, &r->resource);
 		return ret;
@@ -985,8 +984,7 @@ static int ioctl_add_descriptor(struct client *client, union ioctl_arg *arg)
 	if (ret < 0)
 		goto failed;
 
-	r->resource.release = release_descriptor;
-	ret = add_client_resource(client, &r->resource);
+	ret = add_client_resource(client, &r->resource, release_descriptor);
 	if (ret < 0) {
 		fw_core_remove_descriptor(&r->descriptor);
 		goto failed;
@@ -1471,8 +1469,7 @@ static int ioctl_allocate_iso_resource(struct client *client, union ioctl_arg *a
 	e2->iso_resource.closure = request->closure;
 	e2->iso_resource.type = FW_CDEV_EVENT_ISO_RESOURCE_DEALLOCATED;
 
-	r->resource.release = release_iso_resource_auto;
-	err = add_client_resource(client, &r->resource);
+	err = add_client_resource(client, &r->resource, release_iso_resource_auto);
 	if (err < 0)
 		return err;
 	request->handle = r->resource.handle;
